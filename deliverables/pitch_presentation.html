@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risk as Alpha</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #0a0a0a;
+    color: #e8e8e8;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  .slide {
+    display: none;
+    width: 100vw;
+    height: 100vh;
+    padding: 50px 70px;
+    position: relative;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .slide.active { display: flex; }
+
+  .slide-number {
+    position: absolute;
+    bottom: 24px;
+    right: 36px;
+    font-size: 13px;
+    color: #444;
+    font-weight: 300;
+  }
+
+  h1 { font-size: 52px; font-weight: 700; line-height: 1.1; color: #fff; margin-bottom: 12px; }
+  h2 { font-size: 34px; font-weight: 600; line-height: 1.2; margin-bottom: 28px; color: #fff; }
+  h3 { font-size: 21px; font-weight: 600; margin-bottom: 14px; color: #c0c0c0; }
+
+  p, li { font-size: 19px; line-height: 1.55; color: #ccc; }
+
+  .subtitle { font-size: 21px; color: #777; font-weight: 300; margin-bottom: 44px; }
+
+  /* Thesis box */
+  .thesis-box {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border-left: 4px solid #4a9eff;
+    padding: 24px 28px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 21px;
+    line-height: 1.55;
+    color: #e0e0e0;
+  }
+
+  .key-points { list-style: none; margin: 18px 0; }
+  .key-points li {
+    padding: 8px 0 8px 26px;
+    position: relative;
+    font-size: 19px;
+    color: #ccc;
+  }
+  .key-points li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 16px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: #4a9eff;
+  }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a9eff;
+    border-bottom: 2px solid #333;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  td {
+    padding: 12px 14px;
+    font-size: 18px;
+    color: #ccc;
+    border-bottom: 1px solid #1e1e1e;
+    vertical-align: top;
+    line-height: 1.45;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr.priority td { color: #e8e8e8; font-weight: 500; }
+  tr.priority td:first-child { color: #4a9eff; }
+
+  .tag {
+    display: inline-block;
+    background: #1a3a5c;
+    color: #4a9eff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .bottom-line {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: #111;
+    border-radius: 6px;
+    font-size: 18px;
+    color: #aaa;
+    font-style: italic;
+    border-left: 3px solid #4a9eff;
+    line-height: 1.5;
+  }
+
+  /* Stat callouts */
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    margin: 24px 0;
+  }
+  .stat-card {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 1px solid #2a3a5a;
+    border-radius: 10px;
+    padding: 28px 24px;
+    text-align: center;
+  }
+  .stat-number {
+    font-size: 48px;
+    font-weight: 800;
+    color: #4a9eff;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .stat-label {
+    font-size: 15px;
+    color: #999;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+  .stat-source {
+    font-size: 12px;
+    color: #555;
+    margin-top: 6px;
+  }
+
+  /* Data edge comparison */
+  .edge-compare {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    gap: 0;
+    margin: 20px 0;
+    align-items: center;
+  }
+  .edge-box {
+    padding: 28px 24px;
+    border-radius: 10px;
+  }
+  .edge-old {
+    background: #1a1a1a;
+    border: 1px solid #333;
+  }
+  .edge-new {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 1px solid #2a4a7a;
+  }
+  .edge-arrow {
+    text-align: center;
+    font-size: 28px;
+    color: #4a9eff;
+  }
+  .edge-box h3 { font-size: 18px; margin-bottom: 16px; }
+  .edge-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    font-size: 17px;
+    color: #999;
+  }
+  .edge-new .edge-item { color: #ccc; }
+  .edge-icon {
+    width: 22px;
+    margin-right: 10px;
+    font-size: 16px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .edge-old .edge-icon { color: #ff6b6b; }
+  .edge-new .edge-icon { color: #51cf66; }
+
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 20px 0;
+  }
+  .pipe-node {
+    background: #151520;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 18px 20px;
+    text-align: center;
+    min-width: 160px;
+  }
+  .pipe-node.highlight {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border-color: #2a4a7a;
+  }
+  .pipe-node-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a9eff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .pipe-node-detail {
+    font-size: 14px;
+    color: #999;
+    line-height: 1.4;
+  }
+  .pipe-arrow {
+    font-size: 22px;
+    color: #333;
+    padding: 0 8px;
+    flex-shrink: 0;
+  }
+
+  /* Dual value banner */
+  .dual-banner {
+    background: linear-gradient(135deg, #1a2e1a, #1a3320);
+    border: 1px solid #2a5a3a;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .dual-col h3 {
+    font-size: 16px;
+    color: #51cf66;
+    margin-bottom: 8px;
+  }
+  .dual-col p {
+    font-size: 16px;
+    color: #aaa;
+    line-height: 1.5;
+  }
+
+  /* Two columns */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin: 16px 0;
+  }
+  .col { padding: 22px; border-radius: 8px; }
+  .col-a { background: #1a1a1a; border: 1px solid #333; }
+  .col-b { background: linear-gradient(135deg, #1a1a2e, #16213e); border: 1px solid #2a4a7a; }
+  .col h3 { margin-bottom: 12px; font-size: 19px; }
+  .col ul { list-style: none; padding: 0; }
+  .col ul li {
+    font-size: 17px;
+    padding: 5px 0 5px 18px;
+    position: relative;
+    color: #bbb;
+    line-height: 1.45;
+  }
+  .col ul li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 12px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .col-a ul li::before { background: #555; }
+  .col-b ul li::before { background: #4a9eff; }
+
+  .contrast-line {
+    margin-top: 16px;
+    padding: 14px 18px;
+    background: #1c1c1c;
+    border-radius: 6px;
+    font-size: 17px;
+    color: #aaa;
+    line-height: 1.55;
+  }
+
+  /* Request box */
+  .request-box {
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 22px;
+    margin: 10px 0;
+  }
+  .request-box h3 { color: #4a9eff; font-size: 17px; }
+  .request-box ul { list-style: none; padding: 0; }
+  .request-box ul li {
+    font-size: 17px;
+    padding: 4px 0 4px 20px;
+    position: relative;
+    color: #bbb;
+  }
+  .request-box ul li::before {
+    content: '\2713';
+    position: absolute;
+    left: 0;
+    color: #4a9eff;
+    font-size: 14px;
+  }
+
+  .sensitivity-block { margin-top: 14px; }
+  .sensitivity-block p {
+    font-size: 16px;
+    color: #888;
+    margin: 5px 0;
+    padding-left: 14px;
+    border-left: 2px solid #333;
+    line-height: 1.5;
+  }
+
+  /* Timeline */
+  .timeline-table td:first-child {
+    font-weight: 600;
+    color: #888;
+    white-space: nowrap;
+    width: 90px;
+  }
+  .timeline-table tr.checkpoint td {
+    background: #1a1a2e;
+    color: #4a9eff;
+    font-weight: 600;
+  }
+
+  /* Ask grid */
+  .ask-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 14px 0;
+  }
+  .ask-box {
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 22px;
+  }
+  .ask-box h3 { font-size: 17px; margin-bottom: 10px; }
+  .ask-box ul { list-style: none; padding: 0; }
+  .ask-box ul li { font-size: 16px; padding: 4px 0; color: #bbb; line-height: 1.45; }
+
+  .wont-be {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+  .wont-item {
+    text-align: center;
+    padding: 14px;
+    background: #111;
+    border-radius: 8px;
+    border: 1px solid #222;
+  }
+  .wont-item .label { font-size: 14px; color: #666; font-weight: 500; margin-bottom: 4px; }
+  .wont-item .detail { font-size: 14px; color: #bbb; }
+
+  .paper-ref { font-size: 13px; color: #555; }
+  .nav-hint { position: fixed; bottom: 24px; left: 36px; font-size: 12px; color: #2a2a2a; }
+
+  /* Title slide */
+  .title-slide { justify-content: center; align-items: center; text-align: center; }
+  .title-slide h1 { font-size: 56px; margin-bottom: 6px; }
+  .title-slide .subtitle { font-size: 20px; margin-bottom: 44px; }
+  .title-meta { font-size: 17px; color: #555; font-weight: 300; }
+  .title-meta span { margin: 0 14px; }
+
+  /* Backup slide marker */
+  .backup-marker {
+    position: absolute;
+    top: 24px;
+    right: 36px;
+    font-size: 12px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: #1a1a1a;
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: Title -->
+<div class="slide title-slide active" id="slide1">
+  <h1>Risk as Alpha</h1>
+  <p class="subtitle">ML Signal Discovery from Risk-System Outputs</p>
+  <div class="title-meta">
+    <span>Ryan Vincent</span>
+    <span>&middot;</span>
+    <span>XA Strats</span>
+    <span>&middot;</span>
+    <span>April 30, 2026</span>
+  </div>
+  <div class="slide-number">1 / 11</div>
+</div>
+
+<!-- SLIDE 2: The Thesis -->
+<div class="slide" id="slide2">
+  <h2>The risk system already contains predictive signals<br>that theory says should exist.</h2>
+  <div class="thesis-box">
+    Intermediary asset pricing theory proves that dealer balance-sheet constraints price risk across asset classes. The risk system measures these constraints daily. I want to test whether those outputs predict returns, volatility, and drawdowns.
+  </div>
+  <ul class="key-points">
+    <li>Every external test of this theory uses stale quarterly Fed Z.1 data with a 3-month publication lag and wrong dealer sign</li>
+    <li>SecDB produces the real measurement daily, cross-asset, with correct dealer sign</li>
+    <li>This is a hypothesis test, not a fishing expedition: every feature has a pre-registered theoretical prediction before any model is trained</li>
+  </ul>
+  <div class="slide-number">2 / 11</div>
+</div>
+
+<!-- SLIDE 3: Theory with data points -->
+<div class="slide" id="slide3">
+  <h2>The theory is settled. The data has been the bottleneck.</h2>
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-number">77%</div>
+      <div class="stat-label">of cross-sectional returns explained by a single intermediary-leverage factor</div>
+      <div class="stat-source">Adrian, Etula &amp; Muir (2014) &ndash; J. Finance</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">6</div>
+      <div class="stat-label">asset classes priced by a single kernel: equities, options, CDS, bonds, FX, commodities</div>
+      <div class="stat-source">He, Kelly &amp; Manela (2017) &ndash; JFE</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">Daily</div>
+      <div class="stat-label">frequency of SecDB risk outputs vs. quarterly Fed Z.1 data used in every published test</div>
+      <div class="stat-source">The data edge</div>
+    </div>
+  </div>
+  <div class="bottom-line">
+    He &amp; Krishnamurthy (2013, AER) proved mathematically that risk premia rise nonlinearly when dealer constraints bind. Adrian-Shin (2010) showed dealer repos forecast VIX innovations. Every paper used crude public proxies. The theory works with bad data. The question is whether it works better with the real thing.
+  </div>
+  <div class="slide-number">3 / 11</div>
+</div>
+
+<!-- SLIDE 4: Data Edge -->
+<div class="slide" id="slide4">
+  <h2>The data edge</h2>
+  <div class="edge-compare">
+    <div class="edge-box edge-old">
+      <h3 style="color: #ff6b6b;">What external researchers use</h3>
+      <div class="edge-item"><span class="edge-icon">&times;</span> Quarterly frequency (Fed Z.1 Flow of Funds)</div>
+      <div class="edge-item"><span class="edge-icon">&times;</span> 3-month publication lag</div>
+      <div class="edge-item"><span class="edge-icon">&times;</span> Aggregated across entire banking sector</div>
+      <div class="edge-item"><span class="edge-icon">&times;</span> No dealer sign (long vs. short unknown)</div>
+      <div class="edge-item"><span class="edge-icon">&times;</span> No VaR limits, no utilization data</div>
+      <div class="edge-item"><span class="edge-icon">&times;</span> No scenario P&amp;L or factor decomposition</div>
+    </div>
+    <div class="edge-arrow">&rarr;</div>
+    <div class="edge-box edge-new">
+      <h3 style="color: #51cf66;">What SecDB provides</h3>
+      <div class="edge-item"><span class="edge-icon">&check;</span> Daily frequency (nightly risk run)</div>
+      <div class="edge-item"><span class="edge-icon">&check;</span> Available next morning, no lag</div>
+      <div class="edge-item"><span class="edge-icon">&check;</span> Desk-level and firm-level granularity</div>
+      <div class="edge-item"><span class="edge-icon">&check;</span> Correct dealer sign on every position</div>
+      <div class="edge-item"><span class="edge-icon">&check;</span> VaR utilization (usage vs. limit)</div>
+      <div class="edge-item"><span class="edge-icon">&check;</span> Factor-VaR decomposition, scenario P&amp;L</div>
+    </div>
+  </div>
+  <div class="bottom-line">
+    The theory was proved with quarterly proxies. Daily, correctly-signed, desk-level data is a step change in data quality, not an incremental improvement.
+  </div>
+  <div class="slide-number">4 / 11</div>
+</div>
+
+<!-- SLIDE 5: Features (simplified) -->
+<div class="slide" id="slide5">
+  <h2>Five feature families from the risk system</h2>
+  <table>
+    <thead>
+      <tr><th>Feature Family</th><th>What It Measures</th><th>Theoretical Mechanism</th></tr>
+    </thead>
+    <tbody>
+      <tr class="priority">
+        <td>VaR Utilization <span class="tag">Priority</span></td>
+        <td>Balance-sheet constraint level</td>
+        <td>Forced selling when utilization hits the limit (Coval-Stafford 2007)</td>
+      </tr>
+      <tr class="priority">
+        <td>Factor Concentration <span class="tag">Priority</span></td>
+        <td>Crowding in risk exposures</td>
+        <td>Concentrated risk predicts correlated drawdowns (He-Kelly-Manela 2017)</td>
+      </tr>
+      <tr>
+        <td>VaR Dynamics</td>
+        <td>Risk appetite direction</td>
+        <td>Change in dealer risk forecasts VIX innovations (Adrian-Shin 2010)</td>
+      </tr>
+      <tr>
+        <td>Scenario P&amp;L</td>
+        <td>Tail exposure asymmetry</td>
+        <td>Worst-case scenario shift signals regime change in risk exposure</td>
+      </tr>
+      <tr>
+        <td>Cross-Asset Flow</td>
+        <td>Capital rotation</td>
+        <td>Component VaR migration = balance-sheet reallocation</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="bottom-line">
+    These aren't proxies. VaR utilization literally <em>is</em> the constraint the theory says drives prices. Each feature is tested independently before combining, to isolate what's actually working.
+  </div>
+  <div class="slide-number">5 / 11</div>
+</div>
+
+<!-- SLIDE 6: Outputs + Dual Value + Pipeline -->
+<div class="slide" id="slide6">
+  <h2>What it predicts, how it's traded</h2>
+
+  <div class="dual-banner">
+    <div class="dual-col">
+      <h3>As alpha</h3>
+      <p>Trade directly through VIX futures, variance swaps, asset-class futures, and options</p>
+    </div>
+    <div class="dual-col">
+      <h3>As risk management</h3>
+      <p>Time hedges and size exposures on positions the desk already holds. See the stress event coming 2-3 days earlier.</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Prediction Target</th><th>Why This Target</th><th>How It's Traded</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="color:#e0e0e0;font-weight:500;">VIX Innovations</td>
+        <td>Most replicated result: dealer repos forecast this (Adrian-Shin 2010)</td>
+        <td>VIX futures, variance swaps, time hedges before vol spikes</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;font-weight:500;">Drawdowns in Most-Concentrated Asset Class</td>
+        <td>Tests the Coval-Stafford fire-sale mechanism</td>
+        <td>Reduce exposure or go short ahead of forced selling</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;font-weight:500;">Cross-Asset Momentum Reversals</td>
+        <td>Constraints bind, crowded trades unwind (He-Kelly-Manela)</td>
+        <td>Fade crowded momentum at the right time</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;font-weight:500;">Realized Volatility</td>
+        <td>Lowest bar, highest signal-to-noise</td>
+        <td>Trade the spread when predicted RV diverges from implied</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="slide-number">6 / 11</div>
+</div>
+
+<!-- SLIDE 7: Pipeline -->
+<div class="slide" id="slide7">
+  <h2>End-to-end pipeline</h2>
+  <div class="pipeline">
+    <div class="pipe-node">
+      <div class="pipe-node-title">Risk System</div>
+      <div class="pipe-node-detail">Nightly VaR, factor decomposition, scenario P&amp;L, utilization</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-node">
+      <div class="pipe-node-title">Feature Engineering</div>
+      <div class="pipe-node-detail">5 families: utilization, concentration, dynamics, scenario, flow</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-node highlight">
+      <div class="pipe-node-title">Models</div>
+      <div class="pipe-node-detail">Ridge baseline + LightGBM on identical features</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-node">
+      <div class="pipe-node-title">Predictions</div>
+      <div class="pipe-node-detail">Continuous scores for VIX, drawdowns, reversals, vol</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-node">
+      <div class="pipe-node-title">Evaluation</div>
+      <div class="pipe-node-detail">IC, Sharpe, turnover, cost analysis, SHAP</div>
+    </div>
+  </div>
+
+  <div style="margin-top:24px;">
+    <h3 style="color:#4a9eff;font-size:17px;margin-bottom:14px;">Point-in-time discipline at every stage</h3>
+    <div class="stats-row" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+      <div style="text-align:center;padding:14px;background:#111;border-radius:8px;border:1px solid #222;">
+        <div style="font-size:15px;color:#ccc;font-weight:500;">Features</div>
+        <div style="font-size:13px;color:#888;margin-top:4px;">Stamped with when data was <em>known</em>, not when it applied</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:#111;border-radius:8px;border:1px solid #222;">
+        <div style="font-size:15px;color:#ccc;font-weight:500;">Holdout</div>
+        <div style="font-size:13px;color:#888;margin-top:4px;">3-6 months reserved on day one, untouched until final test</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:#111;border-radius:8px;border:1px solid #222;">
+        <div style="font-size:15px;color:#ccc;font-weight:500;">Validation</div>
+        <div style="font-size:13px;color:#888;margin-top:4px;">Purged K-fold CV with embargo breaks temporal leakage</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:#111;border-radius:8px;border:1px solid #222;">
+        <div style="font-size:15px;color:#ccc;font-weight:500;">Costs</div>
+        <div style="font-size:13px;color:#888;margin-top:4px;">Transaction costs in every backtest from day one</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">7 / 11</div>
+</div>
+
+<!-- SLIDE 8: Two Paths -->
+<div class="slide" id="slide8">
+  <h2>Two paths, one project</h2>
+  <div class="two-col">
+    <div class="col col-a">
+      <h3 style="color:#999;">Path A &ndash; I calculate risk metrics myself</h3>
+      <ul>
+        <li>Build historical VaR from position data and market returns</li>
+        <li>Compute my own component VaR, factor exposures, concentration</li>
+        <li>Doable. I'm prepared to do it.</li>
+        <li>3-4 weeks building a crude approximation of what the risk system already does</li>
+        <li>My VaR won't match the desk's VaR</li>
+        <li>Can't compute real utilization without knowing the limits</li>
+      </ul>
+    </div>
+    <div class="col col-b">
+      <h3 style="color:#4a9eff;">Path B &ndash; Read access to risk cube outputs</h3>
+      <ul>
+        <li>The risk system already computes everything I need every night</li>
+        <li>Reading outputs only, not writing, not touching production</li>
+        <li>Zero engineering cost to the desk</li>
+        <li>This is the version that tests the theory with the real measurement</li>
+        <li>This is the version that can't be done anywhere else</li>
+      </ul>
+    </div>
+  </div>
+  <div class="contrast-line">
+    Path A means testing the theory with a self-built proxy, which is essentially what external researchers already do with Fed Z.1 data. The entire reason to do this project here is to use the real thing.
+  </div>
+  <div class="slide-number">8 / 11</div>
+</div>
+
+<!-- SLIDE 9: The Ask -->
+<div class="slide" id="slide9">
+  <h2>What I'm asking for</h2>
+  <div class="request-box">
+    <h3>Data request (bounded and specific)</h3>
+    <ul>
+      <li>Daily firm-level or desk-level VaR with component breakdown by asset class</li>
+      <li>At least one of: scenario P&amp;L, factor-VaR decomposition, or VaR utilization</li>
+      <li>Historical depth: as far back as available (5 years ideal, 2-3 workable)</li>
+      <li>Frequency: daily, end-of-day, after the nightly risk run</li>
+      <li>No write access. No production changes. No real-time feeds.</li>
+    </ul>
+  </div>
+  <div class="sensitivity-block">
+    <p><strong style="color:#ccc;">I understand this data is sensitive.</strong></p>
+    <p>I don't need positions, trades, or P&amp;L. VaR is already an aggregated output that reveals nothing about individual strategies.</p>
+    <p>I can work at whatever level of aggregation you're comfortable with.</p>
+    <p>Raw numbers never appear in any deliverable. Outputs are statistical properties (IC, Sharpe, SHAP rankings), not dollar amounts.</p>
+  </div>
+  <div class="bottom-line">
+    VaR utilization (usage vs. limit) is the single highest-value feature. It's the direct measurement of the constraint the theory says drives everything. If access isn't workable, I'll build my own metrics and test the same hypothesis. If the self-calculated version shows something, that's a reason to revisit.
+  </div>
+  <div class="slide-number">9 / 11</div>
+</div>
+
+<!-- SLIDE 10: Rigor -->
+<div class="slide" id="slide10">
+  <h2>How I make sure the results are real</h2>
+  <table>
+    <thead>
+      <tr><th>What Kills Projects</th><th>How This Project Handles It</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="color:#e0e0e0;font-weight:500;">Data snooping</td>
+        <td>Every experiment logged. Deflated Sharpe Ratio (Bailey &amp; Lopez de Prado 2014) adjusts for total number of things tried.</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;font-weight:500;">Overfitting</td>
+        <td>Ridge regression baseline on every test. If the ML doesn't beat a linear model on the same features, it added nothing.</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;font-weight:500;">Lookahead bias</td>
+        <td>Point-in-time stamping on every feature. Holdout reserved on day one, untouched until the final test.</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;font-weight:500;">"Can you trade it?"</td>
+        <td>Transaction costs in every backtest from the start. Sharpe reported gross and net. Breakeven cost calculated.</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;font-weight:500;">Unstable features</td>
+        <td>Feature importance checked across all CV folds. If a feature flips sign between folds, it gets flagged and dropped.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="bottom-line">
+    Validation infrastructure is ~25% of total project time. Built before touching any signals. ~45 independent trials exhaust a Sharpe of 1.0 on 5 years of data (Bailey-Borwein-LdP 2014). Every trial is counted.
+  </div>
+  <div class="slide-number">10 / 11</div>
+</div>
+
+<!-- SLIDE 11: Timeline + What I Need -->
+<div class="slide" id="slide11">
+  <h2>20-week plan</h2>
+  <table class="timeline-table">
+    <thead><tr><th>Weeks</th><th>Phase</th><th>What You Get</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1 - 2</td>
+        <td style="color:#e0e0e0;">Pitch &amp; Data Access</td>
+        <td>This meeting. Data audit. Aligned on direction.</td>
+      </tr>
+      <tr>
+        <td>3 - 5</td>
+        <td style="color:#e0e0e0;">Validation Infrastructure</td>
+        <td>Backtesting engine, validation stack, smoke-tested on synthetic data</td>
+      </tr>
+      <tr>
+        <td>6 - 12</td>
+        <td style="color:#e0e0e0;">Signal Testing</td>
+        <td>Each feature family tested independently, ridge vs. LightGBM, SHAP analysis</td>
+      </tr>
+      <tr class="checkpoint">
+        <td>13</td>
+        <td>Checkpoint</td>
+        <td>Memo with results. Data-driven evaluation. We meet to review.</td>
+      </tr>
+      <tr>
+        <td>14 - 20</td>
+        <td style="color:#e0e0e0;">Deepen &amp; Deliver</td>
+        <td>Regime analysis, cross-asset panel, capacity analysis, final report</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="ask-grid" style="margin-top:20px;">
+    <div class="ask-box">
+      <h3 style="color:#4a9eff;">What I need from you</h3>
+      <ul>
+        <li>Your ideas -- happy to fold them into this framework</li>
+        <li>Data access or guidance on what's available</li>
+        <li>30-minute check-in every 2-3 weeks</li>
+        <li>Week 13 checkpoint meeting on the calendar</li>
+      </ul>
+    </div>
+    <div class="ask-box">
+      <h3 style="color:#4a9eff;">What you get back</h3>
+      <ul>
+        <li><strong>Week 13:</strong> Memo documenting what worked, what didn't, and why</li>
+        <li><strong>Week 20:</strong> Research report, every claim backed by a chart, ridge baseline on all results, transaction-cost analysis</li>
+      </ul>
+    </div>
+  </div>
+  <div class="wont-be">
+    <div class="wont-item">
+      <div class="label">Not a black box</div>
+      <div class="detail">Every prediction explained with SHAP</div>
+    </div>
+    <div class="wont-item">
+      <div class="label">Not a fishing expedition</div>
+      <div class="detail">Every feature has a hypothesis before any model runs</div>
+    </div>
+    <div class="wont-item">
+      <div class="label">Not an overfit backtest</div>
+      <div class="detail">Deflated Sharpe on every reported number</div>
+    </div>
+  </div>
+  <div class="slide-number">11 / 11</div>
+</div>
+
+<!-- BACKUP SLIDES (navigate past slide 11) -->
+
+<!-- BACKUP 1: Detailed Feature Engineering -->
+<div class="slide" id="slide12">
+  <div class="backup-marker">Backup Slide</div>
+  <h2>Feature engineering detail</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Raw Input</th><th>Transformations</th></tr></thead>
+    <tbody>
+      <tr>
+        <td style="color:#4a9eff;font-weight:500;">VaR Utilization</td>
+        <td>VaR usage, VaR limit</td>
+        <td>Usage/limit %, rate of change, z-score over 21-day rolling window</td>
+      </tr>
+      <tr>
+        <td style="color:#4a9eff;font-weight:500;">Factor Concentration</td>
+        <td>Factor-VaR by factor</td>
+        <td>Herfindahl index (sum of squared shares), top-3 factor share, max factor share</td>
+      </tr>
+      <tr>
+        <td style="color:#4a9eff;font-weight:500;">VaR Dynamics</td>
+        <td>Firm-level VaR, component VaR</td>
+        <td>Delta VaR (day-over-day), 5d/21d momentum, rate of change</td>
+      </tr>
+      <tr>
+        <td style="color:#4a9eff;font-weight:500;">Scenario P&amp;L</td>
+        <td>Stress scenario results</td>
+        <td>P&amp;L rank, dispersion (std across scenarios), worst-case identity, skewness</td>
+      </tr>
+      <tr>
+        <td style="color:#4a9eff;font-weight:500;">Cross-Asset Flow</td>
+        <td>Component VaR by asset class</td>
+        <td>Share shifts (5d change in rates_share, equities_share), rolling cross-asset correlation</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="bottom-line">
+    ~15-25 total features. Each theory-motivated, not data-mined. Point-in-time stamped: VaR for date T is known at T+1 morning after the nightly risk run. Features use knowledge date, not application date.
+  </div>
+  <div class="slide-number">Backup 1</div>
+</div>
+
+<!-- BACKUP 2: Validation Stack Detail -->
+<div class="slide" id="slide13">
+  <div class="backup-marker">Backup Slide</div>
+  <h2>Validation stack detail</h2>
+  <div class="pipeline" style="margin-bottom:24px;">
+    <div class="pipe-node">
+      <div class="pipe-node-title">Purged K-Fold CV</div>
+      <div class="pipe-node-detail">Remove training samples that overlap with test period + embargo buffer</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-node">
+      <div class="pipe-node-title">CPCV</div>
+      <div class="pipe-node-detail">Produce a distribution of Sharpes from a single history, not just one number</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-node highlight">
+      <div class="pipe-node-title">Deflated Sharpe</div>
+      <div class="pipe-node-detail">Adjust Sharpe for number of trials, non-normality, sample length</div>
+    </div>
+    <div class="pipe-arrow">&rarr;</div>
+    <div class="pipe-node">
+      <div class="pipe-node-title">Haircut Sharpe</div>
+      <div class="pipe-node-detail">Harvey-Liu multiple-testing correction (Bonferroni / BHY-FDR)</div>
+    </div>
+  </div>
+  <div class="stats-row" style="grid-template-columns:1fr 1fr;">
+    <div class="stat-card">
+      <div class="stat-number" style="font-size:36px;">~45</div>
+      <div class="stat-label">independent trials exhaust a Sharpe of 1.0 on 5 years of daily data</div>
+      <div class="stat-source">Bailey, Borwein &amp; Lopez de Prado (2014)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" style="font-size:36px;">t &gt; 3</div>
+      <div class="stat-label">the hurdle for a new factor, given 316+ already tested in the literature</div>
+      <div class="stat-source">Harvey, Liu &amp; Zhu (2016) &ndash; RFS</div>
+    </div>
+  </div>
+  <div class="bottom-line">
+    Ridge regression on identical features is the mandatory baseline. If LightGBM doesn't beat ridge, the ML added nothing. SHAP + MDA across folds checks feature stability. Every experiment logged for honest DSR trial counting.
+  </div>
+  <div class="slide-number">Backup 2</div>
+</div>
+
+<!-- BACKUP 3: Key References -->
+<div class="slide" id="slide14">
+  <div class="backup-marker">Backup Slide</div>
+  <h2>Key references</h2>
+  <table>
+    <thead><tr><th>Paper</th><th>Key Finding</th><th>Role in This Project</th></tr></thead>
+    <tbody>
+      <tr>
+        <td style="color:#e0e0e0;">He &amp; Krishnamurthy (2013)</td>
+        <td>Risk premia rise nonlinearly at constraint boundaries</td>
+        <td>Theoretical foundation</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;">Adrian, Etula &amp; Muir (2014)</td>
+        <td>Single-factor SDF, R&sup2; = 77% on 41 portfolios</td>
+        <td>Proves single factor works empirically</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;">He, Kelly &amp; Manela (2017)</td>
+        <td>Single kernel across 6 asset classes</td>
+        <td>Justifies cross-asset approach</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;">Adrian &amp; Shin (2010)</td>
+        <td>Dealer repos forecast VIX innovations</td>
+        <td>Direct precedent for VIX target</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;">Coval &amp; Stafford (2007)</td>
+        <td>Forced selling predicts 5-day reversals</td>
+        <td>Mechanism for utilization signal</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;">Gu, Kelly &amp; Xiu (2020)</td>
+        <td>Trees/NNs beat linear on 60yr equity panel</td>
+        <td>Justifies LightGBM as method</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;">Kozak, Nagel &amp; Santosh (2020)</td>
+        <td>Ridge on PCs matches nonlinear ML</td>
+        <td>Justifies mandatory ridge baseline</td>
+      </tr>
+      <tr>
+        <td style="color:#e0e0e0;">Bailey &amp; Lopez de Prado (2014)</td>
+        <td>Deflated Sharpe Ratio</td>
+        <td>Applied to every reported number</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="slide-number">Backup 3</div>
+</div>
+
+<div class="nav-hint">Arrow keys or click to navigate</div>
+
+<script>
+  let current = 1;
+  const total = 14;
+  const mainSlides = 11;
+
+  function showSlide(n) {
+    document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+    document.getElementById('slide' + n).classList.add('active');
+    current = n;
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault();
+      if (current < total) showSlide(current + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (current > 1) showSlide(current - 1);
+    } else if (e.key === 'Home') {
+      showSlide(1);
+    } else if (e.key === 'End') {
+      showSlide(total);
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.clientX > window.innerWidth / 2) {
+      if (current < total) showSlide(current + 1);
+    } else {
+      if (current > 1) showSlide(current - 1);
+    }
+  });
+</script>
+</body>
+</html>

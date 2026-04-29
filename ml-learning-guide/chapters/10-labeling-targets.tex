@@ -1,0 +1,638 @@
+\chapter{Labeling and Target Construction}
+\label{ch:labeling}
+
+\begin{projectconnection}
+In Phase~1 you build the label construction module (Task~6 in the implementation plan).
+The choice of label is as important as the choice of features---the label \emph{is} your hypothesis.
+Triple-barrier labeling with volatility-scaled thresholds is the primary labeling method;
+meta-labeling adds a precision filter.
+Your prediction targets (VIX innovations, realized vol, drawdowns) come from the
+theoretical foundations in Chapters~\ref{ch:asset-pricing}--\ref{ch:intermediary}.
+\end{projectconnection}
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Why Labeling Matters}
+\label{sec:labeling-why}
+
+\begin{prereq}[Supervised Learning Recap]
+Supervised learning maps inputs $\bX$ to labels $\by$.
+The model minimizes $\loss(\hat{\by}, \by)$ over training data.
+If $\by$ is poorly constructed---noisy, misaligned with the trading horizon, or
+insensitive to the path of prices---no model can recover a useful signal.
+Garbage in, garbage out applies with full force here.
+\end{prereq}
+
+Every supervised ML problem requires a label: the thing you predict.
+In most ML applications the label is obvious (cat vs.\ dog, spam vs.\ not-spam).
+In finance the label is a \emph{design choice}, and that choice encodes your hypothesis.
+
+\textbf{The label defines the question.}
+Predicting 5-day returns asks a different question than predicting whether
+a stop-loss will be hit before a profit target.
+The same features can yield a strong signal under one labeling scheme and
+pure noise under another.
+
+\subsection{Standard Return Labels}
+
+The simplest label is the forward return over a fixed horizon:
+\begin{equation}
+\label{eq:fixed-horizon-label}
+y_t \;=\; \frac{P_{t+h} - P_t}{P_t},
+\end{equation}
+where $h$ is a fixed holding period (1 day, 5 days, 21 days).
+You then threshold: $y_t > \tau \Rightarrow +1$, $y_t < -\tau \Rightarrow -1$, else $0$.
+
+Three problems:
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Path dependence is ignored.}
+A position that hits $-5\%$ intraday and recovers to $+1\%$ at $t+h$
+gets labeled $+1$, but no risk manager would have held through the drawdown.
+
+\item \textbf{Fixed thresholds fail across asset classes.}
+A $\pm 1\%$ threshold is reasonable for equities but trivial for
+emerging-market FX and far too wide for G10 rates.
+Heteroskedasticity within a single asset makes a fixed $\tau$ equally
+inappropriate across time.
+
+\item \textbf{Horizon selection is arbitrary.}
+Why 5 days? Why not 3 or 10?
+The choice of $h$ implicitly assumes a holding period that may not match
+the signal's actual predictive horizon.
+\end{enumerate}
+
+\begin{intuition}[Labels as Strategy Blueprints]
+Think of the label as a compressed description of what a trading strategy
+would do.
+A fixed-horizon return label describes a ``buy and hold for exactly $h$
+days'' strategy---no stops, no targets, no early exit.
+That is not how anyone trades.
+The triple-barrier method (next section) labels data the way a
+strategy actually behaves: entry, stop-loss, profit-target, and
+maximum holding period.
+\end{intuition}
+
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Triple-Barrier Labeling}
+\label{sec:triple-barrier}
+
+The triple-barrier method, introduced by Lopez de Prado (2018, Ch.~3),
+fixes every problem listed above.
+It defines three barriers around each entry point and labels based on
+which barrier the price path touches first.
+
+\begin{definition}[Triple-Barrier Method]
+Given an entry at time $t_0$ with price $P_{t_0}$:
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Upper barrier} (profit-taking):
+$P_{t_0}\,(1 + m_u \cdot \sigma_t)$, where $m_u$ is the upper multiplier
+and $\sigma_t$ is a rolling volatility estimate.
+\item \textbf{Lower barrier} (stop-loss):
+$P_{t_0}\,(1 - m_\ell \cdot \sigma_t)$, where $m_\ell$ is the lower multiplier.
+\item \textbf{Vertical barrier} (expiration):
+a maximum holding period $T_{\max}$ bars after $t_0$.
+\end{enumerate}
+The label is:
+\[
+y =
+\begin{cases}
++1 & \text{if upper barrier is hit first,} \\
+-1 & \text{if lower barrier is hit first,} \\
+0  & \text{if vertical barrier is reached before either horizontal barrier.}
+\end{cases}
+\]
+\end{definition}
+
+\subsection{Volatility-Scaled Thresholds}
+
+The barrier widths adapt to current market conditions through $\sigma_t$,
+typically estimated as an exponentially weighted moving standard deviation
+of log returns:
+\begin{equation}
+\label{eq:ewma-vol}
+\sigma_t \;=\; \sqrt{\sum_{i=0}^{n-1} w_i \left(r_{t-i} - \bar{r}_t^{w}\right)^2},
+\qquad w_i = \frac{(1-\lambda)\,\lambda^{i}}{1-\lambda^{n}},
+\end{equation}
+where $r_{t-i} = \ln P_{t-i} - \ln P_{t-i-1}$ are log returns,
+$\bar{r}_t^{w} = \sum_i w_i\, r_{t-i}$ is the weighted mean,
+and $\lambda = 2^{-1/\tau_h}$ for a half-life of $\tau_h$ days.
+Lopez de Prado recommends a span of approximately 100 bars
+(roughly $\tau_h \approx 50$ days for daily data).
+
+\begin{prereq}[Exponentially Weighted Moving Average]
+An EWMA gives more weight to recent observations.
+The half-life $\tau_h$ is the number of periods after which a past
+observation's weight drops to half.
+A 20-day half-life means an observation from 20 days ago contributes
+half as much as today's.
+Pandas implements this as \texttt{df.ewm(halflife=20).std()}.
+\end{prereq}
+
+Why volatility scaling matters: a $2\%$ barrier is tight during a crisis
+(daily vol $\approx 3\%$) but loose during calm markets (daily vol $\approx 0.5\%$).
+Multiplying by $\sigma_t$ normalizes the barrier width in
+``number of standard deviations,'' making labels comparable across time
+and across asset classes.
+
+\subsection{Triple-Barrier Diagram}
+
+\begin{center}
+\begin{tikzpicture}[xscale=1.1, yscale=1.4]
+  % axes
+  \draw[-{Stealth}] (0,0) -- (8.5,0) node[right] {\small time};
+  \draw[-{Stealth}] (0,-2) -- (0,2.8) node[above] {\small price};
+
+  % entry
+  \filldraw (0.5,0) circle (2pt) node[below=3pt] {\footnotesize $P_{t_0}$};
+
+  % upper barrier
+  \draw[dashed, keyorange, thick] (0.5,1.6) -- (6.5,1.6)
+    node[right, font=\footnotesize, keyorange] {upper: $P_{t_0}(1+m_u\sigma_t)$};
+
+  % lower barrier
+  \draw[dashed, warnred, thick] (0.5,-1.4) -- (6.5,-1.4)
+    node[right, font=\footnotesize, warnred] {lower: $P_{t_0}(1-m_\ell\sigma_t)$};
+
+  % vertical barrier
+  \draw[dashed, defblue, thick] (6.5,-1.8) -- (6.5,2.2)
+    node[above, font=\footnotesize, defblue] {$T_{\max}$};
+
+  % price path (hits upper barrier)
+  \draw[thick, black]
+    (0.5,0) -- (1.2,0.3) -- (1.8,-0.2) -- (2.5,0.4) -- (3.0,0.1)
+    -- (3.6,0.7) -- (4.1,0.5) -- (4.6,1.0) -- (5.1,1.2) -- (5.5,1.6);
+
+  % hit marker
+  \filldraw[keyorange] (5.5,1.6) circle (3pt);
+  \node[above right, font=\footnotesize\bfseries, keyorange] at (5.5,1.7) {$y=+1$};
+
+  % labels
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}]
+    (0.5,-2.0) -- (6.5,-2.0) node[midway, below=6pt, font=\footnotesize] {max holding period};
+\end{tikzpicture}
+\end{center}
+
+\subsection{Worked Example: Step-by-Step Label Assignment}
+
+\begin{workedexample}{Triple-Barrier Label Assignment}
+\textbf{Setup.} Ten daily prices starting at $P_0 = 100$.
+Rolling volatility (EWMA, 20-day half-life) at entry: $\sigma_0 = 1.0\%$.
+Multipliers: $m_u = m_\ell = 2$.
+Maximum holding period: $T_{\max} = 5$ days.
+
+\textbf{Barriers.}
+Upper: $100 \times (1 + 2 \times 0.01) = 102.00$.
+Lower: $100 \times (1 - 2 \times 0.01) = 98.00$.
+Vertical: day 5.
+
+\textbf{Price path.}
+\begin{center}
+\begin{tabular}{lccccc}
+\toprule
+Day & 1 & 2 & 3 & 4 & 5 \\
+\midrule
+Price & 100.40 & 100.80 & 101.50 & 101.20 & 102.10 \\
+Hit? & --- & --- & --- & --- & upper \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+On day 5 the price crosses 102.00 for the first time $\Rightarrow$
+upper barrier is hit before the vertical barrier $\Rightarrow$ $y = +1$.
+
+\textbf{Alternate path.}
+If instead the prices were $\{99.80, 99.30, 98.50, 97.90, \ldots\}$,
+the price crosses 98.00 on day 3 $\Rightarrow$ $y = -1$.
+
+\textbf{Alternate path 2.}
+Prices $\{100.20, 99.80, 100.10, 100.50, 100.30\}$.
+Neither barrier is breached within 5 days.
+At the vertical barrier: $P_5 = 100.30 > P_0 = 100$, so $y = 0$
+(or optionally $y = \operatorname{sign}(P_5 - P_0) = +1$, depending
+on configuration).
+\end{workedexample}
+
+\begin{keyidea}[Why Triple-Barrier Labeling Works]
+Triple-barrier labeling aligns the label with how a trading strategy
+would actually behave: a position has a stop-loss, a profit target,
+and a maximum holding period.
+The label records \emph{which constraint binds first}, not just the
+terminal return.
+This produces labels that are more informative and less noisy than
+fixed-horizon returns, because the label reflects the path of prices,
+not just the endpoint.
+\end{keyidea}
+
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Meta-Labeling}
+\label{sec:meta-labeling}
+
+Triple-barrier labeling tells you the \emph{outcome} of a trade.
+Meta-labeling (Lopez de Prado 2018, Ch.~3.6) adds a second layer:
+a model that predicts \emph{whether to take the trade at all}.
+
+\begin{definition}[Meta-Labeling]
+A two-stage labeling procedure:
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Primary model} predicts the \emph{side}: long ($+1$) or short ($-1$).
+This can be any model---ML, fundamental, or rule-based
+(e.g., moving-average crossover, carry signal, mean-reversion filter).
+\item \textbf{Secondary (meta) model} predicts whether the primary model is
+\emph{correct}: $1$ if the trade is profitable (per triple-barrier), $0$ otherwise.
+\end{enumerate}
+The meta-label is:
+\[
+y^{\text{meta}}_t =
+\begin{cases}
+1 & \text{if primary side} \times \text{triple-barrier label} > 0, \\
+0 & \text{otherwise.}
+\end{cases}
+\]
+\end{definition}
+
+\subsection{Precision--Recall Tradeoff}
+
+The primary model is designed for \textbf{high recall}: it flags most
+profitable opportunities, even at the cost of many false positives.
+The meta-model adds \textbf{precision}: it filters out trades where
+the primary model is likely wrong.
+
+\begin{prereq}[Precision and Recall]
+\textbf{Precision} $= \text{TP} / (\text{TP} + \text{FP})$: of all trades the model takes,
+what fraction are profitable?
+\textbf{Recall} $= \text{TP} / (\text{TP} + \text{FN})$: of all profitable opportunities,
+what fraction does the model capture?
+A model that trades on every signal has recall $= 1$ but may have
+low precision.
+Meta-labeling sacrifices some recall for substantially higher precision.
+\end{prereq}
+
+In empirical tests using synthetic data and equity strategies, adding
+meta-labeling to a Bollinger Band mean-reversion strategy increased
+out-of-sample precision from 0.17 to 0.20 and accuracy from 17\% to
+63\% (Singh and Joubert, Hudson \& Thames research note).
+For a trend-following SMA crossover, out-of-sample precision rose from
+0.48 to 0.54.
+These gains come from filtering false positives, not from discovering
+new signal.
+
+\subsection{Betting Size from Meta-Probabilities}
+
+The meta-model outputs a probability $p_t \in [0,1]$.
+This directly maps to position size:
+\begin{equation}
+\label{eq:bet-size}
+\text{size}_t \;=\; f(p_t) \;\times\; \text{side}_t,
+\end{equation}
+where $f$ is a monotone mapping (e.g., $f(p) = 2p - 1$ so that
+$p = 0.5 \Rightarrow$ no bet, $p = 1.0 \Rightarrow$ full position).
+The side comes from the primary model; the magnitude comes from the
+meta-model's confidence.
+
+\begin{warning}[Meta-Labeling Requires a Reasonable Primary Model]
+Meta-labeling filters false positives from the primary model.
+If the primary model is random (accuracy $\approx 50\%$ with no structure),
+there is nothing systematic for the meta-model to learn.
+Always verify that the primary model has above-chance directional accuracy
+before investing effort in meta-labeling.
+A ridge regression baseline (Chapter~\ref{ch:regularized}) is a
+reasonable first primary model.
+\end{warning}
+
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Label Uniqueness and Concurrency}
+\label{sec:label-uniqueness}
+
+\begin{prereq}[Why i.i.d.\ Assumptions Fail for Overlapping Labels]
+Standard ML assumes training samples are independent and identically
+distributed (i.i.d.).
+Triple-barrier labels with a 5-day maximum holding period create
+overlapping return windows: the label for day $t$ depends on prices
+$\{P_{t+1}, \ldots, P_{t+5}\}$, and the label for day $t+1$ depends on
+$\{P_{t+2}, \ldots, P_{t+6}\}$.
+Four of five days overlap.
+This makes consecutive labels highly correlated, violating the
+i.i.d.\ assumption.
+Ignoring this inflates apparent model performance, because the model
+``memorizes'' shared return information rather than learning genuine patterns.
+\end{prereq}
+
+\subsection{Concurrency and Uniqueness}
+
+Lopez de Prado (2018, Ch.~4) quantifies this overlap with two
+measures.
+
+\begin{definition}[Concurrency Count]
+For a set of $N$ labeled events, each spanning a time window
+$[t_i^{\text{start}}, t_i^{\text{end}}]$, the concurrency at bar $t$ is:
+\begin{equation}
+\label{eq:concurrency}
+c_t \;=\; \sum_{i=1}^{N} \mathbf{1}\!\left[t_i^{\text{start}} \leq t \leq t_i^{\text{end}}\right],
+\end{equation}
+where $\mathbf{1}[\cdot]$ is the indicator function.
+$c_t$ counts how many labels are ``active'' at time $t$---i.e., how
+many overlapping return windows include bar $t$.
+\end{definition}
+
+\begin{definition}[Average Uniqueness]
+The average uniqueness of label $i$ is:
+\begin{equation}
+\label{eq:avg-uniqueness}
+\bar{u}_i \;=\; \frac{1}{|T_i|}\sum_{t \in T_i} \frac{1}{c_t},
+\end{equation}
+where $T_i = \{t : t_i^{\text{start}} \leq t \leq t_i^{\text{end}}\}$
+is the set of bars spanned by label $i$.
+A label with $\bar{u}_i = 1$ has no overlap with any other label.
+A label with $\bar{u}_i = 0.25$ shares its information with roughly
+three other concurrent labels on average.
+\end{definition}
+
+\begin{workedexample}{Computing Average Uniqueness}
+Three events with the following spans:
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Event & Start & End & Bars \\
+\midrule
+$A$ & 1 & 3 & $\{1,2,3\}$ \\
+$B$ & 2 & 4 & $\{2,3,4\}$ \\
+$C$ & 4 & 5 & $\{4,5\}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Concurrency at each bar:
+$c_1 = 1$, $c_2 = 2$, $c_3 = 2$, $c_4 = 2$, $c_5 = 1$.
+
+Average uniqueness:
+\begin{align*}
+\bar{u}_A &= \tfrac{1}{3}\left(\tfrac{1}{1} + \tfrac{1}{2} + \tfrac{1}{2}\right) = \tfrac{1}{3}(2.0) \approx 0.667, \\
+\bar{u}_B &= \tfrac{1}{3}\left(\tfrac{1}{2} + \tfrac{1}{2} + \tfrac{1}{2}\right) = 0.500, \\
+\bar{u}_C &= \tfrac{1}{2}\left(\tfrac{1}{2} + \tfrac{1}{1}\right) = 0.750.
+\end{align*}
+Event $C$ is most unique; event $B$ is least unique.
+In sample-weighted training, $C$ receives the highest weight.
+\end{workedexample}
+
+\subsection{Using Uniqueness for Sample Weighting}
+
+There are two practical applications:
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Sample weights.}
+Set $w_i = \bar{u}_i$ and pass these weights to the model's loss
+function.
+Both LightGBM and scikit-learn accept a \texttt{sample\_weight}
+argument.
+High-uniqueness samples contribute more to the gradient;
+low-uniqueness (highly overlapping) samples are downweighted.
+
+\item \textbf{Bagging adjustment.}
+When using bagged models (random forests, bagged trees), set
+\texttt{max\_samples}$\;= \overline{u}$, the average uniqueness across
+all labels.
+This prevents bootstrap samples from containing many overlapping
+observations.
+Lopez de Prado further proposes \emph{sequential bootstrapping},
+which draws samples one at a time and reweights the sampling
+distribution after each draw to penalize overlap with
+already-selected observations.
+\end{enumerate}
+
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Prediction Targets for the Project}
+\label{sec:prediction-targets}
+
+The labeling method (triple-barrier, meta-labeling) defines \emph{how}
+you label.
+The prediction target defines \emph{what} you label.
+This section specifies the four targets from the design spec and
+explains why each is motivated by theory.
+
+\subsection{VIX Innovations}
+
+\begin{definition}[VIX Innovation]
+\begin{equation}
+\label{eq:vix-innovation}
+\Delta \text{VIX}_t \;=\; \text{VIX}_t \;-\; \text{VIX}_{t-1}.
+\end{equation}
+This is the daily change in implied volatility.
+Positive $\Delta\text{VIX}_t$ means the market's expectation of
+future volatility increased.
+\end{definition}
+
+\begin{keyresult}[Adrian and Shin (2010): Dealer Repos Forecast VIX]
+Adrian and Shin show that changes in U.S.\ primary dealer repo positions
+forecast innovations in the VIX index.
+A forecasting regression of VIX changes on lagged repo growth produces
+$R^2 = 11.6\%$, compared to $R^2 = 8.9\%$ using only the lagged VIX
+level---a relative improvement of 30\%.
+The predictive power comes primarily through the \emph{volatility risk
+premium} (the gap between implied and realized volatility), not through
+actual volatility changes.
+Interpretation: when dealers expand their balance sheets
+(repo growth $> 0$), risk appetite rises and implied volatility
+compresses; when dealers contract (repo growth $< 0$), risk appetite
+falls and implied volatility spikes.
+
+\medskip
+\noindent
+\textit{Source:} Adrian, T.\ and Shin, H.S.\ (2010),
+``Liquidity and Leverage,''
+\textit{Journal of Financial Intermediation}, 19(3), 418--437.
+\end{keyresult}
+
+Why this is the cleanest target: VIX innovations are a single,
+tradeable, observable time series with a direct theoretical link to
+the risk data you have in SecDB.
+Adrian--Shin used stale quarterly Fed data; SecDB gives you \emph{daily}
+dealer-level risk outputs.
+If the quarterly signal works, the daily signal should be strictly
+stronger.
+
+\subsection{Realized Volatility}
+
+\begin{definition}[Realized Volatility]
+\begin{equation}
+\label{eq:realized-vol}
+\text{RV}_t \;=\; \sqrt{\sum_{i=1}^{n} r_{t,i}^2},
+\end{equation}
+where $r_{t,i}$ is the $i$-th intraday return on day $t$ and $n$ is
+the number of intraday intervals.
+For daily data without intraday granularity, the simpler proxy is
+$\text{RV}_t = |r_t|$ or $\text{RV}_t = r_t^2$.
+\end{definition}
+
+\begin{prereq}[Why Volatility Is Easier to Predict Than Returns]
+Returns have very low signal-to-noise ratios (SNR).
+A Sharpe ratio of 1.0 on daily returns corresponds to SNR $\approx
+1/\sqrt{252} \approx 0.063$---the signal is 6\% of the noise.
+Volatility is more persistent (high autocorrelation), more
+predictable (GARCH models capture 30--50\% of variance), and
+does not require predicting direction.
+Predicting $\text{RV}_{t+1}$ is a strictly easier problem than
+predicting $r_{t+1}$.
+\end{prereq}
+
+Realized volatility is the second-priority target.
+It is useful both as a standalone prediction (vol-timing strategies)
+and as an input to volatility-adjusted position sizing.
+Predicting it with risk-cube features tests whether SecDB data
+captures information about future realized risk beyond what
+standard GARCH models provide.
+
+\subsection{Drawdowns by Most-Concentrated Asset Class}
+
+\begin{definition}[Maximum Drawdown over Horizon]
+\begin{equation}
+\label{eq:drawdown}
+\text{DD}_{t,h} \;=\; \max_{0 \leq s \leq h}\;
+\frac{\max_{0 \leq u \leq s} P_{t+u} - P_{t+s}}{\max_{0 \leq u \leq s} P_{t+u}},
+\end{equation}
+where $h$ is the forward-looking horizon.
+This measures the worst peak-to-trough decline in the window $[t, t+h]$.
+\end{definition}
+
+The design spec identifies factor concentration ($\HHI$ of VaR
+decomposition; see Chapter~\ref{ch:features}) as a priority feature.
+The natural target to pair it with is drawdowns in the most-concentrated
+asset class: when risk is concentrated and then unwinds (fire sales
+per Coval and Stafford 2007, as discussed in Chapter~\ref{ch:intermediary}),
+the concentrated asset class should experience the largest drawdown.
+
+This target is noisier than VIX innovations.
+Use it as a secondary target, not a starting point.
+
+\subsection{Cross-Asset Momentum Reversals}
+
+\begin{definition}[Momentum Reversal Indicator]
+Label $y_t = +1$ if the trailing 12-month winner underperforms
+the trailing 12-month loser over the next $h$ days (reversal), and
+$y_t = -1$ otherwise (continuation).
+Compute across asset classes (equities, rates, credit, FX)
+rather than within.
+\end{definition}
+
+Cross-asset momentum reversals are the most complex target.
+The hypothesis: when VaR utilization is near the limit, forced
+deleveraging causes recent winners to reverse as dealers unwind
+their most profitable (and most concentrated) positions.
+He, Kelly, and Manela (2017, discussed in Chapter~\ref{ch:intermediary})
+show that a single intermediary SDF prices assets across classes,
+so cross-asset reversals should be predictable from cross-asset
+risk data.
+
+This target has the longest horizon and the fewest independent
+observations.
+Reserve it for Phase~4A if VIX innovations and realized vol
+produce positive results.
+
+\begin{keyidea}[Target Priority Order]
+Start with VIX innovations (cleanest target per Adrian--Shin, single
+observable series, direct theory link) and realized volatility
+(higher SNR than returns, more predictable).
+Only move to drawdowns and momentum reversals after establishing
+that SecDB features contain signal on the easier targets.
+If VIX innovations and realized vol both show zero IC after purged
+cross-validation (Chapter~\ref{ch:validation}), the harder targets
+will not rescue the project---that is the Week~13 checkpoint.
+\end{keyidea}
+
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Practical Considerations}
+\label{sec:labeling-practical}
+
+\subsection{Choosing Barrier Parameters}
+
+The triple-barrier method has three parameters: $m_u$, $m_\ell$, and $T_{\max}$.
+Guidelines from practice:
+
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Symmetric barriers} ($m_u = m_\ell$) are the default.
+Start with $m_u = m_\ell = 2$ (i.e., barriers at $\pm 2\sigma$).
+Asymmetric barriers encode a view that profits and losses are
+treated differently---only use this if you have a specific reason.
+
+\item \textbf{Maximum holding period.}
+Match $T_{\max}$ to the signal's expected decay.
+For daily risk-cube features, $T_{\max} = 5$ to $21$ trading days is
+reasonable.
+Too short and most labels hit the vertical barrier ($y=0$);
+too long and labels become noisy.
+
+\item \textbf{Sensitivity analysis.}
+Always test at least 3 parameter combinations
+(e.g., $m = \{1.5, 2.0, 2.5\}$, $T_{\max} = \{5, 10, 21\}$)
+and report results for all.
+A signal that only appears at one parameter setting is fragile.
+Log every combination in the experiment tracker for honest Deflated
+Sharpe Ratio accounting (Chapter~\ref{ch:validation}).
+\end{itemize}
+
+\subsection{Handling Label Imbalance}
+
+Triple-barrier labels often produce imbalanced classes.
+In low-volatility periods, most labels hit the vertical barrier
+($y = 0$), creating a dominant class.
+Options:
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Merge} $y=0$ into the sign of the terminal return,
+reducing to a binary $\{-1, +1\}$ problem.
+\item \textbf{Upsample} the minority class with replacement before training.
+\item \textbf{Class weights.} Set
+$w_c = N / (k \cdot N_c)$, where $N$ is total samples, $k$ is number
+of classes, and $N_c$ is class count.
+Scikit-learn and LightGBM support this natively.
+\end{enumerate}
+
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Summary}
+\label{sec:labeling-summary}
+
+\begin{center}
+\begin{tabular}{p{3.8cm} p{9.5cm}}
+\toprule
+\textbf{Concept} & \textbf{Key Takeaway} \\
+\midrule
+Fixed-horizon labels &
+Simple but ignore path, fail across asset classes, and assume
+an arbitrary holding period. \\[4pt]
+Triple-barrier labeling &
+Three barriers (profit, stop, time) with volatility-scaled thresholds.
+Label $= $ which barrier is hit first.
+Aligns labels with actual strategy behavior. \\[4pt]
+Meta-labeling &
+Primary model predicts side; secondary model predicts whether primary
+is correct. Trades recall for precision; meta-probability $\to$
+position size. \\[4pt]
+Label uniqueness &
+Overlapping return windows violate i.i.d.
+Average uniqueness $\bar{u}_i = \frac{1}{|T_i|}\sum_{t \in T_i} 1/c_t$
+gives sample weights for training. \\[4pt]
+VIX innovations &
+Cleanest target. Adrian--Shin (2010): dealer repo growth predicts
+$\Delta$VIX with $R^2$ improvement from 8.9\% to 11.6\%. \\[4pt]
+Realized volatility &
+Higher SNR than returns. Tests whether SecDB data beats GARCH. \\[4pt]
+Drawdowns &
+Pair with factor concentration ($\HHI$). Noisier; use as secondary target. \\[4pt]
+Momentum reversals &
+Cross-asset, longest horizon. Reserve for Phase 4A. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The labeling choices made here flow directly into the validation
+framework (Chapter~\ref{ch:validation}): purged cross-validation must
+respect the overlapping windows created by triple-barrier labels,
+and the Deflated Sharpe Ratio must account for every target--parameter
+combination tested.
+Build the label module (Task~6) before any signal testing, and
+commit to the experiment log from the first run.

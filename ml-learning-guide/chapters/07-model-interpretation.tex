@@ -1,0 +1,524 @@
+\chapter{Model Interpretation}
+\label{ch:interpretation}
+
+\begin{projectconnection}[Phase 2--5: Interpretation Is Not Optional]
+SHAP analysis appears throughout your project: in Phase~2 for identifying which risk-cube feature families drive predictions, in Phase~3 for the checkpoint (is feature importance stable across CV folds?), and in Phase~5 for the final presentation (SHAP waterfalls convert ``trust me'' into ``here is what drives this prediction'').
+MDI/MDA stability across CV folds is your test for whether importance rankings are reliable---if the top feature flips between folds, you are fitting noise.
+Every LightGBM result you present must include SHAP output alongside the ridge baseline from Chapter~\ref{ch:regularized}.
+\end{projectconnection}
+
+%% ═══════════════════════════════════════════════════════════
+\section{Why Interpretation Matters in Finance}
+\label{sec:why-interpretation}
+%% ═══════════════════════════════════════════════════════════
+
+Model interpretation in quantitative finance is not a nice-to-have---it is a gating requirement for deployment.
+Four reasons, in order of career relevance:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Regulatory and compliance scrutiny.}
+  Financial regulators (Fed SR 11-7, OCC 2011-12) require model risk management for any model that influences trading or risk limits.
+  A black box that cannot explain \emph{why} it issued a signal will not survive compliance review.
+  Phase~4A of your project initiates compliance review at weeks~16--17; you need interpretable output ready before that.
+
+  \item \textbf{Sponsor trust.}
+  Your desk sponsor thinks in terms of economic mechanisms: ``VaR utilization spikes precede forced selling, which causes drawdowns.''
+  If you show a SHAP waterfall decomposing a prediction into the contribution of VaR utilization (+12 bps), factor concentration (+8 bps), and scenario P\&L dispersion ($-$3 bps), the sponsor can evaluate whether the model's reasoning matches the theory from Chapter~\ref{ch:intermediary}.
+  If you show only an aggregate $R^2$, the sponsor has no way to assess whether the model learned something real or memorized noise.
+
+  \item \textbf{Debugging and feature auditing.}
+  SHAP dependence plots reveal when a model exploits spurious features.
+  If the top SHAP feature is ``day of week'' rather than VaR utilization, you have a data leak or a calendar artifact---not alpha.
+  Interpretation catches these problems before the OOS test wastes your one-shot holdout (Chapter~\ref{ch:validation}).
+
+  \item \textbf{Presentation.}
+  At the final desk presentation (Phase~5), the single most convincing chart is the SHAP waterfall plot.
+  Chapter~\ref{ch:presenting} covers presentation strategy in detail; this chapter gives you the tools to produce the charts.
+\end{enumerate}
+
+%% ═══════════════════════════════════════════════════════════
+\section{SHAP from Game Theory}
+\label{sec:shap-theory}
+%% ═══════════════════════════════════════════════════════════
+
+\begin{prereq}[Cooperative Game Theory Basics]
+A \emph{cooperative game} is a pair $(N, v)$, where $N = \{1, 2, \ldots, p\}$ is a set of players and $v : 2^N \to \R$ is a \emph{value function} mapping every coalition (subset) $S \subseteq N$ to a real-valued payoff $v(S)$, with $v(\emptyset) = 0$.
+The central question: given that the grand coalition $N$ achieves payoff $v(N)$, how should the total payoff be divided \emph{fairly} among the $p$ players?
+A player's \emph{marginal contribution} to coalition $S$ is $v(S \cup \{i\}) - v(S)$---the additional payoff player $i$ brings when joining $S$.
+The challenge is that player $i$'s marginal contribution depends on which coalition $i$ joins, so there is no single number that captures $i$'s worth without averaging over coalitions.
+\end{prereq}
+
+\subsection{Shapley Values}
+
+Lloyd Shapley (1953) proved that there is exactly one allocation rule satisfying four fairness axioms.
+That allocation is the \emph{Shapley value}:
+
+\begin{definition}[Shapley Value]
+For a cooperative game $(N, v)$ with $p = |N|$ players, the Shapley value of player $i$ is:
+\begin{equation}
+\phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|!\;(p - |S| - 1)!}{p!} \Big[ v(S \cup \{i\}) - v(S) \Big]
+\label{eq:shapley-value}
+\end{equation}
+
+Term by term:
+\begin{itemize}[nosep]
+  \item $S \subseteq N \setminus \{i\}$: every possible coalition that does not include player $i$. There are $2^{p-1}$ such coalitions.
+  \item $v(S \cup \{i\}) - v(S)$: the marginal contribution of player $i$ to coalition $S$.
+  \item $\frac{|S|!\;(p - |S| - 1)!}{p!}$: the weight, equal to the fraction of all $p!$ orderings in which the $|S|$ players in $S$ arrive before $i$ and the remaining $p - |S| - 1$ arrive after. This ensures every ordering of players is counted equally.
+\end{itemize}
+\end{definition}
+
+The Shapley value is the unique allocation satisfying four axioms:
+
+\begin{keyidea}[The Four Shapley Axioms]
+\begin{enumerate}[nosep]
+  \item \textbf{Efficiency}: contributions sum to the total payoff: $\sum_{i=1}^p \phi_i(v) = v(N) - v(\emptyset)$.
+  No value is created or lost in the allocation.
+
+  \item \textbf{Symmetry}: if players $i$ and $j$ contribute identically to every coalition ($v(S \cup \{i\}) = v(S \cup \{j\})$ for all $S$ not containing $i$ or $j$), then $\phi_i = \phi_j$.
+  Equal contributors receive equal credit.
+
+  \item \textbf{Dummy}: if player $i$ adds nothing to any coalition ($v(S \cup \{i\}) = v(S)$ for all $S$), then $\phi_i = 0$.
+  Irrelevant features get zero attribution.
+
+  \item \textbf{Additivity} (linearity): for two games $v$ and $w$ on the same player set, $\phi_i(v + w) = \phi_i(v) + \phi_i(w)$.
+  This lets us decompose complex games into simpler components.
+\end{enumerate}
+Shapley (1953) proved that \emph{no other allocation rule} satisfies all four simultaneously.
+\end{keyidea}
+
+\subsection{From Game Theory to ML}
+
+Lundberg and Lee (2017, NeurIPS) connected Shapley values to model interpretation by defining the game as follows:
+\begin{itemize}[nosep]
+  \item \textbf{Players}: the $p$ features $\{x_1, x_2, \ldots, x_p\}$.
+  \item \textbf{Value function}: $v(S) = \E[f(\bx) \mid x_S]$---the expected model prediction when only the features in $S$ are observed, marginalizing over the features not in $S$.
+  \item \textbf{Grand coalition payoff}: $v(N) = f(\bx)$---the full model prediction for this specific observation.
+  \item \textbf{Empty coalition}: $v(\emptyset) = \E[f(\bx)]$---the average prediction across the dataset.
+\end{itemize}
+
+The SHAP value of feature $i$ for observation $\bx$ is then the Shapley value $\phi_i$ under this game.
+By the efficiency axiom:
+\begin{equation}
+f(\bx) = \E[f(\bx)] + \sum_{i=1}^p \phi_i(\bx)
+\label{eq:shap-efficiency}
+\end{equation}
+
+Term by term:
+\begin{itemize}[nosep]
+  \item $f(\bx)$: the model's prediction for this observation.
+  \item $\E[f(\bx)]$: the baseline---the average prediction across the dataset.
+  \item $\phi_i(\bx)$: feature $i$'s contribution to pushing this prediction away from the baseline. Positive means feature $i$ pushed the prediction up; negative means down.
+\end{itemize}
+
+This is the decomposition that SHAP waterfall plots visualize: starting from the baseline $\E[f(\bx)]$, each feature's SHAP value is a step that walks the prediction to its final value $f(\bx)$.
+
+\begin{intuition}[SHAP as Fair Credit Assignment]
+Imagine three analysts jointly produce a trading signal.
+Analyst A specializes in rates, Analyst B in credit, Analyst C in FX.
+The signal earns \$10M.
+How much credit does each analyst deserve?
+
+You cannot just look at what each analyst produces alone---their value depends on who else is on the team.
+Analyst A might add \$6M when working solo but only \$2M when B is already on the team (because A and B have overlapping rates/credit expertise).
+The Shapley value computes A's average marginal contribution across \emph{all} possible team compositions: A alone, A with B, A with C, A with B and C.
+This is exactly what SHAP does for features: it averages each feature's marginal contribution across all possible subsets of other features.
+No double-counting, no leftover value.
+\end{intuition}
+
+\subsection{Computational Cost}
+
+The naive computation of Equation~\eqref{eq:shapley-value} requires evaluating $v(S)$ for all $2^p$ coalitions.
+With $p = 15$ risk-cube features, that is $2^{15} = 32{,}768$ coalition evaluations \emph{per observation}.
+For $n = 1{,}250$ observations, this totals $\sim$41 million evaluations---expensive for a generic model.
+This exponential cost is why Lundberg and Lee (2017) proposed model-specific approximations, the most important of which is TreeSHAP.
+
+\begin{workedexample}{SHAP by Enumeration for 3 Features}
+Consider a model $f(x_1, x_2, x_3)$ predicting next-day VIX innovation, with $\E[f] = 0$ (the baseline).
+For one specific observation, $f(\bx) = 0.12$ (predicting a 12 bps VIX increase).
+
+We want $\phi_1$, the SHAP value of feature $x_1$ (VaR utilization).
+There are $2^{3-1} = 4$ coalitions $S \subseteq \{2, 3\}$ not containing player 1:
+
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+$S$ & $|S|$ & Weight $\frac{|S|!(3-|S|-1)!}{3!}$ & $v(S \cup \{1\}) - v(S)$ \\
+\midrule
+$\emptyset$    & 0 & $\frac{0! \cdot 2!}{3!} = \frac{2}{6} = \frac{1}{3}$ & $v(\{1\}) - v(\emptyset) = 0.08 - 0 = 0.08$ \\[4pt]
+$\{2\}$        & 1 & $\frac{1! \cdot 1!}{3!} = \frac{1}{6}$               & $v(\{1,2\}) - v(\{2\}) = 0.11 - 0.03 = 0.08$ \\[4pt]
+$\{3\}$        & 1 & $\frac{1! \cdot 1!}{3!} = \frac{1}{6}$               & $v(\{1,3\}) - v(\{3\}) = 0.10 - 0.02 = 0.08$ \\[4pt]
+$\{2,3\}$      & 2 & $\frac{2! \cdot 0!}{3!} = \frac{2}{6} = \frac{1}{3}$ & $v(\{1,2,3\}) - v(\{2,3\}) = 0.12 - 0.05 = 0.07$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\[
+\phi_1 = \tfrac{1}{3}(0.08) + \tfrac{1}{6}(0.08) + \tfrac{1}{6}(0.08) + \tfrac{1}{3}(0.07) = 0.0267 + 0.0133 + 0.0133 + 0.0233 = 0.077
+\]
+
+Similarly, suppose $\phi_2 = 0.025$ and $\phi_3 = 0.018$.
+Check efficiency: $\phi_1 + \phi_2 + \phi_3 = 0.077 + 0.025 + 0.018 = 0.12 = f(\bx) - \E[f]$. \checkmark
+
+VaR utilization ($x_1$) gets the most credit: it contributed 7.7 bps of the 12 bps prediction.
+This is the number that appears in the SHAP waterfall.
+\end{workedexample}
+
+%% ═══════════════════════════════════════════════════════════
+\section{TreeSHAP}
+\label{sec:treeshap}
+%% ═══════════════════════════════════════════════════════════
+
+\begin{prereq}[Tree Structure Notation]
+A single decision tree $t$ has $L_t$ leaves and maximum depth $D_t$.
+Each internal node stores a feature index, a split threshold, and pointers to left/right children.
+Each leaf stores a prediction value $w_j$.
+An observation $\bx$ follows a unique root-to-leaf path, landing in exactly one leaf.
+The key insight for TreeSHAP: the tree structure determines which features are ``used'' (split on) along each path, and this structure can be exploited to compute exact Shapley values efficiently.
+\end{prereq}
+
+For generic models, computing exact Shapley values costs $O(2^p)$---exponential in the number of features.
+Lundberg et al.\ (2020, \textit{Nature Machine Intelligence}) introduced TreeSHAP, an algorithm that exploits the recursive structure of decision trees to compute \emph{exact} Shapley values in polynomial time.
+
+\begin{keyresult}[TreeSHAP: Exact Shapley in Polynomial Time]
+For an ensemble of $T$ trees, each with at most $L$ leaves and maximum depth $D$, TreeSHAP computes exact SHAP values in:
+\begin{equation}
+O(T \cdot L \cdot D^2) \text{ time}, \qquad O(D^2 + p) \text{ memory}
+\label{eq:treeshap-complexity}
+\end{equation}
+where $p$ is the number of features.
+Compare this to the naive $O(T \cdot L \cdot 2^p)$: with $p = 15$ features, TreeSHAP is roughly $2^{15} / D^2 \approx 32{,}768 / 16 \approx 2{,}000\times$ faster (at depth $D = 4$).
+The algorithm produces \textbf{exact} Shapley values---not a sampling approximation---because it recursively pushes probability mass through tree paths, accounting for all feature subsets simultaneously.
+\end{keyresult}
+
+The key algorithmic insight is the \emph{additivity} axiom applied to tree ensembles.
+By additivity, the SHAP value for the full ensemble is the sum of SHAP values for each individual tree: $\phi_i^{\text{ensemble}} = \sum_{t=1}^T \phi_i^{(t)}$.
+So the problem reduces to computing exact SHAP values for a single tree, then summing across trees.
+
+For a single tree, the algorithm traverses from root to leaf along the observation's decision path.
+At each internal node, it tracks a set of ``path fractions'' that encode how the prediction would change if each subset of features were observed or unobserved.
+Because a tree of depth $D$ splits on at most $D$ features along any root-to-leaf path, the number of relevant feature subsets is bounded by $O(2^D)$---not $O(2^p)$.
+With $D = 4$ and $p = 15$, this is $16$ vs.\ $32{,}768$.
+The $D^2$ factor in the complexity arises from maintaining and updating these path fractions at each node.
+
+Three properties make TreeSHAP the gold standard for LightGBM/XGBoost interpretation:
+\begin{enumerate}[nosep]
+  \item \textbf{Exact, not approximate.}
+  Kernel SHAP (also from Lundberg and Lee, 2017) uses weighted regression to approximate Shapley values for any model, but introduces sampling noise.
+  TreeSHAP produces the exact answer for tree ensembles.
+
+  \item \textbf{Fast enough for production.}
+  With your LightGBM configuration from Chapter~\ref{ch:trees} ($T \approx 800$ trees after early stopping, $D = 4$, $L \leq 15$), computing SHAP values for all $n = 1{,}250$ observations takes seconds, not hours.
+
+  \item \textbf{Native integration.}
+  The \texttt{shap} Python library (by Lundberg) calls LightGBM's internal C++ API to extract tree structures directly, avoiding serialization overhead.
+  The call is a single line: \texttt{shap.TreeExplainer(model).shap\_values(X)}.
+\end{enumerate}
+
+\begin{warning}[TreeSHAP Interventional vs.\ Path-Dependent]
+TreeSHAP has two modes: ``interventional'' and ``tree\_path\_dependent'' (the default).
+The path-dependent method is faster but can assign nonzero SHAP values to features the model never split on, because it uses the tree's internal node-cover statistics to marginalize.
+The interventional method marginalizes using background data, which is theoretically cleaner but slower.
+For your project, use the default path-dependent mode for exploratory analysis (fast, directionally correct) and switch to interventional for final presentation charts where precision matters.
+Set the mode via \texttt{shap.TreeExplainer(model, feature\_perturbation="interventional", data=X\_background)}.
+\end{warning}
+
+%% ═══════════════════════════════════════════════════════════
+\section{SHAP Plots}
+\label{sec:shap-plots}
+%% ═══════════════════════════════════════════════════════════
+
+The \texttt{shap} library produces four core plot types.
+Each answers a different question.
+
+\subsection{Summary Plot (Beeswarm)}
+
+\texttt{shap.summary\_plot(shap\_values, X)}
+
+The beeswarm plot shows, for \emph{every observation}, the SHAP value of each feature.
+Each dot is one observation; the $x$-axis is the SHAP value (contribution to prediction), and color indicates the feature value (red = high, blue = low).
+Features are sorted by mean absolute SHAP value (global importance).
+
+\textbf{What to look for}:
+\begin{itemize}[nosep]
+  \item Is VaR utilization consistently at the top? (If not, re-examine the thesis from Chapter~\ref{ch:intermediary}.)
+  \item Do high feature values (red dots) appear on the right (positive SHAP)? If VaR utilization is high and SHAP is positive, the model learned ``high VaR utilization predicts higher VIX innovation''---consistent with intermediary theory.
+  \item Are there features with wide SHAP spread but no clear color pattern? These may be capturing nonlinear or interaction effects.
+\end{itemize}
+
+\subsection{Dependence Plot}
+
+\texttt{shap.dependence\_plot("var\_utilization", shap\_values, X)}
+
+The dependence plot shows one feature's value ($x$-axis) against its SHAP value ($y$-axis), colored by the feature that most strongly interacts with it.
+It is the SHAP analog of a partial dependence plot but is observation-specific (not averaged).
+
+\textbf{What to look for}:
+\begin{itemize}[nosep]
+  \item Nonlinearity: is the relationship between VaR utilization and its SHAP value linear, or does it exhibit a threshold effect (e.g., SHAP jumps sharply above 80\% utilization)?
+  A threshold would support the Coval--Stafford (2007) fire-sale mechanism (Chapter~\ref{ch:intermediary}).
+  \item Interactions: if the coloring feature is factor concentration ($\HHI$), the plot reveals whether VaR utilization's impact is amplified when factor concentration is also high---a two-way interaction that LightGBM captures but ridge misses.
+\end{itemize}
+
+\subsection{Waterfall Plot}
+
+\texttt{shap.plots.waterfall(shap\_values[i])}
+
+The waterfall shows, for a \emph{single observation}, how each feature pushes the prediction away from the baseline $\E[f(\bx)]$.
+Starting at the baseline, features are stacked as positive (red) or negative (blue) bars, arriving at the final prediction.
+
+\begin{keyidea}[The Money Chart for Phase 5]
+The waterfall plot is the single most effective chart in your final presentation.
+It converts a LightGBM prediction into a narrative: ``For this date, VaR utilization pushed the predicted VIX innovation up by 8 bps, factor concentration added 5 bps, but low scenario dispersion pulled it back by 3 bps, giving a net prediction of +12 bps above the mean.''
+Sponsors, portfolio managers, and risk committees understand waterfall decompositions because they mirror the additive P\&L attribution they already use.
+Pick 2--3 observations for your presentation: one where the model was right, one where it was wrong, and one during a stress event.
+\end{keyidea}
+
+\subsection{Force Plot}
+
+\texttt{shap.plots.force(shap\_values[i])}
+
+The force plot shows the same information as the waterfall but in a horizontal bar format.
+Features pushing the prediction higher appear on the left (red); features pushing it lower appear on the right (blue).
+The force plot is more compact than the waterfall and useful for dashboards, but less readable for presentations.
+Use waterfall for slides, force plots for interactive monitoring.
+
+%% ═══════════════════════════════════════════════════════════
+\section{MDI vs.\ MDA}
+\label{sec:mdi-mda}
+%% ═══════════════════════════════════════════════════════════
+
+\begin{prereq}[Feature Importance Before SHAP]
+Before SHAP existed, the standard feature importance measures for tree ensembles were MDI and MDA, both introduced by Breiman (2001).
+These are aggregate (global) measures---they assign a single importance score to each feature across the entire dataset, unlike SHAP which provides per-observation attributions.
+They are still widely reported and you should understand their strengths and weaknesses.
+\end{prereq}
+
+\subsection{MDI: Mean Decrease in Impurity}
+
+\begin{definition}[Mean Decrease in Impurity (MDI)]
+For a tree ensemble, the MDI of feature $j$ is the sum of the impurity decreases at all nodes that split on feature $j$, weighted by the number of samples reaching each node, averaged across all trees:
+\begin{equation}
+\mathrm{MDI}_j = \frac{1}{T} \sum_{t=1}^T \sum_{\substack{k \in \text{nodes of tree } t \\ \text{splitting on feature } j}} p_{tk} \cdot \Delta I_{tk}
+\label{eq:mdi}
+\end{equation}
+where $T$ is the number of trees, $p_{tk}$ is the fraction of samples reaching node $k$ in tree $t$, and $\Delta I_{tk}$ is the impurity decrease (information gain) at that node.
+\end{definition}
+
+MDI is computed as a byproduct of tree training---it comes for free and requires no additional data evaluation.
+In LightGBM, this is the default \texttt{feature\_importances\_} attribute (with \texttt{importance\_type='split'} counting split frequency, or \texttt{importance\_type='gain'} using total gain, which is closer to Equation~\eqref{eq:mdi}).
+
+\subsection{MDA: Mean Decrease in Accuracy (Permutation Importance)}
+
+\begin{definition}[Mean Decrease in Accuracy (MDA)]
+The MDA of feature $j$ is the decrease in model accuracy when feature $j$'s values are randomly permuted across observations, breaking the association between $x_j$ and the target:
+\begin{equation}
+\mathrm{MDA}_j = \mathrm{Score}(\bX) - \mathrm{Score}(\bX^{(j)}_{\pi})
+\label{eq:mda}
+\end{equation}
+where $\mathrm{Score}(\bX)$ is the model's accuracy (or $R^2$, or negative MSE) on the original data, $\bX^{(j)}_{\pi}$ is the dataset with column $j$ randomly permuted, and $\mathrm{Score}(\bX^{(j)}_{\pi})$ is the accuracy after permutation.
+\end{definition}
+
+If feature $j$ is important, permuting it destroys the signal and accuracy drops substantially; $\mathrm{MDA}_j$ is large.
+If feature $j$ is irrelevant, permuting it changes nothing; $\mathrm{MDA}_j \approx 0$.
+
+MDA is model-agnostic---it works for any model, not just trees.
+The cost is that it requires $p$ additional passes through the dataset (one permutation per feature), each evaluating the full model.
+
+\textbf{Practical note}: always compute MDA on held-out data, not training data.
+In-sample MDA can be misleading because the model has already memorized the training set; permuting a feature may appear to cause a large accuracy drop even if the feature is just noise that the model overfit to.
+In your project, compute MDA on the purged-CV test fold for each split.
+
+\begin{workedexample}{MDA for VaR Utilization}
+You have a trained LightGBM model evaluated on the test fold ($n_{\text{test}} = 250$ observations).
+The model achieves $R^2 = 0.018$ on the original test data (i.e., it explains 1.8\% of variance in VIX innovations---tiny, but potentially economically meaningful).
+
+To compute MDA for VaR utilization ($x_1$):
+\begin{enumerate}[nosep]
+  \item Randomly shuffle the VaR utilization column across the 250 test observations, leaving all other features intact.
+  \item Re-evaluate the model on the permuted data: $R^2_{\pi} = 0.004$.
+  \item $\mathrm{MDA}_1 = 0.018 - 0.004 = 0.014$.
+\end{enumerate}
+
+Repeat for factor concentration ($x_2$): $R^2_{\pi} = 0.011$, so $\mathrm{MDA}_2 = 0.018 - 0.011 = 0.007$.
+
+Repeat for scenario P\&L rank ($x_3$): $R^2_{\pi} = 0.017$, so $\mathrm{MDA}_3 = 0.018 - 0.017 = 0.001$.
+
+Ranking: VaR utilization (0.014) $>$ factor concentration (0.007) $>$ scenario P\&L rank (0.001).
+This ranking should be consistent with the SHAP-based ranking from the beeswarm plot.
+If it is not, investigate whether the discrepancy comes from nonlinear interaction effects (which SHAP captures per-observation but MDA averages out).
+
+To get confidence intervals, repeat the permutation 10--30 times with different random seeds and report the mean $\pm$ standard deviation.
+\end{workedexample}
+
+\subsection{MDI vs.\ MDA: Comparison}
+
+\begin{center}
+\begin{tabular}{p{3.8cm} p{5.2cm} p{5.2cm}}
+\toprule
+\textbf{Criterion} & \textbf{MDI (Impurity-Based)} & \textbf{MDA (Permutation-Based)} \\
+\midrule
+Computation & Free (byproduct of training) & Requires $p$ extra model evaluations \\[4pt]
+Bias & Biased toward high-cardinality and continuous features (Strobl et al., 2007) & Unbiased under independence \\[4pt]
+Correlated features & Splits importance across correlated features arbitrarily & Can over-estimate importance of correlated features (permuting one leaves the correlated partner intact) \\[4pt]
+Evaluation data & Uses training data (in-sample) & Should use held-out data (OOS) \\[4pt]
+Scale & Relative (sums to total impurity decrease) & Absolute (in units of the accuracy metric) \\[4pt]
+Model-agnostic? & Trees only & Any model \\[4pt]
+Recommended? & Quick sanity check only & Primary importance measure for your project \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{warning}[MDI Is Biased---Do Not Use as Your Primary Importance Measure]
+MDI systematically inflates the importance of features with more unique values.
+A continuous feature (e.g., VaR utilization, which can take any value in $[0, 1]$) has hundreds of possible split points, giving it more chances to appear in a split by random chance alone.
+A binary feature (e.g., ``VaR limit breach yes/no'') has only one split point.
+Even if the binary feature is more predictive, MDI may rank the continuous feature higher simply because the tree had more opportunities to split on it.
+
+Strobl et al.\ (2007) demonstrated this bias rigorously: in simulations with uninformative features, MDI assigned nonzero importance to continuous noise features while correctly zeroing out categorical noise features.
+Use MDI only as a fast sanity check during development.
+For any result you report---in the checkpoint memo, the research report, or the presentation---use MDA or SHAP.
+\end{warning}
+
+\subsection{SHAP vs.\ MDI/MDA: When to Use Which}
+
+All three measures answer ``which features matter?'' but at different levels of granularity:
+\begin{itemize}[nosep]
+  \item \textbf{SHAP}: local (per-observation) attributions that sum to the prediction. The richest information. Use for presentation charts, debugging individual predictions, and detecting nonlinear effects.
+  \item \textbf{MDA}: global importance with a clear unit (accuracy drop). Use as the primary aggregate importance measure for checkpoint reports and stability analysis. Complements SHAP because it is computed on a different principle (perturbation vs.\ game-theoretic allocation).
+  \item \textbf{MDI}: global importance, free, but biased. Use only as a quick sanity check during interactive development. Never report MDI as a final result.
+\end{itemize}
+
+In practice, you will compute all three.
+If they agree on the top features, you have robust evidence.
+If SHAP and MDA agree but MDI disagrees, the MDI bias is the likely explanation---ignore MDI.
+If SHAP and MDA disagree, the signal may be driven by a small number of extreme observations (high-leverage points); investigate with SHAP dependence plots.
+
+%% ═══════════════════════════════════════════════════════════
+\section{Feature Importance Stability}
+\label{sec:importance-stability}
+%% ═══════════════════════════════════════════════════════════
+
+A feature importance ranking that changes every time you retrain the model is not a reliable signal---it is an artifact of noise.
+Stability testing is how you distinguish between the two.
+
+\subsection{The Problem}
+
+Compute MDA on CV fold 1: VaR utilization is the top feature, factor concentration is second.
+Compute MDA on CV fold 2: factor concentration is top, scenario P\&L dispersion is second, VaR utilization drops to fourth.
+Which ranking do you trust?
+Neither---the instability suggests the model is not reliably identifying the same signal across different slices of the data.
+
+This matters especially for your project because $n \approx 1{,}250$ is small.
+With small samples, the particular observations in each fold have outsized influence on the tree structure, which directly affects importance rankings.
+Unstable importance rankings are a leading indicator of poor out-of-sample performance.
+
+\subsection{Method: MDA Across CV Folds}
+
+The protocol:
+\begin{enumerate}[nosep]
+  \item Run purged $K$-fold CV (Chapter~\ref{ch:validation}) with $K = 5$.
+  \item For each fold $k$, train the LightGBM model on the training split and compute $\mathrm{MDA}_j^{(k)}$ for every feature $j$ on the test split.
+  \item Collect the $K$ importance vectors: $\{\mathrm{MDA}^{(1)}, \mathrm{MDA}^{(2)}, \ldots, \mathrm{MDA}^{(K)}\}$.
+  \item Rank features within each fold. Compute Spearman rank correlation between all $\binom{K}{2}$ pairs of fold rankings.
+\end{enumerate}
+
+\subsection{Stability Metric: Rank Correlation}
+
+\begin{definition}[Feature Importance Stability]
+Given $K$ fold-level importance rankings $r^{(1)}, r^{(2)}, \ldots, r^{(K)}$ over $p$ features, the \emph{importance stability} is the average pairwise Spearman rank correlation:
+\begin{equation}
+\rho_{\mathrm{stability}} = \frac{2}{K(K-1)} \sum_{k=1}^{K-1} \sum_{l=k+1}^K \rho_S\!\left(r^{(k)}, r^{(l)}\right)
+\label{eq:stability-metric}
+\end{equation}
+where $\rho_S$ denotes the Spearman rank correlation coefficient.
+\end{definition}
+
+\textbf{Interpretation}:
+\begin{itemize}[nosep]
+  \item $\rho_{\mathrm{stability}} > 0.8$: strong stability. The same features dominate across folds. Proceed with confidence.
+  \item $\rho_{\mathrm{stability}} \in [0.5, 0.8]$: moderate stability. The top 2--3 features are consistent, but mid-ranked features shuffle. Report the stable features; be cautious about the unstable ones.
+  \item $\rho_{\mathrm{stability}} < 0.5$: weak stability. Importance rankings are essentially random across folds. This is a red flag---the model may be fitting noise. At the Phase~3 checkpoint, this is grounds for concern about the signal.
+\end{itemize}
+
+\subsection{Complementary Check: SHAP Stability}
+
+Apply the same protocol using mean absolute SHAP values instead of MDA:
+\begin{enumerate}[nosep]
+  \item For each fold $k$, compute SHAP values for the test split.
+  \item Compute mean $|\phi_j|$ per feature, yielding a SHAP-based importance ranking.
+  \item Calculate $\rho_{\mathrm{stability}}$ as above.
+\end{enumerate}
+
+If both MDA-based and SHAP-based stability metrics agree (both high or both low), you have a clear signal.
+If they disagree, investigate: the discrepancy may reveal that a feature's importance is driven by a few extreme observations (which SHAP captures but MDA averages out).
+
+\subsection{What to Do When Importance Is Unstable}
+
+If $\rho_{\mathrm{stability}} < 0.5$, do not simply report the average ranking and move on.
+Unstable importance indicates a structural problem that must be diagnosed:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Check the ridge baseline.}
+  If ridge coefficient rankings are stable across folds but LightGBM's MDA rankings are not, the instability is specific to the tree model---likely because the sample is too small for the tree to reliably identify interaction effects.
+  In this case, the linear signal exists but the nonlinear signal does not.
+
+  \item \textbf{Reduce model complexity.}
+  Decrease \texttt{max\_depth} from 4 to 3, increase \texttt{min\_child\_samples} from 100 to 200.
+  Simpler trees are more stable because they have fewer degrees of freedom to fit different noise patterns in each fold.
+
+  \item \textbf{Increase effective sample size.}
+  Pool across asset classes using the panel structure from Chapter~\ref{ch:panel}.
+  If pooling stabilizes importance, the signal exists but requires cross-asset information to estimate reliably.
+
+  \item \textbf{Accept the finding.}
+  If none of the above works, the honest conclusion is that the feature's importance is not distinguishable from noise at the current sample size.
+  This is a valid finding---report it.
+\end{enumerate}
+
+\begin{projectconnection}[Phase 3 Checkpoint: Stability Criterion]
+At the week~13 checkpoint, one of the pass/fail criteria is ``MDA stable across folds.''
+Concretely: if the top two features (by MDA) are the same across all 5 purged-CV folds and $\rho_{\mathrm{stability}} > 0.6$, the importance is stable enough to proceed.
+If the top feature changes in every fold, the model is chasing different noise patterns in each data slice---this is the ``GBM $\leq$ ridge'' scenario from the design spec, and you should consider the pivot to Project~2.
+\end{projectconnection}
+
+%% ═══════════════════════════════════════════════════════════
+\section{Putting It Together: Interpretation Workflow}
+\label{sec:interpretation-workflow}
+%% ═══════════════════════════════════════════════════════════
+
+The full interpretation workflow for each signal-testing notebook in Phase~2:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Train LightGBM} with the hyperparameters from Chapter~\ref{ch:trees} (depth 3--5, learning rate 0.01--0.05, purged CV).
+  \item \textbf{Compute SHAP values} via TreeSHAP for the test-fold observations: \texttt{shap.TreeExplainer(model).shap\_values(X\_test)}.
+  \item \textbf{Generate four plots}: summary (beeswarm), dependence (for the top 2 features), waterfall (for 2--3 representative observations).
+  \item \textbf{Compute MDA} on each CV fold. Calculate $\rho_{\mathrm{stability}}$ and report it.
+  \item \textbf{Sanity-check against theory}: does the SHAP-implied feature ranking match the economic hypothesis? If VaR utilization and factor concentration are the top SHAP features (consistent with He--Kelly--Manela, Coval--Stafford), the model's reasoning aligns with intermediary theory. If ``day of month'' ranks first, investigate a data issue.
+  \item \textbf{Compare to ridge coefficients}: ridge from Chapter~\ref{ch:regularized} gives direct coefficient magnitudes. If the ridge coefficient ranking roughly matches the SHAP ranking, the signal is approximately linear. If they diverge, LightGBM is capturing nonlinearity or interactions that ridge misses---and the SHAP dependence plot should reveal where.
+\end{enumerate}
+
+%% ═══════════════════════════════════════════════════════════
+\section{Summary}
+\label{sec:interpretation-summary}
+%% ═══════════════════════════════════════════════════════════
+
+\begin{center}
+\begin{tabular}{p{4cm} p{9.5cm}}
+\toprule
+\textbf{Concept} & \textbf{Key Takeaway} \\
+\midrule
+SHAP values & Per-observation, per-feature attribution grounded in Shapley's uniqueness theorem. Satisfy efficiency, symmetry, dummy, and additivity. \\[6pt]
+TreeSHAP & Computes \emph{exact} Shapley values for tree ensembles in $O(TLD^2)$ time (Lundberg et al., 2020). The gold standard for LightGBM interpretation. \\[6pt]
+Waterfall plot & Decomposes a single prediction into feature contributions. The most effective chart for desk presentations. \\[6pt]
+Summary (beeswarm) plot & Shows SHAP values for all observations, revealing global feature importance and the direction of effects. \\[6pt]
+MDI (impurity-based) & Free but biased toward high-cardinality features (Strobl et al., 2007). Use only as a quick sanity check. \\[6pt]
+MDA (permutation) & Model-agnostic, unbiased under independence. Your primary non-SHAP importance measure. Compute on held-out data. \\[6pt]
+Importance stability & Average pairwise Spearman rank correlation of MDA rankings across CV folds. $\rho > 0.8$: stable; $\rho < 0.5$: red flag. \\[6pt]
+Interpretation workflow & TreeSHAP $\to$ four plots $\to$ MDA stability $\to$ theory sanity check $\to$ ridge comparison. Every Phase~2 notebook follows this. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\bigskip
+\noindent\textbf{What's next}: Chapter~\ref{ch:panel} covers panel econometrics---pooling observations across asset classes to increase effective sample size, which directly affects the stability metrics introduced here.

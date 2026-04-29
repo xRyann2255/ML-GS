@@ -1,0 +1,700 @@
+\chapter{Validation Frameworks}
+\label{ch:validation}
+
+\begin{projectconnection}
+This chapter is the validation stack from Phase~1 (Task~7 in the implementation plan). Every number in your project runs through this gauntlet: purged CV, DSR, CPCV, ridge baseline. This is what separates credible work from ``intern ran a GBM.'' Master this chapter and you can defend your results against any methodological challenge. The modules you build---\texttt{src/validation/purged\_cv.py}, \texttt{src/validation/cpcv.py}, \texttt{src/validation/deflated\_sharpe.py}, \texttt{src/validation/haircut\_sharpe.py}, \texttt{src/validation/baseline.py}---are the most important code in the entire project.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{Why Standard K-Fold CV Fails for Time Series}
+\label{sec:standard-cv-fails}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[K-Fold Cross-Validation]
+Standard $K$-fold CV partitions $n$ observations into $K$ roughly equal groups uniformly at random. For each fold $k$, the model trains on the remaining $K-1$ folds and is evaluated on fold $k$. The final performance estimate is the average across all $K$ folds. This works when observations are independent and identically distributed (i.i.d.)---e.g., classifying images where one cat photo tells you nothing about the next.
+\end{prereq}
+
+\begin{prereq}[Autocorrelation]
+A time series $\{x_t\}$ is \textbf{autocorrelated} if $\text{Corr}(x_t, x_{t+h}) \neq 0$ for some lag $h > 0$. Financial returns exhibit weak autocorrelation (typically $|\rho_1| < 0.05$), but features built from returns---rolling means, exponential moving averages, volatility estimates---can have autocorrelation exceeding 0.95 at lag 1 if the lookback window is long.
+\end{prereq}
+
+Standard $K$-fold CV randomly partitions observations, ignoring their temporal order. This creates a specific, devastating problem: \textbf{train-test leakage through time}.
+
+Consider a model trained on January and March data, tested on February. The training set contains observations from \emph{both sides} of the test period. Any feature with temporal persistence---a 21-day rolling mean, a 63-day volatility estimate, a VaR utilization z-score---will carry information from the future into the training set. The model learns patterns that include forward-looking data, inflating test-set performance.
+
+The problem is worse than it first appears. Financial labels themselves have temporal extent. A triple-barrier label (Chapter~\ref{ch:labeling}) starting at time $t$ might not resolve until $t + 15$ trading days. If observation $t$ is in the training set and observation $t + 5$ is in the test set, the training label for $t$ contains information about returns through $t + 15$---which overlaps with the test observation's feature window.
+
+\begin{center}
+\begin{tikzpicture}[x=0.6cm, y=1.2cm]
+  % Timeline
+  \draw[thick, -{Stealth[length=3mm]}] (0,0) -- (22,0) node[right]{\small Time};
+
+  % Month labels
+  \foreach \m/\x in {Jan/2, Feb/6, Mar/10, Apr/14, May/18} {
+    \node[below] at (\x, -0.15) {\small \m};
+    \draw (\x-1.8,0.05) -- (\x-1.8,-0.05);
+  }
+
+  % Train folds (standard CV)
+  \fill[blue!25] (0.2,0.5) rectangle (4.2,1.0);
+  \node[font=\small] at (2.2,0.75) {Train};
+  \fill[red!30] (4.2,0.5) rectangle (8.2,1.0);
+  \node[font=\small] at (6.2,0.75) {Test};
+  \fill[blue!25] (8.2,0.5) rectangle (12.2,1.0);
+  \node[font=\small] at (10.2,0.75) {Train};
+  \fill[blue!25] (12.2,0.5) rectangle (16.2,1.0);
+  \node[font=\small] at (14.2,0.75) {Train};
+  \fill[blue!25] (16.2,0.5) rectangle (20.2,1.0);
+  \node[font=\small] at (18.2,0.75) {Train};
+
+  \node[left, font=\small\bfseries] at (0, 0.75) {Standard};
+
+  % Leakage arrows
+  \draw[warnred, thick, -{Stealth[length=2mm]}, dashed] (3.5,0.5) -- (4.8,0.5);
+  \draw[warnred, thick, -{Stealth[length=2mm]}, dashed] (9.0,0.5) -- (7.6,0.5);
+  \node[warnred, font=\scriptsize, above] at (6.2,1.05) {Leakage from both sides};
+
+  % Correct approach
+  \fill[blue!25] (0.2,-1.0) rectangle (4.2,-0.5);
+  \node[font=\small] at (2.2,-0.75) {Train};
+  \fill[red!30] (4.2,-1.0) rectangle (8.2,-0.5);
+  \node[font=\small] at (6.2,-0.75) {Test};
+  \fill[blue!25] (8.2,-1.0) rectangle (12.2,-0.5);
+  \node[font=\small] at (10.2,-0.75) {Train};
+
+  % Purge zones
+  \fill[yellow!40] (3.2,-1.0) rectangle (4.2,-0.5);
+  \node[font=\tiny, rotate=90] at (3.7,-0.75) {Purge};
+  \fill[orange!30] (8.2,-1.0) rectangle (9.2,-0.5);
+  \node[font=\tiny, rotate=90] at (8.7,-0.75) {Embargo};
+
+  \node[left, font=\small\bfseries] at (0, -0.75) {Purged};
+\end{tikzpicture}
+\end{center}
+
+\begin{intuition}[Why Random Splits Are Toxic for Finance]
+Imagine you are predicting tomorrow's weather, and your training set includes the day after tomorrow's temperature. Your model would look brilliant---not because it learned atmospheric physics, but because it peeked at the answer sheet. Standard CV on time series does exactly this. The model sees the ``answer'' (future data adjacent to the test period) in training, then is ``tested'' on the period sandwiched in between. The resulting performance estimate is not just wrong---it is systematically too optimistic, which is the worst kind of wrong.
+\end{intuition}
+
+% ──────────────────────────────────────────────────────────────
+\section{Purged K-Fold CV with Embargo}
+\label{sec:purged-cv}
+% ──────────────────────────────────────────────────────────────
+
+L\'{o}pez de Prado (2018, Ch.~7) introduced purged $K$-fold CV to solve the leakage problem. It has two components.
+
+\begin{definition}[Purging]
+Let observation $i$ have feature time $t_i$ and a label that depends on returns from $t_i$ to $t_i + h_i$ (the \textbf{label horizon}). Let the test fold span the time interval $[t_{\text{start}}, t_{\text{end}}]$. \textbf{Purge} from the training set any observation $j$ whose label horizon overlaps with the test period:
+\begin{equation}
+\text{Remove } j \text{ from training if } [t_j, \, t_j + h_j] \cap [t_{\text{start}}, \, t_{\text{end}}] \neq \emptyset
+\label{eq:purge}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $t_j$ --- the timestamp of training observation $j$.
+  \item $h_j$ --- the label horizon of observation $j$ (e.g., the holding period of a triple-barrier label).
+  \item $[t_{\text{start}}, t_{\text{end}}]$ --- the time window of the test fold.
+\end{itemize}
+Purging removes training observations whose labels were influenced by returns that occur during the test period.
+\end{definition}
+
+\begin{definition}[Embargo]
+After the end of each test fold at time $t_{\text{end}}$, remove an additional $h_e$ observations from the training set:
+\begin{equation}
+\text{Remove } j \text{ from training if } t_j \in (t_{\text{end}}, \, t_{\text{end}} + h_e]
+\label{eq:embargo}
+\end{equation}
+where $h_e$ is the \textbf{embargo length}, typically set as a percentage of the total sample:
+\begin{equation}
+h_e = \lceil \text{pct}_{\text{embargo}} \times T \rceil
+\label{eq:embargo-length}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $h_e$ --- the number of observations removed after each test fold boundary.
+  \item $\text{pct}_{\text{embargo}}$ --- the embargo fraction (commonly 1--5\%).
+  \item $T$ --- total number of observations.
+\end{itemize}
+The embargo accounts for serial correlation in features that persists beyond the label horizon.
+\end{definition}
+
+\begin{warning}[Embargo Must Match Feature Lookback]
+Even with purging, if your features have long memory---a 63-day rolling volatility, a 21-day exponential moving average---the embargo must be at least as long as the longest feature lookback window. If you use a 63-day rolling standard deviation as a feature and set embargo to 5 days, the first training observation after the test fold still contains 58 days of overlap with test-period returns. Set $h_e \geq \max_k(\text{lookback}_k)$ where $k$ indexes your features.
+\end{warning}
+
+\begin{center}
+\begin{tikzpicture}[x=0.45cm, y=1.0cm]
+  % Timeline
+  \draw[thick, -{Stealth[length=3mm]}] (0,0) -- (28,0) node[right]{\small $t$};
+
+  % Fold boundaries
+  \foreach \x in {0, 5, 10, 15, 20, 25} {
+    \draw[gray, dashed] (\x, -0.3) -- (\x, 5.5);
+  }
+
+  % Fold labels
+  \foreach \i/\x in {1/2.5, 2/7.5, 3/12.5, 4/17.5, 5/22.5} {
+    \node[below, font=\scriptsize] at (\x, -0.3) {Fold \i};
+  }
+
+  % Fold 1 as test
+  \fill[blue!20] (5,4.8) rectangle (10,5.3);
+  \fill[red!30] (0,4.8) rectangle (5,5.3);
+  \fill[blue!20] (10,4.8) rectangle (25,5.3);
+  \fill[orange!30] (5,4.8) rectangle (6.2,5.3);
+  \node[left, font=\scriptsize] at (0,5.05) {$k{=}1$};
+  \node[font=\tiny] at (2.5,5.05) {Test};
+
+  % Fold 3 as test — the detailed one
+  \fill[blue!20] (0,3.0) rectangle (10,3.5);
+  \fill[red!30] (10,3.0) rectangle (15,3.5);
+  \fill[blue!20] (15,3.0) rectangle (25,3.5);
+  \node[left, font=\scriptsize] at (0,3.25) {$k{=}3$};
+  \node[font=\tiny] at (12.5,3.25) {Test};
+
+  % Purge zone before test fold 3
+  \fill[yellow!50] (8.5,3.0) rectangle (10,3.5);
+  \node[font=\tiny, rotate=90] at (9.25,3.25) {Purge};
+
+  % Embargo zone after test fold 3
+  \fill[orange!40] (15,3.0) rectangle (16.5,3.5);
+  \node[font=\tiny, rotate=90] at (15.75,3.25) {Emb.};
+
+  % Fold 5 as test
+  \fill[blue!20] (0,1.2) rectangle (20,1.7);
+  \fill[red!30] (20,1.2) rectangle (25,1.7);
+  \fill[yellow!50] (18.5,1.2) rectangle (20,1.7);
+  \node[left, font=\scriptsize] at (0,1.45) {$k{=}5$};
+  \node[font=\tiny] at (22.5,1.45) {Test};
+  \node[font=\tiny, rotate=90] at (19.25,1.45) {Purge};
+
+  % Legend
+  \fill[red!30] (0,-1.2) rectangle (1.5,-0.9);
+  \node[right, font=\scriptsize] at (1.7,-1.05) {Test};
+  \fill[blue!20] (6,-1.2) rectangle (7.5,-0.9);
+  \node[right, font=\scriptsize] at (7.7,-1.05) {Train};
+  \fill[yellow!50] (12,-1.2) rectangle (13.5,-0.9);
+  \node[right, font=\scriptsize] at (13.7,-1.05) {Purged};
+  \fill[orange!40] (19,-1.2) rectangle (20.5,-0.9);
+  \node[right, font=\scriptsize] at (20.7,-1.05) {Embargo};
+\end{tikzpicture}
+\end{center}
+
+\begin{workedexample}{Purged CV on 1,250 Daily Observations}
+Suppose you have $T = 1{,}250$ daily observations (5 years), $K = 5$ folds, and embargo = 2\% ($h_e = \lceil 0.02 \times 1{,}250 \rceil = 25$ days). Your labels have a 10-day horizon.
+
+\textbf{Fold boundaries:} Each fold contains $1{,}250 / 5 = 250$ observations.
+\begin{itemize}[nosep]
+  \item Fold 1: obs 1--250 \quad Fold 2: obs 251--500 \quad Fold 3: obs 501--750
+  \item Fold 4: obs 751--1000 \quad Fold 5: obs 1001--1250
+\end{itemize}
+
+\textbf{Testing fold 3} (obs 501--750). The training set starts as folds 1, 2, 4, 5 (1{,}000 obs).
+
+\textbf{Purge:} Remove training obs whose 10-day label horizon overlaps $[501, 750]$:
+\begin{itemize}[nosep]
+  \item Before: obs 491--500 in fold 2 have labels extending to obs 501--510 $\Rightarrow$ remove 10 obs.
+  \item After: obs 751--760 in fold 4 have features at times 751--760, but their labels do not reach back into the test fold, so no purging needed on the trailing side. However, \emph{features} of obs 751--760 might use returns from the test fold (e.g., a 21-day rolling mean at $t = 755$ uses returns from $t = 735$ to $t = 755$). This is handled by the embargo.
+\end{itemize}
+
+\textbf{Embargo:} Remove obs 751--775 from training (25 obs after the test fold boundary).
+
+\textbf{Effective training size:} $1{,}000 - 10 - 25 = 965$ observations (vs.\ 1{,}000 in standard CV).
+
+The cost is modest: 3.5\% fewer training observations. The benefit is enormous: elimination of look-ahead bias that can inflate Sharpe ratios by 50\% or more.
+\end{workedexample}
+
+% ──────────────────────────────────────────────────────────────
+\section{Combinatorial Purged CV (CPCV)}
+\label{sec:cpcv}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Combinatorics: $n$ Choose $k$]
+The binomial coefficient $\binom{n}{k} = \frac{n!}{k!(n-k)!}$ counts the number of ways to choose $k$ items from $n$ without regard to order. For example, $\binom{6}{2} = 15$.
+\end{prereq}
+
+Standard purged $K$-fold CV has a limitation: with $K = 5$ folds, you get only 5 Sharpe ratio estimates. That is too thin a distribution to draw reliable conclusions about your strategy's robustness.
+
+\textbf{Combinatorial Purged Cross-Validation} (CPCV), introduced by L\'{o}pez de Prado (2018, Ch.~12), solves this by systematically constructing all possible train-test splits from $N$ sequential groups, choosing $k$ as the test set.
+
+\begin{definition}[CPCV]
+Partition $T$ observations into $N$ contiguous, non-overlapping groups of approximately equal size. For each combination of $k$ groups selected as the test set (out of $N$ total groups), train on the remaining $N - k$ groups with purging and embargo applied. This yields:
+\begin{equation}
+\text{Number of splits} = \binom{N}{k}
+\label{eq:cpcv-splits}
+\end{equation}
+Each split produces one out-of-sample (OOS) Sharpe ratio estimate. The number of unique backtest paths (non-overlapping sequences through all time periods) is:
+\begin{equation}
+\varphi(N, k) = \frac{k}{N} \binom{N}{k}
+\label{eq:cpcv-paths}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $N$ --- number of contiguous time groups.
+  \item $k$ --- number of groups used as the test set in each split.
+  \item $\binom{N}{k}$ --- total combinations tested.
+  \item $\varphi(N, k)$ --- the number of distinct backtest paths, each covering the full time period.
+\end{itemize}
+\end{definition}
+
+\begin{workedexample}{CPCV with $N = 6$, $k = 2$}
+Partition 1{,}250 observations into $N = 6$ groups of ${\sim}208$ observations each. Choose $k = 2$ groups as test.
+
+\textbf{Number of splits:} $\binom{6}{2} = 15$.
+
+\textbf{Number of paths:} $\varphi(6, 2) = \frac{2}{6} \times 15 = 5$.
+
+One specific combination: test groups $\{2, 5\}$, train on groups $\{1, 3, 4, 6\}$. After purging and embargo, the model trains on groups 1, 3, 4, 6 (minus purged/embargoed observations near group 2 and group 5 boundaries), and is tested on groups 2 and 5.
+
+Each of the 6 groups appears as a test group in exactly $\binom{5}{1} = 5$ of the 15 splits, ensuring uniform coverage.
+
+\textbf{The 15 test-set combinations:}
+\begin{center}
+\begin{tabular}{cccccc}
+\toprule
+$\{1,2\}$ & $\{1,3\}$ & $\{1,4\}$ & $\{1,5\}$ & $\{1,6\}$ & \\
+$\{2,3\}$ & $\{2,4\}$ & $\{2,5\}$ & $\{2,6\}$ & & \\
+$\{3,4\}$ & $\{3,5\}$ & $\{3,6\}$ & & & \\
+$\{4,5\}$ & $\{4,6\}$ & & & & \\
+$\{5,6\}$ & & & & & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+From these 15 splits, you construct 5 non-overlapping backtest paths, each covering all 6 time groups. This gives you a distribution of 5 full-sample Sharpe ratios, compared to the single path from standard walk-forward or the 5 fold-level estimates from standard $K$-fold.
+\end{workedexample}
+
+\begin{keyidea}[CPCV Gives You a Distribution, Not a Point Estimate]
+Standard CV gives you one average performance estimate. CPCV gives you a \emph{distribution} of Sharpe ratios from a single history. If the distribution is tight and centered above zero, the signal is robust. If it is wide and straddles zero, you are likely fitting noise. This distribution is the input to the Probability of Backtest Overfitting (Section~\ref{sec:pbo}).
+\end{keyidea}
+
+Scaling up: with $N = 10$ and $k = 2$, you get $\binom{10}{2} = 45$ splits and $\varphi(10,2) = 9$ paths. With $N = 12$ and $k = 2$, you get 66 splits and 11 paths. More splits mean a richer distribution, but each split has a smaller test set and more purging overhead. In practice, $N = 6$ to $N = 10$ with $k = 2$ is a reasonable range for daily financial data.
+
+% ──────────────────────────────────────────────────────────────
+\section{The Deflated Sharpe Ratio}
+\label{sec:dsr}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[The Standard Normal CDF]
+The cumulative distribution function of the standard normal distribution is $\Phi(z) = \Pr(Z \leq z)$ where $Z \sim \N(0,1)$. Its inverse $\Phi^{-1}(p)$ gives the $z$-value at which the CDF equals $p$. For example, $\Phi^{-1}(0.975) = 1.96$ and $\Phi^{-1}(0.95) = 1.645$.
+\end{prereq}
+
+\begin{prereq}[Skewness and Kurtosis]
+For a random variable $X$ with mean $\mu$ and standard deviation $\sigma$:
+\begin{itemize}[nosep]
+  \item \textbf{Skewness:} $\hat{\gamma}_3 = \frac{1}{T}\sum_{t=1}^{T}\left(\frac{x_t - \mu}{\sigma}\right)^3$. Negative skewness means the left tail is heavier (large losses more likely than large gains). Hedge fund returns typically have $\hat{\gamma}_3 \in [-1, -0.3]$.
+  \item \textbf{Excess kurtosis:} $\hat{\gamma}_4 = \frac{1}{T}\sum_{t=1}^{T}\left(\frac{x_t - \mu}{\sigma}\right)^4 - 3$. Positive excess kurtosis means fatter tails than the normal distribution. Financial returns typically have $\hat{\gamma}_4 \in [1, 5]$.
+\end{itemize}
+\end{prereq}
+
+You tested 30 feature configurations. The best has Sharpe ratio 1.2. Is it real, or did you just get lucky by picking the best out of many attempts?
+
+This is the \textbf{multiple testing problem} applied to strategy selection. Bailey and L\'{o}pez de Prado (2014) developed the \textbf{Deflated Sharpe Ratio} (DSR) to answer exactly this question.
+
+\subsection{Expected Maximum Sharpe Under the Null}
+
+If you run $N$ independent trials on data with no true signal, the expected maximum Sharpe ratio among them is not zero---it grows with $N$. The \textbf{False Strategy Theorem} gives the benchmark:
+
+\begin{definition}[Expected Maximum Sharpe Ratio (False Strategy Theorem)]
+If $N$ independent strategies are tested on the same data, each with true Sharpe ratio zero, the expected maximum observed Sharpe ratio is approximately:
+\begin{equation}
+\SR_0 \approx \sqrt{\mathbf{V}[\widehat{\SR}_n]} \left[ (1 - \gamma)\,\Phi^{-1}\!\left(1 - \frac{1}{N}\right) + \gamma\,\Phi^{-1}\!\left(1 - \frac{1}{N e}\right) \right]
+\label{eq:sr0}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\SR_0$ --- the expected maximum Sharpe ratio under the null (no skill).
+  \item $\mathbf{V}[\widehat{\SR}_n]$ --- the cross-sectional variance of Sharpe ratio estimates across the $N$ trials. Under the null with i.i.d.\ returns, $\mathbf{V}[\widehat{\SR}_n] \approx 1/(T-1)$.
+  \item $\gamma \approx 0.5772$ --- the Euler--Mascheroni constant.
+  \item $e \approx 2.718$ --- Euler's number.
+  \item $N$ --- the number of independent strategy trials.
+  \item $\Phi^{-1}(\cdot)$ --- inverse standard normal CDF.
+\end{itemize}
+\end{definition}
+
+For a rough approximation when $N$ is moderate to large, $\SR_0 \approx \sqrt{2 \ln N / T}$ (from extreme value theory for Gaussians), but equation~\eqref{eq:sr0} is more accurate and accounts for the cross-sectional variance of observed Sharpe ratios.
+
+\subsection{The DSR Formula}
+
+\begin{definition}[Deflated Sharpe Ratio]
+The DSR is the probability that the observed Sharpe ratio $\widehat{\SR}^*$ exceeds the expected maximum under the null:
+\begin{equation}
+\DSR = \Phi\!\left( \frac{(\widehat{\SR}^* - \SR_0)\sqrt{T - 1}}{\sqrt{1 - \hat{\gamma}_3 \, \SR_0 + \frac{\hat{\gamma}_4 - 1}{4}\SR_0^2}} \right)
+\label{eq:dsr}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\widehat{\SR}^*$ --- the observed (non-annualized) Sharpe ratio of the best strategy.
+  \item $\SR_0$ --- the expected maximum Sharpe under the null, from equation~\eqref{eq:sr0}.
+  \item $T$ --- the number of return observations (sample size).
+  \item $\hat{\gamma}_3$ --- skewness of the strategy's returns.
+  \item $\hat{\gamma}_4$ --- kurtosis of the strategy's returns (not excess kurtosis; use $\hat{\gamma}_4 = \text{excess kurtosis} + 3$).
+  \item $\Phi(\cdot)$ --- standard normal CDF.
+\end{itemize}
+$\DSR$ ranges from 0 to 1. A DSR of 0.95 means: even after accounting for the number of trials, non-normality, and sample size, there is a 95\% probability that the strategy has genuine skill. $\DSR < 0.5$ means the observed Sharpe is more likely a product of selection bias than real signal.
+\end{definition}
+
+The denominator is the standard deviation of the Sharpe ratio estimator, adjusted for non-normal returns:
+\begin{equation}
+\hat{\sigma}(\widehat{\SR}) = \sqrt{\frac{1 - \hat{\gamma}_3 \, \SR_0 + \frac{\hat{\gamma}_4 - 1}{4}\SR_0^2}{T - 1}}
+\label{eq:sr-se}
+\end{equation}
+When returns are normal ($\hat{\gamma}_3 = 0$, $\hat{\gamma}_4 = 3$), this simplifies to $\hat{\sigma}(\widehat{\SR}) = \sqrt{(1 + \SR_0^2/2)/(T-1)}$, the standard Lo (2002) result.
+
+\begin{workedexample}{Computing the Deflated Sharpe Ratio}
+You ran 30 experiments on 5 years of daily data ($T = 1{,}250$). The best strategy has annualized Sharpe 1.20, with return skewness $\hat{\gamma}_3 = -0.5$ and kurtosis $\hat{\gamma}_4 = 4.0$.
+
+\textbf{Step 1: De-annualize.} $\widehat{\SR}^* = 1.20 / \sqrt{252} \approx 0.0756$ (daily).
+
+\textbf{Step 2: Compute $\SR_0$.} Assume $\mathbf{V}[\widehat{\SR}_n] \approx 1/(T-1) = 1/1249 \approx 0.000801$, so $\sqrt{\mathbf{V}} \approx 0.0283$. With $N = 30$:
+\begin{align*}
+\Phi^{-1}(1 - 1/30) &= \Phi^{-1}(0.9667) \approx 1.834 \\
+\Phi^{-1}(1 - 1/(30 \cdot e)) &= \Phi^{-1}(0.9877) \approx 2.249 \\
+\SR_0 &\approx 0.0283 \times [(1 - 0.5772)(1.834) + 0.5772(2.249)] \\
+      &\approx 0.0283 \times [0.775 + 1.299] \\
+      &\approx 0.0283 \times 2.074 \approx 0.0587
+\end{align*}
+
+\textbf{Step 3: Compute the denominator.}
+\[
+1 - (-0.5)(0.0587) + \frac{4.0 - 1}{4}(0.0587)^2 = 1 + 0.0294 + 0.000258 \approx 1.0296
+\]
+
+\textbf{Step 4: Compute DSR.}
+\[
+\DSR = \Phi\!\left(\frac{(0.0756 - 0.0587)\sqrt{1249}}{\sqrt{1.0296}}\right) = \Phi\!\left(\frac{0.0169 \times 35.34}{1.0147}\right) = \Phi(0.589) \approx 0.72
+\]
+
+\textbf{Interpretation:} DSR = 0.72. After accounting for 30 trials, there is only a 72\% probability that the Sharpe of 1.20 reflects genuine skill rather than selection bias. This is below the 0.95 threshold most researchers would require for confidence. You cannot claim a credible signal at this level.
+\end{workedexample}
+
+\begin{keyresult}[Bailey and L\'{o}pez de Prado (2014)]
+With 45 independent trials on 5 years of daily data ($T \approx 1{,}250$), the expected maximum Sharpe ratio under the null is approximately 1.87 (annualized). This means a reported Sharpe of 1.0 after 45 trials has DSR $\approx 0.02$---virtually certain to be spurious. Even a Sharpe of 1.5 requires fewer than ${\sim}10$ trials to maintain DSR above 0.95 on this sample size. The implication: track every experiment, because the number of trials is the single biggest driver of whether your results are credible.
+\end{keyresult}
+
+\begin{warning}[Every Experiment Counts as a Trial]
+Every configuration you test---different feature subsets, different targets, different hyperparameters, different label horizons---counts as a trial for DSR purposes. If you try 5 feature sets $\times$ 4 targets $\times$ 3 model types, that is $N = 60$ trials, not 1. If you do not log failed experiments, your DSR is dishonestly high, because you are understating $N$. This is why the experiment tracker (Task~9, \texttt{src/tracking/tracker.py}) is not optional bureaucracy---it is the integrity mechanism that makes DSR honest.
+\end{warning}
+
+% ──────────────────────────────────────────────────────────────
+\section{Haircut Sharpe Ratio}
+\label{sec:haircut-sharpe}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[$p$-Values and Hypothesis Testing]
+The $p$-value is the probability of observing a test statistic at least as extreme as the one obtained, assuming the null hypothesis is true. A $p$-value of 0.01 means: if there were truly no effect, you would see a result this extreme only 1\% of the time. When you run multiple tests, the probability that \emph{at least one} yields a small $p$-value by chance increases rapidly. Multiple testing corrections adjust $p$-values upward to account for this.
+\end{prereq}
+
+Harvey and Liu (2015) take a different approach to the same problem: instead of computing a probability (DSR), they compute a \textbf{haircut}---the percentage reduction applied to a reported Sharpe ratio to account for multiple testing.
+
+\subsection{Sharpe-to-$t$-Statistic Conversion}
+
+The foundation is the relationship between the Sharpe ratio and the $t$-statistic:
+\begin{equation}
+t = \SR \times \sqrt{T}
+\label{eq:sr-to-t}
+\end{equation}
+where $\SR$ is the non-annualized Sharpe ratio and $T$ is the number of observations. Testing whether a Sharpe ratio is significantly different from zero is equivalent to testing whether the mean excess return is significantly different from zero, which is a standard $t$-test.
+
+\subsection{Three Correction Methods}
+
+Harvey and Liu (2015) apply three progressively less conservative multiple testing corrections.
+
+\begin{definition}[Bonferroni Correction]
+Given $M$ tests with individual $p$-values $p_1, \ldots, p_M$, the Bonferroni-adjusted $p$-values are:
+\begin{equation}
+p_i^{\text{Bonf}} = \min(M \cdot p_i, \; 1)
+\label{eq:bonferroni}
+\end{equation}
+Every $p$-value is inflated by the total number of tests. This controls the \textbf{family-wise error rate} (FWER): the probability of even one false rejection. It is the most conservative correction.
+\end{definition}
+
+\begin{definition}[Holm Step-Down Correction]
+Sort the $M$ $p$-values in ascending order: $p_{(1)} \leq p_{(2)} \leq \cdots \leq p_{(M)}$. The adjusted $p$-values are:
+\begin{equation}
+p_{(i)}^{\text{Holm}} = \min\!\left(\max_{j \leq i}\!\left[(M - j + 1) \cdot p_{(j)}\right], \; 1\right)
+\label{eq:holm}
+\end{equation}
+Holm applies decreasing penalties: the smallest $p$-value is multiplied by $M$ (same as Bonferroni), the second-smallest by $M - 1$, and so on. It also controls FWER but is uniformly more powerful (less conservative) than Bonferroni.
+\end{definition}
+
+\begin{definition}[BHY (Benjamini--Hochberg--Yekutieli) FDR Correction]
+Sort $p$-values descending: $p_{(M)} \geq p_{(M-1)} \geq \cdots \geq p_{(1)}$. The adjusted $p$-values are:
+\begin{equation}
+p_{(i)}^{\text{BHY}} = \min\!\left(\frac{M \cdot c(M)}{i} \cdot p_{(i)}, \; 1\right)
+\label{eq:bhy}
+\end{equation}
+where $c(M) = \sum_{j=1}^{M} 1/j$ is the $M$-th harmonic number. For $M = 20$: $c(20) \approx 3.55$.
+
+BHY controls the \textbf{false discovery rate} (FDR)---the expected fraction of rejections that are false---rather than the stricter FWER. It is the least conservative of the three.
+\end{definition}
+
+\subsection{Computing the Haircut}
+
+For each correction method, the haircut percentage on a given strategy's Sharpe ratio is:
+\begin{equation}
+\text{Haircut \%} = \frac{\SR_{\text{reported}} - \SR_{\text{adjusted}}}{\SR_{\text{reported}}} \times 100
+\label{eq:haircut-pct}
+\end{equation}
+where $\SR_{\text{adjusted}}$ is the Sharpe ratio corresponding to the corrected $p$-value. If the adjusted $p$-value is no longer significant (exceeds the significance level $\alpha$), the adjusted Sharpe is effectively zero and the haircut is 100\%.
+
+\begin{workedexample}{Haircut Sharpe with 20 Tests}
+You report a strategy with annualized $\SR = 1.50$ from $T = 1{,}250$ daily observations, and you have tested $M = 20$ strategies total.
+
+\textbf{Step 1:} Convert to $t$-statistic. Daily $\SR = 1.50/\sqrt{252} = 0.0945$. Then $t = 0.0945 \times \sqrt{1{,}250} = 3.34$.
+
+\textbf{Step 2:} Single-test $p$-value. $p = 2(1 - \Phi(3.34)) \approx 0.00084$ (two-sided).
+
+\textbf{Step 3: Bonferroni.} $p^{\text{Bonf}} = 20 \times 0.00084 = 0.0168$. Still significant at $\alpha = 0.05$. The adjusted $t$-statistic is $\Phi^{-1}(1 - 0.0168/2) = 2.39$, giving adjusted $\SR_{\text{ann}} = (2.39/\sqrt{1{,}250}) \times \sqrt{252} = 1.07$. Haircut: $(1.50 - 1.07)/1.50 = 28.5\%$.
+
+\textbf{Step 4: Holm.} If this strategy's $p$-value ranks, say, 1st of 20, the Holm adjustment for the top-ranked is identical to Bonferroni: $20 \times 0.00084 = 0.0168$. Haircut: $\approx 28.5\%$ (same for the best strategy).
+
+\textbf{Step 5: BHY.} With $c(20) = 3.55$: $p^{\text{BHY}} = (20 \times 3.55 / 1) \times 0.00084 = 0.0597$. Marginally insignificant at $\alpha = 0.05$. Adjusted $t = \Phi^{-1}(1 - 0.0597/2) = 1.88$, giving adjusted $\SR_{\text{ann}} = 0.84$. Haircut: $(1.50 - 0.84)/1.50 = 43.7\%$.
+
+\textbf{Summary:}
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Adjusted $p$} & \textbf{Adjusted $\SR$} & \textbf{Haircut \%} \\
+\midrule
+None (single test) & 0.00084 & 1.50 & 0\% \\
+Bonferroni & 0.0168 & 1.07 & 28.5\% \\
+Holm (rank 1) & 0.0168 & 1.07 & 28.5\% \\
+BHY & 0.0597 & 0.84 & 43.7\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+A Sharpe of 1.50 after 20 tests survives Bonferroni and Holm (still significant at 5\%), but the BHY adjustment renders it borderline. The 50\% rule-of-thumb haircut that practitioners sometimes apply is in the right ballpark for BHY but too harsh for Bonferroni in this case.
+\end{workedexample}
+
+\begin{keyresult}[Harvey, Liu, and Zhu (2016)]
+Cataloging 316 factors tested in the academic literature, Harvey, Liu, and Zhu show that the appropriate $t$-statistic hurdle for a newly proposed factor is $t > 3.0$, not the conventional 1.96. Using this criterion, only 9 of 313 return-correlated variables survive. A Sharpe ratio of 1.0 annualized on 5 years of daily data gives $t = (1.0/\sqrt{252}) \times \sqrt{1{,}250} \approx 2.23$---below the 3.0 threshold. The implication: most published ``factors'' are likely false discoveries.
+\end{keyresult}
+
+\begin{keyidea}[Harvey--Liu--Zhu vs.\ DSR: Complementary Tools]
+DSR and Haircut Sharpe address the same problem from different angles. DSR computes a probability that your observed Sharpe exceeds the expected maximum under the null. Haircut Sharpe computes the adjusted Sharpe after penalizing for multiple tests. Use both. If DSR $> 0.95$ \emph{and} the haircutted Sharpe is still economically meaningful (say, above 0.5 annualized after costs), you have a defensible result.
+\end{keyidea}
+
+% ──────────────────────────────────────────────────────────────
+\section{Probability of Backtest Overfitting (PBO)}
+\label{sec:pbo}
+% ──────────────────────────────────────────────────────────────
+
+Bailey, Borwein, L\'{o}pez de Prado, and Zhu (2014) propose a direct, model-free measure of whether a strategy selection process is overfit: the \textbf{Probability of Backtest Overfitting} (PBO).
+
+\subsection{Combinatorially Symmetric Cross-Validation (CSCV)}
+
+The procedure works on the $T \times N$ matrix of trial P\&L, where $T$ is the number of time periods and $N$ is the number of strategy configurations tested.
+
+\begin{definition}[CSCV and PBO]
+\textbf{Step 1.} Partition the $T$ time periods into $S$ non-overlapping, contiguous blocks of approximately equal size ($S$ must be even).
+
+\textbf{Step 2.} Form all $\binom{S}{S/2}$ combinations of $S/2$ blocks. For each combination $c$:
+\begin{enumerate}[nosep]
+  \item The selected $S/2$ blocks form the in-sample (IS) set $J_c$.
+  \item The remaining $S/2$ blocks form the out-of-sample (OOS) set $\bar{J}_c$.
+  \item Compute the performance metric (Sharpe ratio) for each of the $N$ strategies on both IS and OOS.
+  \item Let $n^*_c = \arg\max_n \SR_n^{\text{IS}}(c)$ be the strategy that performed best in-sample.
+  \item Compute its OOS relative rank: $\omega_c = (\text{rank of } n^*_c \text{ in OOS}) / N$.
+\end{enumerate}
+
+\textbf{Step 3.} Compute the logit of the relative rank:
+\begin{equation}
+\lambda_c = \ln\!\left(\frac{\omega_c}{1 - \omega_c}\right)
+\label{eq:logit}
+\end{equation}
+
+\textbf{Step 4.} The \textbf{Probability of Backtest Overfitting} is:
+\begin{equation}
+\text{PBO} = \Pr(\lambda < 0) = \frac{\#\{c : \lambda_c < 0\}}{\binom{S}{S/2}}
+\label{eq:pbo}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $S$ --- number of temporal blocks (typically 8--16; must be even).
+  \item $\binom{S}{S/2}$ --- number of IS/OOS partitions. For $S = 10$: $\binom{10}{5} = 252$.
+  \item $n^*_c$ --- the strategy that performed best in-sample for partition $c$.
+  \item $\omega_c$ --- the relative rank of $n^*_c$ in the OOS sample (0 = worst, 1 = best).
+  \item $\lambda_c < 0$ means the IS-optimal strategy ranked below median OOS.
+  \item $\text{PBO} > 0.50$ means the IS-best strategy is more likely to underperform than outperform OOS---the selection process is overfit.
+\end{itemize}
+\end{definition}
+
+\begin{intuition}[What PBO Really Measures]
+PBO answers a simple question: ``If I pick the strategy that looks best in-sample, what fraction of the time does it rank below average out-of-sample?'' If PBO $= 0.60$, then 60\% of the time, the strategy you would choose based on backtesting actually underperforms the median strategy in fresh data. Your selection process is not identifying skill---it is identifying noise, and the noise looks different in every partition.
+\end{intuition}
+
+For $S = 10$, you get 252 IS/OOS partitions---a rich enough sample to estimate PBO reliably. The rule of thumb: PBO $< 0.30$ is encouraging; PBO $> 0.50$ is a red flag; PBO $> 0.70$ means your strategy selection is almost certainly overfit and you should not proceed.
+
+% ──────────────────────────────────────────────────────────────
+\section{Experiment Tracking for Honest DSR}
+\label{sec:experiment-tracking}
+% ──────────────────────────────────────────────────────────────
+
+The DSR, Haircut Sharpe, and PBO all depend on knowing $N$---the number of trials. If you do not track trials systematically, you will understate $N$ and overstate significance. This is not a theoretical concern; it is the most common form of unintentional p-hacking in quantitative research.
+
+\begin{keyidea}[The Experiment Log Is as Important as the Model Code]
+Every configuration you test must be logged, including failures. The log should record:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Field} & \textbf{Example} \\
+\midrule
+Experiment ID & \texttt{exp-042} \\
+Timestamp & \texttt{2026-06-15 14:30} \\
+Features & VaR utilization z-score, factor HHI \\
+Target & VIX 5-day innovation \\
+Model & LightGBM, 100 trees, max\_depth=4 \\
+CV method & Purged 5-fold, embargo=2\% \\
+Raw Sharpe (annualized) & 0.87 \\
+DSR (cumulative $N$) & 0.68 ($N = 42$) \\
+Notes & Weak on credit targets \\
+\bottomrule
+\end{tabular}
+\end{center}
+This log is the input to \texttt{src/tracking/tracker.py} (Task~9). When you compute DSR at experiment 42, $N = 42$. If you had deleted experiments 10--25 because they ``didn't work,'' you would compute DSR with $N = 27$ and get a higher, dishonest value.
+\end{keyidea}
+
+What counts as a new trial?
+
+\begin{itemize}[nosep]
+  \item Different feature subset --- yes, new trial.
+  \item Different target variable --- yes, new trial.
+  \item Different model type (ridge vs.\ GBM) --- yes, new trial.
+  \item Different hyperparameter configuration --- yes, if you select based on OOS performance. If you use an inner CV loop for hyperparameter tuning and only the outer fold counts for selection, then only the outer configurations count.
+  \item Re-running the same configuration after a bug fix --- not a new trial (the previous run was invalid, not a genuine test of a different hypothesis).
+\end{itemize}
+
+% ──────────────────────────────────────────────────────────────
+\section{The Ridge Baseline: Your Credibility Floor}
+\label{sec:validation:ridge-baseline}
+% ──────────────────────────────────────────────────────────────
+
+Every result you report must be accompanied by a ridge regression baseline on the identical feature set. This is not optional.
+
+\begin{keyidea}[Why Ridge, Not OLS]
+OLS overfits when the number of features approaches the number of observations (Chapter~\ref{ch:regularized}). Ridge adds an $\ell_2$ penalty that shrinks coefficients toward zero, giving a stable baseline that is hard to overfit. If your GBM does not beat ridge on the same features and the same purged CV, the GBM is fitting noise---the nonlinear interactions it is detecting are not real, they are artifacts.
+\end{keyidea}
+
+The baseline protocol:
+\begin{enumerate}[nosep]
+  \item Standardize all features to zero mean and unit variance.
+  \item Fit ridge regression with $\lambda$ chosen by inner purged CV (3-fold within each outer training fold).
+  \item Evaluate on the same outer test fold as your GBM.
+  \item Report ridge Sharpe alongside GBM Sharpe in every table and chart.
+\end{enumerate}
+
+If GBM Sharpe exceeds ridge Sharpe by a meaningful margin (e.g., $> 0.2$ annualized) and this improvement is consistent across CPCV paths, there is evidence of genuine nonlinear signal. If GBM $\approx$ ridge, the signal is linear and a simpler model suffices. If GBM $<$ ridge, the GBM is overfitting.
+
+\begin{projectconnection}[The Ridge Test in Your Checkpoint]
+At the Week~13 checkpoint (Task~16), the decision criteria explicitly include ``GBM beats ridge.'' If the GBM does not outperform the ridge baseline, the checkpoint assessment pivots toward Project~2 or the hybrid option. This is not punitive---it is information. A ridge-competitive result means the signal is linear, which is still valuable but may not justify the complexity of a tree-based model. Present it honestly: ``The signal exists and is well-captured by a linear model.''
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{The Sample-Size Problem}
+\label{sec:sample-size}
+% ──────────────────────────────────────────────────────────────
+
+Five years of daily data gives you approximately 1{,}250 observations. This is not a lot.
+
+\begin{keyresult}[Bailey, Borwein, L\'{o}pez de Prado, and Zhu (2014)]
+On 5 years of daily data ($T \approx 1{,}250$), approximately 45 independent trials are sufficient for the expected maximum Sharpe ratio under the null to reach ${\sim}1.87$ (annualized). After 45 trials, a Sharpe of 1.0 is almost certainly noise. After 100 trials, even a Sharpe of 1.5 becomes dubious. The fundamental constraint is not computational---it is informational: there are only 1{,}250 independent observations, and each trial extracts a bit more of the finite signal from the noise floor.
+\end{keyresult}
+
+This creates a tension: you want to explore many hypotheses (more trials $\Rightarrow$ better chance of finding something real), but each trial inflates $N$ (more trials $\Rightarrow$ higher bar for significance). Three mitigations:
+
+\subsection{Theory-Motivated Features}
+
+Features grounded in economic theory (intermediary asset pricing, He--Krishnamurthy 2013, Chapter~\ref{ch:intermediary}) are not the same as features generated by a data-mining search. The DSR framework assumes trials are independent draws from the null. If your feature is motivated by a specific causal hypothesis---``VaR utilization proxies for dealer risk capacity, which theory says should price assets''---it is more defensible than ``I tried 200 technical indicators and this one worked.'' This does not let you skip DSR, but it strengthens the narrative when presenting to a skeptical audience.
+
+\subsection{Panel Structure}
+
+Instead of treating each asset class as a separate experiment, use a panel regression (Chapter~\ref{ch:panel}) with asset-class fixed effects. A single panel model that tests VaR utilization across equities, rates, FX, and credit is \emph{one trial}, not four. This preserves $N$ while increasing the effective sample size to $1{,}250 \times K_{\text{assets}}$, improving statistical power without inflating the multiple-testing penalty.
+
+\subsection{Pre-Registration}
+
+Before looking at results, write down your hypotheses and the features you will test. Specify the decision criteria. This is the scientific analog of ``pre-registering'' a clinical trial. It does not change the statistics, but it gives you intellectual credibility when you claim that your 5 experiments were the only 5 you ran, rather than the 5 survivors out of 50.
+
+% ──────────────────────────────────────────────────────────────
+\section{Putting It All Together: The Validation Pipeline}
+\label{sec:validation-pipeline}
+% ──────────────────────────────────────────────────────────────
+
+The full validation pipeline for every experiment in your project is:
+
+\begin{center}
+\begin{tikzpicture}[node distance=1.1cm, font=\small,
+  vstep/.style={draw, rounded corners, minimum width=5.5cm, minimum height=0.7cm, align=center, fill=blue!5}]
+
+  \node[vstep] (s1) {1. Log experiment to tracker ($N \leftarrow N + 1$)};
+  \node[vstep, below=of s1] (s2) {2. Run purged $K$-fold CV (embargo $\geq$ max lookback)};
+  \node[vstep, below=of s2] (s3) {3. Run CPCV ($N = 6$, $k = 2$): get 15 Sharpe estimates};
+  \node[vstep, below=of s3] (s4) {4. Compute DSR with cumulative trial count $N$};
+  \node[vstep, below=of s4] (s5) {5. Compute Haircut Sharpe (Bonferroni, Holm, BHY)};
+  \node[vstep, below=of s5] (s6) {6. Compare GBM vs.\ ridge on same features \& CV splits};
+  \node[vstep, below=of s6] (s7) {7. Check PBO on CPCV paths};
+
+  \draw[arrow] (s1) -- (s2);
+  \draw[arrow] (s2) -- (s3);
+  \draw[arrow] (s3) -- (s4);
+  \draw[arrow] (s4) -- (s5);
+  \draw[arrow] (s5) -- (s6);
+  \draw[arrow] (s6) -- (s7);
+
+  % Decision
+  \node[decisionblock, below=1.2cm of s7, minimum width=3cm] (dec) {All pass?};
+  \draw[arrow] (s7) -- (dec);
+
+  \node[vstep, right=1.5cm of dec, fill=green!10, minimum width=3cm] (yes) {Proceed to OOS test};
+  \node[vstep, left=1.5cm of dec, fill=red!10, minimum width=3cm] (no) {Discard or revise};
+
+  \draw[arrow] (dec) -- node[above, font=\scriptsize]{Yes} (yes);
+  \draw[arrow] (dec) -- node[above, font=\scriptsize]{No} (no);
+\end{tikzpicture}
+\end{center}
+
+A result passes the gauntlet if:
+\begin{enumerate}[nosep]
+  \item Purged CV Sharpe $> 0$ consistently across folds.
+  \item DSR $> 0.95$ (or at minimum $> 0.50$, with honest $N$).
+  \item Haircutted Sharpe is economically meaningful ($> 0.5$ annualized after costs).
+  \item GBM beats ridge (or ridge alone is acceptable as a simpler model).
+  \item PBO $< 0.50$ (ideally $< 0.30$).
+\end{enumerate}
+
+Only results that survive this pipeline should touch the reserved holdout data in Phase~5 (Chapter~\ref{ch:backtesting}). The holdout is a one-shot test---you do not iterate on it. If you send a noise-fitted model to holdout, you waste your only chance at a clean OOS result.
+
+% ──────────────────────────────────────────────────────────────
+\section{Summary}
+\label{sec:ch11-summary}
+% ──────────────────────────────────────────────────────────────
+
+\begin{enumerate}[nosep]
+  \item Standard $K$-fold CV fails for time series because random partitioning creates train-test leakage through temporally autocorrelated features and overlapping label horizons.
+  \item \textbf{Purged CV} removes training observations whose labels overlap with the test period. \textbf{Embargo} removes additional observations after the test boundary to handle serial correlation in features.
+  \item \textbf{CPCV} generates $\binom{N}{k}$ train-test splits from $N$ contiguous groups, producing a distribution of Sharpe ratios rather than a single estimate. With $N = 6$, $k = 2$: 15 splits, 5 paths.
+  \item The \textbf{Deflated Sharpe Ratio} accounts for multiple testing, non-normality, and sample size: $\DSR = \Phi\!\left(\frac{(\widehat{\SR}^* - \SR_0)\sqrt{T-1}}{\sqrt{1 - \hat{\gamma}_3 \SR_0 + (\hat{\gamma}_4 - 1)\SR_0^2/4}}\right)$. Require DSR $> 0.95$.
+  \item The \textbf{expected maximum Sharpe under the null} grows with the number of trials $N$. With 45 trials on 5 years of daily data, $\E[\max \SR] \approx 1.87$ annualized.
+  \item \textbf{Haircut Sharpe} applies Bonferroni, Holm, or BHY corrections. Harvey--Liu--Zhu (2016): a new factor needs $t > 3.0$, not 1.96. Only 9 of 313 published factors survive.
+  \item \textbf{PBO} $= \Pr(\lambda < 0)$ where $\lambda$ is the logit of the IS-optimal strategy's OOS rank. PBO $> 0.50$ $=$ overfit.
+  \item The \textbf{ridge baseline} is your credibility floor. GBM must beat ridge on identical features and CV splits.
+  \item \textbf{Every experiment must be logged.} The experiment tracker ensures honest trial counting for DSR.
+  \item With $T \approx 1{,}250$ daily observations, approximately 45 trials exhaust a Sharpe of 1.0. Mitigate with theory-motivated features, panel structure, and pre-registration.
+\end{enumerate}
+
+% ──────────────────────────────────────────────────────────────
+\section*{Key Results Reference}
+\label{sec:ch11-key-results}
+% ──────────────────────────────────────────────────────────────
+
+\begin{center}
+\begin{tabular}{p{4.5cm} p{4cm} p{5cm}}
+\toprule
+\textbf{Paper} & \textbf{Key Claim} & \textbf{Headline Result} \\
+\midrule
+L\'{o}pez de Prado (2018), Ch.~7, 12 & Standard CV leaks in time series; purging and embargo fix it & Purged CV + CPCV: the correct CV framework for financial ML \\
+\addlinespace
+Bailey \& L\'{o}pez de Prado (2014) & Selection bias inflates Sharpe ratios & DSR: 45 trials on 5yr daily data $\Rightarrow$ $\E[\max \SR] \approx 1.87$; Sharpe 1.0 has DSR $\approx 0.02$ \\
+\addlinespace
+Harvey \& Liu (2015) & Backtested Sharpe must be haircutted & Three corrections: Bonferroni, Holm, BHY; 50\% rule of thumb is imprecise \\
+\addlinespace
+Harvey, Liu, \& Zhu (2016) & Most published factors are false discoveries & $t > 3.0$ hurdle; only 9 of 313 factors survive; 316+ factors tested \\
+\addlinespace
+Bailey, Borwein, LdP, Zhu (2014) & Backtest overfitting is quantifiable & PBO via CSCV; PBO $> 0.50$ $=$ more likely overfit than not \\
+\bottomrule
+\end{tabular}
+\end{center}

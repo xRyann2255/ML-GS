@@ -1,0 +1,771 @@
+% ══════════════════════════════════════════════════════════════
+% Chapter 9 — Feature Engineering from Risk Systems
+% ══════════════════════════════════════════════════════════════
+
+\chapter{Feature Engineering from Risk Systems}
+\label{ch:features}
+
+\begin{projectconnection}[Project Connection --- Phase 0 \& Phase 2]
+This chapter maps directly to Phase~0 (data pipeline) and Phase~2
+(feature engineering).  Every feature family here corresponds to a
+module in \texttt{src/features/}.  The critical lesson: \textbf{point-in-time
+discipline}.  A single lookahead bug---using VaR from the overnight risk
+run before it was actually available---invalidates your entire backtest.
+\end{projectconnection}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Point-in-Time Discipline}
+\label{sec:pit}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Feature Matrix Notation]
+A feature matrix $\bX \in \R^{T \times p}$ has $T$ rows (one per time
+step) and $p$ columns (one per feature).  Row $t$ contains only
+information that was \emph{known and available} at time $t$.  If any
+entry $X_{t,j}$ uses data that arrived after $t$, the matrix is
+contaminated by lookahead bias.
+\end{prereq}
+
+Every feature must be stamped with \emph{when it was known}, not when
+it applied.  Lopez de Prado (2018, Ch.~2) calls this
+\textbf{point-in-time} (PIT) stamping and identifies lookahead bias as
+the single most common and most damaging error in financial ML.
+The principle is simple: a feature available only at time $t+\delta$
+cannot appear in any row earlier than $t+\delta$ in your feature
+matrix.
+
+\subsection{Knowledge-Date Lagging}
+
+SecDB runs its nightly risk engine in a batch process.  The VaR number
+for business date $T$ is computed overnight between $T$ close and $T+1$
+open.  Therefore:
+
+\begin{itemize}[nosep]
+  \item The \textbf{as-of date} of VaR is $T$---it measures the
+        portfolio's risk as of the close on date $T$.
+  \item The \textbf{knowledge date} is $T+1$ morning---this is when the
+        number becomes available to traders and models.
+  \item Any model using VaR$_T$ as a feature may only do so for
+        predictions dated $T+1$ or later.
+\end{itemize}
+
+The gap between as-of date and knowledge date varies by data source:
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Risk Output} & \textbf{As-of Date} & \textbf{Knowledge Date} \\
+\midrule
+Nightly VaR / ES          & $T$ close  & $T+1$ pre-open \\
+Scenario P\&L              & $T$ close  & $T+1$ pre-open \\
+Intraday Greeks            & Real-time  & Real-time \\
+VaR limit (set by risk)    & Set date   & Set date \\
+Factor-VaR decomposition   & $T$ close  & $T+1$ pre-open \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Intraday Greeks are the exception: they are computed in
+real-time by SecDB's pricing engine and available immediately.  This is
+why Project~2 (Chapter~\ref{ch:microstructure}, Phase~4B) can use
+same-day Greek features.
+
+\begin{definition}[Point-in-Time Stamping]
+For a risk output $x$ with as-of date $T$ and knowledge date $T+\delta$,
+the PIT-stamped feature is:
+\begin{equation}
+\label{eq:pit}
+\tilde{x}_t =
+\begin{cases}
+x_T & \text{if } t \ge T + \delta \\
+\texttt{NaN} & \text{if } t < T + \delta
+\end{cases}
+\end{equation}
+where $\delta$ is the \textbf{publication lag}---typically 1 business day
+for overnight batch outputs.  The tilde notation $\tilde{x}$ denotes the
+PIT-lagged version.
+\end{definition}
+
+\begin{workedexample}{VaR Point-in-Time Timeline}
+Consider the following sequence for a Monday--Wednesday window:
+
+\begin{center}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Event} & \textbf{Wall-Clock Time} & \textbf{As-of} & \textbf{Knowledge} \\
+\midrule
+Monday close       & Mon 4:00pm  & ---     & --- \\
+Risk batch starts  & Mon 6:00pm  & Monday  & --- \\
+Risk batch ends    & Tue 5:00am  & Monday  & Tuesday \\
+Tuesday open       & Tue 9:30am  & ---     & --- \\
+Model predicts     & Tue 9:30am  & ---     & Uses VaR$_{\text{Mon}}$ \\
+Tuesday close      & Tue 4:00pm  & ---     & --- \\
+Risk batch ends    & Wed 5:00am  & Tuesday & Wednesday \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The model running at Tuesday open may use Monday's VaR (batch completed
+at 5am Tuesday) but \emph{not} Tuesday's VaR (batch has not run yet).
+In code, this means:
+
+\begin{equation}
+\label{eq:pit-example}
+\tilde{\VaR}_{t=\text{Tue}} = \VaR_{\text{Mon}}, \qquad
+\tilde{\VaR}_{t=\text{Wed}} = \VaR_{\text{Tue}}
+\end{equation}
+
+Using $\VaR_{\text{Tue}}$ at Tuesday close is cheating---it was not
+available until Wednesday morning.
+\end{workedexample}
+
+\begin{warning}[A Single Lookahead Bug Invalidates Your Entire Backtest]
+VaR for date $T$, computed in the overnight batch, is available at
+$T+1$ open.  Using it at $T$ close is cheating.  The effect is subtle:
+your backtest will show inflated Sharpe ratios because the model
+``knows'' tomorrow's risk state today.  Lopez de Prado (2018, Ch.~2)
+emphasizes that lookahead bias is the most frequent source of false
+discoveries in financial ML---more common than overfitting and harder
+to detect because the backtest looks clean.  In your pipeline code
+(\texttt{src/data/point\_in\_time.py}), enforce PIT lagging at the data
+ingestion layer so no downstream code can accidentally skip it.
+\end{warning}
+
+\subsection{Implementation Discipline}
+
+Three rules for your \texttt{src/data/pipeline.py}:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Lag at ingestion, not at modeling.}  Apply the
+        knowledge-date shift when data enters the pipeline.  Every
+        downstream consumer sees only PIT-valid data.
+  \item \textbf{Store both timestamps.}  Keep the as-of date and
+        knowledge date as separate columns.  This allows auditing.
+  \item \textbf{Unit test with synthetic data.}  Create a test where a
+        feature's knowledge date is deliberately set to $T+1$.  Verify
+        that the feature at time $T$ is \texttt{NaN}, not the $T$ value.
+\end{enumerate}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Feature Family 1: VaR Utilization}
+\label{sec:feat-var-util}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[VaR Utilization Recap]
+VaR utilization $= \VaR_{\text{current}} / \VaR_{\text{limit}} \times
+100\%$ measures how much of the desk's risk budget is deployed.
+Desks typically operate at 50--80\%; approaching 100\% forces position
+reduction.  See Section~\ref{sec:var-utilization} of
+Chapter~\ref{ch:risk-systems} for the full definition and the
+procyclical leverage mechanism (Adrian and Shin, 2014).
+\end{prereq}
+
+VaR utilization is one of two \textbf{priority} feature families
+(design spec, Phase~2).  The theoretical basis is strong: VaR
+utilization is the most direct proxy for the binding constraint in
+intermediary asset pricing models (He and Krishnamurthy, 2013;
+Chapter~\ref{ch:intermediary}).
+
+\subsection{Feature Definitions}
+
+Let $U_t = \VaR_t / \VaR_{\text{limit},t}$ denote VaR utilization at
+time $t$ (PIT-lagged per Section~\ref{sec:pit}).  Three features:
+
+\begin{definition}[VaR Utilization Features]
+\textbf{(1) Level:}
+\begin{equation}
+\label{eq:util-level}
+f^{\text{util-level}}_t = \tilde{U}_t
+\end{equation}
+Current utilization percentage.  Values above 85\% signal constrained
+dealers.
+
+\textbf{(2) Rate of change} over horizon $h \in \{1, 5, 21\}$ days:
+\begin{equation}
+\label{eq:util-roc}
+f^{\text{util-}\Delta h}_t = \tilde{U}_t - \tilde{U}_{t-h}
+\end{equation}
+Rising utilization signals building stress; the 5-day change captures
+weekly dynamics; the 21-day change captures monthly trends.
+
+\textbf{(3) Z-score} over a rolling window of length $w$ (default $w=63$
+business days, approximately 3 months):
+\begin{equation}
+\label{eq:util-zscore}
+f^{\text{util-z}}_t = \frac{\tilde{U}_t - \bar{U}_{t,w}}
+  {\hat{\sigma}_{U,t,w}}
+\end{equation}
+where $\bar{U}_{t,w}$ and $\hat{\sigma}_{U,t,w}$ are the rolling mean
+and standard deviation of $\tilde{U}$ over the window
+$[t-w+1,\; t]$.
+
+\begin{itemize}[nosep]
+  \item $f^{\text{util-level}}$ --- raw utilization; captures the
+        constraint \emph{level}.
+  \item $f^{\text{util-}\Delta h}$ --- first difference; captures the
+        \emph{direction} of constraint tightening or loosening.
+  \item $f^{\text{util-z}}$ --- standardized anomaly; captures how
+        \emph{unusual} today's utilization is relative to recent history.
+\end{itemize}
+\end{definition}
+
+\begin{workedexample}{VaR Utilization Features from a 10-Day Series}
+Given PIT-lagged utilization data:
+
+\begin{center}
+\small
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+$t$ & $\tilde{U}_t$ (\%) & $\Delta 1$d & $\Delta 5$d &
+  Z-score ($w\!=\!5$) \\
+\midrule
+1  & 62 & ---  & ---  & --- \\
+2  & 64 & $+2$ & ---  & --- \\
+3  & 68 & $+4$ & ---  & --- \\
+4  & 71 & $+3$ & ---  & --- \\
+5  & 73 & $+2$ & $+11$& --- \\
+6  & 78 & $+5$ & $+14$& $+1.63$ \\
+7  & 76 & $-2$ & $+12$& $+0.99$ \\
+8  & 80 & $+4$ & $+12$& $+1.38$ \\
+9  & 83 & $+3$ & $+12$& $+1.55$ \\
+10 & 88 & $+5$ & $+15$& $+1.82$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{itemize}[nosep]
+  \item \textbf{Level:} At $t\!=\!10$, utilization is 88\%---above the
+        85\% warning threshold.
+  \item \textbf{$\Delta 5$d:} The 5-day change of $+15$ percentage
+        points signals rapid constraint tightening.
+  \item \textbf{Z-score:} At $+1.82$, today's utilization is nearly
+        2 standard deviations above its recent 5-day rolling mean.
+\end{itemize}
+In practice, use $w=63$ (3 months) for the z-score to have a
+meaningful rolling baseline.  The $w=5$ window here is for illustration
+only.
+\end{workedexample}
+
+\begin{intuition}[Why Three Features, Not Just One?]
+The level, rate of change, and z-score capture fundamentally different
+information.  A desk at 85\% utilization that has been there for 6
+months (z-score near 0) is in a different state than a desk that jumped
+from 60\% to 85\% in a week (z-score near $+2$).  Both have the same
+level, but the second desk is under acute stress and more likely to
+be forced to sell.  The z-score distinguishes chronic from acute
+constraint tightening.
+\end{intuition}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Feature Family 2: Factor Concentration}
+\label{sec:feat-factor-conc}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Factor-VaR Decomposition and HHI]
+Factor-VaR decomposes total VaR into contributions from underlying risk
+factors (rates, credit, equity, FX, commodities).  The
+Herfindahl-Hirschman Index $\HHI = \sum_k s_k^2$ measures concentration,
+where $s_k$ is factor $k$'s share of total VaR.  $\HHI \in [1/K, 1]$;
+higher values mean more concentrated risk.  See
+Section~\ref{sec:factor-var} and specifically equation~\eqref{eq:hhi}
+of Chapter~\ref{ch:risk-systems}.
+\end{prereq}
+
+Factor concentration is the second \textbf{priority} feature family.
+The theory: when many dealers crowd into the same factor, HHI rises.
+If that factor reverses, concentrated dealers must all deleverage
+simultaneously---triggering fire sales (Coval and Stafford, 2007)
+and predictable return reversals (He, Kelly, and Manela, 2017;
+Chapter~\ref{ch:intermediary}).
+
+\subsection{Feature Definitions}
+
+Let $s_{k,t}$ denote the PIT-lagged factor-VaR share of factor $k$ at
+time $t$.
+
+\begin{definition}[Factor Concentration Features]
+\textbf{(1) Herfindahl Index:}
+\begin{equation}
+\label{eq:feat-hhi}
+f^{\text{HHI}}_t = \sum_{k=1}^{K} \tilde{s}_{k,t}^{\,2}
+\end{equation}
+Measures overall concentration.  $K$ is the number of risk factors
+(typically 5--10 for a cross-asset desk).
+
+\textbf{(2) Top-3 factor share:}
+\begin{equation}
+\label{eq:top3}
+f^{\text{top3}}_t = \sum_{k \in \mathcal{T}_t} \tilde{s}_{k,t}
+\end{equation}
+where $\mathcal{T}_t$ is the set of three factors with the largest
+VaR shares at time $t$.  This is a simpler, more interpretable
+concentration metric.
+
+\textbf{(3) Rolling HHI change:}
+\begin{equation}
+\label{eq:delta-hhi}
+f^{\Delta\text{HHI}}_t = f^{\text{HHI}}_t - f^{\text{HHI}}_{t-h}
+\end{equation}
+for $h \in \{5, 21\}$ days.  Rising HHI means concentration is
+increasing.
+
+\begin{itemize}[nosep]
+  \item $f^{\text{HHI}}$ --- level of concentration across all factors.
+  \item $f^{\text{top3}}$ --- concentration in the dominant factors;
+        robust to noise in small factor shares.
+  \item $f^{\Delta\text{HHI}}$ --- direction and speed of
+        concentration changes.
+\end{itemize}
+\end{definition}
+
+\begin{keyidea}[High HHI = Concentrated Risk = Fragility]
+High HHI means one factor dominates the risk profile.  This signals
+crowding and fragility.  He, Kelly, and Manela (2017) show that a single
+intermediary-capital factor prices risk across asset classes---when
+dealers are concentrated in one factor, the cross-asset pricing kernel
+is exposed to a single point of failure.
+
+\textbf{Concrete numbers:} For a 5-factor desk, $\HHI = 0.20$ means
+all factors contribute equally ($N_{\text{eff}} = 5$).  $\HHI = 0.50$
+means the desk is effectively a 2-factor bet.  $\HHI > 0.60$ should
+raise concern about crowding.
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Feature Family 3: VaR Dynamics}
+\label{sec:feat-var-dynamics}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[VaR Computation Methods and the Cliff Effect]
+VaR under historical simulation suffers from the cliff effect: an
+extreme observation entering or leaving the lookback window can cause
+a discontinuous jump (Section~\ref{subsec:hist-sim} of
+Chapter~\ref{ch:risk-systems}).  VaR-dynamics features should be
+smoothed (e.g., 5-day moving average) to reduce this noise.
+\end{prereq}
+
+VaR dynamics capture the \emph{time-series behavior} of the aggregate
+risk number---not where risk lives (that is factor concentration) or
+how close the desk is to its limit (that is utilization), but how risk
+itself is evolving.
+
+\subsection{Feature Definitions}
+
+Let $V_t$ denote the desk's total VaR at time $t$, PIT-lagged.
+
+\begin{definition}[VaR Dynamics Features]
+\textbf{(1) Delta VaR:}
+\begin{equation}
+\label{eq:delta-var}
+f^{\Delta\text{VaR}}_t = \tilde{V}_t - \tilde{V}_{t-1}
+\end{equation}
+The daily change in VaR.  Large positive values indicate a rapid
+increase in measured risk.
+
+\textbf{(2) Component VaR by asset class:}
+\begin{equation}
+\label{eq:cvar-ac}
+f^{\text{CVaR-}c}_t = \widetilde{\text{CVaR}}_{c,t}
+\end{equation}
+for each asset class $c \in \{\text{rates, credit, equity, FX,
+commodities}\}$.  These track the risk contribution of each asset class
+over time (see equation~\eqref{eq:cvar} of Chapter~\ref{ch:risk-systems}
+for the component VaR definition).
+
+\textbf{(3) VaR momentum:}
+\begin{equation}
+\label{eq:var-mom}
+f^{\text{VaR-mom}}_t = \operatorname{sign}\!\Bigl(
+  \sum_{i=0}^{4} (\tilde{V}_{t-i} - \tilde{V}_{t-i-1})
+\Bigr) \cdot
+\biggl|\sum_{i=0}^{4} (\tilde{V}_{t-i} - \tilde{V}_{t-i-1})\biggr|^{1/2}
+\end{equation}
+Sign and square-root magnitude of the 5-day rolling VaR change.  The
+square root compresses extreme values while preserving sign.
+
+\begin{itemize}[nosep]
+  \item $f^{\Delta\text{VaR}}$ --- instantaneous risk change.
+  \item $f^{\text{CVaR-}c}$ --- risk attribution by asset class.
+  \item $f^{\text{VaR-mom}}$ --- direction and persistence of risk
+        trends.
+\end{itemize}
+\end{definition}
+
+\begin{warning}[Methodology Breaks Masquerade as Signals]
+Section~\ref{sec:methodology-changes} of Chapter~\ref{ch:risk-systems}
+warns that VaR model updates create structural breaks.  A switch from
+historical simulation to Monte Carlo can produce a one-day $\Delta$VaR
+that dwarfs any genuine portfolio change.  LightGBM
+(Chapter~\ref{ch:trees}) will happily learn to split on these artifacts.
+Before engineering VaR-dynamics features, obtain the methodology change
+dates from Phase~0's risk-model audit and either include them as
+binary control variables or restrict training to a single methodology
+regime.
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Feature Family 4: Scenario P\&L}
+\label{sec:feat-scenario}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Scenario Analysis Recap]
+A scenario specifies simultaneous moves in multiple risk factors
+(e.g., rates $+200$bp, equities $-25\%$).  The risk system revalues the
+portfolio under each scenario to produce a scenario P\&L.  See
+Section~\ref{sec:scenarios} of Chapter~\ref{ch:risk-systems} for
+types of scenarios and a worked numerical example.
+\end{prereq}
+
+Scenario P\&L features are forward-looking in a way that VaR is not.
+VaR uses backward-looking distributions; scenarios ask ``what would
+happen \emph{if}?''  Changes in scenario P\&L capture shifts in
+portfolio vulnerability that may not yet appear in VaR.
+
+\subsection{Feature Definitions}
+
+Let $\pi_{j,t}$ denote the PIT-lagged scenario P\&L for scenario $j$
+at time $t$, with $j = 1, \ldots, J$ scenarios.
+
+\begin{definition}[Scenario P\&L Features]
+\textbf{(1) Worst-case rank:}
+\begin{equation}
+\label{eq:worst-rank}
+f^{\text{worst-id}}_t = \arg\min_j \;\tilde{\pi}_{j,t}
+\end{equation}
+Which scenario produces the largest loss today?  This is a categorical
+feature---the \emph{identity} of the worst scenario, not its magnitude.
+
+\textbf{(2) Scenario dispersion:}
+\begin{equation}
+\label{eq:scenario-disp}
+f^{\text{disp}}_t = \sqrt{\frac{1}{J}\sum_{j=1}^{J}
+  \bigl(\tilde{\pi}_{j,t} - \bar{\pi}_t\bigr)^2}
+\end{equation}
+where $\bar{\pi}_t = J^{-1}\sum_j \tilde{\pi}_{j,t}$ is the
+cross-scenario mean.  High dispersion means the portfolio is
+directionally sensitive---performance varies sharply with the type of
+stress.  Low dispersion means the portfolio is well-hedged or
+indifferent to the specific scenario.
+
+\textbf{(3) Worst-case identity change:}
+\begin{equation}
+\label{eq:worst-flip}
+f^{\text{flip}}_t = \mathbf{1}\!\bigl[
+  f^{\text{worst-id}}_t \ne f^{\text{worst-id}}_{t-1}\bigr]
+\end{equation}
+A binary indicator: did the worst scenario change from yesterday?
+A flip signals a qualitative shift in portfolio vulnerability---the
+desk's primary risk has rotated.
+
+\textbf{(4) Scenario P\&L skewness:}
+\begin{equation}
+\label{eq:scenario-skew}
+f^{\text{skew}}_t = \frac{J^{-1}\sum_{j=1}^{J}
+  (\tilde{\pi}_{j,t} - \bar{\pi}_t)^3}
+  {\bigl(f^{\text{disp}}_t\bigr)^3}
+\end{equation}
+Negative skewness means a few scenarios produce very large losses
+relative to the rest---the portfolio has a fat left tail across
+scenarios.
+
+\begin{itemize}[nosep]
+  \item $f^{\text{worst-id}}$ --- categorical; use one-hot encoding or
+        target encoding for tree models.
+  \item $f^{\text{disp}}$ --- continuous; high values signal directional
+        exposure.
+  \item $f^{\text{flip}}$ --- binary; captures qualitative regime shifts.
+  \item $f^{\text{skew}}$ --- continuous; captures asymmetry in
+        scenario outcomes.
+\end{itemize}
+\end{definition}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Feature Family 5: Cross-Asset Flow}
+\label{sec:feat-cross-asset}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Component VaR Shares]
+Component VaR (Section~\ref{sec:component-var} of
+Chapter~\ref{ch:risk-systems}) decomposes total VaR by position or
+asset class.  The component VaR share of asset class $c$ is
+$s_{c,t} = \text{CVaR}_{c,t} / \VaR_t$.  Shares sum to 1 (Euler
+decomposition).
+\end{prereq}
+
+Cross-asset flow features track how risk \emph{migrates} between asset
+classes.  These features are distinct from factor concentration
+(Section~\ref{sec:feat-factor-conc}), which measures overall
+diversification.  Cross-asset flow measures the \emph{direction} of
+risk rotation.
+
+\subsection{Feature Definitions}
+
+Let $s_{c,t}$ denote the PIT-lagged component VaR share of asset class
+$c$ at time $t$.
+
+\begin{definition}[Cross-Asset Flow Features]
+\textbf{(1) Component VaR share shift:}
+\begin{equation}
+\label{eq:share-shift}
+f^{\Delta s_c}_t = \tilde{s}_{c,t} - \tilde{s}_{c,t-h}
+\end{equation}
+for each asset class $c$ and horizon $h \in \{5, 21\}$ days.  Positive
+values mean the desk is accumulating risk in asset class $c$ relative
+to other classes.
+
+\textbf{(2) Rolling cross-asset VaR correlation:}
+\begin{equation}
+\label{eq:cross-corr}
+f^{\rho_{c_1,c_2}}_t = \operatorname{Corr}\!\bigl(
+  \tilde{s}_{c_1,\, t-w+1:t},\; \tilde{s}_{c_2,\, t-w+1:t}
+\bigr)
+\end{equation}
+over a rolling window of $w=63$ days, for key asset-class pairs (e.g.,
+rates--credit, equity--commodities).  High positive correlation means
+the desk's risk in both classes moves together; high negative
+correlation suggests active rotation from one class to another.
+
+\begin{itemize}[nosep]
+  \item $f^{\Delta s_c}$ --- direction of risk rotation by asset class.
+  \item $f^{\rho_{c_1,c_2}}$ --- persistence and co-movement of risk
+        allocation decisions.
+\end{itemize}
+\end{definition}
+
+\begin{keyidea}[Risk Rotation Predicts Relative Performance]
+If the rates VaR share rises while the credit VaR share falls,
+dealers are rotating risk---accumulating rate exposure and shedding
+credit exposure.  Under the intermediary pricing framework
+(Chapter~\ref{ch:intermediary}), this shift in dealer balance sheets
+should predict \emph{relative} performance between rates and credit.
+He, Kelly, and Manela (2017) show that a single intermediary-capital
+factor prices the cross-section of returns across asset classes.
+Cross-asset flow features test whether \emph{changes} in risk
+allocation across classes carry incremental information beyond
+the aggregate constraint level.
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Feature Family 6: Dealer Greeks (Project 2)}
+\label{sec:feat-greeks}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Dealer Greeks]
+A dealer's net gamma, vega, vanna, and charm determine whether hedging
+flows stabilize or destabilize prices.  Short-gamma dealers amplify
+price moves; long-gamma dealers dampen them.  See
+Sections~\ref{sec:gamma} and~\ref{sec:higher-greeks} of
+Chapter~\ref{ch:microstructure} for definitions and the
+shock-absorber vs.\ shock-amplifier intuition.
+\end{prereq}
+
+These features belong to Phase~4B (Project~2: Book-Gamma Intraday
+Momentum).  They are included here for completeness and because the
+shared infrastructure (Task~5, data pipeline) should accommodate them
+from the start.  All Greek features are available in real time from
+SecDB's pricing engine, so PIT lagging is not required---but you must
+still ensure that features used for end-of-day predictions are computed
+at a consistent timestamp (e.g., 3:00pm snapshot).
+
+\subsection{Feature Definitions}
+
+Let $\Gamma^{\text{net}}_t$, $\mathcal{V}^{\text{net}}_t$,
+$\text{Vanna}^{\text{net}}_t$, and $\text{Charm}^{\text{net}}_t$ denote
+the aggregate net book-level Greeks from SecDB at time $t$.
+
+\begin{definition}[Dealer Greek Features]
+\textbf{(1) Net gamma, vega, vanna, charm:}
+\begin{equation}
+\label{eq:net-greeks}
+f^{\Gamma}_t = \Gamma^{\text{net}}_t, \quad
+f^{\mathcal{V}}_t = \mathcal{V}^{\text{net}}_t, \quad
+f^{\text{vanna}}_t = \text{Vanna}^{\text{net}}_t, \quad
+f^{\text{charm}}_t = \text{Charm}^{\text{net}}_t
+\end{equation}
+These are the raw aggregate sensitivities.  The sign of gamma is the
+key feature: negative aggregate gamma predicts intraday momentum
+(Baltussen, Da, Lammers, and Martens, 2021;
+Section~\ref{sec:intraday-momentum} of Chapter~\ref{ch:microstructure}).
+
+\textbf{(2) Gamma-flip level:}
+\begin{equation}
+\label{eq:gamma-flip}
+S^{\text{flip}}_t = \text{strike at which aggregate } \Gamma^{\text{net}}
+  \text{ changes sign}
+\end{equation}
+The gamma-flip level is the underlying price where the desk transitions
+from long gamma (stabilizing) to short gamma (destabilizing) or vice
+versa.
+
+\textbf{(3) Distance to flip:}
+\begin{equation}
+\label{eq:dist-flip}
+f^{\text{d-flip}}_t = \frac{S_t - S^{\text{flip}}_t}{S_t} \times 100\%
+\end{equation}
+where $S_t$ is the current underlying price.  Small absolute values
+mean the market is near the flip level---a regime transition in hedging
+flow direction is imminent.
+
+\begin{itemize}[nosep]
+  \item $f^{\Gamma}, f^{\mathcal{V}}, f^{\text{vanna}},
+        f^{\text{charm}}$ --- raw book-level sensitivities with
+        correct dealer sign (not estimated from public data).
+  \item $S^{\text{flip}}$ --- the gamma regime boundary.
+  \item $f^{\text{d-flip}}$ --- proximity to regime transition;
+        nonlinear effects concentrate near zero.
+\end{itemize}
+\end{definition}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Confound Checking}
+\label{sec:confounds}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Omitted Variable Bias]
+If a predictor $x$ and outcome $y$ are both driven by an omitted
+variable $z$, the apparent predictive relationship between $x$ and $y$
+is spurious.  Including $z$ as a control variable reveals whether $x$
+has \emph{incremental} predictive power.  This is the financial-ML
+analogue of the ``confound'' in causal inference.
+\end{prereq}
+
+A risk-system feature that merely repackages information already
+available in public data adds no value.  VaR rises when markets are
+stressed---but so does the VIX.  If your VaR-based signal vanishes
+after controlling for VIX, you have not discovered a new signal; you
+have built a noisy VIX proxy.
+
+\subsection{Control Variables}
+
+Add the following public factors as controls in every model:
+
+\begin{enumerate}[nosep]
+  \item \textbf{VIX level and change:} $\text{VIX}_t$ and
+        $\Delta\text{VIX}_t$.  The most common confound for any
+        risk-based feature.
+  \item \textbf{Credit spread:} Investment-grade and high-yield OAS
+        (option-adjusted spread).  Confounds credit-related features.
+  \item \textbf{Term slope:} 10y$-$2y Treasury yield spread.  Confounds
+        rate-related features and captures macro regime.
+  \item \textbf{Equity market return:} S\&P 500 trailing 5-day return.
+        Confounds any feature correlated with market direction.
+  \item \textbf{Dollar index:} DXY level and change.  Confounds
+        FX-related features.
+\end{enumerate}
+
+\subsection{The Confound Test}
+
+Run two models (ridge baseline, then LightGBM---see
+Chapters~\ref{ch:regularized} and~\ref{ch:trees}):
+
+\begin{enumerate}[nosep]
+  \item \textbf{Model A:} Risk features only.
+  \item \textbf{Model B:} Risk features $+$ public controls.
+\end{enumerate}
+
+Compare the information coefficient ($\IC$) and SHAP importance
+(Chapter~\ref{ch:interpretation}) of each risk feature across
+Models A and B.
+
+\begin{keyidea}[Confound Checking Is Not Optional]
+If your signal vanishes after adding public controls, it is redundant
+with publicly available information---you have not added value.  The
+test is simple: compare $\IC$ with and without controls.  A feature
+that survives controls has \emph{incremental} information from
+proprietary risk data.  A feature that does not is just noise around
+VIX or credit spreads.
+
+This is the feature-level analogue of the confound checks in
+asset pricing (Chapter~\ref{ch:asset-pricing}): a ``new'' factor that
+is spanned by existing factors adds nothing.
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Summary}
+\label{sec:features-summary}
+% ──────────────────────────────────────────────────────────────
+
+Table~\ref{tab:feature-families} maps each feature family to its
+constituent features, source chapter, and project phase.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{@{}p{2.6cm}p{4.5cm}p{2.8cm}p{2.8cm}@{}}
+\toprule
+\textbf{Feature Family} & \textbf{Features} &
+  \textbf{Source Chapter} & \textbf{Project Phase} \\
+\midrule
+VaR Utilization
+  & Level, $\Delta h$-day change, z-score
+  & Ch.~\ref{ch:risk-systems} \S\ref{sec:var-utilization}
+  & Phase 2 (priority) \\[6pt]
+
+Factor Concentration
+  & HHI, top-3 share, $\Delta$HHI
+  & Ch.~\ref{ch:risk-systems} \S\ref{sec:factor-var}
+  & Phase 2 (priority) \\[6pt]
+
+VaR Dynamics
+  & $\Delta$VaR, CVaR by asset class, VaR momentum
+  & Ch.~\ref{ch:risk-systems} \S\ref{sec:var-methods}
+  & Phase 2 \\[6pt]
+
+Scenario P\&L
+  & Worst-case id, dispersion, flip indicator, skewness
+  & Ch.~\ref{ch:risk-systems} \S\ref{sec:scenarios}
+  & Phase 2 \\[6pt]
+
+Cross-Asset Flow
+  & CVaR share shifts, rolling cross-asset correlation
+  & Ch.~\ref{ch:risk-systems} \S\ref{sec:component-var}
+  & Phase 2 \\[6pt]
+
+Dealer Greeks
+  & Net $\Gamma$/$\mathcal{V}$/vanna/charm, flip level,
+    distance to flip
+  & Ch.~\ref{ch:microstructure} \S\ref{sec:gamma}
+  & Phase 4B \\
+\bottomrule
+\end{tabular}
+\caption{Feature family reference.  Priority families (VaR utilization
+  and factor concentration) are tested first in Phase~2 per the design
+  spec.  All batch-computed features require PIT lagging
+  (Section~\ref{sec:pit}).  Dealer Greeks are real-time and belong to
+  Project~2.}
+\label{tab:feature-families}
+\end{table}
+
+\vspace{1em}
+
+\noindent\textbf{Key takeaways:}
+\begin{enumerate}[nosep]
+  \item Point-in-time discipline is non-negotiable.  Enforce PIT lagging
+        at the data ingestion layer.  VaR for date $T$ is available at
+        $T+1$ open.
+  \item Six feature families span the full set of SecDB risk outputs.
+        VaR utilization and factor concentration are tested first
+        (strongest theory: Adrian and Shin, 2014; He, Kelly, and
+        Manela, 2017; Coval and Stafford, 2007).
+  \item Every feature must pass confound checks against public controls
+        (VIX, credit spread, term slope).  Features that do not survive
+        controls are noisy proxies, not new signals.
+  \item The level, rate of change, and z-score of a quantity are three
+        different features---they capture different aspects
+        (constraint state, direction, unusualness) and should all be
+        included.
+  \item Dealer Greek features (Project~2) are real-time and do not
+        require PIT lagging, but they do require a consistent intraday
+        timestamp for reproducibility.
+\end{enumerate}

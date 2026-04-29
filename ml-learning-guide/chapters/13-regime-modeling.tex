@@ -1,0 +1,569 @@
+\chapter{Regime Modeling}
+\label{ch:regimes}
+
+\begin{projectconnection}
+In Phase~4A (Task~17), you fit a Gaussian Mixture Model on macro features to
+classify market regimes and decompose your signal's performance by regime.
+This chapter teaches GMM regime classification, the Two Sigma template for
+interpreting regimes, ADWIN for online drift detection, Markov-switching
+models for regime persistence, and---critically---the Asness et al.\ (2017)
+caveat on why regime-conditional strategies often disappoint in practice.
+\end{projectconnection}
+
+% ══════════════════════════════════════════════════════════════
+\section{Why Regime-Awareness Matters}
+\label{sec:regimes:why}
+% ══════════════════════════════════════════════════════════════
+
+A signal that earns $\IC = 0.04$ unconditionally might earn $\IC = 0.10$ in
+calm markets and $\IC = -0.03$ during crises.  If the positive performance
+comes entirely from one market regime, the signal is \emph{fragile}: the
+next crisis could wipe out years of steady gains.  Regime decomposition
+answers a simple but important question: \emph{is your signal's Sharpe
+driven by one regime, or is it broad-based?}
+
+Three practical uses of regime modeling in your project:
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{Diagnostic.}  Decompose backtest Sharpe by regime.  A signal
+    that works only in steady-state periods is less valuable than one that
+    works across regimes.
+  \item \textbf{Risk management.}  Scale position sizes down when the model
+    assigns high probability to a crisis regime.
+  \item \textbf{Feature enrichment.}  Feed regime probabilities as
+    additional features into your LightGBM model (Chapter~\ref{ch:trees}).
+\end{enumerate}
+
+\begin{intuition}[Regimes as Weather]
+Think of regimes like weather seasons.  A farmer who only knows the
+\emph{average} annual rainfall will plant the same crop year-round.  One who
+distinguishes wet and dry seasons adapts.  Your signal is the crop;
+regimes are the seasons.  The goal is not to predict regimes (that is
+hard)---it is to \emph{check whether your crop survives all seasons}.
+\end{intuition}
+
+% ══════════════════════════════════════════════════════════════
+\section{Gaussian Mixture Models for Regime Classification}
+\label{sec:regimes:gmm}
+% ══════════════════════════════════════════════════════════════
+
+\begin{prereq}[Multivariate Gaussian and Mixture Models]
+A $d$-dimensional Gaussian density is
+\[
+  \N(\bx \mid \bm{\mu}, \bm{\Sigma})
+  = \frac{1}{(2\pi)^{d/2} |\bm{\Sigma}|^{1/2}}
+    \exp\!\Bigl(-\tfrac{1}{2}(\bx - \bm{\mu})^\top \bm{\Sigma}^{-1}
+    (\bx - \bm{\mu})\Bigr),
+\]
+where $\bm{\mu} \in \R^d$ is the mean and
+$\bm{\Sigma} \in \R^{d \times d}$ is the covariance matrix
+(symmetric positive-definite).  A \emph{mixture model} says the data
+come from several such Gaussians, each chosen with some probability.
+If this is unfamiliar, review Bishop (2006), Ch.~2 and~9.
+\end{prereq}
+
+\begin{definition}[Gaussian Mixture Model]
+A $K$-component Gaussian Mixture Model (GMM) models the density of
+observations $\bx \in \R^d$ as
+\begin{equation}
+  p(\bx) = \sum_{k=1}^{K} \pi_k \; \N(\bx \mid \bm{\mu}_k, \bm{\Sigma}_k),
+  \label{eq:gmm}
+\end{equation}
+where:
+\begin{itemize}[leftmargin=1.5em]
+  \item $K$ is the number of mixture components (regimes),
+  \item $\pi_k \geq 0$ is the \textbf{mixing weight} for component $k$,
+        with $\sum_{k=1}^K \pi_k = 1$,
+  \item $\bm{\mu}_k \in \R^d$ is the \textbf{mean} of component $k$,
+  \item $\bm{\Sigma}_k \in \R^{d \times d}$ is the \textbf{covariance}
+        of component $k$.
+\end{itemize}
+\end{definition}
+
+The parameters $\btheta = \{\pi_k, \bm{\mu}_k, \bm{\Sigma}_k\}_{k=1}^K$
+are estimated by maximum likelihood.  Because the log-likelihood
+\[
+  \ell(\btheta) = \sum_{t=1}^{T} \log \sum_{k=1}^{K} \pi_k \;
+  \N(\bx_t \mid \bm{\mu}_k, \bm{\Sigma}_k)
+\]
+has no closed-form solution (the log wraps a sum), we use the
+Expectation--Maximization (EM) algorithm
+(Dempster, Laird, and Rubin, 1977).
+
+% ── EM Algorithm ──
+\subsection{The EM Algorithm}
+\label{sec:regimes:em}
+
+EM alternates between two steps until convergence:
+
+\begin{keyidea}[EM for Gaussian Mixtures]
+\textbf{E-step} (soft labels).  For each observation $\bx_t$ and component
+$k$, compute the \emph{responsibility}:
+\begin{equation}
+  \gamma_{tk} = \frac{\pi_k \; \N(\bx_t \mid \bm{\mu}_k, \bm{\Sigma}_k)}
+    {\sum_{j=1}^{K} \pi_j \; \N(\bx_t \mid \bm{\mu}_j, \bm{\Sigma}_j)}.
+  \label{eq:estep}
+\end{equation}
+$\gamma_{tk}$ is the posterior probability that observation $t$ belongs to
+component $k$.
+
+\textbf{M-step} (update parameters).  Using the responsibilities as weights:
+\begin{align}
+  N_k &= \sum_{t=1}^{T} \gamma_{tk}, \label{eq:mstep-n}\\[4pt]
+  \bm{\mu}_k^{\text{new}} &= \frac{1}{N_k} \sum_{t=1}^{T} \gamma_{tk}\,
+    \bx_t, \label{eq:mstep-mu}\\[4pt]
+  \bm{\Sigma}_k^{\text{new}} &= \frac{1}{N_k} \sum_{t=1}^{T}
+    \gamma_{tk}\,(\bx_t - \bm{\mu}_k^{\text{new}})
+    (\bx_t - \bm{\mu}_k^{\text{new}})^\top, \label{eq:mstep-sigma}\\[4pt]
+  \pi_k^{\text{new}} &= \frac{N_k}{T}. \label{eq:mstep-pi}
+\end{align}
+$N_k$ is the effective number of points assigned to component $k$.
+
+Repeat E-step and M-step until $|\ell^{(i+1)} - \ell^{(i)}| < \epsilon$.
+EM guarantees $\ell(\btheta)$ is non-decreasing at every iteration
+(Dempster, Laird, and Rubin, 1977).
+\end{keyidea}
+
+% ── Model selection ──
+\subsection{Choosing $K$: BIC}
+\label{sec:regimes:bic}
+
+More components always improve in-sample fit, so you cannot pick $K$ by
+maximizing the log-likelihood.  The Bayesian Information Criterion penalizes
+complexity:
+\begin{equation}
+  \text{BIC} = -2\,\ell(\hat{\btheta}) + p \log T,
+  \label{eq:bic}
+\end{equation}
+where $p$ is the number of free parameters and $T$ is the sample size.
+For a $K$-component GMM in $d$ dimensions with full covariance matrices,
+$p = K(1 + d + d(d+1)/2) - 1$.  Choose the $K$ that
+\emph{minimizes} BIC.  Two Sigma used cross-validated log-likelihood with
+similar results.  For your project, $K \in \{2, 3, 4\}$; $K = 3$ or $4$
+is typical.
+
+% ── Feature choice ──
+\subsection{Feature Selection for Regime GMM}
+\label{sec:regimes:features}
+
+The regime GMM takes macro observables, not your alpha features.  Typical
+choices:
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  Feature & Source & Captures \\
+  \midrule
+  VIX level & CBOE & Equity risk appetite \\
+  IG credit spread & ICE BofA & Credit stress \\
+  10y--2y term slope & Treasury & Growth/policy expectations \\
+  DXY (USD index) & Fed & Dollar regime \\
+  Realized cross-asset corr. & Computed & Contagion / diversification \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+Standardize all features to zero mean and unit variance before fitting.
+This prevents the GMM from being dominated by whichever feature has the
+largest scale.
+
+\begin{warning}[Do Not Use Your Alpha Features as Regime Inputs]
+If you feed your risk-cube signals into the regime GMM \emph{and then}
+condition on regimes, you introduce circularity.  The regime model should
+use independent macro variables.  Your alpha features go into the
+LightGBM prediction model; the regime model provides an orthogonal lens
+for decomposing performance.
+\end{warning}
+
+% ── Worked example ──
+\begin{workedexample}{One EM Iteration on a 2D, 3-Component GMM}
+Suppose $d = 2$ features (VIX, credit spread), $K = 3$ components, and
+$T = 5$ observations.  After initialization, the current parameters are:
+
+\[
+  \pi_1 = 0.5, \quad \pi_2 = 0.3, \quad \pi_3 = 0.2.
+\]
+\[
+  \bm{\mu}_1 = \begin{pmatrix} 14 \\ 1.0 \end{pmatrix}, \quad
+  \bm{\mu}_2 = \begin{pmatrix} 22 \\ 2.5 \end{pmatrix}, \quad
+  \bm{\mu}_3 = \begin{pmatrix} 35 \\ 5.0 \end{pmatrix}.
+\]
+All covariances initialized to $\bm{\Sigma}_k = \mathbf{I}_2$ for
+simplicity.
+
+\textbf{E-step for $\bx_1 = (15, 1.2)^\top$:}
+
+Compute unnormalized responsibilities:
+\begin{align*}
+  \tilde{\gamma}_{1,1} &= \pi_1 \cdot \N(\bx_1 \mid \bm{\mu}_1,
+    \mathbf{I}) = 0.5 \times \N\bigl((15,1.2)^\top \mid (14,1.0)^\top,
+    \mathbf{I}\bigr). \\
+  \|\bx_1 - \bm{\mu}_1\|^2 &= (15-14)^2 + (1.2-1.0)^2 = 1.04. \\
+  \N(\cdot) &= \frac{1}{2\pi} \exp(-1.04/2) = 0.0942. \\
+  \tilde{\gamma}_{1,1} &= 0.5 \times 0.0942 = 0.0471.
+\end{align*}
+Similarly, $\|\bx_1 - \bm{\mu}_2\|^2 = (15-22)^2 + (1.2-2.5)^2 = 50.69$,
+giving $\tilde{\gamma}_{1,2} = 0.3 \times 1.32 \times 10^{-12} \approx 0$.
+And $\|\bx_1 - \bm{\mu}_3\|^2 = 414.44$, giving
+$\tilde{\gamma}_{1,3} \approx 0$.
+
+\textbf{Normalize:}
+\[
+  \gamma_{1,1} = \frac{0.0471}{0.0471 + 0 + 0} \approx 1.00, \quad
+  \gamma_{1,2} \approx 0, \quad \gamma_{1,3} \approx 0.
+\]
+
+Observation $\bx_1$ is assigned almost entirely to component~1 (low-VIX,
+low-spread = steady state).  Repeat for all $T$ observations to complete
+the E-step, then update parameters via Eqs.~\eqref{eq:mstep-n}--\eqref{eq:mstep-pi}.
+
+\textbf{Takeaway.}  Points far from a component's mean get
+near-zero responsibility.  This is how the GMM ``self-organizes'' into
+clusters without hard labels.
+\end{workedexample}
+
+% ══════════════════════════════════════════════════════════════
+\section{The Two Sigma Regime Template}
+\label{sec:regimes:twosigma}
+% ══════════════════════════════════════════════════════════════
+
+Two Sigma applied a GMM to 17 factor returns and identified four market
+conditions that recur historically.  Their template provides a useful
+vocabulary for interpreting your own GMM output.
+
+\begin{keyidea}[Four Macro Regimes (Two Sigma, 2021)]
+\begin{center}
+\begin{tabular}{p{2.8cm} p{5.5cm} p{5.2cm}}
+  \toprule
+  \textbf{Regime} & \textbf{Characteristics} & \textbf{Asset behavior} \\
+  \midrule
+  \textbf{Steady State} &
+    Low VIX, tight spreads, moderate growth.  Dominates the 2010s decade. &
+    Equity, credit, and most style factors earn positive returns. \\[4pt]
+  \textbf{Crisis} &
+    VIX spikes, spreads widen, cross-asset correlations surge.
+    1987, 2008~GFC, 2020~COVID. &
+    Equity and credit suffer large drawdowns; defensive factors outperform. \\[4pt]
+  \textbf{Inflation} &
+    Rising CPI, steepening yield curve, commodity strength.
+    Concentrated in 1970s--early 1980s. &
+    Local inflation factor posts double-digit mean returns; equities and
+    bonds underperform. \\[4pt]
+  \textbf{Walking on Ice} &
+    Equity returns above average but volatility $\sim$1.6~pp above
+    long-run mean.  Often precedes or follows crises. &
+    Positive equity returns mask elevated fragility; bubble risk. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\end{keyidea}
+
+\subsection{Regime-Conditional Sharpe Decomposition}
+\label{sec:regimes:conditional-sharpe}
+
+Once you assign regime probabilities to each date in your backtest, compute
+regime-conditional Sharpe ratios:
+\begin{equation}
+  \SR_k = \frac{\bar{r}_k}{\sigma_k}, \quad
+  \text{where } \bar{r}_k = \frac{\sum_t \gamma_{tk}\, r_t}
+  {\sum_t \gamma_{tk}}, \quad
+  \sigma_k^2 = \frac{\sum_t \gamma_{tk}\,(r_t - \bar{r}_k)^2}
+  {\sum_t \gamma_{tk}}.
+  \label{eq:regime-sharpe}
+\end{equation}
+Report these alongside your unconditional Sharpe.  The presentation
+(Chapter~\ref{ch:presenting}) should include a table like:
+
+\begin{center}
+\begin{tabular}{lcccc}
+  \toprule
+  & Steady State & Crisis & Inflation & Walking on Ice \\
+  \midrule
+  $\SR$ & 1.20 & $-0.30$ & 0.45 & 0.85 \\
+  Fraction of days & 55\% & 10\% & 15\% & 20\% \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+If $\SR$ is positive only in Steady State (55\% of days), your signal is
+fragile.  If positive across three or four regimes, it is robust.
+
+\begin{prereq}[Sharpe Ratio and Annualization]
+The Sharpe ratio $\SR = \bar{r}/\sigma$ measures risk-adjusted return.
+For daily data, annualize via $\SR_{\text{annual}} = \SR_{\text{daily}}
+\times \sqrt{252}$.  This chapter computes regime-conditional Sharpe
+ratios on daily strategy returns, then annualizes.  See
+Chapter~\ref{ch:backtesting} for the full backtesting framework.
+\end{prereq}
+
+% ══════════════════════════════════════════════════════════════
+\section{ADWIN for Concept Drift Detection}
+\label{sec:regimes:adwin}
+% ══════════════════════════════════════════════════════════════
+
+The GMM approach is \emph{offline}: you fit the model to all available data
+and then label each date.  In production, you need \emph{online} detection
+of distribution shifts.  ADWIN (Adaptive Windowing; Bifet and Gavald\`{a},
+2007) provides exactly this.
+
+\begin{definition}[ADWIN Algorithm]
+ADWIN maintains a variable-length window $W$ of recent observations.  At
+each time step, it tests all possible partitions of $W$ into two contiguous
+sub-windows $W_0$ (older) and $W_1$ (newer).  A drift is declared when the
+absolute difference between the sub-window means exceeds a threshold
+derived from the Hoeffding bound:
+\begin{equation}
+  |\hat{\mu}_{W_0} - \hat{\mu}_{W_1}| \geq \epsilon_{\text{cut}},
+  \quad \text{where } \epsilon_{\text{cut}}
+  = \sqrt{\frac{1}{2m}\cdot \ln \frac{4|W|}{\delta}},
+  \label{eq:adwin}
+\end{equation}
+$m = (1/|W_0| + 1/|W_1|)^{-1}$ is the harmonic mean of the sub-window
+sizes, $|W|$ is the total window length, and $\delta \in (0,1)$ is a
+confidence parameter controlling sensitivity.  When drift is detected,
+all observations in $W_0$ are discarded.
+\end{definition}
+
+\textbf{How to use ADWIN in your project:}
+\begin{enumerate}[leftmargin=1.5em]
+  \item Feed your model's \emph{prediction errors}
+        ($\hat{y}_t - y_t$) into ADWIN.
+  \item When ADWIN fires, it means the error distribution has shifted---your
+        model's relationship with the data has changed.
+  \item Trigger a model retrain on the post-drift window only.
+\end{enumerate}
+
+The parameter $\delta$ controls the trade-off: $\delta = 0.01$ (more
+sensitive, more false positives, faster detection) vs.\ $\delta = 0.0001$
+(fewer false positives, slower detection).  For daily financial data with
+$\sim$252 observations per year, $\delta = 0.002$ is a reasonable starting
+point.
+
+\begin{intuition}[ADWIN as a Smoke Detector]
+ADWIN is like a smoke detector for your model.  It does not tell you
+\emph{what} regime you are in (the GMM does that).  It tells you that
+something has \emph{changed}---your model's errors suddenly look different
+from what they were.  When the alarm sounds, you investigate: has the
+market entered a new regime, or did your feature pipeline break?
+\end{intuition}
+
+% ══════════════════════════════════════════════════════════════
+\section{Markov-Switching Models}
+\label{sec:regimes:markov}
+% ══════════════════════════════════════════════════════════════
+
+\begin{prereq}[Hidden Markov Models]
+A Hidden Markov Model (HMM) has two layers: (1)~a latent state sequence
+$s_t \in \{1, \ldots, K\}$ evolving as a Markov chain, and (2)~observed
+emissions $\bx_t$ whose distribution depends on $s_t$.  The key
+assumption: $s_t$ depends on $s_{t-1}$ only (Markov property).  If
+unfamiliar, review Murphy (2012), Ch.~17.
+\end{prereq}
+
+Hamilton (1989) introduced Markov-switching regression to economics,
+modeling U.S.\ GNP growth as an autoregression whose mean shifts between
+two states: expansion and contraction.  The model is:
+\begin{equation}
+  y_t = \mu_{s_t} + \sum_{i=1}^{p} \phi_i (y_{t-i} - \mu_{s_{t-i}})
+  + \varepsilon_t, \quad \varepsilon_t \sim \N(0, \sigma^2),
+  \label{eq:hamilton-ms}
+\end{equation}
+where $s_t \in \{0, 1\}$ is the latent state with transition matrix:
+\begin{equation}
+  \mathbf{P} = \begin{pmatrix}
+    p_{00} & p_{01} \\
+    p_{10} & p_{11}
+  \end{pmatrix}, \quad
+  p_{ij} = \Pr(s_t = j \mid s_{t-1} = i), \quad
+  p_{i0} + p_{i1} = 1.
+  \label{eq:transition}
+\end{equation}
+
+\begin{keyresult}[Hamilton (1989): Markov-Switching GNP]
+Applied to U.S.\ quarterly GNP growth (1951Q1--1984Q4) with an AR(4)
+specification, Hamilton estimated:
+\begin{itemize}[leftmargin=1.5em]
+  \item Mean growth in expansion ($s_t = 1$): $\hat{\mu}_1 = 1.16\%$
+        per quarter.
+  \item Mean growth in recession ($s_t = 0$): $\hat{\mu}_0 = -0.36\%$
+        per quarter.
+  \item Persistence: $\hat{p}_{11} = 0.90$ (expansions last on average
+        $1/(1 - 0.90) \approx 10$ quarters),
+        $\hat{p}_{00} = 0.75$ (recessions last $\approx$4 quarters).
+\end{itemize}
+The model's filtered probabilities closely matched NBER recession
+dates without using them as inputs.
+\end{keyresult}
+
+\subsection{GMM vs.\ Markov-Switching: When to Use Which}
+\label{sec:regimes:comparison}
+
+\begin{center}
+\begin{tabular}{p{3.5cm} p{5cm} p{5cm}}
+  \toprule
+  & \textbf{GMM} & \textbf{Markov-Switching} \\
+  \midrule
+  Temporal structure &
+    None.  Each $\bx_t$ classified independently. &
+    Markov chain: $s_t$ depends on $s_{t-1}$. \\[4pt]
+  Regime persistence &
+    Not modeled.  Can oscillate between regimes at high frequency. &
+    Explicitly modeled via transition probabilities. \\[4pt]
+  Estimation &
+    EM on mixture (fast, scales well). &
+    Hamilton filter (slower, requires forward--backward recursion). \\[4pt]
+  Output &
+    Posterior probabilities $\gamma_{tk}$ per observation. &
+    Filtered $\Pr(s_t = k \mid \bx_{1:t})$ and smoothed
+    $\Pr(s_t = k \mid \bx_{1:T})$. \\[4pt]
+  Python &
+    \texttt{sklearn.mixture.GaussianMixture} &
+    \texttt{statsmodels.tsa.regime\_switching} \\[4pt]
+  Best for &
+    Quick regime labeling; diagnostic decomposition. &
+    When regime persistence matters; macro modeling. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{keyidea}[Use GMM for Your Project]
+GMM treats each observation independently; Markov-switching models regime
+persistence.  For your project, you are performing a \emph{post-hoc
+diagnostic}: ``did my signal's Sharpe come from one regime or many?''
+You are not forecasting regimes in real time.  For this purpose, GMM is
+simpler, faster, and sufficient.  If you later want to build a regime
+forecasting overlay for position sizing, switch to Markov-switching.
+\end{keyidea}
+
+% ══════════════════════════════════════════════════════════════
+\section{The Factor Timing Caveat}
+\label{sec:regimes:timing-caveat}
+% ══════════════════════════════════════════════════════════════
+
+Before you get excited about regime-conditional strategies, read the
+cautionary evidence.
+
+\begin{keyresult}[Asness, Chandra, Ilmanen, and Israel (2017)]
+In ``Contrarian Factor Timing is Deceptively Difficult,'' the authors test
+whether buying factors after drawdowns (contrarian timing via value spreads)
+improves multi-factor portfolios.  Key findings:
+\begin{itemize}[leftmargin=1.5em]
+  \item For a 3-factor portfolio (HML + UMD + BAB), value-spread timing
+        \emph{decreases} the Sharpe ratio from 0.55 to 0.54.
+  \item For individual factors, timing helps momentum (Sharpe 0.26
+        $\to$ 0.33) but hurts defensive/low-beta (Sharpe 0.53 $\to$ 0.40).
+  \item The timing signal is correlated with the value factor itself, so
+        in a portfolio that already holds value, timing adds redundant and
+        intermittent exposure rather than genuine new information.
+  \item Results are reported gross of transaction costs.  Net of costs,
+        the case for timing weakens further.
+\end{itemize}
+The authors conclude that contrarian factor timing is ``a weak addition for
+long-term investors holding well-diversified factors including value.''
+\end{keyresult}
+
+\subsection{Implications for Your Project}
+\label{sec:regimes:implications}
+
+The Asness et al.\ result does \emph{not} say regime modeling is useless.
+It says:
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{Conditional $>$ unconditional is the wrong comparison.}
+    You must compare the regime-conditional strategy to the unconditional
+    strategy \emph{after accounting for any additional factor exposures} the
+    conditioning introduces.  If your regime overlay tilts toward value or
+    momentum, you are adding a factor bet, not alpha.
+  \item \textbf{Document honestly.}  Report both conditional and
+    unconditional Sharpe.  If the conditional strategy wins, show that it
+    is not explained by loading on known factors.
+  \item \textbf{The bar is high.}  Even sophisticated practitioners at AQR
+    found that timing adds little.  If your regime decomposition shows that
+    the signal works only in one regime, the honest conclusion may be to
+    report that fragility rather than to build a timing strategy around it.
+\end{enumerate}
+
+\begin{warning}[Regimes Are Only Known in Hindsight]
+Regime-conditional strategies look better in backtests than in practice
+because the regime is only known with certainty in hindsight.  Your GMM
+assigns \emph{probabilities}, not hard labels.  Today's observation might
+be 60\% Steady State and 40\% Walking on Ice.  If you build a strategy
+that goes fully risk-on in Steady State and risk-off otherwise, you are
+implicitly assuming perfect regime classification.  In practice: (a)~use
+soft probabilities, not hard assignments; (b)~test with lagged regime
+labels (yesterday's classification applied today); (c)~measure how
+often the GMM changes its mind on the most recent 20 days of data when
+one new observation arrives.
+\end{warning}
+
+% ══════════════════════════════════════════════════════════════
+\section{Practical Implementation Checklist}
+\label{sec:regimes:checklist}
+% ══════════════════════════════════════════════════════════════
+
+For Task~17 in your project plan, follow this sequence:
+
+\begin{enumerate}[leftmargin=1.5em]
+  \item \textbf{Assemble macro features.}  Pull VIX, IG credit spread,
+    10y--2y slope, DXY, and realized 60-day cross-asset correlation.
+    Standardize to $z$-scores.
+  \item \textbf{Fit GMMs for $K \in \{2, 3, 4, 5\}$.}  Use
+    \texttt{sklearn.mixture.GaussianMixture} with
+    \texttt{covariance\_type='full'} and \texttt{n\_init=10} (multiple
+    random restarts to avoid local optima).  Record BIC for each $K$.
+  \item \textbf{Select $K$.}  Pick the $K$ that minimizes BIC.  Inspect
+    the regimes manually: do they correspond to recognizable market
+    conditions?  If $K = 3$ and $K = 4$ have similar BIC, prefer the one
+    with more interpretable clusters.
+  \item \textbf{Label each date.}  Assign soft probabilities
+    $\gamma_{tk}$, not hard labels.  Store as columns in your feature
+    DataFrame.
+  \item \textbf{Decompose signal performance.}  Compute
+    regime-conditional Sharpe (Eq.~\ref{eq:regime-sharpe}), IC, and
+    hit rate.  Report in a table.
+  \item \textbf{Test regime overlay.}  If desired, scale positions by
+    $\gamma_{t,\text{steady}}$ (probability of being in the favorable
+    regime).  Compare Sharpe to the unconditional strategy.  Apply the
+    Asness et al.\ sanity check: does the improvement survive controlling
+    for additional factor exposures?
+  \item \textbf{Set up ADWIN.}  Feed prediction residuals into ADWIN
+    with $\delta = 0.002$.  Log all detected drift points.  Check whether
+    they align with GMM regime transitions.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════
+\section{Summary}
+\label{sec:regimes:summary}
+% ══════════════════════════════════════════════════════════════
+
+\begin{center}
+\begin{tabular}{p{4cm} p{9.5cm}}
+  \toprule
+  \textbf{Concept} & \textbf{Key Takeaway} \\
+  \midrule
+  GMM regime classification &
+    $p(\bx) = \sum_k \pi_k \N(\bx \mid \bm{\mu}_k, \bm{\Sigma}_k)$.
+    EM alternates E-step (soft labels) and M-step (update parameters).
+    Select $K$ by BIC. \\[4pt]
+  Two Sigma template &
+    Four regimes---Steady State, Crisis, Inflation, Walking on Ice---fit
+    to factor returns via GMM. \\[4pt]
+  ADWIN &
+    Online drift detection via adaptive windowing and Hoeffding bounds.
+    Apply to prediction errors to trigger retraining. \\[4pt]
+  Markov-switching &
+    Hamilton (1989): HMM with regime-dependent parameters.  Models
+    persistence.  Use GMM for post-hoc decomposition; Markov-switching
+    for real-time regime forecasting. \\[4pt]
+  Factor timing caveat &
+    Asness et al.\ (2017): contrarian timing of factors via value spreads
+    barely helps (3-factor Sharpe 0.55 $\to$ 0.54) and can hurt
+    diversification.  Regime conditioning is diagnostic first, strategy
+    second. \\[4pt]
+  Your project &
+    Phase~4A, Task~17: fit GMM on macro features, decompose signal by
+    regime, report conditional Sharpe honestly.  Use soft probabilities,
+    test with lagged labels, control for factor exposure overlap. \\
+  \bottomrule
+\end{tabular}
+\end{center}

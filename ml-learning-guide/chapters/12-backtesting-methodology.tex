@@ -1,0 +1,501 @@
+\chapter{Backtesting Methodology}
+\label{ch:backtesting}
+
+\begin{projectconnection}
+This chapter covers the backtesting engine from Phase~1 (Task~8) and the walk-forward OOS test in Phase~5 (Task~22).  Transaction-cost-aware P\&L, turnover, and capacity estimation are ``what the trading floor asks about first''---the practical questions that determine whether a signal is tradeable.  The modules you build here---\texttt{src/backtest/engine.py}, \texttt{src/backtest/metrics.py}, \texttt{src/backtest/reporting.py}---translate statistical significance into economic significance.
+\end{projectconnection}
+
+Chapter~\ref{ch:validation} gave you the statistical toolkit: purged CV, DSR, CPCV, PBO, ridge baseline.  Those tools answer \emph{is this signal real?}  This chapter answers the follow-up question: \emph{if it is real, can anyone trade it?}  A signal with $\IC = 0.05$ and a Sharpe of 1.2 before costs is worthless if turnover eats the spread.  Every number you report in your project must survive both the validation gauntlet and the transaction-cost gauntlet.
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Transaction-Cost-Aware P\&L}
+\label{sec:tc-pnl}
+% ══════════════════════════════════════════════════════════════
+
+\begin{prereq}[Basis Points]
+One basis point (bp) $= 0.01\% = 0.0001$.  A 5~bp cost means you pay 0.05\% of notional each time you trade.  Financial practitioners quote spreads, fees, and slippage in basis points because percentages are too coarse for large-notional positions.
+\end{prereq}
+
+\begin{prereq}[Signal as Position Weight]
+Throughout this chapter, $\hat{y}_t$ denotes the signal (model prediction) at time $t$, interpreted as a \emph{signed position weight}: $\hat{y}_t > 0$ means long, $\hat{y}_t < 0$ means short, and the magnitude determines position size.  In your project, $\hat{y}_t$ comes from the LightGBM or ridge model trained on risk-cube features (Chapter~\ref{ch:features}).  We assume $\hat{y}_t$ is scaled so that $|\hat{y}_t| \leq 1$.
+\end{prereq}
+
+\subsection{Gross P\&L}
+
+The simplest P\&L measure ignores trading costs entirely:
+\begin{equation}
+\label{eq:gross-pnl}
+\text{PnL}_t^{\text{gross}} \;=\; \hat{y}_t \cdot r_{t+1},
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $\hat{y}_t$ --- signal (position weight) formed at end of day $t$, using information available up to $t$.
+  \item $r_{t+1}$ --- realized return from close of day $t$ to close of day $t+1$.
+\end{itemize}
+The product is the return earned by holding $\hat{y}_t$ units through the next period.  Note the strict time alignment: $\hat{y}_t$ must use only data from $t$ and earlier.  Using $r_t$ instead of $r_{t+1}$ is the most common backtest bug and produces spectacularly inflated results.
+
+\begin{warning}[The Off-by-One That Ends Careers]
+If your backtest uses $\hat{y}_t \cdot r_t$, the signal is multiplied by a return that has already been realized.  This is look-ahead bias, and it will produce Sharpe ratios above 3.0 routinely.  \emph{Every} backtest implementation must be audited for this.  The fix: always pair the signal timestamp with the \emph{next-period} return.  In your pipeline, the point-in-time module (\texttt{src/data/point\_in\_time.py}) enforces this alignment.
+\end{warning}
+
+\subsection{Net P\&L}
+
+Trading costs are proportional to the \emph{change} in position:
+\begin{equation}
+\label{eq:net-pnl}
+\text{PnL}_t^{\text{net}} \;=\; \hat{y}_t \cdot r_{t+1} \;-\; |\hat{y}_t - \hat{y}_{t-1}| \cdot c,
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $|\hat{y}_t - \hat{y}_{t-1}|$ --- absolute change in position (the amount traded).
+  \item $c$ --- half-spread cost per unit of notional, in the same units as $r_{t+1}$.
+\end{itemize}
+The cost term $|\hat{y}_t - \hat{y}_{t-1}| \cdot c$ captures the spread you pay each time the position changes.  If $\hat{y}_t = \hat{y}_{t-1}$, you pay nothing.  If the signal flips from $+1$ to $-1$, you pay $2c$ (a full round-trip).
+
+\subsection{Parameterized Spreads by Asset Class}
+
+Costs vary enormously across asset classes.  Typical half-spread estimates for liquid instruments:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Asset Class} & \textbf{Half-Spread (bps)} & \textbf{Example Instrument} \\
+\midrule
+G10 FX (spot)        & 1--2   & EUR/USD \\
+US Treasuries (on-the-run) & 0.5--1 & 10y UST \\
+Equity index futures  & 0.5--1 & E-mini S\&P 500 \\
+IG credit (CDX)       & 2--5   & CDX.IG \\
+EM FX                 & 5--15  & USD/BRL \\
+Single-name CDS       & 5--10  & IG single names \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{keyidea}[Report Sharpe at Multiple Cost Levels]
+Never report a single Sharpe ratio.  Compute net Sharpe at $c = 0$, 1, 2, 5, 10, and 20~bps.  Plot the \textbf{Sharpe-vs-cost curve}: a monotonically decreasing function that shows exactly where the signal dies.  The \textbf{breakeven cost} $c^*$ is the spread at which net Sharpe $= 0$.  This is the single number the desk cares about most.  If $c^* > 5$~bps for liquid rates or FX, the signal is plausibly tradeable.  If $c^* < 1$~bp, it is not.
+\end{keyidea}
+
+\begin{workedexample}{Gross vs.\ Net P\&L Over 5 Days}
+
+Suppose $c = 5$~bps $= 0.0005$, and $\hat{y}_0 = 0$ (flat at start).
+
+\begin{center}
+\begin{tabular}{crrrrr}
+\toprule
+$t$ & $\hat{y}_t$ & $r_{t+1}$ (\%) & $|\Delta \hat{y}_t|$ & Gross (\%) & Net (\%) \\
+\midrule
+1 & $+0.80$ & $+0.30$ & 0.80 & $+0.240$ & $+0.200$ \\
+2 & $+0.60$ & $-0.10$ & 0.20 & $-0.060$ & $-0.070$ \\
+3 & $-0.50$ & $-0.40$ & 1.10 & $+0.200$ & $+0.145$ \\
+4 & $-0.50$ &  $+0.20$ & 0.00 & $-0.100$ & $-0.100$ \\
+5 & $+0.30$ & $+0.50$ & 0.80 & $+0.150$ & $+0.110$ \\
+\midrule
+  & & & $\Sigma = 2.90$ & $\Sigma = +0.430$ & $\Sigma = +0.285$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Day-by-day:
+\begin{itemize}[nosep]
+  \item \textbf{Day 1:} Enter long $0.80$. Gross $= 0.80 \times 0.30\% = 0.240\%$. Cost $= 0.80 \times 0.05\% = 0.040\%$. Net $= 0.200\%$.
+  \item \textbf{Day 3:} Flip from $+0.60$ to $-0.50$ costs $1.10 \times 0.05\% = 0.055\%$. The flip is expensive---but the short earns $0.200\%$ gross because the market falls.
+  \item \textbf{Day 4:} No trade ($\Delta \hat{y} = 0$), so gross $=$ net. Holding a short into a rising market loses $0.100\%$.
+\end{itemize}
+
+Cumulative gross P\&L $= +0.430\%$; cumulative net $= +0.285\%$.  Costs consumed $(0.430 - 0.285)/0.430 = 33.7\%$ of gross returns.  This cost drag is typical for a moderately active signal on liquid instruments.  On a 5~bp spread, one-third of gross evaporated.  At 10~bps it would be two-thirds.
+
+\textbf{Breakeven cost.}  The breakeven cost $c^*$ is the cost level where cumulative net P\&L $= 0$.  Here, cumulative $|\Delta\hat{y}| = 2.90$, cumulative gross $= 0.430\%$.  Solving $0.430\% - 2.90 \times c^* = 0$ gives $c^* = 0.430/2.90 = 0.148\%$ $\approx$ 15~bps.  This signal survives costs up to 15~bps---comfortable for G10 FX or rates futures, marginal for EM instruments.
+\end{workedexample}
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Turnover}
+\label{sec:turnover}
+% ══════════════════════════════════════════════════════════════
+
+\begin{definition}[Turnover]
+Daily turnover is the absolute change in position weight:
+\begin{equation}
+\label{eq:turnover}
+\tau_t \;=\; |\hat{y}_t - \hat{y}_{t-1}|.
+\end{equation}
+Average daily turnover over $T$ days:
+\begin{equation}
+\label{eq:avg-turnover}
+\bar{\tau} \;=\; \frac{1}{T}\sum_{t=1}^{T} |\hat{y}_t - \hat{y}_{t-1}|.
+\end{equation}
+Annualized turnover $= 252 \times \bar{\tau}$.  A signal with $\bar{\tau} = 0.10$ trades the equivalent of 10\% of its position daily, or roughly $25\times$ annual turnover.
+\end{definition}
+
+\begin{prereq}[Why Turnover Matters]
+Transaction costs are proportional to turnover.  A signal with high IC but high turnover may have lower net Sharpe than a weaker signal with low turnover.  The net Sharpe of any signal can be decomposed as:
+\[
+\SR^{\text{net}} \;\approx\; \SR^{\text{gross}} - \frac{252 \cdot \bar{\tau} \cdot c}{\sigma_{\text{ret}}},
+\]
+where $\sigma_{\text{ret}}$ is the annualized volatility of gross returns.  The second term is the Sharpe-ratio drag from costs.
+\end{prereq}
+
+Turnover is controlled by signal smoothness.  High-frequency signals (e.g., daily z-score of VaR utilization) tend to have higher turnover than slow signals (e.g., 63-day rolling Herfindahl index).
+
+\textbf{Quantifying the cost drag.}  Suppose your signal produces an annualized gross Sharpe of 1.2 with return volatility $\sigma_{\text{ret}} = 10\%$, so annualized gross return $= 1.2 \times 10\% = 12\%$.  With $\bar{\tau} = 0.10$ and $c = 5$~bps:
+\[
+\text{Annual cost} = 252 \times 0.10 \times 0.0005 = 1.26\%.
+\]
+Net return $= 12\% - 1.26\% = 10.74\%$.  Net Sharpe $= 10.74/10 = 1.07$.  Costs shaved 0.13 off the Sharpe ratio.  Double the turnover to $\bar{\tau} = 0.20$ and the cost doubles: net Sharpe drops to 0.95.  Triple it and you lose 0.38 Sharpe points.  The relationship is linear and merciless.
+
+Two practical levers to control turnover:
+
+\begin{enumerate}[nosep]
+\item \textbf{Signal filtering.}  Apply exponential smoothing: $\hat{y}_t^{\text{smooth}} = \alpha \hat{y}_t + (1 - \alpha)\hat{y}_{t-1}^{\text{smooth}}$.  This reduces turnover at the cost of slower reaction.
+\item \textbf{Trade buffer.}  Only trade when $|\hat{y}_t - \hat{y}_{t-1}| > \delta$ for some threshold $\delta$.  This eliminates small, cost-inefficient position adjustments.
+\end{enumerate}
+
+\begin{intuition}[Turnover as a Tax on Instability]
+Think of turnover as a tax you pay for changing your mind.  A signal that flips daily from long to short pays the spread twice per day---$2c$ per round-trip.  At 5~bps half-spread, that is 10~bps daily, or roughly $25\%$ annually.  No signal survives that.  The practical sweet spot for daily signals is $\bar{\tau} \in [0.02, 0.15]$: enough activity to capture opportunities, low enough to keep costs manageable.
+\end{intuition}
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Capacity Estimation}
+\label{sec:capacity}
+% ══════════════════════════════════════════════════════════════
+
+\begin{prereq}[Market Impact]
+When you trade a large order, you move the price against yourself.  Buying pushes the price up; selling pushes it down.  This \emph{market impact} is a cost above and beyond the bid-ask spread.  It depends on how large your order is relative to the market's daily volume.
+\end{prereq}
+
+A signal that works on \$1M of capital may not work on \$1B.  \textbf{Capacity} is the dollar amount at which market impact erodes the signal to zero net Sharpe.
+
+\subsection{The Square-Root Market Impact Model}
+
+The empirically best-supported market impact model is the square-root law (Almgren and Chriss, 2001; Bouchaud, 2010):
+\begin{equation}
+\label{eq:sqrt-impact}
+\Delta p \;=\; \eta \,\sigma \sqrt{\frac{v}{V}},
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $\Delta p$ --- price impact as a fraction of price.
+  \item $\sigma$ --- daily volatility of the instrument.
+  \item $v$ --- number of shares (or notional) you trade.
+  \item $V$ --- average daily volume (ADV) of the instrument.
+  \item $\eta$ --- dimensionless constant, empirically $\eta \approx 0.1$--$1.0$ depending on asset class and urgency.
+\end{itemize}
+The square root makes impact concave: trading 4\% of ADV costs twice as much (per unit) as trading 1\% of ADV, not four times.  This concavity has a practical implication: splitting a large order into smaller pieces and spreading them over time reduces total impact.  This is the theoretical foundation of execution algorithms (VWAP, TWAP) used on trading desks.
+
+\textbf{Numerical example.}  Consider a US Treasury future with $\sigma = 0.50\%$ daily and $V = \$30\text{B}$ ADV.  Trading $v = \$300\text{M}$ ($= 1\%$ of ADV) with $\eta = 0.3$:
+\[
+\Delta p = 0.3 \times 0.005 \times \sqrt{0.01} = 0.3 \times 0.005 \times 0.1 = 0.00015 = 1.5\text{~bps}.
+\]
+At $v = \$3\text{B}$ ($= 10\%$ of ADV): $\Delta p = 0.3 \times 0.005 \times \sqrt{0.1} \approx 4.7$~bps.  Ten times the volume, only three times the impact---that is the square root at work.
+
+\subsection{Order-of-Magnitude Capacity Reasoning}
+
+For your project, exact capacity is unknowable.  Use order-of-magnitude reasoning:
+
+\begin{enumerate}[nosep]
+  \item Estimate the strategy's daily trade notional: $\text{Notional} = \text{AUM} \times \bar{\tau}$.
+  \item Compare to ADV of the target instruments.  Rule of thumb: you can trade up to 1--5\% of ADV without excessive impact.
+  \item Compute implied AUM capacity: $\text{AUM}^* = (0.01 \text{ to } 0.05) \times \text{ADV} / \bar{\tau}$.
+\end{enumerate}
+
+\textbf{Example.}  A cross-asset signal on G10 rates futures (combined ADV $\approx$ \$50B notional) with $\bar{\tau} = 0.05$.  At 1\% of ADV: capacity $= 0.01 \times 50\text{B} / 0.05 = \$10\text{B}$.  At 5\% of ADV: \$50B.  This is a high-capacity strategy---liquid instruments with moderate turnover.
+
+Compare a signal on single-name CDS (ADV $\approx$ \$50M) with $\bar{\tau} = 0.20$: capacity $= 0.01 \times 50\text{M} / 0.20 = \$2.5\text{M}$.  Institutional-scale capital cannot trade this.
+
+\begin{warning}[Capacity Estimates Are Rough]
+The square-root model is a useful approximation, not a precise tool.  Impact depends on execution algorithm, time horizon, market conditions, and counterparty relationships---none of which you observe in a backtest.  Use order-of-magnitude reasoning: is this a \$10M strategy or a \$10B strategy?  Do not report capacity to spurious precision.  Saying ``capacity is \$847M'' signals that you do not understand the uncertainty.  Saying ``capacity is order \$1B for liquid rates, order \$10M for single-name CDS'' signals that you do.
+\end{warning}
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Walk-Forward Out-of-Sample Testing}
+\label{sec:walk-forward}
+% ══════════════════════════════════════════════════════════════
+
+\begin{prereq}[In-Sample vs. Out-of-Sample]
+\textbf{In-sample (IS)} data is used for model training and selection.  \textbf{Out-of-sample (OOS)} data is reserved and never used until final evaluation.  The distinction matters because any data used for decisions---even indirectly through hyperparameter tuning or feature selection---is no longer truly out-of-sample.
+\end{prereq}
+
+The validation tools in Chapter~\ref{ch:validation} (purged CV, DSR, CPCV, PBO) all operate on the in-sample data.  They provide strong evidence that your signal is not overfit.  But the final, definitive test is the \textbf{holdout}---data reserved since Phase~1 (Task~4), untouched through months of experimentation.
+
+\subsection{The Sacred Holdout}
+
+In your project, you reserve the most recent 3--6 months of data as the holdout at the very beginning (Phase~1, Week~3).  This data is:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Locked.}  The holdout dates are written to a config file.  The pipeline module refuses to return holdout data until explicitly unlocked.
+  \item \textbf{Invisible.}  You never look at holdout returns, not even summary statistics.  Any information leakage---even knowing that ``the holdout period was volatile''---biases your decisions.
+  \item \textbf{One-shot.}  You run the holdout test exactly once, in Phase~5 (Task~22).  There is no iteration.  If the result is disappointing, you report it honestly.
+\end{enumerate}
+
+\begin{warning}[The Holdout Is Not a Second Chance]
+If your model fails the holdout test, you do \emph{not} go back, re-tune, and test again.  That would make the holdout into just another validation fold.  The entire point of the holdout is that it is the one piece of data your decisions never touched.  Iterating on it destroys this property permanently.  Chapter~\ref{ch:validation} emphasized this: only results that survive the full validation gauntlet (purged CV, DSR, PBO) should touch the holdout.
+\end{warning}
+
+\subsection{One-Shot Holdout Protocol}
+
+The Phase~5 holdout test follows a strict protocol:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Freeze the model.}  The model specification, hyperparameters, and feature set are fixed.  No changes after this point.
+  \item \textbf{Train on all IS data.}  Retrain the final model on the full in-sample period (not a single CV fold).
+  \item \textbf{Generate predictions on holdout.}  Run the frozen model on holdout data.  Record predictions.
+  \item \textbf{Compute all metrics.}  IC, ICIR, Sharpe (gross and net at multiple cost levels), Sortino, hit rate, max drawdown, turnover.
+  \item \textbf{Apply DSR and Haircut Sharpe.}  Use the experiment count from your log (\texttt{experiments/experiment\_log.csv}) as $N$.  Compute DSR on the holdout Sharpe.  Apply the Haircut (Chapter~\ref{ch:validation}).
+  \item \textbf{Report.}  Include holdout results alongside IS results.  If holdout Sharpe $<$ IS Sharpe (it almost always is), that is expected.  If holdout Sharpe $\leq 0$, report it and discuss why.
+\end{enumerate}
+
+\subsection{Rolling-Window Walk-Forward}
+
+The one-shot holdout is the gold standard, but it gives a single number from a single period.  The rolling-window walk-forward provides a richer picture:
+
+\begin{enumerate}[nosep]
+  \item Fix a training window of length $W$ (e.g., 756 days $\approx$ 3 years).
+  \item Train the model on days $[1, W]$.  Predict day $W+1$.
+  \item Roll forward: train on $[2, W+1]$, predict $W+2$.  Repeat.
+  \item Stitch all one-step-ahead predictions into a single OOS return series.
+\end{enumerate}
+
+This produces a fully out-of-sample prediction for every day in the dataset (after the initial training window), at the cost of retraining the model $T - W$ times.  The stitched return series can be analyzed for IC, Sharpe, and all other metrics.
+
+In practice, you do not retrain every single day.  A common compromise: retrain monthly (every 21 trading days) and use the same model for the next 21 predictions.  This reduces computation by $\sim 21\times$ while maintaining the walk-forward discipline.  The key requirement is that \emph{no training set ever includes data from the prediction period or later}.
+
+\textbf{Walk-forward vs.\ holdout.}  These are complements, not substitutes.  The walk-forward gives a rich time series of OOS performance across multiple market regimes.  The holdout gives a single, pristine test on data your decisions never touched.  Report both.  If they agree, your result is robust.  If walk-forward looks good but the holdout fails, suspect that walk-forward parameters (window length $W$, retraining frequency) were tuned to look good---a subtler form of overfitting.
+
+\begin{keyidea}[Rolling-Window vs. Expanding-Window]
+A \textbf{rolling} window (fixed length $W$) discards old data as new data arrives.  An \textbf{expanding} window (train on all available data up to $t$) keeps everything.  Rolling windows are better when you suspect regime change or structural breaks---old data from a different regime may hurt more than help.  Expanding windows are better when sample size is the binding constraint (your case, with $T \approx 1{,}250$).  Report both if feasible.
+\end{keyidea}
+
+
+% ══════════════════════════════════════════════════════════════
+\section{IC, ICIR, and Performance Metrics}
+\label{sec:metrics}
+% ══════════════════════════════════════════════════════════════
+
+\begin{prereq}[Spearman Rank Correlation]
+The Spearman rank correlation between two variables is the Pearson correlation computed on their ranks rather than their raw values.  It measures monotonic association without assuming linearity.  Range: $[-1, +1]$.  In finance, rank-based measures are preferred because they are robust to outliers in returns.
+\end{prereq}
+
+\subsection{Information Coefficient (IC)}
+
+\begin{definition}[Information Coefficient]
+The Information Coefficient at time $t$ is the Spearman rank correlation between the model's cross-sectional predictions and the realized outcomes:
+\begin{equation}
+\label{eq:ic}
+\IC_t \;=\; \rho_{\text{Spearman}}\!\bigl(\hat{y}_{i,t},\; r_{i,t+1}\bigr), \quad i = 1, \ldots, N_t,
+\end{equation}
+where $\hat{y}_{i,t}$ is the prediction for asset $i$ at time $t$, $r_{i,t+1}$ is the realized return, and $N_t$ is the number of assets in the cross-section.  For a single-asset time-series signal (no cross-section), IC reduces to the rank correlation between the signal and the next-period return computed over rolling windows.
+\end{definition}
+
+IC benchmarks for cross-sectional equity signals (Gu, Kelly, and Xiu, 2020):
+\begin{itemize}[nosep]
+  \item $\IC < 0.02$: noise.
+  \item $\IC \in [0.02, 0.05]$: weak but potentially tradeable with low cost.
+  \item $\IC \in [0.05, 0.10]$: strong.  Most published factors live here.
+  \item $\IC > 0.10$: exceptional.  Verify you do not have a bug.
+\end{itemize}
+
+\subsection{ICIR}
+
+\begin{definition}[Information Coefficient Information Ratio]
+\begin{equation}
+\label{eq:icir}
+\text{ICIR} \;=\; \frac{\overline{\IC}}{\sigma_{\IC}} \;=\; \frac{\frac{1}{T}\sum_{t=1}^T \IC_t}{\sqrt{\frac{1}{T-1}\sum_{t=1}^T (\IC_t - \overline{\IC})^2}},
+\end{equation}
+where $\overline{\IC}$ is the time-series mean and $\sigma_{\IC}$ is the time-series standard deviation of the IC sequence.
+\end{definition}
+
+ICIR measures the \emph{consistency} of predictive power.  A signal with $\overline{\IC} = 0.04$ and $\sigma_{\IC} = 0.02$ (ICIR $= 2.0$) is far more reliable than one with $\overline{\IC} = 0.04$ and $\sigma_{\IC} = 0.08$ (ICIR $= 0.5$).  An ICIR above 0.5 is considered good; above 1.0 is very strong.
+
+\subsection{Performance Metric Reference}
+
+\begin{center}
+\begin{tabular}{p{3.2cm} p{5.8cm} p{4.5cm}}
+\toprule
+\textbf{Metric} & \textbf{Formula / Description} & \textbf{When to Use} \\
+\midrule
+IC & Spearman $\rho(\hat{y}_{i,t}, r_{i,t+1})$ & Cross-sectional signal quality \\
+\addlinespace
+ICIR & $\overline{\IC} / \sigma_{\IC}$ & Signal consistency over time \\
+\addlinespace
+Sharpe Ratio & $\SR = \frac{\mu_{\text{ret}}}{\sigma_{\text{ret}}} \times \sqrt{252}$ & Risk-adjusted return (annualized) \\
+\addlinespace
+Sortino Ratio & $\frac{\mu_{\text{ret}}}{\sigma_{\text{downside}}} \times \sqrt{252}$ & Penalizes downside vol only; use if return distribution is skewed \\
+\addlinespace
+Hit Rate & $\frac{\#\{\text{PnL}_t > 0\}}{T}$ & Fraction of profitable days; aim for $>52\%$ \\
+\addlinespace
+Max Drawdown & $\max_{s \leq t} \bigl(\text{cumPnL}_s - \text{cumPnL}_t\bigr)$ & Worst peak-to-trough loss; survival metric \\
+\addlinespace
+Calmar Ratio & $\frac{\text{Annualized Return}}{\text{Max Drawdown}}$ & Return per unit of worst-case pain \\
+\addlinespace
+Turnover & $\bar{\tau} = \frac{1}{T}\sum |\hat{y}_t - \hat{y}_{t-1}|$ & Cost exposure; lower is cheaper \\
+\addlinespace
+Breakeven Cost & $c^*$ where $\SR^{\text{net}}(c^*) = 0$ & Tradeability threshold \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{keyidea}[Lead with IC and Sharpe, Support with the Rest]
+In your presentation (Chapter~\ref{ch:presenting}), lead with IC, ICIR, and net Sharpe at realistic costs.  Support with Sortino, hit rate, and max drawdown.  Always show the ridge baseline alongside GBM.  If the desk asks one question, it will be about breakeven cost.  If they ask two, the second is about max drawdown.
+\end{keyidea}
+
+
+% ══════════════════════════════════════════════════════════════
+\section{P\&L Decomposition by Regime}
+\label{sec:pnl-regime}
+% ══════════════════════════════════════════════════════════════
+
+\begin{projectconnection}[Project Connection: Regime Decomposition]
+In Phase~4A (Task~17, if you pass the Week~13 checkpoint), you fit a GMM on macro features to classify regimes.  The regime decomposition in this section uses that GMM output.  Even before Phase~4A, you can do a simpler version: split P\&L by VIX tercile (low/medium/high) or by calendar period (e.g., pre/post a known stress event).  The point is to check whether your signal's Sharpe is broad-based or concentrated.
+\end{projectconnection}
+
+Aggregate metrics hide regime dependence.  A signal with a Sharpe of 1.5 that earned 90\% of its P\&L during the 2020 COVID crash is a crisis-alpha signal, not a steady earner.  If your desk does not want concentrated crisis exposure, that Sharpe is misleading.
+
+The regime decomposition is straightforward:
+
+\begin{enumerate}[nosep]
+  \item Classify each day into a regime using the GMM from Chapter~\ref{ch:regimes} (e.g., ``calm,'' ``transition,'' ``crisis'').
+  \item Split the cumulative P\&L series by regime.  Sum P\&L$_t^{\text{net}}$ separately for each regime.
+  \item Compute Sharpe, IC, and hit rate within each regime.
+  \item Plot the regime-conditional cumulative P\&L curves.
+\end{enumerate}
+
+\textbf{Interpretation rules:}
+\begin{itemize}[nosep]
+  \item If $>70\%$ of cumulative P\&L comes from a single regime that occupies $<30\%$ of the sample: the signal is \textbf{fragile}.  It is a regime bet, not a robust predictor.
+  \item If P\&L is roughly proportional to time spent in each regime: the signal is \textbf{broad-based}.  This is what you want.
+  \item If the signal is profitable in calm regimes and loses money in crises: it is likely a short-volatility strategy---harvesting a risk premium that blows up exactly when the desk needs it most.
+\end{itemize}
+
+\begin{intuition}[The Regime P\&L Plot]
+Imagine a cumulative P\&L chart where you color the background by regime: blue for calm, yellow for transition, red for crisis.  If the line only goes up during red periods, your signal is a crisis detector---useful, but fragile.  If it goes up steadily regardless of background color, the signal is robust.  This single chart communicates more than a page of summary statistics.  Always include it in your research report (Chapter~\ref{ch:presenting}).
+\end{intuition}
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Signal Decay Post-Publication}
+\label{sec:signal-decay}
+% ══════════════════════════════════════════════════════════════
+
+\begin{keyresult}[McLean and Pontiff (2016): Post-Publication Signal Decay]
+Studying 97 anomalies published in top finance journals, McLean and Pontiff (2016, \emph{Journal of Finance}) find:
+\begin{itemize}[nosep]
+  \item \textbf{26\% decay out-of-sample}: anomaly returns are 26\% lower in the period after the original sample ends but before the paper is published.  This captures data-mining bias---the original in-sample results were partly lucky.
+  \item \textbf{58\% decay post-publication}: anomaly returns are 58\% lower after the paper is published.  The additional 32 percentage points ($58\% - 26\%$) are attributed to informed trading by investors who read the paper and arbitrage the signal away.
+  \item \textbf{Decay is worse for liquid, low-idiosyncratic-risk stocks}: precisely the stocks that are cheapest to trade, and therefore most susceptible to arbitrage.
+\end{itemize}
+\end{keyresult}
+
+The implication is severe: a published signal with an in-sample Sharpe of 1.0 should be expected to deliver roughly $1.0 \times (1 - 0.58) = 0.42$ post-publication---before your own transaction costs.  After the Haircut Sharpe correction from Chapter~\ref{ch:validation} and realistic transaction costs, most published anomalies are economically zero.
+
+The 26\% OOS decay and the 58\% post-publication decay address different problems.  The 26\% is the cost of data mining: the original researchers tried many specifications and reported the best one.  This is exactly what DSR corrects for.  The additional 32 percentage points are the cost of \emph{crowding}: once the paper is public, capital flows into the strategy, compresses the spread, and arbitrages the signal away.  Decay is worse for liquid, low-idiosyncratic-risk stocks---precisely the instruments where arbitrage is cheapest.
+
+\subsection{Why Proprietary Data May Be More Durable}
+
+The McLean-Pontiff decay is driven by \emph{publication}: once the signal is public, capital floods in and arbitrages it away.  Signals built on proprietary data (like SecDB risk cubes) have a structural advantage:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Data barrier.}  External researchers use stale quarterly Fed Z.1 data to proxy dealer balance-sheet constraints (He, Kelly, and Manela, 2017; Chapter~\ref{ch:intermediary}).  You have daily, cross-asset risk outputs.  Even if the conceptual insight is known, no one outside the firm can replicate the exact signal.
+  \item \textbf{Execution barrier.}  The signal is designed for a specific desk's trading infrastructure.  Replication by outsiders requires both the data and the execution capability.
+  \item \textbf{Continuous updating.}  You observe the risk system daily.  Public anomalies are static once published.
+\end{enumerate}
+
+\subsection{The Shared-Factor Caveat}
+
+Durability is not guaranteed.  If your risk-cube signal is correlated with a published factor---say, it loads on momentum or value---then the published-factor component shares that factor's decay.  In your project, confound checks (Phase~2, Task~15) regress your signal's returns on known public factors (Fama-French, Carhart, intermediary capital ratio).  If the alpha survives these regressions, the proprietary component is genuinely incremental.  If it does not, you are repackaging a known signal with expensive data.
+
+\begin{keyidea}[The Durability Test]
+A signal's expected durability depends on three questions: (1) Is the data proprietary or public? (2) Is the signal correlated with published factors? (3) Are the instruments liquid enough for the signal to be arbitraged away?  Signals built on proprietary data, orthogonal to published factors, and trading in moderately liquid instruments have the best chance of survival.  Your risk-cube signals score well on (1) and potentially on (2), which is why the confound checks matter.
+\end{keyidea}
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Common Backtest Pitfalls}
+\label{sec:backtest-pitfalls}
+% ══════════════════════════════════════════════════════════════
+
+Beyond look-ahead bias (Section~\ref{sec:tc-pnl}), several other pitfalls routinely produce inflated backtests.
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Survivorship bias.}  Testing only on instruments that exist today, excluding those that delisted, defaulted, or were acquired.  A CDS strategy tested only on names that survived ignores the names that blew up---exactly the tail events that matter most.
+
+\item \textbf{Stale pricing.}  Using end-of-day marks for instruments that trade infrequently (e.g., corporate bonds, EM sovereign CDS).  The ``returns'' are partly mark-to-model artifacts, not executable prices.  If you cannot trade at the price in your backtest, the backtest is fiction.
+
+\item \textbf{Free-option bias.}  Assuming you can trade at the close price after observing close-of-day data.  In reality, you observe the close, compute your signal, and trade at the \emph{next available} price.  The gap between close and next-open can be significant in volatile markets.
+
+\item \textbf{Ignoring short-selling constraints.}  Assuming you can short any instrument at zero cost.  In practice, shorting is expensive (borrow fees), sometimes impossible (recall risk), and subject to regulatory constraints.  If your signal requires short positions, document the borrow cost assumption.
+
+\item \textbf{Selection bias in signal construction.}  Testing 50 feature variants and reporting the best one without adjusting for multiple testing.  This is the problem DSR solves (Chapter~\ref{ch:validation}), but only if you honestly log every trial.
+\end{enumerate}
+
+Your backtesting engine should include checks for the first three.  The point-in-time module handles look-ahead; the pipeline should flag stale prices (zero returns for consecutive days); and the engine should use next-period returns by construction.
+
+% ══════════════════════════════════════════════════════════════
+\section{Putting It All Together: The Backtest Report}
+\label{sec:backtest-report}
+% ══════════════════════════════════════════════════════════════
+
+Your backtesting engine (\texttt{src/backtest/reporting.py}) should produce a standardized report for every experiment.  Standardization matters: when you have tested 30 signal variants over Phase~2, a consistent format lets you compare results at a glance rather than re-reading ad hoc notebooks.  The desk will not read 30 notebooks.  They will scan a table.
+
+The report includes:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Signal summary.}  Feature set, model type (ridge/GBM), label type, training window.
+  \item \textbf{Gross and net P\&L.}  Cumulative P\&L chart with cost levels overlaid.
+  \item \textbf{Sharpe-vs-cost curve.}  Net Sharpe at $c = 0, 1, 2, 5, 10, 20$~bps.  Breakeven cost $c^*$.
+  \item \textbf{IC time series.}  Rolling IC with mean, standard deviation, ICIR.
+  \item \textbf{Performance table.}  Sharpe, Sortino, hit rate, max drawdown, Calmar, turnover.
+  \item \textbf{Validation results.}  Purged CV Sharpe, DSR, CPCV distribution, PBO (from Chapter~\ref{ch:validation}).
+  \item \textbf{SHAP summary.}  Top features by mean $|\SHAP|$ value (Chapter~\ref{ch:interpretation}).
+  \item \textbf{Ridge baseline comparison.}  GBM vs.\ ridge on identical features and CV splits.
+  \item \textbf{Regime decomposition.}  P\&L by regime (once Chapter~\ref{ch:regimes} infrastructure is built).
+  \item \textbf{Experiment ID.}  Logged to \texttt{experiments/experiment\_log.csv} with all parameters for honest DSR trial counting.
+\end{enumerate}
+
+This report is generated for every signal variant tested during Phase~2.  At Phase~5, the holdout results are appended as a final section, completing the story from hypothesis to out-of-sample evidence.
+
+\begin{projectconnection}[Project Connection: The Report as Deliverable]
+The backtest report format above maps directly to the research report you write in Phase~5 (Task~23).  Each section of the report corresponds to a slide or a page in your final presentation (Chapter~\ref{ch:presenting}).  Build the reporting module early in Phase~1, run it automatically for every experiment, and your Phase~5 consolidation becomes assembly rather than reconstruction.
+\end{projectconnection}
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Summary}
+\label{sec:ch12-summary}
+% ══════════════════════════════════════════════════════════════
+
+\begin{enumerate}[nosep]
+  \item \textbf{Gross P\&L} is $\hat{y}_t \cdot r_{t+1}$.  \textbf{Net P\&L} subtracts $|\hat{y}_t - \hat{y}_{t-1}| \cdot c$ for half-spread cost $c$.  Always report both.
+  \item \textbf{Turnover} $\bar{\tau}$ measures trading intensity.  Sharpe degrades linearly in $\bar{\tau} \times c$.  Target $\bar{\tau} \in [0.02, 0.15]$ for daily signals.
+  \item The \textbf{breakeven cost} $c^*$ is the spread at which net Sharpe $= 0$.  This is the single number the desk asks for.
+  \item \textbf{Capacity} follows the square-root impact model: $\Delta p = \eta\,\sigma\sqrt{v/V}$.  Use order-of-magnitude reasoning, not false precision.
+  \item The \textbf{holdout} is sacred: reserved since Phase~1, tested once in Phase~5, never iterated upon.
+  \item \textbf{Rolling-window walk-forward} stitches one-step-ahead OOS predictions across time.  Use expanding windows when sample size is binding ($T \approx 1{,}250$).
+  \item \textbf{IC} measures cross-sectional prediction quality.  \textbf{ICIR} measures its consistency.  Benchmarks: $\IC \in [0.02, 0.05]$ is typical; ICIR $> 0.5$ is good.
+  \item \textbf{Regime decomposition} splits P\&L by market regime.  If $>70\%$ of P\&L comes from $<30\%$ of time: the signal is fragile.
+  \item \textbf{McLean and Pontiff (2016):} anomaly returns decay 26\% out-of-sample and 58\% post-publication across 97 published signals.  Proprietary data signals may be more durable, but only if orthogonal to published factors.
+  \item Every experiment generates a \textbf{standardized backtest report}: P\&L, costs, IC, validation, SHAP, ridge baseline, regime decomposition, experiment ID.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════
+\section*{Key Results Reference}
+\label{sec:ch12-key-results}
+% ══════════════════════════════════════════════════════════════
+
+\begin{center}
+\begin{tabular}{p{4.2cm} p{4.5cm} p{5cm}}
+\toprule
+\textbf{Paper} & \textbf{Key Claim} & \textbf{Headline Result} \\
+\midrule
+McLean \& Pontiff (2016, JF) & Published anomalies decay post-publication & 26\% OOS decay (data mining); 58\% post-publication decay (arbitrage) across 97 signals \\
+\addlinespace
+L\'{o}pez de Prado (2018), Ch.~14--15 & Backtesting must account for costs and overfitting & Transaction-cost-aware P\&L; backtest report framework; holdout discipline \\
+\addlinespace
+Bailey, Borwein, LdP, Zhu (2014) & Backtest overfitting is quantifiable and endemic & $\sim$45 trials on 5yr daily data exhaust Sharpe 1.0; most published backtests are overfit \\
+\addlinespace
+Almgren \& Chriss (2001) & Market impact follows a square-root law & $\Delta p = \eta\,\sigma\sqrt{v/V}$; capacity is order-of-magnitude, not precise \\
+\bottomrule
+\end{tabular}
+\end{center}

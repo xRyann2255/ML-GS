@@ -1,0 +1,801 @@
+% ══════════════════════════════════════════════════════════════
+% Chapter 4 — Market Microstructure and Dealer Positioning
+% ══════════════════════════════════════════════════════════════
+
+\chapter{Market Microstructure and Dealer Positioning}
+\label{ch:microstructure}
+
+\begin{projectconnection}[Project Connection --- Phase 2 \& Phase 4B]
+This chapter teaches the mechanics of dealer positioning that create
+your features.  VaR utilization and factor concentration
+(Phase~2, Project~1) reflect dealer constraints from
+Chapter~\ref{ch:intermediary}'s theory.  Dealer Greeks---gamma, vanna,
+charm (Phase~4B, Project~2)---create mechanical hedging flows that
+move prices.  Understanding \emph{why} these flows exist is the
+difference between engineering meaningful features and fitting noise.
+\end{projectconnection}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Dealer Balance Sheets and Inventory}
+\label{sec:dealer-inventory}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Long and Short Positions]
+A \textbf{long} position means you own the asset and profit when its
+price rises.  A \textbf{short} position means you have sold an asset
+you do not own (by borrowing it) and profit when the price falls.
+A dealer who sells a call option to a client is \emph{short} the call;
+a dealer who buys a bond from a client is \emph{long} the bond.
+\end{prereq}
+
+\begin{prereq}[Bid-Ask Spread]
+The \textbf{bid} is the highest price a dealer will pay to buy an
+asset; the \textbf{ask} (or offer) is the lowest price a dealer will
+accept to sell.  The \textbf{bid-ask spread} $= \text{ask} - \text{bid}$
+is the dealer's compensation for providing immediacy.  Typical spreads:
+$\sim$1 cent for liquid large-cap equities, $\sim$1--5 basis points
+for on-the-run Treasuries, $\sim$10--50 basis points for corporate
+bonds.
+\end{prereq}
+
+Market-makers exist because buyers and sellers rarely arrive at the same
+time.  A client wants to sell \$50M of investment-grade bonds today;
+the natural buyer may not appear for days.  The dealer steps in, buys
+the bonds at the bid price, warehouses them, and hopes to sell at the
+ask before the market moves against the position.
+
+This creates \textbf{inventory}---risk the dealer holds involuntarily
+as a byproduct of providing liquidity.  Inventory has two costs:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Carry cost:} The position uses capital and consumes
+        balance sheet.  The dealer must fund the position (repo,
+        margin) and hold regulatory capital against it.
+  \item \textbf{Market risk:} The position contributes to the desk's
+        VaR (Chapter~\ref{ch:risk-systems}).  Large inventory pushes
+        VaR utilization toward the limit, constraining the desk's
+        ability to make further markets.
+\end{enumerate}
+
+\begin{keyidea}[Inventory Links to VaR Utilization]
+A desk with high inventory has high VaR.  High VaR relative to the
+limit means high VaR utilization.  High VaR utilization constrains
+future market-making, reducing liquidity provision.  This is the
+micro-level mechanism behind the procyclical leverage documented by
+Adrian and Shin (2014) and the intermediary constraints priced by
+He, Krishnamurthy (2013)---concepts from Chapter~\ref{ch:intermediary}.
+
+\textbf{For your project:} When VaR utilization rises rapidly
+(Section~\ref{sec:var-utilization} of Chapter~\ref{ch:risk-systems}),
+it signals that dealers are accumulating involuntary inventory.
+The subsequent forced reduction of that inventory creates
+predictable price pressure.
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Delta Hedging}
+\label{sec:delta-hedging}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[What Is an Option?]
+An \textbf{option} gives the holder the right---but not the
+obligation---to buy (call) or sell (put) an underlying asset at a
+specified \textbf{strike price} $K$ on or before an
+\textbf{expiration date} $T$.
+
+\textbf{Payoff at expiration:}
+\begin{itemize}[nosep]
+  \item Call: $\max(S_T - K,\; 0)$.  Profits when $S_T > K$.
+  \item Put:  $\max(K - S_T,\; 0)$.  Profits when $S_T < K$.
+\end{itemize}
+Before expiration, an option's value $V(S,t)$ depends on the current
+price $S$, time to expiration $T-t$, volatility $\sigma$, interest
+rate $r$, and the strike $K$.  The Black-Scholes model provides the
+canonical pricing formula, but the key insight for this chapter is
+simpler: \emph{option value changes when the underlying moves.}
+\end{prereq}
+
+Options dealers do not speculate on direction---they earn the bid-ask
+spread on options and hedge away the directional risk.  The primary
+hedge is \textbf{delta hedging}.
+
+\begin{definition}[Delta]
+The \textbf{delta} of an option is the first derivative of its value
+with respect to the underlying price:
+\begin{equation}
+\label{eq:delta-def}
+\Delta \;=\; \frac{\partial V}{\partial S}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $V$ --- option value.
+  \item $S$ --- price of the underlying asset.
+  \item Call delta: $\Delta \in [0,\,1]$.  A deep in-the-money call
+        has $\Delta \approx 1$; a far out-of-the-money call has
+        $\Delta \approx 0$.
+  \item Put delta: $\Delta \in [-1,\,0]$.  Same logic, opposite sign.
+  \item $\Delta$ changes as $S$ moves---it is not constant.
+\end{itemize}
+\end{definition}
+
+\textbf{Delta hedging in practice:} If a dealer sells a call option
+with $\Delta = 0.50$ on 100 shares, the dealer is short delta by
+$0.50 \times 100 = 50$ shares.  To hedge, the dealer buys 50 shares
+of the underlying.  Now, if the stock rises by \$1, the option loss
+($-\$50$) is offset by the stock gain ($+\$50$).
+
+The problem: delta changes as $S$ moves.  If the stock rises, the
+call's delta increases (say to 0.60), and the dealer must buy
+10 more shares.  If the stock falls, the call's delta decreases
+(say to 0.40), and the dealer must sell 10 shares.
+
+\begin{keyidea}[Delta Hedging Creates Mechanical Flows]
+Delta hedging generates \textbf{predictable, mechanical trading} in
+the underlying asset.  When the stock moves, dealers must rebalance.
+The direction of rebalancing depends on whether dealers are net long
+or net short \emph{gamma}---the topic of the next section.
+
+These flows are not information-driven.  They are constraint-driven:
+the dealer \emph{must} hedge regardless of any view on future
+direction.  This is precisely the kind of non-fundamental flow that
+can create predictable short-term return patterns.
+\end{keyidea}
+
+\begin{workedexample}{Delta Hedging a Short Call Position}
+A dealer sells 1{,}000 at-the-money call contracts on a stock at
+$S = \$100$, $K = \$100$.  Each contract covers 100 shares.
+Delta of each call: $\Delta = 0.50$.
+
+\textbf{Initial hedge:}
+Total delta exposure $= -1{,}000 \times 100 \times 0.50
+  = -50{,}000$ shares (short delta).
+The dealer buys 50{,}000 shares to hedge.
+
+\textbf{Stock rises to \$105:}
+New delta $\approx 0.62$.
+Required hedge $= 1{,}000 \times 100 \times 0.62 = 62{,}000$ shares.
+The dealer must buy $62{,}000 - 50{,}000 = 12{,}000$ additional shares.
+
+\textbf{Stock falls to \$95:}
+New delta $\approx 0.38$.
+Required hedge $= 1{,}000 \times 100 \times 0.38 = 38{,}000$ shares.
+The dealer must sell $50{,}000 - 38{,}000 = 12{,}000$ shares.
+
+In both cases, the dealer trades \emph{in the direction of the move}:
+buying on the way up, selling on the way down.  This amplifies the
+price change---the hallmark of a short-gamma position.
+\end{workedexample}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Gamma and the Gamma-Flip Level}
+\label{sec:gamma}
+% ──────────────────────────────────────────────────────────────
+
+\begin{definition}[Gamma]
+The \textbf{gamma} of an option is the second derivative of its
+value with respect to the underlying price, or equivalently, the
+rate of change of delta:
+\begin{equation}
+\label{eq:gamma-def}
+\Gamma \;=\; \frac{\partial^2 V}{\partial S^2}
+  \;=\; \frac{\partial \Delta}{\partial S}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\Gamma > 0$ always for plain vanilla options
+        (both calls and puts).
+  \item Gamma is highest for at-the-money options near expiration.
+  \item A dealer who \emph{buys} options is \textbf{long gamma}
+        ($\Gamma > 0$).
+  \item A dealer who \emph{sells} options is \textbf{short gamma}
+        ($\Gamma < 0$ for the dealer's portfolio).
+\end{itemize}
+\end{definition}
+
+The sign of aggregate dealer gamma determines whether hedging flows
+stabilize or destabilize prices.
+
+\begin{intuition}[Shock Absorbers vs.\ Shock Amplifiers]
+\textbf{Long-gamma dealers are shock absorbers.}  When the underlying
+rises, their delta increases, so they \emph{sell} into the rally
+(locking in gains).  When it falls, their delta decreases, so they
+\emph{buy} the dip.  Their hedging dampens price moves.
+
+\textbf{Short-gamma dealers are shock amplifiers.}  When the underlying
+rises, their negative gamma means they must \emph{buy more} to stay
+hedged.  When it falls, they must \emph{sell more}.  Their hedging
+amplifies price moves.
+
+The effect is proportional to the \emph{aggregate} net gamma across
+all dealers.  One dealer's long gamma can cancel another's short gamma.
+What matters for price impact is the signed sum.
+\end{intuition}
+
+\vspace{0.5em}
+
+% ── TikZ Diagram: Long vs Short Gamma Hedging ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  node distance=0.5cm and 2.5cm,
+  every node/.style={font=\small},
+  flowblock/.style={draw, rounded corners, minimum height=0.8cm,
+    minimum width=2.8cm, align=center, font=\small},
+  arrow/.style={-{Stealth[length=2.5mm]}, thick},
+]
+
+% ── Left column: Long Gamma ──
+\node[font=\bfseries\small, text=intgreen] (ltitle) {Net Long Gamma};
+\node[flowblock, fill=green!8, below=0.4cm of ltitle] (lshock)
+  {Price rises by $\delta$};
+\node[flowblock, fill=green!8, below=0.4cm of lshock] (ldelta)
+  {$\Delta$ increases\\(calls more in-the-money)};
+\node[flowblock, fill=green!8, below=0.4cm of ldelta] (lhedge)
+  {Dealer \textbf{sells} shares\\to reduce hedge};
+\node[flowblock, fill=green!15, below=0.4cm of lhedge] (lresult)
+  {Selling pressure\\dampens rally};
+
+\draw[arrow, intgreen] (lshock) -- (ldelta);
+\draw[arrow, intgreen] (ldelta) -- (lhedge);
+\draw[arrow, intgreen] (lhedge) -- (lresult);
+
+% ── Right column: Short Gamma ──
+\node[font=\bfseries\small, text=warnred, right=4cm of ltitle]
+  (rtitle) {Net Short Gamma};
+\node[flowblock, fill=red!8, below=0.4cm of rtitle] (rshock)
+  {Price rises by $\delta$};
+\node[flowblock, fill=red!8, below=0.4cm of rshock] (rdelta)
+  {$\Delta$ increases\\(short calls deeper ITM)};
+\node[flowblock, fill=red!8, below=0.4cm of rdelta] (rhedge)
+  {Dealer \textbf{buys} shares\\to increase hedge};
+\node[flowblock, fill=red!15, below=0.4cm of rhedge] (rresult)
+  {Buying pressure\\amplifies rally};
+
+\draw[arrow, warnred] (rshock) -- (rdelta);
+\draw[arrow, warnred] (rdelta) -- (rhedge);
+\draw[arrow, warnred] (rhedge) -- (rresult);
+
+% ── Center label ──
+\node[font=\footnotesize\itshape, text=gray,
+  below=0.3cm of $(lresult)!0.5!(rresult)$]
+  {Symmetric logic applies when prices fall};
+
+\end{tikzpicture}
+\caption{Dealer hedging flows under net long gamma (stabilizing)
+vs.\ net short gamma (destabilizing).  The mechanism is symmetric
+for price declines: long-gamma dealers buy dips; short-gamma dealers
+sell into declines.}
+\label{fig:gamma-flows}
+\end{figure}
+
+\subsection{Aggregate Gamma and the Gamma-Flip Level}
+
+Individual option positions have positive gamma.  But \emph{dealers}
+can be net long or net short gamma depending on whether they are net
+buyers or net sellers of options.  The \textbf{aggregate net dealer
+gamma} is the dollar-weighted sum of gamma across all dealer
+positions:
+
+\begin{equation}
+\label{eq:agg-gamma}
+\Gamma_{\text{agg}} \;=\; \sum_{i} n_i \cdot \Gamma_i \cdot S^2
+  \cdot 0.01
+\end{equation}
+\begin{itemize}[nosep]
+  \item $n_i$ --- net dealer position in contract $i$ (positive if
+        dealer is long, negative if short).
+  \item $\Gamma_i$ --- gamma of contract $i$.
+  \item $S$ --- underlying price.
+  \item The $S^2 \times 0.01$ normalization converts to ``dollars of
+        stock a dealer must trade per 1\% move in $S$.''
+\end{itemize}
+
+The \textbf{gamma-flip level} (also called the \textbf{gamma-neutral
+level}) is the price $S^*$ at which $\Gamma_{\text{agg}} = 0$.  Below
+$S^*$, dealers are typically net short gamma (puts gain gamma as the
+underlying falls); above $S^*$, dealers are typically net long gamma.
+
+\begin{keyidea}[The Gamma-Flip Level as a Regime Boundary]
+When the underlying is above the gamma-flip level, dealers' hedging
+dampens volatility (long gamma).  When it crosses below the flip
+level, the regime switches: dealers' hedging amplifies volatility
+(short gamma).  This transition---from shock absorber to shock
+amplifier---often coincides with sharp increases in realized
+volatility and intraday price swings.
+
+\textbf{For your project (Phase~4B):} If you compute aggregate
+dealer gamma from SecDB's book-level Greeks, the gamma-flip level
+becomes a natural feature.  Distance to the flip level, and whether
+the market recently crossed it, can predict volatility regime changes.
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Higher-Order Greeks}
+\label{sec:higher-greeks}
+% ──────────────────────────────────────────────────────────────
+
+Gamma is the primary driver of mechanical hedging flows, but three
+higher-order sensitivities create additional predictable trading
+patterns.
+
+\begin{prereq}[Partial Derivatives]
+The Greeks are partial derivatives of option value $V(S, \sigma, t)$
+with respect to different variables.  Delta is $\partial V / \partial S$.
+Gamma is $\partial^2 V / \partial S^2$.  The higher-order Greeks below
+are cross-partials or time derivatives.  You do not need to derive
+them---just understand what they measure.
+\end{prereq}
+
+\begin{definition}[Vega, Vanna, and Charm]
+\textbf{Vega} --- sensitivity of option value to implied volatility:
+\begin{equation}
+\label{eq:vega-def}
+\mathcal{V} \;=\; \frac{\partial V}{\partial \sigma}
+\end{equation}
+Vega is always positive for long option positions.  When implied
+volatility rises by 1 percentage point, the option value changes by
+approximately $\mathcal{V}$.
+
+\textbf{Vanna} --- cross-sensitivity of delta to volatility (or
+equivalently, sensitivity of vega to the underlying price):
+\begin{equation}
+\label{eq:vanna-def}
+\text{Vanna} \;=\; \frac{\partial^2 V}{\partial S\, \partial \sigma}
+  \;=\; \frac{\partial \Delta}{\partial \sigma}
+  \;=\; \frac{\partial \mathcal{V}}{\partial S}
+\end{equation}
+Vanna matters on days when both $S$ and $\sigma$ move together---i.e.,
+during market stress, when prices drop and volatility spikes
+simultaneously.
+
+\textbf{Charm} (delta decay) --- sensitivity of delta to the passage
+of time:
+\begin{equation}
+\label{eq:charm-def}
+\text{Charm} \;=\; -\frac{\partial \Delta}{\partial t}
+  \;=\; -\frac{\partial^2 V}{\partial S\, \partial t}
+\end{equation}
+Charm captures how delta changes overnight, even if $S$ and $\sigma$
+are unchanged.  As options approach expiration, at-the-money delta
+moves toward 0.50, and out-of-the-money delta decays toward 0.
+\begin{itemize}[nosep]
+  \item $\mathcal{V}$ drives hedging when volatility moves
+        (earnings, FOMC).
+  \item Vanna drives hedging when price and volatility move
+        \emph{simultaneously} (sell-offs with vol spikes).
+  \item Charm drives end-of-day hedging as time passes---even on
+        quiet days.
+\end{itemize}
+\end{definition}
+
+\begin{keyidea}[Which Greek Matters When]
+\begin{center}
+\small
+\begin{tabular}{@{}llp{6cm}@{}}
+\toprule
+\textbf{Greek} & \textbf{Trigger} & \textbf{Hedging Flow} \\
+\midrule
+Gamma & Price moves &
+  Dominant hedging flow.  Direction depends on dealer net gamma sign. \\
+Vanna & Vol move + price move &
+  Large on event days (earnings, FOMC) when $S$ and $\sigma$ move
+  together.  Creates asymmetric flows in sell-offs. \\
+Charm & Time passing &
+  Predictable end-of-day flow as dealers adjust for overnight
+  delta decay.  Strongest near expiration. \\
+Vega & Vol moves alone &
+  Matters for vol surface trading but less relevant for
+  directional flow in the underlying. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For Phase~4B, gamma is the primary feature.  Add vanna as a
+feature on event days (scheduled vol events like FOMC, NFP, CPI)
+and charm for modeling last-hour flows.
+\end{keyidea}
+
+\begin{workedexample}{Vanna Flow During a Sell-Off}
+Suppose dealers are short a large book of put options on the S\&P~500.
+The market drops 2\% and the VIX spikes 5 vol points.
+
+\textbf{Gamma effect:} The puts' delta becomes more negative
+(closer to $-1$).  Dealers who are short these puts have positive
+delta exposure increasing---they must \emph{sell} index futures to
+re-hedge.  This amplifies the decline (short gamma).
+
+\textbf{Vanna effect:} The simultaneous volatility spike further
+increases the magnitude of put delta (higher vol $\Rightarrow$
+out-of-the-money puts gain delta).  Dealers must sell \emph{even more}
+futures than gamma alone would dictate.
+
+During the COVID crash of March 2020, the compounding of gamma and
+vanna hedging flows was widely cited as an amplifier of the sell-off.
+The vanna effect is often larger than the gamma effect during
+high-volatility episodes because $\sigma$ and $S$ move
+simultaneously.
+\end{workedexample}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Fire Sales: Coval and Stafford (2007)}
+\label{sec:fire-sales}
+% ──────────────────────────────────────────────────────────────
+
+The theoretical framework from Chapter~\ref{ch:intermediary} predicts
+that constrained intermediaries create predictable price pressure.
+Coval and Stafford (2007) provide the cleanest empirical evidence.
+
+\begin{keyresult}[Fire Sales and Reversals (Coval and Stafford, 2007, JFE)]
+Using mutual fund holdings data from 1980--2003, Coval and Stafford
+identify stocks subject to flow-driven forced selling (funds
+experiencing large outflows that mechanically liquidate existing
+positions).
+
+\textbf{Key findings:}
+\begin{itemize}[nosep]
+  \item Stocks in the heaviest forced-selling decile experience
+        cumulative abnormal returns of approximately $-10\%$ during
+        the selling quarter ($t$-stat $\approx -3.7$).
+  \item Reversals emerge gradually: $+2\%$ in the following quarter,
+        approximately $+8\%$ over the subsequent year, with full mean
+        reversion at roughly 18--20 months.
+  \item A long-short strategy trading against anticipated forced
+        sales earns abnormal returns exceeding $10\%$ annually.
+  \item Funds in the bottom outflow decile are roughly twice as
+        likely to liquidate positions as funds with normal flows.
+\end{itemize}
+The mechanism: capital outflows force funds to sell regardless of
+fundamental value, pushing prices below fair value.  Prices revert
+as the forced selling subsides and other investors provide liquidity.
+\end{keyresult}
+
+The Coval-Stafford mechanism applies directly to dealer banks, but
+through a different constraint.  Mutual funds are forced to sell by
+\emph{redemptions}.  Dealers are forced to sell by \emph{VaR limits}.
+
+\begin{keyidea}[VaR Limits as the Dealer Fire-Sale Trigger]
+In Chapter~\ref{ch:risk-systems}, Section~\ref{sec:var-utilization},
+you learned that VaR utilization approaching 100\% forces desks to
+reduce positions.  This is the dealer-bank analog of Coval-Stafford
+fund outflows:
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & \textbf{Mutual Fund} & \textbf{Dealer Bank} \\
+\midrule
+Constraint & Redemptions (outflows) & VaR limit \\
+Trigger & Large capital outflows & VaR utilization $> 90\%$ \\
+Forced action & Liquidate existing positions & Reduce positions
+  or hedge \\
+Price impact & $\approx -10\%$ CAR & Expected similar magnitude \\
+Reversal & 18--20 months to mean revert & Your project tests this \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The key difference: Coval-Stafford used public fund holdings
+(13F filings, quarterly).  You have daily VaR utilization from
+SecDB---a higher-frequency, more granular version of the same
+constraint.
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Dealer Gamma and Intraday Momentum}
+\label{sec:intraday-momentum}
+% ──────────────────────────────────────────────────────────────
+
+Baltussen, Da, Lammers, and Martens (2021, JFE) connect the
+gamma-hedging mechanics from Section~\ref{sec:gamma} to a
+specific, tradeable pattern: \textbf{market intraday momentum}.
+
+\begin{keyresult}[Intraday Momentum from Gamma Hedging
+  (Baltussen et al., 2021, JFE)]
+Using intraday returns on 60+ futures contracts across equities,
+bonds, commodities, and currencies from 1974--2020:
+\begin{itemize}[nosep]
+  \item The return in the \textbf{last 30 minutes} before market
+        close is positively predicted by the return during the
+        rest of the day (open to 30 minutes before close).
+  \item The predictability is economically large: a simple trading
+        strategy (go long if the day's return is positive, short if
+        negative, held for the last 30 minutes) produces annualized
+        Sharpe ratios between \textbf{0.87 and 1.73} at the
+        asset-class level.
+  \item The effect is strongest on days with large absolute returns
+        and reverts over the following days.
+  \item The authors link the pattern to gamma hedging demand from
+        options market-makers and leveraged ETF rebalancing: both
+        must trade in the direction of the day's move near the close.
+\end{itemize}
+\end{keyresult}
+
+\textbf{The mechanism in detail:}  Suppose the S\&P~500 is up 1.5\%
+by 3:30pm.  Dealers who are net short gamma on index options must buy
+more futures to rebalance their delta hedge (Section~\ref{sec:gamma}).
+Leveraged ETFs that target $2\times$ or $3\times$ daily returns must
+also buy to restore their target leverage ratio.  Both flows
+concentrate near the close, pushing the index further in the
+direction of the day's move.
+
+\begin{keyidea}[Why Proprietary Data Beats Public GEX]
+Public ``Gamma Exposure'' (GEX) estimates---available from services
+like SqueezeMetrics and SpotGamma---reconstruct aggregate dealer gamma
+from exchange-reported options data.  These estimates have three
+problems:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Missing OTC volume:} Public data covers only
+        exchange-listed options.  A substantial portion of dealer
+        gamma sits in over-the-counter contracts that are invisible
+        to public data.
+  \item \textbf{Unknown dealer side:} Public data shows open interest
+        and volume but not \emph{who} is long and who is short.
+        Assigning dealer vs.\ customer sides requires assumptions
+        that introduce sign errors.
+  \item \textbf{Incomplete expiration coverage:} Different providers
+        include different subsets of expirations (0DTE, weeklies,
+        monthlies), producing conflicting estimates for the same
+        underlying on the same day.
+\end{enumerate}
+
+SecDB provides the dealer's \emph{actual} book-level Greeks with
+correct sign---no assumptions about positioning needed.  This is
+the core advantage of Project~2 (Phase~4B).
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Option Expiration Effects}
+\label{sec:expiration-effects}
+% ──────────────────────────────────────────────────────────────
+
+Dealer gamma effects are not constant---they intensify near option
+expiration dates.  Ni, Pearson, and Poteshman (2005, JFE) document
+the most direct evidence.
+
+\begin{keyresult}[Stock Pinning at Strikes (Ni, Pearson, and
+  Poteshman, 2005, JFE)]
+On option expiration dates, closing prices of stocks with listed
+options \textbf{cluster at strike prices}.  On each expiration date,
+the returns of optionable stocks are altered by an average of at
+least \textbf{16.5 basis points}, translating into aggregate
+market-capitalization shifts on the order of \textbf{\$9 billion}
+(in their 1996--2002 sample).
+
+The mechanism: delta-hedging market-makers with net long option
+positions sell stock above the nearest strike and buy below it,
+driving the closing price toward the strike.  The effect reverses
+for net short positions, creating ``declustering.''
+\end{keyresult}
+
+The expiration-pinning effect is relevant to your project for two
+reasons.  First, it is direct evidence that dealer hedging moves
+prices in a predictable, non-informational way.  Second, the rise of
+zero-days-to-expiration (0DTE) options---which now account for over
+40\% of S\&P~500 options volume---means that this pinning effect
+occurs \emph{every trading day}, not just on monthly expiration
+Fridays.
+
+\begin{workedexample}{Gamma Near Expiration}
+Consider an at-the-money call with $K = \$100$, $S = \$100$, and
+1 day to expiration.  Its gamma is extremely high: a small move in
+$S$ causes a large change in delta.
+
+If $S$ rises to \$101 (1\% move), the call's delta jumps from
+$\approx 0.50$ to $\approx 0.85$.  A dealer short this call must
+buy 35 additional shares per contract---a much larger rebalance than
+for an option with 30 days to expiration, where the same move might
+shift delta by only 5 shares.
+
+Near expiration, gamma is concentrated at the strike.  This is why
+pinning effects are strongest at strikes with the most open interest,
+and why dealers' hedging flows peak in the final hours of expiration
+day.
+\end{workedexample}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Caveats and Pitfalls}
+\label{sec:microstructure-caveats}
+% ──────────────────────────────────────────────────────────────
+
+The dealer-positioning channel is real, but three caveats
+from the literature require careful handling.
+
+\subsection{Implied Volatility Spread as a Borrow-Fee Proxy}
+
+\begin{keyresult}[IVS Reflects Borrow Fees, Not Information
+  (Muravyev, Pearson, and Pollet, 2025, JFE)]
+The implied-volatility spread (call IV minus put IV) and implied
+volatility skew are widely used as signals for future stock returns.
+Muravyev, Pearson, and Pollet show that this apparent predictability
+is largely a proxy for \textbf{stock borrow fees}:
+\begin{itemize}[nosep]
+  \item The return predictability from IV spread and skew decreases
+        by at least \textbf{two-thirds} when high-borrow-fee stocks
+        are excluded from the sample.
+  \item The mechanism: standard implied volatility calculations
+        assume zero borrowing costs.  When borrow fees are high
+        (hard-to-borrow stocks), this assumption inflates put IV
+        relative to call IV, creating a spurious ``signal.''
+  \item Strategies that appear profitable in backtests become
+        unprofitable once actual borrowing costs are included.
+\end{itemize}
+\end{keyresult}
+
+\begin{warning}[Control for Short Interest When Using Options Data]
+If your Project~2 features touch equities (even through index
+components), any signal derived from implied volatility differences
+or options order flow may be contaminated by borrow fees.
+Muravyev, Pearson, and Pollet (2025) show that at least two-thirds
+of the return predictability from IV spread and skew disappears when
+high-borrow-fee stocks are excluded.
+
+\textbf{Mitigation:}
+\begin{enumerate}[nosep]
+  \item If available, include stock borrow fees as a control variable
+        in your regressions.
+  \item At minimum, add short interest as a percentage of float as a
+        control.
+  \item Test whether your signal survives when restricted to the
+        subset of stocks with low short interest and low borrow fees.
+\end{enumerate}
+This caveat is less binding for rates and FX futures (Project~1's
+primary asset classes), where borrow fees are negligible.  It becomes
+critical if Project~2 extends to single-stock options.
+\end{warning}
+
+\subsection{Gamma Fragility: Sign Flips Intraday}
+
+Barbon and Buraschi (2021) provide granular evidence on how dealer
+gamma affects returns at the stock level, using options data from
+Nasdaq exchanges (ISE, GEMX, PHLX) over 2010--2020.
+
+\begin{keyresult}[Gamma Fragility (Barbon and Buraschi, 2021)]
+A one-standard-deviation increase in the dealer gamma imbalance is
+associated with:
+\begin{itemize}[nosep]
+  \item A decrease of \textbf{5--25 basis points} in absolute daily
+        returns for single stocks (stabilization from long gamma).
+  \item A decrease of more than \textbf{20 basis points}
+        ($\approx$20\% of a standard deviation) in absolute daily
+        returns for indexes.
+  \item A decrease in intraday return autocorrelation of
+        \textbf{1.5--2\%} per standard deviation of gamma imbalance.
+  \item The effect is significantly larger for \textbf{illiquid}
+        stocks, where dealer hedging flows represent a larger share
+        of total volume.
+\end{itemize}
+The fragility arises because gamma imbalances can flip sign quickly
+as new option trades execute, existing options expire, and the
+underlying price crosses strike boundaries.
+\end{keyresult}
+
+\begin{warning}[Dealer Gamma Changes Intraday]
+The gamma estimates you compute from SecDB's morning risk run may be
+stale by the afternoon close.  Three sources of intraday change:
+\begin{enumerate}[nosep]
+  \item \textbf{New option trades} change dealer positions throughout
+        the day.  A single large customer order can flip the desk's
+        net gamma sign.
+  \item \textbf{Price movement} shifts which options are at-the-money
+        (where gamma is highest).  A 2\% intraday move can
+        redistribute gamma across strikes.
+  \item \textbf{Time decay} (charm) alters delta and gamma
+        continuously, especially for near-expiration options.
+\end{enumerate}
+
+\textbf{Mitigation for Phase~4B:}
+\begin{itemize}[nosep]
+  \item Use end-of-day Greeks (after the close), not morning
+        estimates, when constructing daily features.
+  \item Treat the gamma feature as a \emph{regime indicator}
+        (long gamma vs.\ short gamma) rather than a precise dollar
+        estimate.
+  \item Include the absolute magnitude of gamma as a separate feature
+        measuring the \emph{intensity} of hedging flows, regardless
+        of direction.
+\end{itemize}
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Summary}
+\label{sec:micro-summary}
+% ──────────────────────────────────────────────────────────────
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}p{3cm}p{4.5cm}p{6cm}@{}}
+\toprule
+\textbf{Concept} & \textbf{Mechanism} & \textbf{Project Relevance} \\
+\midrule
+Dealer inventory &
+  Market-making creates involuntary positions that consume VaR &
+  Links to VaR utilization features
+  (Ch.~\ref{ch:risk-systems}) \\[6pt]
+
+Delta hedging &
+  Dealers trade the underlying to offset option exposure;
+  $\Delta = \partial V / \partial S$ &
+  Creates the mechanical flows underlying all Greek-based
+  features \\[6pt]
+
+Gamma &
+  $\Gamma = \partial^2 V / \partial S^2$; determines whether
+  hedging stabilizes or amplifies prices &
+  Primary feature for Project~2 (Phase~4B); gamma-flip level
+  as regime boundary \\[6pt]
+
+Vanna, charm &
+  Cross-partials that drive hedging on event days (vanna) and
+  near the close (charm) &
+  Secondary features for Phase~4B; add on scheduled-event
+  days \\[6pt]
+
+Fire sales (Coval-Stafford) &
+  Forced selling $\Rightarrow$ $\approx -10\%$ CAR
+  $\Rightarrow$ reversal over 18--20 months &
+  VaR limit breaches are the dealer analog;
+  Project~1 tests this with daily data \\[6pt]
+
+Intraday momentum (Baltussen et al.) &
+  Gamma hedging predicts last-30-min returns;
+  SR $\in [0.87, 1.73]$ &
+  Direct test for Project~2 using SecDB book Greeks \\[6pt]
+
+Gamma fragility (Barbon-Buraschi) &
+  Gamma imbalance dampens/amplifies returns by 5--25 bps
+  per $\sigma$; stronger for illiquid assets &
+  Use gamma as a regime indicator, not a precise estimate;
+  effect is fragile intraday \\[6pt]
+
+IVS caveat (Muravyev et al.) &
+  IV spread/skew proxies borrow fees; $\ge 2/3$ of
+  predictability is spurious &
+  Control for short interest if touching equity options \\
+\bottomrule
+\end{tabular}
+\caption{Chapter~\ref{ch:microstructure} key concepts and project
+relevance.}
+\label{tab:ch4-summary}
+\end{table}
+
+\vspace{1em}
+
+\noindent\textbf{Key takeaways:}
+\begin{enumerate}[nosep]
+  \item Dealers accumulate inventory by providing liquidity.
+        Inventory consumes VaR, linking microstructure to the
+        risk-system outputs in Chapter~\ref{ch:risk-systems}.
+  \item Delta hedging creates mechanical, non-informational
+        trading flows.  The direction depends on the sign of
+        aggregate dealer gamma.
+  \item Net long gamma stabilizes prices (sell rallies, buy dips).
+        Net short gamma destabilizes them (buy rallies, sell dips).
+        The gamma-flip level is a regime boundary.
+  \item Coval and Stafford (2007) show forced selling creates
+        $\approx -10\%$ abnormal returns with subsequent reversal.
+        VaR limits are the dealer-bank version of the same constraint.
+  \item Baltussen et al.\ (2021) show gamma hedging predicts
+        last-30-minute returns with Sharpe ratios of 0.87--1.73.
+        SecDB book Greeks give you the correct sign that public
+        data cannot.
+  \item Implied-volatility signals may proxy borrow fees
+        (Muravyev et al., 2025).  Control for short interest when
+        using options-derived features on equities.
+  \item Dealer gamma is fragile: it changes intraday and flips
+        sign quickly.  Treat it as a regime indicator, not a precise
+        estimate.
+\end{enumerate}
+
+\noindent The next chapter (Chapter~\ref{ch:regularized}) introduces
+regularized linear models---the ridge and lasso baselines that every
+ML signal must beat before you trust it.
