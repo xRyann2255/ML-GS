@@ -16,42 +16,38 @@ Target time: ~17 minutes total.
 ---
 
 ## Slide 2 -- The Thesis
-**[~2 minutes]**
+**[~1.5 minutes]**
 
-"Here's the idea in one sentence. Intermediary asset pricing theory proves that dealer balance-sheet constraints price risk across asset classes. Our risk system measures those constraints every day. I want to test whether those outputs predict returns, volatility, and drawdowns."
+"Here's the idea in one sentence. There's a well-established body of theory proving that dealer balance-sheet constraints price risk across asset classes. Our risk system measures those constraints every day. I want to test whether those outputs predict returns, volatility, and drawdowns."
 
 **[Pause -- let them read the slide]**
 
-"The reason this hasn't been tested before is a data problem. Every external researcher has had to reconstruct dealer constraints from quarterly Fed Z.1 tables -- data published with a three-month lag, wrong sign conventions, aggregated across the entire banking sector. They proved the theory works despite bad data. We have the real measurement, daily, cross-asset, with the correct dealer sign."
+"The reason this hasn't been tested properly is a data problem -- external researchers have never had access to the right data. I'll show you what I mean in a moment."
 
-"This is not a fishing expedition. Every feature I test has a reason from the theory for why it should work. If it doesn't, I document that and move on."
+"And this is not a fishing expedition. Every feature I test has a reason from the theory for why it should work. If it doesn't, I document that and move on."
 
 **[Advance to Slide 3]**
 
 ---
 
 ## Slide 3 -- The Theory is Settled
-**[~2 minutes]**
+**[~1.5 minutes]**
 
 **[Let the three numbers land before speaking]**
 
-"Three numbers tell the story."
+"The theory behind this isn't speculative. Three numbers."
 
 **[Point to 77%]**
 
-"Adrian, Etula, and Muir showed that a single factor based on intermediary leverage explains 77% of the cross-section of 41 test portfolios. Remarkable for a single factor."
+"A 2014 paper showed that a single factor based on intermediary leverage explains 77% of the cross-section of 41 test portfolios. Remarkable for one factor."
 
 **[Point to 6]**
 
-"He, Kelly, and Manela extended this to a single pricing kernel across six asset classes -- equities, options, CDS, bonds, FX, and commodities. A cross-asset result, which is why the XA desk is the right home for this."
+"A follow-up extended this to a single pricing kernel across six asset classes -- equities, options, CDS, bonds, FX, and commodities. That cross-asset result is why the XA desk is the right home for this."
 
 **[Point to Daily]**
 
-"And this is the gap. Every one of these results used quarterly data. Our risk system produces this daily."
-
-**[Slightly slower]**
-
-"He and Krishnamurthy showed that risk premia rise nonlinearly when dealer constraints bind. Adrian and Shin showed dealer repos forecast VIX moves. Every paper used crude proxies. The theory works with bad data. The question is whether it works better with the real thing."
+"And this is the gap. Every one of these results used quarterly data. Our risk system produces this daily. That leads directly to the next slide."
 
 **[Advance to Slide 4]**
 
@@ -68,7 +64,7 @@ Target time: ~17 minutes total.
 
 "On the right -- what SecDB produces every night. Daily, available next morning, desk-level granularity, correct dealer sign, with utilization, factor decomposition, and scenario P&L."
 
-"This isn't an incremental improvement. The theory was proved with the left column. I want to test it with the right."
+"This isn't an incremental improvement. The theory was proved with the left column. I want to test it with the right. So what would I actually pull from SecDB?"
 
 **[Advance to Slide 5]**
 
@@ -77,15 +73,15 @@ Target time: ~17 minutes total.
 ## Slide 5 -- Features
 **[~3 minutes. This is the intellectual core -- spend time here.]**
 
-"Five families of features from the risk system, each backed by a specific paper."
+"Five families of features from the risk system, each backed by published research."
 
 **[Point to the top two rows]**
 
 "The two priorities are VaR utilization and factor concentration."
 
-"VaR utilization -- usage as a percentage of the limit -- is the most direct measurement of balance-sheet constraints. When utilization approaches the limit, forced selling follows. Coval and Stafford showed that forced selling creates predictable reversals. Utilization measures how close we are to that trigger."
+"VaR utilization -- usage as a percentage of the limit -- is the most direct measurement of balance-sheet constraints. When utilization approaches the limit, forced selling follows. There's a well-known 2007 paper showing that forced selling by constrained institutions creates predictable reversals. Utilization measures how close we are to that trigger."
 
-"Factor concentration -- a Herfindahl index across the factor-VaR decomposition. When risk is concentrated in a few factors rather than diversified, that's crowding. He-Kelly-Manela showed that hidden concentration predicts correlated drawdowns. Low dispersion means everyone is in the same trade."
+"Factor concentration -- a Herfindahl index across the factor-VaR decomposition. When risk is concentrated in a few factors rather than diversified, that's crowding. The literature shows that hidden concentration predicts correlated drawdowns. Low dispersion means everyone is in the same trade."
 
 **[Gesture to the remaining three rows]**
 
@@ -93,7 +89,7 @@ Target time: ~17 minutes total.
 
 **[Pause, then deliver the key line]**
 
-"These aren't proxies. VaR utilization literally is the constraint the theory says drives prices. Each feature is tested independently first, so I can isolate what's actually working."
+"These aren't proxies. VaR utilization literally is the constraint the theory says drives prices. Each feature is tested independently first, so I can isolate what's actually working. If those features do contain signal, here's what they'd predict."
 
 **[Advance to Slide 6]**
 
@@ -112,7 +108,7 @@ Target time: ~17 minutes total.
 
 **[Walk through the four targets]**
 
-"Four targets. VIX innovations -- unexpected changes in VIX. Adrian and Shin showed dealer positions forecast this directly. If anything in the risk system predicts anything, this should be it."
+"Four targets. VIX innovations -- unexpected changes in VIX. There's a direct result in the literature showing dealer positions forecast this. If anything in the risk system predicts anything, this should be it."
 
 "Drawdowns in the most-concentrated asset class. If concentration is high in rates and utilization is spiking, does rates draw down next? That's the forced-selling channel."
 
@@ -125,17 +121,13 @@ Target time: ~17 minutes total.
 ---
 
 ## Slide 7 -- Pipeline
-**[~1-2 minutes. Walk through left to right, don't dwell.]**
+**[~30-45 seconds. This is a reference slide -- trace it quickly and move on.]**
 
-"Here's how it fits together."
+"Quickly on how this all connects. Risk outputs come in nightly, I build features, those go into a simple linear model and LightGBM side by side on identical features, and everything gets evaluated with transaction costs baked in."
 
-**[Trace left to right]**
+**[Gesture to the four boxes]**
 
-"Risk system outputs come in nightly. I build five families of features. Those go into two models on identical features -- a simple linear baseline and LightGBM -- so the comparison is clean. Both produce predictions for each target. Everything then goes through evaluation: Sharpe ratios, transaction costs, and SHAP so every prediction is explainable."
-
-**[Point to the four boxes below]**
-
-"Four disciplines run through the whole pipeline. Features are stamped with when the data was known, not when it applied -- so the model can't see the future. The holdout is reserved on day one and untouched until the final test. Validation accounts for time-series dependence. And transaction costs are in every backtest from day one."
+"The key discipline: the model can never see the future. Features are stamped with when the data was known, not when it applied. Holdout reserved on day one. Costs in every backtest. I'll come back to this on the rigor slide."
 
 **[Advance to Slide 8]**
 
@@ -178,6 +170,8 @@ Target time: ~17 minutes total.
 **[Say this naturally, not scripted]**
 
 "And if access isn't workable, I completely understand. I'll build my own metrics and test the same hypothesis. If the self-calculated version shows something, that's a reason to revisit with evidence instead of theory."
+
+"Now -- whatever data I use, here's why you should trust what comes back."
 
 **[Advance to Slide 10]**
 
