@@ -336,3 +336,63 @@ Mean Decrease Accuracy. For each feature, you randomly shuffle its values and se
 ### The silver lining argument
 
 If self-calculated risk metrics show predictive power, that's actually a stronger pitch for real data access: "The crude version shows IC = 0.03. The real data should be even better. Can we try it?"
+
+---
+
+## 12. The index product
+
+### "Why would a client pay for this when they can replicate the public version?"
+
+They're paying for convenience and for GS's execution. Same reason clients buy index-linked notes on strategies they could theoretically replicate. The public version is the floor -- transparency builds trust. But GS runs the enhanced internal version, so the product GS offers through notes or swaps can reflect the better-performing internal signals. The client gets a better product than they could build themselves, plus they don't have to build and maintain the infrastructure.
+
+### "What's the capacity of this index?"
+
+Depends on which targets drive the signal. Index-level predictions -- VIX innovations, broad drawdowns -- trade through liquid futures with large capacity. If it predicts single-name moves, capacity is smaller. I build an explicit capacity analysis: run the model at varying cost levels (0, 2, 5, 10, 20, 50 bps), find the breakeven cost, and plot the Sharpe-vs-cost curve. A signal with Sharpe 1.5 but $5M capacity is interesting research. A signal with Sharpe 0.6 but $500M capacity is a strategy. I'll be honest about which category the result falls into.
+
+### "How is this different from existing GS research indices?"
+
+Most GS indices are factor-based -- momentum, carry, value -- or volatility-based. This one is built on dealer balance-sheet constraints, which is a different economic mechanism entirely. It's complementary, not competing. The intermediary asset pricing literature is well-established but nobody has built it into a systematic index product, partly because nobody outside a dealer has the right data.
+
+### "Who maintains the index after the internship?"
+
+The deliverable is a fully specified, rules-based methodology plus all the code. A strat can take the validated model and run it. The index specification document defines every step mechanically -- no discretion required. I'm not building something that only works if I'm here. The code is modular, tested, and documented.
+
+### "What if the public version performs as well as the internal version? Where's the edge?"
+
+That's still a good outcome. It means the signal is robust and the index is a strong product on its own -- you have a sellable index backed by real theory. The internal version is a bonus, not a requirement. And if public performs as well, it likely means the signal is driven by the economic mechanism, not data granularity -- which actually makes the thesis stronger and the product more credible.
+
+### "What instruments does the index trade? Are they all liquid enough?"
+
+VIX futures, SPX variance swaps, asset-class futures (rates futures, equity index futures, FX majors), delta-hedged options. All liquid, all instruments the desk already trades. No exotics, no illiquid OTC. The instrument universe is deliberately conservative -- capacity and executability matter more than adding marginal instruments.
+
+---
+
+## 13. Two-tier structure
+
+### "Isn't publishing the methodology giving away the signal?"
+
+The methodology is public, the data edge is not. Clients can replicate the public version -- that's the point, it builds trust and makes the product auditable. But they can't replicate the SecDB-enhanced internal version. Same way a factor index publishes its rules but the manager's execution and data advantage still matter. The signal isn't in the rules -- it's in the data quality.
+
+### "What stops a client from just building this themselves?"
+
+Nothing, for the public version. That's by design -- auditability is a feature, not a bug. What they can't build is the internal version with daily desk-level risk data. And most clients don't want to build and maintain the infrastructure anyway; they want exposure through a note or swap. The convenience and the data edge are both part of the value proposition.
+
+### "How do you price the index product?"
+
+Standard for GS research indices: embedded in the note or swap pricing, not a separate fee. The index specification is the product; the pricing is a structuring question for the sales desk. I produce the methodology and the performance track record. How it gets packaged and priced is a downstream decision.
+
+---
+
+## 14. Replicability
+
+### "Which public proxies map to which SecDB features?"
+
+He-Kelly-Manela intermediary capital ratio and dealer CDS spreads for the constraint level (VaR utilization proxy). Self-constructed factor model with Herfindahl index for concentration. NY Fed primary dealer positions for dynamics. Self-constructed scenario analysis using public factor exposures for stress vulnerability. CFTC Commitments of Traders for cross-asset flow. Full mapping is documented in the public data alternative document. The public proxies are noisier and lower-frequency, but they capture the same economic mechanisms.
+
+### "How much signal degradation do you expect from public vs. proprietary data?"
+
+Hard to quantify before running both versions, which is partly the point of the project. Theory suggests the gap should be meaningful: daily vs. quarterly, desk-level vs. sector-aggregate, correct dealer sign vs. unsigned. The published academic results all used quarterly public data and still found statistically significant effects. Daily proprietary data should improve on that. Quantifying the exact gap is one of the key deliverables -- it tells you how much the SecDB data is worth.
+
+### "What if the signal only works on proprietary data and not on public proxies?"
+
+Then the index product as a public offering is weaker, but two things remain valuable. First, the internal risk management application still works -- if SecDB data predicts drawdowns, the desk can use that even if it can't be published as a client-facing index. Second, a signal that only works on proprietary data and not on public proxies raises questions about whether it's a real economic effect or a data artifact -- which the confound checks are specifically designed to catch. Either way, you learn something useful.
