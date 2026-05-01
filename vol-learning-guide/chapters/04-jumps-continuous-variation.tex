@@ -1,4 +1,804 @@
 \chapter{Jumps and Continuous Variation}
 \label{ch:jumps}
 
-% TODO: Write this chapter
+\begin{application}[Why This Chapter]
+Separating jump variation from continuous variation is critical for forecasting.
+The HAR-J and HAR-CJ extensions (Chapter~\ref{ch:har}) split the RV signal into components with different persistence and predictability.
+Signed jump features appear in Chapter~\ref{ch:features}.
+Projects 1 and 4 use jump-decomposed features.
+\end{application}
+
+Chapter~\ref{ch:rv} showed that realized variance $\RV_t$ converges to the quadratic variation of the log-price process.
+When the price path is continuous (no jumps), quadratic variation equals integrated variance, and $\RV_t$ is a clean estimator of $\IVol_t$.
+But prices do jump.
+Earnings surprises, central bank announcements, and flash crashes all produce sudden, large price moves that do not come from the smooth diffusion process.
+When jumps are present, $\RV_t$ picks up \emph{both} continuous and jump variation (Equation~\ref{eq:qv-with-jumps} in Chapter~\ref{ch:rv}).
+This chapter develops the tools to separate them.
+
+
+% ═══════════════════════════════════════════════════
+\section{Why Prices Jump}
+\label{sec:why-jumps}
+% ═══════════════════════════════════════════════════
+
+Prices move for two fundamentally different reasons.
+Most of the time, they drift and fluctuate continuously as traders gradually digest information, adjust positions, and provide liquidity.
+This smooth fluctuation is the \emph{diffusion} component.
+Occasionally, a piece of news is so large or so sudden that the price discontinuously leaps to a new level.
+This is a \emph{jump}.
+
+Concrete examples of jump triggers:
+\begin{itemize}[nosep]
+  \item \textbf{Earnings announcements:} A company reports revenue 15\% above consensus after the close. The stock gaps up 8\% at the next open.
+  \item \textbf{Macro releases:} Non-farm payrolls (NFP) come in at $+350$k vs.\ a $+180$k forecast. Treasury yields spike 15 basis points in seconds.
+  \item \textbf{Central bank decisions:} The Fed surprises with a 50bp rate cut when 25bp was priced. Equity indices jump 2\% in one tick.
+  \item \textbf{Flash crashes:} The May 6, 2010 flash crash sent the Dow down nearly 1,000 points (roughly 9\%) in minutes before recovering.
+  \item \textbf{Geopolitical shocks:} The Swiss National Bank abandoned its EUR/CHF floor on January 15, 2015. EUR/CHF dropped roughly 30\% in seconds.
+\end{itemize}
+
+\begin{intuition}[Diffusion vs.\ Jump]
+Normal price movements are many small moves (diffusion).
+A jump is a sudden, large move that cannot be explained by the smooth diffusion process.
+An earnings surprise that moves a stock 8\% in one tick is a jump.
+A stock drifting 0.05\% per 5-minute bar over the course of an afternoon is diffusion.
+The mathematical distinction is sharp: diffusion is a continuous path, while a jump is a discontinuity in the path.
+\end{intuition}
+
+\begin{prereq}[The Jump-Diffusion Price Process]
+Chapter~\ref{ch:rv} introduced the pure-diffusion log-price process: $dp_t = \mu_t\,dt + \sigma_t\,dW_t$.
+Adding jumps extends this to:
+\[
+  dp_t = \mu_t\,dt + \sigma_t\,dW_t + J_t\,dN_t
+\]
+where $N_t$ is a counting process (it increases by 1 each time a jump occurs) and $J_t$ is the jump size (a random variable, possibly negative).
+You do not need to work with this process directly.
+The key takeaway: the price path now has two sources of variation, and the quadratic variation captures both:
+\[
+  [p]_t = \underbrace{\int_{t-1}^{t}\sigma^2_s\,ds}_{\text{continuous}} + \underbrace{\sum_{s\in(t-1,t]} J^2_s}_{\text{jumps}}
+\]
+This chapter is about estimating each piece separately.
+\end{prereq}
+
+\subsection{Diagram: Continuous vs.\ Jump Price Paths}
+
+Figure~\ref{fig:jump-vs-diffusion} shows two price paths over the same day.
+The left path evolves smoothly (pure diffusion).
+The right path is identical except for a single large jump at 2:15pm.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  name=plotA,
+  width=0.48\textwidth,
+  height=6.5cm,
+  xlabel={Time of day},
+  ylabel={Price (\$)},
+  xmin=0, xmax=6.5,
+  ymin=98.5, ymax=104,
+  xtick={0, 1.625, 3.25, 4.875, 6.5},
+  xticklabels={9:30, 11:00, 12:30, 2:00, 4:00},
+  xticklabel style={font=\scriptsize},
+  grid=major,
+  grid style={gray!20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={Pure Diffusion (No Jumps)},
+]
+% Smooth continuous path
+\addplot[defblue, thick, mark=none, smooth] coordinates {
+  (0, 100.00) (0.3, 100.12) (0.6, 100.05) (0.9, 100.18)
+  (1.2, 100.30) (1.5, 100.22) (1.8, 100.35) (2.1, 100.28)
+  (2.4, 100.40) (2.7, 100.55) (3.0, 100.48) (3.3, 100.60)
+  (3.6, 100.52) (3.9, 100.65) (4.2, 100.72) (4.5, 100.58)
+  (4.8, 100.68) (5.1, 100.75) (5.4, 100.82) (5.7, 100.70)
+  (6.0, 100.78) (6.5, 100.85)
+};
+\end{axis}
+
+\begin{axis}[
+  at={($(plotA.east)+(1.2cm,0)$)},
+  anchor=west,
+  width=0.48\textwidth,
+  height=6.5cm,
+  xlabel={Time of day},
+  ylabel={Price (\$)},
+  xmin=0, xmax=6.5,
+  ymin=98.5, ymax=104,
+  xtick={0, 1.625, 3.25, 4.875, 6.5},
+  xticklabels={9:30, 11:00, 12:30, 2:00, 4:00},
+  xticklabel style={font=\scriptsize},
+  grid=major,
+  grid style={gray!20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={Diffusion + Jump},
+]
+% Path before jump
+\addplot[defblue, thick, mark=none, smooth] coordinates {
+  (0, 100.00) (0.3, 100.12) (0.6, 100.05) (0.9, 100.18)
+  (1.2, 100.30) (1.5, 100.22) (1.8, 100.35) (2.1, 100.28)
+  (2.4, 100.40) (2.7, 100.55) (3.0, 100.48) (3.3, 100.60)
+  (3.6, 100.52) (3.9, 100.65)
+};
+% Jump
+\addplot[warnred, ultra thick, mark=none, dashed] coordinates {
+  (3.9, 100.65) (3.9, 103.10)
+};
+\addplot[only marks, mark=o, mark size=2.5pt, warnred] coordinates {(3.9, 100.65)};
+\addplot[only marks, mark=*, mark size=2.5pt, warnred] coordinates {(3.9, 103.10)};
+% Path after jump
+\addplot[defblue, thick, mark=none, smooth] coordinates {
+  (3.9, 103.10) (4.2, 103.05) (4.5, 102.90)
+  (4.8, 103.00) (5.1, 103.08) (5.4, 103.15) (5.7, 103.02)
+  (6.0, 103.10) (6.5, 103.18)
+};
+% Jump annotation
+\draw[-{Stealth}, warnred] (axis cs: 4.6, 101.9) -- (axis cs: 4.05, 101.9);
+\node[anchor=west, font=\scriptsize, warnred] at (axis cs: 4.6, 101.9) {Jump: $+2.4\%$};
+\end{axis}
+\end{tikzpicture}
+\caption{Two price paths over the same trading day.
+\textbf{Left:} pure diffusion with no jumps.
+The path is continuous and smooth.
+\textbf{Right:} diffusion plus a single jump at 2:00pm (red dashed line).
+The open circle marks the pre-jump price; the filled circle marks the post-jump price.
+Both paths have similar diffusion volatility, but the right path has much higher quadratic variation due to the jump.}
+\label{fig:jump-vs-diffusion}
+\end{figure}
+
+
+% ═══════════════════════════════════════════════════
+\section{Bipower Variation}
+\label{sec:bpv}
+% ═══════════════════════════════════════════════════
+
+You now know that $\RV_t$ captures both continuous and jump variation.
+The next step is to build an estimator that captures \emph{only} the continuous part.
+The key idea, due to \citet{BNS2004}, is bipower variation.
+
+\begin{intuition}[Why Multiplying Neighbors Kills Jumps]
+$\RV_t$ squares each return, so a single jump return of $+2\%$ contributes $(0.02)^2 = 4 \times 10^{-4}$ to the sum.
+Bipower variation instead multiplies each return's absolute value by its neighbor's absolute value.
+A jump return of $+2\%$ is large, but its neighbor (one interval before or after) is typically a normal-sized diffusion return, say $0.05\%$.
+The product $|0.02| \times |0.0005| = 1 \times 10^{-5}$ is far smaller than the squared jump $4 \times 10^{-4}$.
+The jump's contribution is ``diluted'' by the normal-sized neighbor.
+This is the core mechanism: jumps are isolated events, so a product of consecutive returns dampens them.
+\end{intuition}
+
+\begin{definition}[Bipower Variation]
+Given $n$ intraday log returns $r_{t,1}, r_{t,2}, \ldots, r_{t,n}$ within day $t$, the bipower variation is:
+\begin{equation}
+  \BPV_t = \frac{\pi}{2}\sum_{i=2}^{n}|r_{t,i}|\,|r_{t,i-1}|
+  \label{eq:bpv}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\BPV_t$: bipower variation for day $t$
+  \item $|r_{t,i}|$: absolute value of the $i$-th intraday log return
+  \item $|r_{t,i-1}|$: absolute value of the adjacent (previous) intraday log return
+  \item The sum runs from $i=2$ to $n$ (you need pairs of consecutive returns, so you lose one observation)
+  \item $\frac{\pi}{2} \approx 1.5708$: a scaling constant that corrects for the fact that $\E[|Z|] = \sqrt{2/\pi}$ when $Z \sim \N(0,1)$
+\end{itemize}
+\end{definition}
+
+\subsection{Why the $\pi/2$ Scaling Factor}
+
+The scaling factor deserves its own explanation, because it looks arbitrary until you see where it comes from.
+
+\begin{prereq}[Mean Absolute Value of a Standard Normal]
+If $Z \sim \N(0,1)$, then $\E[|Z|] = \sqrt{2/\pi} \approx 0.7979$.
+This follows from integrating the folded normal density.
+The important consequence: $\E[|Z|]^2 = 2/\pi$, which is \emph{not} equal to $\E[Z^2] = 1$.
+Taking absolute values and then multiplying introduces a bias relative to squaring, and the scaling factor corrects for it.
+\end{prereq}
+
+Consider two consecutive diffusion returns with no jumps.
+Each return is approximately $r_{t,i} \approx \sigma_{t,i}\,\epsilon_i$, where $\epsilon_i$ is standard normal.
+The product of absolute values is:
+\[
+  |r_{t,i}|\,|r_{t,i-1}| \approx \sigma_{t,i}\,\sigma_{t,i-1}\,|\epsilon_i|\,|\epsilon_{i-1}|
+\]
+
+Taking expectations:
+\[
+  \E\bigl[|r_{t,i}|\,|r_{t,i-1}|\bigr] \approx \sigma_{t,i}\,\sigma_{t,i-1}\,\bigl(\E[|\epsilon|]\bigr)^2 = \sigma_{t,i}\,\sigma_{t,i-1}\cdot\frac{2}{\pi}
+\]
+
+To make the sum converge to $\int \sigma^2_s\,ds$ (integrated variance), you need to undo the $2/\pi$ factor.
+Multiplying by $\pi/2$ does exactly that.
+
+\begin{keyresult}[\citet{BNS2004}: BPV Consistency]
+Under mild regularity conditions, bipower variation converges in probability to integrated variance even in the presence of finite-activity jumps:
+\[
+  \BPV_t \xrightarrow{p} \IVol_t = \int_{t-1}^{t}\sigma^2_s\,ds \quad \text{as } n \to \infty
+\]
+This result holds regardless of whether jumps occurred during day $t$.
+In contrast, $\RV_t$ converges to integrated variance \emph{plus} the sum of squared jumps.
+\end{keyresult}
+
+\subsection{Diagram: How RV and BPV Respond to a Jump}
+
+Figure~\ref{fig:rv-vs-bpv} shows the key mechanism.
+A sequence of six 5-minute returns includes one jump return ($r_4$).
+The left panel shows each return's contribution to $\RV_t$ (its squared value).
+The right panel shows each return's contribution to $\BPV_t$ (its absolute value times the previous absolute value, scaled by $\pi/2$).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+% Data: returns in percent
+% r1=+0.08, r2=-0.05, r3=+0.06, r4=+1.80 (JUMP), r5=-0.04, r6=+0.07
+
+% Left panel: squared returns (RV contributions)
+\begin{axis}[
+  name=plotRV,
+  width=0.46\textwidth,
+  height=6cm,
+  ybar,
+  bar width=14pt,
+  xlabel={Return index},
+  ylabel={Contribution ($\times 10^{-4}$)},
+  xmin=0.3, xmax=6.7,
+  ymin=0, ymax=3.5,
+  xtick={1,2,3,4,5,6},
+  xticklabels={$r_1$, $r_2$, $r_3$, $r_4$, $r_5$, $r_6$},
+  grid=major,
+  grid style={gray!20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={$\RV$ contributions: $r_i^2$},
+  nodes near coords,
+  every node near coord/.append style={font=\tiny, above},
+  point meta=explicit symbolic,
+]
+% Values: (0.0008)^2=0.64e-6=0.0064e-4, (0.0005)^2=0.25e-6=0.0025e-4
+%         (0.0006)^2=0.36e-6=0.0036e-4, (0.018)^2=324e-6=3.24e-4
+%         (0.0004)^2=0.16e-6=0.0016e-4, (0.0007)^2=0.49e-6=0.0049e-4
+\addplot[fill=defblue!60, draw=defblue] coordinates {
+  (1, 0.0064) [0.006]
+  (2, 0.0025) [0.003]
+  (3, 0.0036) [0.004]
+  (5, 0.0016) [0.002]
+  (6, 0.0049) [0.005]
+};
+\addplot[fill=warnred!70, draw=warnred] coordinates {
+  (4, 3.24) [3.24]
+};
+% Annotation
+\node[anchor=south, font=\scriptsize, warnred] at (axis cs: 4, 3.4) {Jump};
+\end{axis}
+
+% Right panel: BPV contributions
+\begin{axis}[
+  at={($(plotRV.east)+(1.2cm,0)$)},
+  anchor=west,
+  width=0.46\textwidth,
+  height=6cm,
+  ybar,
+  bar width=14pt,
+  xlabel={Return pair index},
+  ylabel={Contribution ($\times 10^{-4}$)},
+  xmin=1.3, xmax=6.7,
+  ymin=0, ymax=3.5,
+  xtick={2,3,4,5,6},
+  xticklabels={$(r_1,r_2)$, $(r_2,r_3)$, $(r_3,r_4)$, $(r_4,r_5)$, $(r_5,r_6)$},
+  xticklabel style={font=\scriptsize},
+  grid=major,
+  grid style={gray!20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={$\BPV$ contributions: $\frac{\pi}{2}|r_i|\,|r_{i-1}|$},
+  nodes near coords,
+  every node near coord/.append style={font=\tiny, above},
+  point meta=explicit symbolic,
+]
+% BPV terms (pi/2 * |r_i| * |r_{i-1}|):
+% (r1,r2): 1.5708 * 0.0008 * 0.0005 = 0.628e-6 = 0.006e-4
+% (r2,r3): 1.5708 * 0.0005 * 0.0006 = 0.471e-6 = 0.005e-4
+% (r3,r4): 1.5708 * 0.0006 * 0.018  = 16.96e-6  = 0.170e-4  <-- jump neighbor
+% (r4,r5): 1.5708 * 0.018  * 0.0004 = 11.31e-6  = 0.113e-4  <-- jump neighbor
+% (r5,r6): 1.5708 * 0.0004 * 0.0007 = 0.440e-6 = 0.004e-4
+\addplot[fill=defblue!60, draw=defblue] coordinates {
+  (2, 0.006) [0.006]
+  (3, 0.005) [0.005]
+  (6, 0.004) [0.004]
+};
+\addplot[fill=keyorange!70, draw=keyorange] coordinates {
+  (4, 0.170) [0.17]
+  (5, 0.113) [0.11]
+};
+% Annotation
+\node[anchor=south west, font=\scriptsize, keyorange] at (axis cs: 4.2, 0.2) {Jump $\times$ neighbor};
+\end{axis}
+\end{tikzpicture}
+\caption{How a jump affects $\RV$ vs.\ $\BPV$.
+\textbf{Left:} the jump return $r_4$ contributes $3.24 \times 10^{-4}$ to $\RV$ (via $r_4^2$), completely dominating all other terms.
+\textbf{Right:} in $\BPV$, the jump is multiplied by its normal-sized neighbors.
+The two terms involving $r_4$ contribute only $0.17$ and $0.11 \times 10^{-4}$, roughly 50$\times$ smaller than the squared jump.
+$\BPV$ ``sees through'' the jump and recovers the continuous variation.}
+\label{fig:rv-vs-bpv}
+\end{figure}
+
+\begin{workedexample}{Computing RV and BPV for a Day with a Jump}
+A stock is sampled every 5 minutes.
+You observe the following six returns (a shortened day for illustration):
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} c c c c c @{}}
+\toprule
+\textbf{Index} & \textbf{Return $r_i$} & \textbf{$r_i^2$} & \textbf{$|r_i|\,|r_{i-1}|$} & \textbf{$\frac{\pi}{2}\,|r_i|\,|r_{i-1}|$} \\
+\midrule
+1 & $+0.0008$ & $0.64 \times 10^{-6}$  & ---                           & ---                           \\
+2 & $-0.0005$ & $0.25 \times 10^{-6}$  & $4.00 \times 10^{-7}$         & $6.28 \times 10^{-7}$         \\
+3 & $+0.0006$ & $0.36 \times 10^{-6}$  & $3.00 \times 10^{-7}$         & $4.71 \times 10^{-7}$         \\
+4 & $+0.0180$ & $324.0 \times 10^{-6}$ & $10.80 \times 10^{-6}$        & $16.96 \times 10^{-6}$        \\
+5 & $-0.0004$ & $0.16 \times 10^{-6}$  & $7.20 \times 10^{-6}$         & $11.31 \times 10^{-6}$        \\
+6 & $+0.0007$ & $0.49 \times 10^{-6}$  & $2.80 \times 10^{-7}$         & $4.40 \times 10^{-7}$         \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+Return $r_4 = +0.0180$ (a 1.8\% move in a single 5-minute bar) is the jump.
+The other returns are typical: 4--8 basis points each.
+
+\textbf{Step 1: Compute $\RV_t$.}
+\[
+  \RV_t = \sum_{i=1}^{6} r_i^2 = (0.64 + 0.25 + 0.36 + 324.0 + 0.16 + 0.49)\times 10^{-6} = 325.90 \times 10^{-6}
+\]
+
+The jump return contributes $324.0 / 325.9 = 99.4\%$ of total $\RV$.
+
+\textbf{Step 2: Compute $\BPV_t$.}
+\[
+  \BPV_t = \frac{\pi}{2}\sum_{i=2}^{6}|r_i|\,|r_{i-1}| = (6.28 + 4.71 + 16{,}960 + 11{,}310 + 4.40) \times 10^{-7} \times \frac{1}{10}
+\]
+Summing the $\frac{\pi}{2}|r_i||r_{i-1}|$ column:
+\[
+  \BPV_t = (0.628 + 0.471 + 16.96 + 11.31 + 0.440) \times 10^{-6} = 29.81 \times 10^{-6}
+\]
+
+\textbf{Step 3: Estimate the jump component.}
+\[
+  J_t^2 = \RV_t - \BPV_t = 325.90 \times 10^{-6} - 29.81 \times 10^{-6} = 296.09 \times 10^{-6}
+\]
+
+\textbf{Interpretation.}
+$\RV_t$ is inflated by the jump: $\sqrt{325.9 \times 10^{-6}} = 1.81\%$ daily vol.
+$\BPV_t$ strips the jump and recovers the diffusion component: $\sqrt{29.81 \times 10^{-6}} = 0.55\%$ daily vol.
+The jump component $J_t^2 = 296 \times 10^{-6}$ accounts for 91\% of the quadratic variation, consistent with a single large jump in an otherwise quiet day.
+
+Note: $\BPV_t$ is not zero in the jump terms because the jump ($r_4$) is still multiplied by its (normal) neighbors.
+But those products are far smaller than $r_4^2$.
+With 78 returns instead of 6, the effect would be even more diluted.
+\end{workedexample}
+
+
+% ═══════════════════════════════════════════════════
+\section{The BNS Jump Test}
+\label{sec:bns-test}
+% ═══════════════════════════════════════════════════
+
+$\BPV_t$ gives you an estimate of continuous variation, and $\RV_t - \BPV_t$ gives you an estimate of jump variation.
+But both are estimates, subject to sampling noise.
+On any given day, $\RV_t - \BPV_t$ will be slightly positive even if no jump occurred, simply due to estimation error.
+You need a formal statistical test to determine whether the difference is large enough to declare a jump day.
+
+\begin{intuition}[The Logic of the Jump Test]
+If no jumps occurred, $\RV_t$ and $\BPV_t$ are both consistent estimators of the same quantity ($\IVol_t$), so their difference should be close to zero.
+If the difference is ``too large'' relative to sampling noise, you reject the null and declare that a jump occurred.
+The test statistic measures how many standard deviations the difference is from zero.
+\end{intuition}
+
+\citet{BNS2006} proposed the following test.
+
+\begin{definition}[BNS Jump Test Statistic]
+The Barndorff-Nielsen and Shephard jump test statistic is:
+\begin{equation}
+  Z_{\text{BNS},t} = \frac{\RV_t - \BPV_t}{\sqrt{\vartheta\,\max\!\left(\frac{1}{n}\,\operatorname{RQ}_t,\; 10^{-10}\right)}}
+  \label{eq:bns-test}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $Z_{\text{BNS},t}$: the test statistic for day $t$
+  \item $\RV_t - \BPV_t$: the estimated jump component (the difference between realized variance and bipower variation)
+  \item $\vartheta = (\pi^2/4) + \pi - 5 \approx 0.6090$: a constant from the asymptotic theory
+  \item $\operatorname{RQ}_t = n\frac{\pi^2}{4}\frac{1}{3}\sum_{i=3}^{n}|r_{t,i}|\,|r_{t,i-1}|\,|r_{t,i-2}|$: realized quarticity, a consistent estimator of integrated quarticity $\int\sigma^4_s\,ds$, needed to scale the variance of the numerator
+  \item $n$: number of intraday returns
+  \item $\max(\cdot,\;10^{-10})$: a numerical safeguard to prevent division by zero
+  \item Under the null hypothesis of no jumps, $Z_{\text{BNS},t} \xrightarrow{d} \N(0,1)$ as $n \to \infty$
+\end{itemize}
+\end{definition}
+
+\begin{keyidea}[How to Use the BNS Test]
+Compare $Z_{\text{BNS},t}$ to standard normal critical values.
+At the 5\% level (one-sided), declare a jump day if $Z_{\text{BNS},t} > 1.645$.
+At the 1\% level, use 2.326.
+If $Z_{\text{BNS},t} \leq 1.645$, you cannot reject the null of no jumps, so you treat $\RV_t$ as pure continuous variation for that day.
+\end{keyidea}
+
+\begin{prereq}[Quarticity]
+Just as variance is the integral of $\sigma^2$, \emph{quarticity} is the integral of $\sigma^4$:
+\[
+  \int_{t-1}^{t}\sigma^4_s\,ds
+\]
+This quantity controls the variance of the $\RV_t - \BPV_t$ difference.
+You never need to compute it by hand.
+The realized quarticity estimator $\operatorname{RQ}_t$ does it for you using products of three consecutive absolute returns, analogous to how $\BPV$ uses products of two.
+\end{prereq}
+
+\begin{workedexample}{Applying the BNS Jump Test}
+Suppose you compute the following quantities for a single day using 78 five-minute returns ($n = 78$):
+\begin{itemize}[nosep]
+  \item $\RV_t = 2.50 \times 10^{-4}$
+  \item $\BPV_t = 1.80 \times 10^{-4}$
+  \item $\operatorname{RQ}_t = 5.00 \times 10^{-8}$
+\end{itemize}
+
+\textbf{Step 1: Compute the numerator.}
+\[
+  \RV_t - \BPV_t = 2.50 \times 10^{-4} - 1.80 \times 10^{-4} = 0.70 \times 10^{-4}
+\]
+
+\textbf{Step 2: Compute the denominator.}
+\[
+  \sqrt{\vartheta \cdot \frac{1}{n}\operatorname{RQ}_t} = \sqrt{0.6090 \times \frac{5.00 \times 10^{-8}}{78}} = \sqrt{0.6090 \times 6.41 \times 10^{-10}}
+\]
+\[
+  = \sqrt{3.90 \times 10^{-10}} = 1.975 \times 10^{-5}
+\]
+
+\textbf{Step 3: Compute the test statistic.}
+\[
+  Z_{\text{BNS},t} = \frac{0.70 \times 10^{-4}}{1.975 \times 10^{-5}} = \frac{7.00 \times 10^{-5}}{1.975 \times 10^{-5}} = 3.54
+\]
+
+\textbf{Step 4: Compare to critical value.}
+$Z_{\text{BNS},t} = 3.54 > 2.326$ (1\% critical value).
+Reject the null of no jumps at the 1\% level.
+This day has a statistically significant jump component.
+
+The continuous variation estimate is $\BPV_t = 1.80 \times 10^{-4}$, and the estimated jump variation is $0.70 \times 10^{-4}$, roughly 28\% of the total quadratic variation.
+\end{workedexample}
+
+\begin{warning}[BNS Test Size Distortion in Finite Samples]
+The BNS test has known size distortions in finite samples: with 78 returns per day, it can over-reject the null (detect jumps that are not there) or under-reject (miss small jumps).
+\citet{HuangTauchen2005} documented these problems and proposed a ratio form of the test statistic that has better finite-sample properties.
+For production use, consider the ratio variant or the corrected versions in \citet{BNS2006}.
+\end{warning}
+
+
+% ═══════════════════════════════════════════════════
+\section{Lee-Mykland: Detecting Individual Jumps}
+\label{sec:lee-mykland}
+% ═══════════════════════════════════════════════════
+
+The BNS test answers: ``Did a jump occur at any point during day $t$?''
+It does not tell you \emph{when} the jump happened or how large it was.
+If you want intraday jump timing and sizes, you need the \citet{LeeMykland2008} test.
+
+\begin{intuition}[From Daily to Intraday Jump Detection]
+The BNS test is like checking whether a patient had a fever at some point during the day.
+The Lee-Mykland test is like checking the patient's temperature every hour and flagging the specific times when fever occurred.
+It tests each individual return against a local volatility estimate to see if that return is ``too large'' to be diffusion.
+\end{intuition}
+
+The Lee-Mykland test works as follows.
+For each intraday return $r_{t,i}$, compute a local volatility estimate from a window of recent returns (excluding the return being tested).
+Then standardize the return by this local volatility.
+If the standardized return exceeds a threshold derived from extreme-value theory, flag it as a jump.
+
+\begin{definition}[Lee-Mykland Test Statistic]
+For each intraday return $r_{t,i}$, the Lee-Mykland test statistic is:
+\begin{equation}
+  \mathcal{L}_{t,i} = \frac{|r_{t,i}|}{\hat{\sigma}_{t,i}}
+  \label{eq:lm-stat}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\mathcal{L}_{t,i}$: the test statistic for the $i$-th return on day $t$
+  \item $|r_{t,i}|$: absolute value of the return being tested
+  \item $\hat{\sigma}_{t,i}$: local volatility estimate from a window of $K$ returns centered around (but excluding) return $i$, typically computed as $\hat{\sigma}_{t,i} = \sqrt{\BPV_K / K}$, where $\BPV_K$ is the bipower variation over the $K$-return window
+\end{itemize}
+A return is classified as a jump if the statistic exceeds a critical value from the Gumbel distribution (extreme-value theory), after centering and scaling by $C_n$ and $S_n$ (constants that depend on the number of observations $n$):
+\begin{equation}
+  \frac{\mathcal{L}_{t,i} - C_n}{S_n} > \beta_\alpha
+  \label{eq:lm-rejection}
+\end{equation}
+where $\beta_\alpha$ is the $(1-\alpha)$ quantile of the standard Gumbel distribution.
+\end{definition}
+
+\begin{keyresult}[\citet{LeeMykland2008}: Intraday Jump Detection]
+The Lee-Mykland test provides both jump detection and jump timing at intraday frequency.
+It identifies the specific returns within the day that are jumps, along with their sizes.
+At standard significance levels, the test correctly identifies large jumps (those exceeding roughly 3--5 local standard deviations) with high power, while maintaining reasonable size control.
+\end{keyresult}
+
+\subsection{Diagram: Intraday Jump Detection}
+
+Figure~\ref{fig:lm-detection} shows an intraday return path with detected jump returns highlighted.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=\textwidth,
+  height=7cm,
+  xlabel={Time of day},
+  ylabel={5-minute return (\%)},
+  xmin=0, xmax=6.5,
+  ymin=-2.5, ymax=3.0,
+  xtick={0, 1.625, 3.25, 4.875, 6.5},
+  xticklabels={9:30, 11:00, 12:30, 2:00, 4:00},
+  xticklabel style={font=\scriptsize},
+  grid=major,
+  grid style={gray!20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={Intraday Returns with Lee-Mykland Jump Detection},
+]
+% Normal diffusion returns (small, random)
+\addplot[ybar, bar width=2pt, fill=defblue!50, draw=defblue] coordinates {
+  (0.08, 0.05) (0.17, -0.08) (0.25, 0.12) (0.33, -0.03) (0.42, 0.07)
+  (0.50, -0.10) (0.58, 0.04) (0.67, 0.09) (0.75, -0.06) (0.83, 0.11)
+  (0.92, -0.05) (1.00, 0.08) (1.08, -0.12) (1.17, 0.06) (1.25, -0.04)
+  (1.33, 0.10) (1.42, 0.03) (1.50, -0.07) (1.58, 0.05) (1.67, -0.09)
+  (1.75, 0.08) (1.83, -0.06) (1.92, 0.04) (2.00, -0.11) (2.08, 0.07)
+  (2.17, -0.03)
+  % After first jump
+  (2.33, 0.08) (2.42, -0.05) (2.50, 0.06) (2.58, -0.10) (2.67, 0.04)
+  (2.75, -0.07) (2.83, 0.09) (2.92, -0.04) (3.00, 0.05) (3.08, -0.08)
+  (3.17, 0.11) (3.25, -0.06) (3.33, 0.03) (3.42, -0.05) (3.50, 0.07)
+  (3.58, -0.09) (3.67, 0.06) (3.75, -0.04) (3.83, 0.08) (3.92, -0.07)
+  (4.00, 0.05)
+  % After second jump
+  (4.17, 0.06) (4.25, -0.08) (4.33, 0.04) (4.42, -0.05) (4.50, 0.09)
+  (4.58, -0.06) (4.67, 0.03) (4.75, -0.07) (4.83, 0.05) (4.92, -0.04)
+  (5.00, 0.08) (5.08, -0.10) (5.17, 0.06) (5.25, -0.03) (5.33, 0.07)
+  (5.42, -0.05) (5.50, 0.04) (5.58, -0.08) (5.67, 0.06) (5.75, -0.04)
+  (5.83, 0.05) (5.92, -0.07) (6.00, 0.03) (6.08, -0.05) (6.17, 0.06)
+  (6.25, -0.04) (6.33, 0.05) (6.42, -0.06)
+};
+
+% Jump returns (highlighted in red)
+\addplot[ybar, bar width=3pt, fill=warnred!70, draw=warnred] coordinates {
+  (2.25, 1.80)
+  (4.08, -2.10)
+};
+
+% Annotations
+\node[anchor=south west, font=\scriptsize, warnred, fill=white, inner sep=1pt]
+  at (axis cs: 2.35, 1.85) {Jump 1: $+1.80\%$};
+\node[anchor=north west, font=\scriptsize, warnred, fill=white, inner sep=1pt]
+  at (axis cs: 4.18, -2.15) {Jump 2: $-2.10\%$};
+
+% Local volatility band (approximate)
+\addplot[dashed, intgreen, thick, mark=none] coordinates {(0, 0.35) (6.5, 0.35)};
+\addplot[dashed, intgreen, thick, mark=none] coordinates {(0, -0.35) (6.5, -0.35)};
+\node[anchor=west, font=\scriptsize, intgreen] at (axis cs: 5.5, 0.50) {$\pm 3\hat{\sigma}$};
+
+\end{axis}
+\end{tikzpicture}
+\caption{Intraday 5-minute returns with Lee-Mykland jump detection.
+Blue bars: normal diffusion returns (typically $\pm$0.1\%).
+Red bars: detected jump returns (far exceeding the local $\pm 3\hat{\sigma}$ band, shown as green dashed lines).
+Jump 1 at 12:15pm ($+1.80\%$) might correspond to a macro release.
+Jump 2 at 2:00pm ($-2.10\%$) is a large negative jump.
+The Lee-Mykland test identifies both the times and sizes of jumps, information that the BNS test (which only flags the day) cannot provide.}
+\label{fig:lm-detection}
+\end{figure}
+
+\begin{keyidea}[BNS vs.\ Lee-Mykland: When to Use Which]
+Use the BNS test when you need a daily-level binary indicator: ``did a jump occur today?''
+This is sufficient for most forecasting applications (e.g., HAR-J in Chapter~\ref{ch:har}).
+Use Lee-Mykland when you need intraday jump timing (e.g., studying how volatility behaves in the minutes after a jump) or when you want to construct signed jump features (Chapter~\ref{ch:features}).
+\end{keyidea}
+
+
+% ═══════════════════════════════════════════════════
+\section{A\"it-Sahalia-Jacod Test}
+\label{sec:asj-test}
+% ═══════════════════════════════════════════════════
+
+Both the BNS test and the Lee-Mykland test assume that microstructure noise is negligible at the sampling frequency you use.
+As Chapter~\ref{ch:rv} discussed, this is a reasonable assumption at 5-minute frequency for liquid assets, but it fails at higher frequencies.
+\citet{AitSahaliaJacod2009} proposed an alternative that is robust to microstructure noise.
+
+\begin{intuition}[Power Variation at Two Scales]
+The idea is to compare realized power variation computed at two different sampling frequencies.
+If no jumps are present, the ratio of these two quantities converges to a known constant (that depends only on the power used, not on the volatility level).
+If jumps are present, the ratio shifts.
+The test detects this shift.
+\end{intuition}
+
+\begin{definition}[Power Variation]
+The realized power variation of order $p > 0$ is:
+\begin{equation}
+  V_t^{(p)} = \sum_{i=1}^{n} |r_{t,i}|^p
+  \label{eq:power-var}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $p = 2$: this reduces to $\RV_t$ (realized variance)
+  \item $p = 1$: sum of absolute returns
+  \item The key property: for $p < 2$, the power variation is dominated by diffusion (jumps contribute negligibly). For $p = 2$, jumps contribute fully. For $p > 2$, jumps dominate.
+\end{itemize}
+\end{definition}
+
+The \citet{AitSahaliaJacod2009} test statistic compares $V_t^{(p)}$ computed at two sampling frequencies, $\Delta$ and $k\Delta$ (e.g., 5-minute and 15-minute).
+Under the null of no jumps, the ratio converges to a constant $k^{p/2-1}$.
+Under the alternative (jumps present), the ratio is different.
+
+\begin{keyresult}[\citet{AitSahaliaJacod2009}: Power-Variation-Ratio Test]
+The test statistic
+\[
+  S_t = \frac{V_t^{(p)}(\Delta)}{V_t^{(p)}(k\Delta)}
+\]
+converges to $k^{p/2-1}$ under the null of no jumps.
+Significant deviation from this value indicates jump activity.
+Because the test uses ratios of power variations at different frequencies, microstructure noise affects numerator and denominator similarly, making the test more robust than BNS in noisy settings.
+\end{keyresult}
+
+The practical advantage of this test is that you can apply it at higher sampling frequencies (1-minute or even 30-second) without the noise distortions that affect BNS.
+The cost is additional complexity and the need to choose $k$ and $p$.
+For a first pass, the BNS test at 5-minute frequency is usually sufficient.
+
+
+% ═══════════════════════════════════════════════════
+\section{Threshold and Truncation Methods}
+\label{sec:threshold}
+% ═══════════════════════════════════════════════════
+
+The BNS approach estimates continuous variation indirectly: compute $\BPV_t$, and the jump component is the residual $\RV_t - \BPV_t$.
+Threshold methods take the opposite approach: directly classify each return as either a jump or a diffusion return, then compute realized variance using only the diffusion returns.
+
+\begin{keyidea}[Truncation: The Simplest Decomposition]
+Any return larger than a threshold $\vartheta_i$ is classified as a jump.
+Continuous variation is computed by summing squared returns only for returns below the threshold.
+This is conceptually simpler than bipower variation and naturally extends to the HAR-CJ decomposition used in Chapter~\ref{ch:har}.
+\end{keyidea}
+
+\begin{definition}[Threshold Realized Variance]
+The threshold (or truncated) realized variance is:
+\begin{equation}
+  \operatorname{TRV}_t = \sum_{i=1}^{n} r_{t,i}^2 \cdot \mathbf{1}\!\left\{|r_{t,i}| \leq \vartheta_i\right\}
+  \label{eq:trv}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\operatorname{TRV}_t$: threshold realized variance for day $t$
+  \item $r_{t,i}^2$: squared $i$-th intraday return
+  \item $\mathbf{1}\{\cdot\}$: indicator function (equals 1 if the condition is true, 0 otherwise)
+  \item $\vartheta_i$: threshold for return $i$, typically set as $\vartheta_i = c\,\hat{\sigma}_i\,\Delta^{\varpi}$, where $c$ is a constant (e.g., $c = 3$), $\hat{\sigma}_i$ is a local volatility estimate, and $\varpi \in (0, 1/2)$ controls how the threshold scales with sampling frequency
+\end{itemize}
+\end{definition}
+
+\citet{Mancini2009} established the theoretical foundation for threshold estimators.
+\citet{CorsiPirinoReno2010} combined the threshold approach with the HAR forecasting model to produce the HAR-CJ decomposition.
+Their key contribution was showing that the threshold-based continuous and jump components improve forecasting performance when entered separately into the HAR model, because they have different persistence.
+
+\begin{keyresult}[\citet{CorsiPirinoReno2010}: Threshold HAR-CJ]
+Splitting $\RV_t$ into a continuous component ($C_t = \operatorname{TRV}_t$) and a jump component ($J_t = \RV_t - \operatorname{TRV}_t$) using the threshold approach, and entering them separately into the HAR model, produces significantly better volatility forecasts than the baseline HAR.
+The improvement comes from allowing the model to assign different persistence parameters to continuous and jump variation.
+\end{keyresult}
+
+
+% ═══════════════════════════════════════════════════
+\section{Why the Decomposition Matters for Forecasting}
+\label{sec:decomposition-matters}
+% ═══════════════════════════════════════════════════
+
+You have now seen four ways to separate jumps from continuous variation: bipower variation, the BNS test, Lee-Mykland, and threshold truncation.
+Why does this separation matter?
+The answer is forecasting: continuous and jump variation behave very differently over time.
+
+\begin{intuition}[Different Persistence]
+Continuous volatility is highly persistent.
+If a stock had high diffusion volatility today, it will very likely have high diffusion volatility tomorrow, and next week, and even next month.
+This is the long-memory property that the HAR model (Chapter~\ref{ch:har}) exploits.
+
+Jump variation is the opposite.
+A jump today tells you almost nothing about whether a jump will occur tomorrow.
+Earnings announcements, FOMC decisions, and geopolitical shocks do not cluster in the same way that diffusion volatility does.
+The jump component is nearly unpredictable.
+\end{intuition}
+
+This difference has a direct implication for forecasting models.
+If you feed raw $\RV_t$ into a model, you are mixing a highly persistent signal (continuous variation) with transient noise (jump variation).
+The model has to learn a single set of persistence parameters that compromises between the two.
+Separating them lets the model learn different dynamics for each component.
+
+\begin{keyidea}[Forecasting with Separated Components]
+In the HAR-J and HAR-CJ models (Chapter~\ref{ch:har}), the continuous component enters with high persistence coefficients (it is highly predictable), while the jump component enters with a small, often statistically insignificant coefficient (it is nearly unpredictable).
+The forecasting improvement comes from the continuous side: by removing jump contamination, you get a cleaner, more persistent signal that the model can exploit more effectively \citep{ABD2007}.
+\end{keyidea}
+
+There is an additional asymmetry.
+\citet{BKT2015} and \citet{PSS2015} found that ``bad jumps'' (large negative returns) are more informative for future volatility than ``good jumps'' (large positive returns).
+A 5\% daily drop signals elevated volatility going forward; a 5\% daily rally does not, to the same degree.
+This connects to the signed volatility decompositions (SHAR) covered in Chapter~\ref{ch:har} and the signed jump features in Chapter~\ref{ch:features}.
+
+\begin{warning}[Do Not Treat Jump and Continuous Components as Interchangeable]
+The continuous and jump components of $\RV_t$ have different statistical properties: different persistence, different distributional shapes, and different predictive content.
+Lumping them together (as raw $\RV_t$ does) throws away information.
+Treating the jump component as if it were as persistent as continuous variation will lead to overstated volatility forecasts after jump days.
+Always decompose before forecasting.
+\end{warning}
+
+
+% ═══════════════════════════════════════════════════
+% SUMMARY
+% ═══════════════════════════════════════════════════
+
+\section*{Summary}
+\addcontentsline{toc}{section}{Summary}
+
+\begin{itemize}[nosep]
+  \item \textbf{Jumps} are sudden, large price moves caused by discrete news events (earnings, macro releases, geopolitical shocks).  They are distinct from the smooth diffusion that drives normal price variation.
+
+  \item \textbf{Quadratic variation} equals integrated variance plus the sum of squared jumps: $[p]_t = \IVol_t + \sum J_s^2$.  Standard $\RV_t$ captures both; this chapter develops tools to separate them.
+
+  \item \textbf{Bipower variation} $\BPV_t = \frac{\pi}{2}\sum_{i=2}^{n}|r_{t,i}|\,|r_{t,i-1}|$ multiplies consecutive absolute returns, dampening the contribution of isolated jumps \citep{BNS2004}.
+
+  \item \textbf{BPV consistency}: $\BPV_t$ converges to $\IVol_t$ even in the presence of finite-activity jumps.  $\RV_t - \BPV_t$ consistently estimates the jump component.
+
+  \item The $\frac{\pi}{2}$ scaling factor corrects for the fact that $\E[|Z|]^2 = 2/\pi$ when $Z \sim \N(0,1)$.
+
+  \item The \textbf{BNS jump test} formalizes this: $Z_{\text{BNS},t} = (\RV_t - \BPV_t)/\sqrt{\vartheta \cdot \operatorname{RQ}_t/n}$ is asymptotically standard normal under the null of no jumps \citep{BNS2006}.  Compare to 1.645 (5\%) or 2.326 (1\%).
+
+  \item The BNS test has \textbf{finite-sample size distortions} (it can over-reject).  The ratio variant or Huang-Tauchen correction improves performance \citep{HuangTauchen2005}.
+
+  \item The \textbf{Lee-Mykland test} detects individual jumps within the day, providing jump timing and sizes, not just a daily binary indicator \citep{LeeMykland2008}.
+
+  \item The \textbf{A\"it-Sahalia-Jacod test} uses power-variation ratios at two frequencies and is more robust to microstructure noise than the BNS test \citep{AitSahaliaJacod2009}.
+
+  \item \textbf{Threshold methods} classify each return as jump or diffusion based on a size cutoff.  Threshold realized variance sums squared returns only for below-threshold returns \citep{Mancini2009, CorsiPirinoReno2010}.
+
+  \item \textbf{Continuous variation is persistent}; jump variation is transient.  Separating them improves forecasting by allowing models to assign different persistence to each component.
+
+  \item \textbf{Bad jumps} (negative) are more informative for future volatility than good jumps (positive), motivating signed jump features in Chapter~\ref{ch:features} \citep{BKT2015, PSS2015}.
+
+  \item The HAR-J and HAR-CJ models (Chapter~\ref{ch:har}) exploit this decomposition directly; Projects 1 and 4 use jump-decomposed features.
+\end{itemize}
+
+
+% ═══════════════════════════════════════════════════
+% KEY RESULTS TABLE
+% ═══════════════════════════════════════════════════
+
+\begin{table}[htbp]
+\centering
+\caption{Key results referenced in this chapter.}
+\label{tab:ch04-key-results}
+\begin{tabular}{@{} p{4.2cm} p{6cm} p{4.3cm} @{}}
+\toprule
+\textbf{Paper} & \textbf{Result} & \textbf{Relevance} \\
+\midrule
+\citet{BNS2004} &
+Bipower variation $\BPV_t$ converges to integrated variance $\IVol_t$ even in the presence of finite-activity jumps. &
+Foundational estimator for separating continuous and jump variation. \\[6pt]
+
+\citet{BNS2006} &
+BNS jump test: $Z_{\text{BNS},t}$ is asymptotically $\N(0,1)$ under no jumps; formal test for jump days. &
+Standard daily jump test used in HAR-J models. \\[6pt]
+
+\citet{LeeMykland2008} &
+Intraday jump detection: identifies individual jump times and sizes using local volatility and extreme-value theory. &
+Enables signed jump features and intraday jump analysis. \\[6pt]
+
+\citet{AitSahaliaJacod2009} &
+Power-variation-ratio test for jump activity, robust to microstructure noise. &
+Alternative to BNS for noisy high-frequency data. \\[6pt]
+
+\citet{CorsiPirinoReno2010} &
+Threshold-based HAR-CJ decomposition improves volatility forecasts by separating persistent continuous and transient jump components. &
+Direct input to HAR-CJ forecasting model (Chapter~\ref{ch:har}). \\[6pt]
+
+\citet{ABD2007} &
+Jump component of $\RV$ has near-zero persistence; forecasting improves when continuous and jump components are modeled separately. &
+Motivates the jump-continuous decomposition for all forecasting in this guide. \\
+\bottomrule
+\end{tabular}
+\end{table}

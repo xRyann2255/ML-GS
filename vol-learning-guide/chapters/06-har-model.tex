@@ -1,4 +1,670 @@
 \chapter{The HAR Model and Its Extensions}
 \label{ch:har}
 
-% TODO: Write this chapter
+\begin{application}[Why This Chapter]
+HAR is THE benchmark for volatility forecasting.
+Every ML model in Chapters~\ref{ch:trees-vol}--\ref{ch:hybrid} must beat HAR to justify its complexity.
+This chapter must be crystal clear because every subsequent forecasting chapter references it.
+Projects 1, 4, and 5 all use HAR variants as their primary baseline.
+\end{application}
+
+Chapter~\ref{ch:garch} forecast volatility using only daily returns.
+That approach works when intraday data is unavailable, but it uses a noisy proxy ($r^2_t$) for what actually happened during the day.
+Chapter~\ref{ch:rv} showed that realized variance $\RV_t = \sum r^2_{t,i}$, computed from intraday returns, is a far more precise measure of daily volatility.
+The natural next question: can you forecast tomorrow's $\RV$ directly from past $\RV$ values, without the latent-variable machinery of GARCH?
+
+The answer is yes, and the model that does it is remarkably simple: three OLS coefficients.
+
+
+% =============================================================
+\section{The Heterogeneous Market Hypothesis}
+\label{sec:hmh}
+% =============================================================
+
+\begin{prereq}[Mean Reversion]
+A quantity \emph{mean-reverts} if it tends to return to a long-run average after being pushed away.
+If today's value is unusually high, mean reversion says tomorrow's value is more likely to be lower (and vice versa).
+The speed of mean reversion determines how long departures persist.
+\end{prereq}
+
+Start with an observation about who trades in financial markets.
+Not everyone operates at the same frequency.
+Day traders react to what happened in the last few hours.
+Portfolio managers at mutual funds or pension funds rebalance weekly.
+Large institutional allocators (sovereign wealth funds, endowments) adjust positions monthly or quarterly.
+
+Each type of participant pays attention to volatility at their own characteristic horizon.
+A day trader cares about yesterday's realized volatility.
+A weekly rebalancer looks at the average volatility over the past week.
+A monthly allocator responds to the volatility level over the past month.
+
+\citet{Muller1993} formalized this as the \emph{Heterogeneous Market Hypothesis} (HMH): the market is a superposition of participants operating at different time scales, and these participants interact.
+When monthly allocators adjust positions, it creates volatility that daily traders react to, and vice versa.
+
+\begin{intuition}[Three Clocks Running Simultaneously]
+Imagine three clocks ticking at different speeds.
+Clock 1 (daily) ticks every day and captures fast-moving volatility reactions: earnings surprises, Fed announcements, flash crashes.
+Clock 2 (weekly) ticks every week and captures medium-term dynamics: multi-day volatility clusters, the weekly options expiration cycle.
+Clock 3 (monthly) ticks every month and captures the slow-moving background volatility level: business-cycle shifts, prolonged risk-on/risk-off regimes.
+Observed volatility is a mixture of all three clocks.
+The HAR model puts one predictor per clock.
+\end{intuition}
+
+Figure~\ref{fig:hmh-diagram} illustrates how the three participant types feed into observed market volatility.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.8cm and 2.5cm,
+    every node/.style={font=\small}
+  ]
+  % Three participant types
+  \node[flowblock, fill=blue!10, minimum width=3.2cm, minimum height=1.2cm]
+    (daily) {Daily Traders\\{\footnotesize horizon: 1 day}};
+  \node[flowblock, fill=orange!10, minimum width=3.2cm, minimum height=1.2cm,
+        right=2.5cm of daily]
+    (weekly) {Weekly Rebalancers\\{\footnotesize horizon: 1 week}};
+  \node[flowblock, fill=green!10, minimum width=3.2cm, minimum height=1.2cm,
+        right=2.5cm of weekly]
+    (monthly) {Monthly Allocators\\{\footnotesize horizon: 1 month}};
+
+  % What each watches
+  \node[below=0.8cm of daily, font=\footnotesize, text=defblue]
+    (d_rv) {watches $\RV_{t-1}$};
+  \node[below=0.8cm of weekly, font=\footnotesize, text=keyorange]
+    (w_rv) {watches $\RV^{(w)}_{t-1}$};
+  \node[below=0.8cm of monthly, font=\footnotesize, text=intgreen]
+    (m_rv) {watches $\RV^{(m)}_{t-1}$};
+
+  % Central node: observed volatility
+  \node[flowblock, fill=purple!10, minimum width=3.5cm, minimum height=1.2cm,
+        below=2.8cm of weekly]
+    (market) {Observed Market\\Volatility $\RV_t$};
+
+  % Arrows
+  \draw[arrow, defblue] (d_rv) -- (market);
+  \draw[arrow, keyorange] (w_rv) -- (market);
+  \draw[arrow, intgreen] (m_rv) -- (market);
+
+  % Feedback arrows (dashed)
+  \draw[arrow, dashed, gray] (market.west) -- ++(-2.0,0) |- (daily.south west);
+  \draw[arrow, dashed, gray] (market.east) -- ++(2.0,0) |- (monthly.south east);
+\end{tikzpicture}
+\caption{The Heterogeneous Market Hypothesis.
+Three types of market participants operate at different horizons, each responding to volatility averaged over their characteristic time scale.
+Their collective actions produce the observed realized volatility.
+Dashed arrows indicate feedback: today's volatility feeds back into each participant's future decisions.}
+\label{fig:hmh-diagram}
+\end{figure}
+
+\begin{keyidea}[Why This Matters for Forecasting]
+If the market were homogeneous (all participants on the same clock), a simple AR(1) model would suffice.
+The heterogeneity means that volatility dynamics involve multiple time scales simultaneously.
+You need a model that captures daily, weekly, and monthly persistence in a single equation.
+That model is HAR.
+\end{keyidea}
+
+
+% =============================================================
+\section{The HAR Model}
+\label{sec:har-model}
+% =============================================================
+
+\begin{prereq}[OLS Regression]
+Ordinary Least Squares (OLS) fits a linear equation $y = \beta_0 + \beta_1 x_1 + \cdots + \beta_k x_k + \varepsilon$ by choosing $\beta_0, \ldots, \beta_k$ to minimize the sum of squared residuals $\sum \varepsilon^2_t$.
+The resulting coefficients are the best linear unbiased estimators under standard assumptions (Gauss--Markov theorem).
+If you can set up a forecasting problem as a linear regression, OLS gives you the answer.
+\end{prereq}
+
+The insight from Section~\ref{sec:hmh} suggests three predictors: yesterday's $\RV$, the average $\RV$ over the past week, and the average $\RV$ over the past month.
+\citet{Corsi2009} turned this directly into a regression.
+The key move is defining the weekly and monthly averages.
+
+\begin{definition}[Weekly and Monthly Realized Variance]
+\label{def:rv-averages}
+The weekly average realized variance on day $t$ is:
+\begin{equation}
+  \RV^{(w)}_{t} = \frac{1}{5}\sum_{i=0}^{4}\RV_{t-i}
+  \label{eq:rv-weekly}
+\end{equation}
+The monthly average realized variance on day $t$ is:
+\begin{equation}
+  \RV^{(m)}_{t} = \frac{1}{22}\sum_{i=0}^{21}\RV_{t-i}
+  \label{eq:rv-monthly}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\RV^{(w)}_{t}$: the arithmetic mean of the five most recent daily realized variances (including today)
+  \item $\RV^{(m)}_{t}$: the arithmetic mean of the 22 most recent daily realized variances (including today)
+  \item 5 trading days = 1 week; 22 trading days $\approx$ 1 month
+  \item These are backward-looking averages, not forecasts
+\end{itemize}
+\end{definition}
+
+Now the model.
+The idea is as simple as it sounds: regress tomorrow's realized variance on yesterday's daily, weekly, and monthly values.
+
+\begin{definition}[The HAR-RV Model \citep{Corsi2009}]
+\label{def:har}
+\begin{equation}
+  \RV_{t+1} = \beta_0 + \beta_d \, \RV_{t} + \beta_w \, \RV^{(w)}_{t} + \beta_m \, \RV^{(m)}_{t} + \varepsilon_{t+1}
+  \label{eq:har}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\RV_{t+1}$: tomorrow's realized variance (the target you are forecasting)
+  \item $\beta_0$: intercept, related to the long-run average level of $\RV$
+  \item $\beta_d$: coefficient on yesterday's daily $\RV$; captures the short-term reaction
+  \item $\RV_t$: yesterday's realized variance
+  \item $\beta_w$: coefficient on the weekly average; captures medium-term persistence
+  \item $\RV^{(w)}_{t}$: average of the five most recent daily $\RV$ values (Equation~\ref{eq:rv-weekly})
+  \item $\beta_m$: coefficient on the monthly average; captures long-term persistence
+  \item $\RV^{(m)}_{t}$: average of the 22 most recent daily $\RV$ values (Equation~\ref{eq:rv-monthly})
+  \item $\varepsilon_{t+1}$: forecast error
+\end{itemize}
+Estimation: OLS.
+No maximum likelihood, no iterative optimization, no latent variables.
+\end{definition}
+
+\begin{intuition}[HAR Mimics Long Memory with Three Coefficients]
+Volatility autocorrelations decay slowly (Chapter~\ref{ch:garch}, Section~\ref{sec:figarch}).
+A pure AR model would need many lags to capture this.
+HAR achieves the same effect with a trick: the weekly average $\RV^{(w)}$ implicitly includes lags 1 through 5, and the monthly average $\RV^{(m)}$ implicitly includes lags 1 through 22.
+Three coefficients, but through the averages, information from 22 past days enters the forecast.
+The result is autocorrelation decay that closely approximates a long-memory process, with none of the estimation complexity of FIGARCH \citep{Corsi2009}.
+\end{intuition}
+
+\begin{warning}[Log or Level?]
+Many papers estimate HAR on $\ln(\RV)$ rather than $\RV$ in levels.
+As noted in Chapter~\ref{ch:rv} (Section~\ref{sec:rv-vs-rvol}), $\ln(\RV_t)$ is approximately Gaussian, which makes OLS residuals better behaved and guarantees positive forecasts (since $e^x > 0$).
+The log specification generally forecasts better.
+Throughout this chapter, all equations are written in levels for clarity; in practice, use logs unless you have a specific reason not to.
+\end{warning}
+
+\subsection{Typical Coefficient Values}
+
+What do the coefficients look like on real data?
+\citet{Corsi2009} estimates HAR on S\&P~500 5-minute $\RV$ (1990--2003) and reports approximate values of $\beta_d \approx 0.36$, $\beta_w \approx 0.28$, $\beta_m \approx 0.28$.
+All three components contribute meaningfully.
+The monthly term's coefficient is similar to the daily term's, confirming that long-horizon persistence matters.
+
+The in-sample $R^2$ is typically 0.40--0.60 for daily-horizon forecasts on equity index $\RV$.
+This is high for a financial time series, and it comes from just three predictors.
+
+\begin{workedexample}{Computing a HAR Forecast}
+You have 22 days of daily realized variance for the S\&P~500 (in units of $10^{-4}$, so 1.0 means 1\% annualized vol corresponds to roughly $0.40 \times 10^{-4}$ daily):
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} c r c r c r @{}}
+\toprule
+\textbf{Day} & \textbf{$\RV_t$} & \textbf{Day} & \textbf{$\RV_t$} & \textbf{Day} & \textbf{$\RV_t$} \\
+\midrule
+1  & 0.80 & 9  & 1.50 & 17 & 1.80 \\
+2  & 0.90 & 10 & 1.30 & 18 & 2.20 \\
+3  & 1.10 & 11 & 1.20 & 19 & 2.50 \\
+4  & 1.00 & 12 & 1.40 & 20 & 2.00 \\
+5  & 1.20 & 13 & 1.60 & 21 & 1.70 \\
+6  & 1.50 & 14 & 1.50 & 22 & 1.90 \\
+7  & 1.40 & 15 & 1.70 & & \\
+8  & 1.60 & 16 & 1.90 & & \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+All values are in units of $10^{-4}$.
+
+\textbf{Step 1: Compute the daily component.}
+$\RV_{22} = 1.90$
+
+\textbf{Step 2: Compute the weekly average.}
+\[
+  \RV^{(w)}_{22} = \frac{1}{5}(\RV_{22} + \RV_{21} + \RV_{20} + \RV_{19} + \RV_{18})
+  = \frac{1.90 + 1.70 + 2.00 + 2.50 + 2.20}{5} = \frac{10.30}{5} = 2.06
+\]
+
+\textbf{Step 3: Compute the monthly average.}
+\[
+  \RV^{(m)}_{22} = \frac{1}{22}\sum_{i=1}^{22} \RV_i
+  = \frac{0.80 + 0.90 + \cdots + 1.90}{22} = \frac{32.70}{22} = 1.486
+\]
+
+\textbf{Step 4: Apply pre-fitted coefficients.}
+Using $\beta_0 = 0.05$, $\beta_d = 0.36$, $\beta_w = 0.28$, $\beta_m = 0.28$ (all in $10^{-4}$ units):
+\begin{align*}
+  \widehat{\RV}_{23} &= 0.05 + 0.36 \times 1.90 + 0.28 \times 2.06 + 0.28 \times 1.486 \\
+                      &= 0.05 + 0.684 + 0.577 + 0.416 \\
+                      &= 1.727
+\end{align*}
+
+The forecast for day 23 is $1.727 \times 10^{-4}$, or equivalently a daily volatility of $\sqrt{1.727 \times 10^{-4}} = 1.31\%$.
+
+Notice how the forecast blends three time scales.
+The daily term ($\RV_{22} = 1.90$) pulls the forecast toward recent conditions.
+The weekly average ($2.06$) is higher than the monthly average ($1.486$) because the last five days were volatile, so the weekly term pulls the forecast up.
+The monthly average anchors the forecast closer to the longer-run level.
+\end{workedexample}
+
+
+% =============================================================
+\section{HAR-J and HAR-CJ: Adding Jumps}
+\label{sec:har-j}
+% =============================================================
+
+The basic HAR uses total realized variance $\RV_t$ as the predictor.
+But as discussed in Chapter~\ref{ch:rv} (Equation~\ref{eq:qv-with-jumps}), $\RV$ captures both the continuous component of price variation and any jumps that occurred during the day.
+A natural question: do jumps and continuous variation have different forecasting power?
+
+\begin{prereq}[Bipower Variation]
+\emph{Bipower variation} (BPV) is an estimator of integrated variance that is robust to jumps.
+It is defined as:
+\begin{equation}
+  \BPV_t = \frac{\pi}{2} \sum_{i=2}^{n} |r_{t,i}|\,|r_{t,i-1}|
+  \label{eq:bpv-def}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $|r_{t,i}|$: absolute value of the $i$-th intraday return
+  \item The product of consecutive absolute returns averages out jump contributions because it is unlikely that two consecutive intervals both contain a jump
+  \item $\pi/2$: a scaling constant that ensures $\BPV_t$ converges to integrated variance $\IVol_t$ (not quadratic variation) as sampling frequency increases
+\end{itemize}
+The key property: $\BPV_t \to \IVol_t$ even when jumps are present, whereas $\RV_t \to \IVol_t + \sum(\text{jumps})^2$.
+The difference $\RV_t - \BPV_t$ therefore isolates the jump component.
+BPV was introduced by \citet{BNS2004} and is covered in detail in Chapter~\ref{ch:jumps}.
+\end{prereq}
+
+\subsection{HAR-J}
+
+\citet{ABD2007} proposed the HAR-J model, which adds a jump component as an additional predictor:
+
+\begin{equation}
+  \RV_{t+1} = \beta_0 + \beta_d \, \RV_{t} + \beta_w \, \RV^{(w)}_{t} + \beta_m \, \RV^{(m)}_{t} + \beta_J \, J_t + \varepsilon_{t+1}
+  \label{eq:har-j}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $J_t = \max(\RV_t - \BPV_t, 0)$: the estimated jump component on day $t$; the $\max$ ensures non-negativity, since measurement error can make $\RV_t - \BPV_t$ slightly negative even on jumpless days
+  \item $\beta_J$: coefficient on jumps; typically estimated as negative and small, meaning jumps have a weak or transient effect on future volatility
+  \item All other terms are the same as in Equation~\eqref{eq:har}
+\end{itemize}
+
+\begin{keyresult}[\citet{ABD2007}: Jumps Matter Less Than You Expect]
+\citet{ABD2007} find that the jump component $J_t$ is statistically significant but economically small in forecasting next-day $\RV$.
+Most of the predictive power comes from the continuous component.
+Jumps are largely transient: a jump on day $t$ does not meaningfully raise volatility on day $t+1$.
+\end{keyresult}
+
+\subsection{HAR-CJ}
+
+\citet{CorsiPirinoReno2010} take the separation further with the HAR-CJ model, which replaces total $\RV$ with the continuous and jump components at all three horizons:
+
+\begin{equation}
+  \RV_{t+1} = \beta_0 + \beta^C_d C_t + \beta^C_w C^{(w)}_t + \beta^C_m C^{(m)}_t
+             + \beta^J_d J_t + \beta^J_w J^{(w)}_t + \beta^J_m J^{(m)}_t + \varepsilon_{t+1}
+  \label{eq:har-cj}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $C_t = \BPV_t$: the continuous component of day $t$'s variation
+  \item $J_t = \max(\RV_t - \BPV_t, 0)$: the jump component of day $t$
+  \item $C^{(w)}_t, C^{(m)}_t$: weekly and monthly averages of the continuous component, constructed like $\RV^{(w)}$ and $\RV^{(m)}$
+  \item $J^{(w)}_t, J^{(m)}_t$: weekly and monthly averages of the jump component
+\end{itemize}
+
+The HAR-CJ model has six slope coefficients instead of three.
+The empirical finding is consistent with HAR-J: continuous coefficients ($\beta^C$) are large and significant; jump coefficients ($\beta^J$) are small and often insignificant at weekly and monthly horizons \citep{CorsiPirinoReno2010}.
+
+\begin{keyidea}[Jumps Are Noise for Forecasting]
+A large jump (e.g., from a surprise rate cut) spikes today's $\RV$ but typically does not persist into tomorrow.
+The continuous component, which reflects the background level of trading activity and uncertainty, is far more persistent and forecastable.
+This is why separating $C$ from $J$ can help: it prevents a one-day spike from inflating the forecast.
+\end{keyidea}
+
+
+% =============================================================
+\section{SHAR: Good Volatility, Bad Volatility}
+\label{sec:shar}
+% =============================================================
+
+HAR and its jump extensions treat all returns symmetrically: a large up move and a large down move both increase $\RV$ by the same amount (both $r^2$ terms are positive).
+But Chapter~\ref{ch:garch} documented the leverage effect (Section~\ref{sec:leverage}): negative returns increase volatility more than positive returns of the same magnitude.
+Can you bring this asymmetry into the HAR framework?
+
+\begin{prereq}[Realized Semivariance]
+\emph{Realized semivariance} decomposes realized variance into contributions from positive and negative intraday returns:
+\begin{equation}
+  RS^+_t = \sum_{i=1}^{n} r^2_{t,i} \, \mathbf{1}_{\{r_{t,i} > 0\}}, \qquad
+  RS^-_t = \sum_{i=1}^{n} r^2_{t,i} \, \mathbf{1}_{\{r_{t,i} < 0\}}
+  \label{eq:semivariance}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $RS^+_t$: positive semivariance, the sum of squared positive intraday returns
+  \item $RS^-_t$: negative semivariance, the sum of squared negative intraday returns
+  \item $\mathbf{1}_{\{r_{t,i} > 0\}}$: indicator function, equal to 1 if $r_{t,i} > 0$
+  \item $RS^+_t + RS^-_t = \RV_t$: the two halves sum to total realized variance
+\end{itemize}
+\end{prereq}
+
+\begin{keyresult}[\citet{PSS2015}: Bad Volatility Is More Persistent]
+Decomposing realized variance into positive semivariance $RS^+$ and negative semivariance $RS^-$ substantially improves forecasts.
+Bad volatility ($RS^-$, from downward price moves) is significantly more persistent than good volatility ($RS^+$, from upward moves).
+\end{keyresult}
+
+The SHAR (Semivariance HAR) model replaces the daily $\RV$ term with $RS^+$ and $RS^-$:
+
+\begin{equation}
+  \RV_{t+1} = \beta_0 + \beta^+_d \, RS^+_t + \beta^-_d \, RS^-_t
+             + \beta_w \, \RV^{(w)}_t + \beta_m \, \RV^{(m)}_t + \varepsilon_{t+1}
+  \label{eq:shar}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $RS^+_t$: yesterday's positive semivariance (``good'' volatility)
+  \item $RS^-_t$: yesterday's negative semivariance (``bad'' volatility)
+  \item $\beta^-_d > \beta^+_d$ is the typical finding: negative semivariance has a larger coefficient, meaning bad volatility predicts more future volatility
+  \item The weekly and monthly components remain as total $\RV$ averages
+\end{itemize}
+
+\begin{intuition}[Why Downward Moves Are More Informative]
+Consider two days with identical $\RV = 2 \times 10^{-4}$.
+On Day A, most of the variation came from upward moves ($RS^+ = 1.6$, $RS^- = 0.4$): a rally day with choppy upward movement.
+On Day B, most came from downward moves ($RS^+ = 0.4$, $RS^- = 1.6$): a selloff with persistent downward pressure.
+
+Day B predicts higher future volatility.
+Why?
+Selloffs trigger margin calls, portfolio insurance rebalancing, stop-loss orders, and panic selling, all of which generate additional volatility.
+Rallies of the same magnitude do not create the same cascading effects.
+This asymmetry is the leverage effect operating at the intraday level.
+\end{intuition}
+
+\citet{PSS2015} show that SHAR improves forecast accuracy relative to HAR across multiple asset classes, with the largest gains on equity indices where the leverage effect is strongest.
+
+
+% =============================================================
+\section{HARQ: Handling Measurement Error}
+\label{sec:harq}
+% =============================================================
+
+All the models so far treat every day's $\RV_t$ as equally reliable.
+But it is not.
+Chapter~\ref{ch:rv} showed that $\RV$ is an \emph{estimate} of integrated variance, subject to estimation error that depends on how volatile volatility was during the day.
+
+\begin{prereq}[Realized Quarticity]
+The precision of realized variance as an estimator of integrated variance depends on the \emph{integrated quarticity}, the integral of $\sigma^4_s$ over the day (see Equation~\ref{eq:rv-clt} in Chapter~\ref{ch:rv}).
+Realized quarticity ($RQ_t$) is a consistent estimator of this quantity:
+\begin{equation}
+  RQ_t = \frac{n}{3} \sum_{i=1}^{n} r^4_{t,i}
+  \label{eq:rq}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $r^4_{t,i}$: the fourth power of the $i$-th intraday return
+  \item $n/3$: a scaling constant that ensures consistency
+  \item High $RQ_t$ means that volatility itself was volatile during the day, making $\RV_t$ a noisy estimate of $\IVol_t$
+  \item Low $RQ_t$ means volatility was stable, making $\RV_t$ precise
+\end{itemize}
+\end{prereq}
+
+The idea behind HARQ is simple: when yesterday's $\RV$ is noisy (high $RQ$), the model should rely less on it.
+When it is precise (low $RQ$), the model should rely more on it.
+
+\begin{keyresult}[\citet{BPQ2016}: HARQ Adjusts for Measurement Error]
+\citet{BPQ2016} allow the daily coefficient in the HAR model to vary with realized quarticity $RQ_t$.
+On noisy days (high $RQ$), the daily $\RV$ coefficient shrinks toward zero, down-weighting the unreliable estimate.
+On precise days (low $RQ$), the coefficient is large, fully exploiting the signal.
+This simple modification produces statistically significant forecast improvements.
+\end{keyresult}
+
+\begin{equation}
+  \RV_{t+1} = \beta_0 + \bigl(\beta_d + \beta_{dQ}\sqrt{RQ_t}\bigr)\,\RV_t
+             + \beta_w \, \RV^{(w)}_t + \beta_m \, \RV^{(m)}_t + \varepsilon_{t+1}
+  \label{eq:harq}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\beta_d$: baseline daily coefficient (the coefficient when $RQ_t = 0$, i.e., the hypothetical noise-free case)
+  \item $\beta_{dQ}$: the adjustment coefficient; typically estimated as negative
+  \item $\sqrt{RQ_t}$: square root of realized quarticity, a measure of how noisy $\RV_t$ is as an estimate
+  \item $\beta_d + \beta_{dQ}\sqrt{RQ_t}$: the effective daily coefficient, which varies from day to day
+  \item When $RQ_t$ is large (noisy day), $\beta_{dQ}\sqrt{RQ_t}$ is a large negative number, shrinking the effective coefficient toward zero
+  \item When $RQ_t$ is small (precise day), the adjustment is negligible and the coefficient stays near $\beta_d$
+\end{itemize}
+
+The following diagram shows how the effective daily coefficient changes with measurement noise.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.75\textwidth,
+    height=6cm,
+    xlabel={$\sqrt{RQ_t}$ (measurement noise)},
+    ylabel={Effective daily coefficient $\beta_d + \beta_{dQ}\sqrt{RQ_t}$},
+    xmin=0, xmax=5,
+    ymin=-0.1, ymax=0.5,
+    grid=major,
+    grid style={gray!20},
+    tick label style={font=\small},
+    label style={font=\small},
+  ]
+
+  % Effective coefficient line
+  \addplot[defblue, very thick, domain=0:5, samples=50]
+    {0.40 - 0.09*x};
+
+  % Zero line
+  \addplot[dashed, gray, domain=0:5] {0};
+
+  % Annotations
+  \node[anchor=south west, font=\footnotesize, defblue] at (axis cs: 0.2, 0.40)
+    {Precise day: rely on $\RV_t$};
+  \node[anchor=north west, font=\footnotesize, warnred] at (axis cs: 3.0, 0.02)
+    {Noisy day: down-weight $\RV_t$};
+
+  % Dots for two example days
+  \addplot[only marks, mark=*, mark size=3pt, intgreen] coordinates {(0.5, 0.355)};
+  \addplot[only marks, mark=*, mark size=3pt, warnred] coordinates {(4.0, 0.04)};
+
+\end{axis}
+\end{tikzpicture}
+\caption{HARQ's adaptive coefficient.
+On days when realized quarticity is low (left), the daily coefficient is large and the model trusts $\RV_t$.
+On days when quarticity is high (right), the coefficient shrinks toward zero, shifting weight to the more stable weekly and monthly averages.}
+\label{fig:harq-coefficient}
+\end{figure}
+
+\begin{keyidea}[HARQ Is the Strongest Univariate RV Forecast]
+Among models that use only past RV and its measurement-error statistics, HARQ is the strongest in the literature \citep{BPQ2016}.
+It is the bar that any ML model must clear.
+If your tree ensemble or neural network cannot beat HARQ on out-of-sample $\QLIKE$ (Chapter~\ref{ch:evaluation}), you have not learned useful nonlinear structure; you have likely overfit.
+\end{keyidea}
+
+\begin{warning}[HARQ Needs Realized Quarticity]
+HARQ requires computing $RQ_t$ from intraday returns.
+If your data source provides only daily $\RV$ without the underlying intraday returns, you cannot construct $RQ_t$ and HARQ is not available.
+In that case, fall back to SHAR or plain HAR as your benchmark.
+\end{warning}
+
+
+% =============================================================
+\section{HAR-X and Beyond: Adding Exogenous Predictors}
+\label{sec:har-x}
+% =============================================================
+
+All HAR variants so far use only past $\RV$ (and its decompositions) as predictors.
+But other variables contain information about future volatility: the VIX, lagged signed returns, macroeconomic indicators, trading volume, options-implied information.
+The HAR-X framework adds these as extra regressors.
+
+\begin{definition}[HAR-X]
+\begin{equation}
+  \RV_{t+1} = \beta_0 + \beta_d \, \RV_t + \beta_w \, \RV^{(w)}_t + \beta_m \, \RV^{(m)}_t
+             + \sum_{j=1}^{p} \gamma_j \, X_{j,t} + \varepsilon_{t+1}
+  \label{eq:har-x}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $X_{j,t}$: the $j$-th exogenous predictor observed on day $t$
+  \item $\gamma_j$: coefficient on the $j$-th predictor
+  \item $p$: number of exogenous predictors
+  \item Common choices for $X_{j,t}$: VIX level, VIX innovations ($\Delta$VIX), lagged daily return $r_t$ (signed, to capture leverage), overnight return, trading volume, implied--realized volatility spread
+\end{itemize}
+\end{definition}
+
+\citet{BollerslevEtAl2018} take this to a large scale in their ``Risk Everywhere'' paper, constructing a large cross-section of HAR-X type models with many macro and market predictors.
+
+When $p$ is large, you face a classic overfitting problem: many predictors, limited data.
+\citet{AudrinoKnaus2016} propose the ``Lassoing the HAR'' approach, applying the Lasso (L1 regularization) to the HAR-X framework:
+
+\begin{equation}
+  \min_{\beta, \gamma} \sum_{t} \left(\RV_{t+1} - \beta_0 - \beta_d \RV_t - \beta_w \RV^{(w)}_t - \beta_m \RV^{(m)}_t - \sum_j \gamma_j X_{j,t}\right)^2 + \lambda \sum_j |\gamma_j|
+  \label{eq:lasso-har}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\lambda$: regularization penalty; larger $\lambda$ shrinks more coefficients to exactly zero
+  \item The penalty applies to the exogenous coefficients $\gamma_j$, not the core HAR terms
+  \item The Lasso selects which exogenous variables matter while keeping the core HAR structure intact
+\end{itemize}
+
+\begin{prereq}[Lasso Regularization]
+The Lasso (Least Absolute Shrinkage and Selection Operator) adds an L1 penalty ($\lambda \sum |\gamma_j|$) to the OLS objective.
+This has two effects: (1) it shrinks coefficients toward zero, reducing overfitting; (2) it sets some coefficients to exactly zero, performing automatic variable selection.
+The tuning parameter $\lambda$ controls the strength of the penalty and is chosen by cross-validation.
+\end{prereq}
+
+\begin{keyidea}[HAR-X Is the Bridge to ML]
+HAR-X with many predictors is effectively a linear ML model.
+Adding Lasso regularization makes it a penalized linear model with variable selection.
+Chapters~\ref{ch:trees-vol}--\ref{ch:hybrid} ask the next question: can \emph{nonlinear} models (tree ensembles, neural networks) improve on this, or does the extra flexibility just lead to overfitting?
+The answer depends critically on the feature set and forecast horizon.
+\end{keyidea}
+
+
+% =============================================================
+\section{Why HAR Is Hard to Beat}
+\label{sec:har-hard-to-beat}
+% =============================================================
+
+If HAR is so simple (three coefficients, OLS), why is it the benchmark rather than a stepping stone that ML quickly surpasses?
+Three reasons.
+
+\textbf{Reason 1: Volatility is highly persistent and approximately linear.}
+The autocorrelation function of $\RV_t$ decays slowly and smoothly.
+A model that captures the right decay rate with the right mixture of time scales gets most of the forecastable variation.
+HAR does exactly this.
+The residual nonlinearity is real but small relative to the linear component.
+
+\textbf{Reason 2: The signal-to-noise ratio is low.}
+Even though volatility is more predictable than returns, the day-to-day fluctuations in $\RV$ are large.
+A model that tries to fit these fluctuations more precisely (e.g., by adding interaction terms, polynomial features, or deep layers) tends to fit noise rather than signal, especially with the relatively short samples typical in finance (10--20 years of daily data is 2,500--5,000 observations).
+
+\textbf{Reason 3: Daily horizon, RV-only features.}
+When you restrict the feature set to past RV values and forecast one day ahead, there is little nonlinear structure for ML to exploit.
+The gains from ML come from two sources that HAR cannot access:
+\begin{enumerate}[nosep]
+  \item \textbf{Richer features}: options-implied volatility, cross-asset information, order flow, macroeconomic data, text/news sentiment (Chapter~\ref{ch:features}).
+  \item \textbf{Longer horizons}: at weekly or monthly forecast horizons, nonlinear regime dynamics and mean-reversion patterns become more pronounced, giving tree-based models and neural networks more to work with.
+\end{enumerate}
+
+\begin{keyidea}[The HAR Litmus Test]
+If your ML model does not beat HAR on the same features (past RV only) and the same forecast horizon (one day), you have not learned nonlinear structure; you have overfit noise.
+Always report HAR alongside your ML results.
+If you beat HAR, the follow-up question is: does the improvement come from richer features (good) or from fitting noise in RV (bad)?
+The answer determines whether the ML model has real economic value.
+\end{keyidea}
+
+The following table summarizes where ML has and has not consistently beaten HAR in the literature.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} l l l @{}}
+\toprule
+\textbf{Setting} & \textbf{HAR vs.\ ML} & \textbf{Why} \\
+\midrule
+Daily horizon, RV-only features & HAR wins or ties & Little nonlinear signal \\
+Daily horizon, rich features & ML often wins & Extra features carry new info \\
+Weekly/monthly horizon, RV-only & ML sometimes wins & Nonlinear regime effects \\
+Weekly/monthly horizon, rich features & ML usually wins & Both advantages compound \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{warning}[Publication Bias]
+Papers that fail to beat HAR are less likely to be published.
+The literature therefore overstates the frequency with which ML improves on HAR.
+Be skeptical of reported improvements below 5--10\% in out-of-sample $\QLIKE$, and always check whether the improvement is statistically significant via a Diebold--Mariano test (Chapter~\ref{ch:evaluation}).
+\end{warning}
+
+
+% =============================================================
+\section*{Summary}
+\addcontentsline{toc}{section}{Summary}
+% =============================================================
+
+\begin{itemize}[nosep]
+  \item The \textbf{Heterogeneous Market Hypothesis} \citep{Muller1993} posits that markets are driven by participants operating at daily, weekly, and monthly horizons, whose interactions produce the observed volatility dynamics.
+
+  \item The \textbf{HAR model} \citep{Corsi2009} translates this directly into a regression: $\RV_{t+1} = \beta_0 + \beta_d \RV_t + \beta_w \RV^{(w)}_t + \beta_m \RV^{(m)}_t + \varepsilon_{t+1}$, estimated by OLS.
+
+  \item HAR \textbf{mimics long memory} with only three coefficients by embedding lags 1--22 through the weekly and monthly averages.
+
+  \item \textbf{Typical $R^2$} for daily-horizon HAR on equity index RV: 0.40--0.60.
+
+  \item \textbf{HAR-J} \citep{ABD2007} adds a jump component $J_t = \max(\RV_t - \BPV_t, 0)$. Jumps are statistically significant but economically small predictors.
+
+  \item \textbf{HAR-CJ} \citep{CorsiPirinoReno2010} separates continuous and jump components at all three horizons. Continuous variation dominates the forecast; jumps are largely transient.
+
+  \item \textbf{SHAR} \citep{PSS2015} decomposes daily RV into positive ($RS^+$) and negative ($RS^-$) semivariance. Bad volatility ($RS^-$) is significantly more persistent, reflecting the leverage effect at the intraday level.
+
+  \item \textbf{HARQ} \citep{BPQ2016} allows the daily coefficient to vary with realized quarticity $RQ_t$, down-weighting $\RV_t$ on noisy days. It is the strongest univariate RV forecast in the literature.
+
+  \item \textbf{HAR-X} adds exogenous predictors (VIX, returns, macro). With many predictors, Lasso regularization \citep{AudrinoKnaus2016} prevents overfitting while preserving the core HAR structure.
+
+  \item HAR is \textbf{extremely competitive} at the daily horizon with RV-only features. ML gains come from richer feature sets and longer horizons.
+
+  \item The \textbf{HAR litmus test}: if your ML model cannot beat HAR on the same features and horizon, it has overfit noise, not learned nonlinear structure.
+
+  \item All HAR variants are estimated by \textbf{OLS} (or penalized OLS), require no iterative optimization, and produce interpretable coefficients. This simplicity is a feature, not a limitation.
+
+  \item Throughout this guide, HAR (or HARQ) is the \textbf{mandatory baseline} for every forecasting model.
+\end{itemize}
+
+
+% =============================================================
+\section*{Key Results}
+\addcontentsline{toc}{section}{Key Results}
+% =============================================================
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{3.5cm} l p{6.5cm} @{}}
+\toprule
+\textbf{Result} & \textbf{Source} & \textbf{Finding} \\
+\midrule
+Heterogeneous Market Hypothesis
+  & \citet{Muller1993}
+  & Markets are driven by participants at multiple horizons;
+    volatility dynamics are a superposition of time scales \\[4pt]
+HAR model
+  & \citet{Corsi2009}
+  & Three OLS coefficients (daily, weekly, monthly RV) approximate
+    long-memory dynamics; $R^2 \approx 0.40$--$0.60$ for daily equity
+    index forecasts \\[4pt]
+HAR-J (jumps)
+  & \citet{ABD2007}
+  & Adding jump component improves fit marginally; jumps are
+    largely transient and do not persist into future volatility \\[4pt]
+HAR-CJ
+  & \citet{CorsiPirinoReno2010}
+  & Full continuous/jump decomposition at all horizons;
+    continuous variation dominates forecasting power \\[4pt]
+SHAR (semivariance)
+  & \citet{PSS2015}
+  & Negative semivariance is more persistent than positive;
+    capturing the leverage effect improves forecasts \\[4pt]
+HARQ (measurement error)
+  & \citet{BPQ2016}
+  & Varying the daily coefficient with $\sqrt{RQ_t}$ down-weights
+    noisy estimates; strongest univariate RV forecast \\[4pt]
+Lassoing the HAR
+  & \citet{AudrinoKnaus2016}
+  & Lasso selects relevant exogenous predictors while preserving
+    core HAR structure; prevents overfitting with many regressors \\[4pt]
+Risk Everywhere
+  & \citet{BollerslevEtAl2018}
+  & Large-scale HAR-X with macro/market predictors; confirms
+    predictability from multiple exogenous sources \\
+\bottomrule
+\end{tabular}
+\end{center}
