@@ -1,4 +1,793 @@
-\chapter{Deep Learning for Volatility}
-\label{ch:dl-vol}
+% ══════════════════════════════════════════════════════════════
+% Chapter 12 — Deep Learning for Volatility
+% ══════════════════════════════════════════════════════════════
 
-% TODO: Write this chapter
+\chapter{Deep Learning for Volatility}\label{ch:deeplearning}
+
+\begin{application}[Where This Chapter Fits]
+Chapter~\ref{ch:trees} showed that tree-based methods are the workhorse for tabular volatility features.
+This chapter asks: when do neural networks offer something trees cannot?
+The answer is narrow but real: sequential raw data (LOB, tick streams), cross-asset pooling, and latent factor extraction.
+Project~2 (Intraday RV from LOB) and Project~4 (Rough Vol vs Deep Learning) use architectures from this chapter.
+\end{application}
+
+\begin{prereq}[What You Need]
+\begin{itemize}[nosep]
+  \item Backpropagation, gradient descent, and the idea of a loss function.
+  \item Matrix multiplication at the level of $\bW \bx + \mathbf{b}$.
+  \item Sigmoid $\sigmoid(\cdot)$ and $\relu(\cdot)$ activations.
+  \item The HAR model from Chapter~\ref{ch:har} and the tree methods from Chapter~\ref{ch:trees}.
+\end{itemize}
+\end{prereq}
+
+% ──────────────────────────────────────────────────────────────
+\section{LSTMs and GRUs}\label{sec:dl:lstm}
+% ──────────────────────────────────────────────────────────────
+
+Chapter~\ref{ch:trees} established that gradient-boosted trees dominate \emph{tabular} volatility forecasting.
+But volatility data is often sequential: a stream of 5-minute returns, a sequence of LOB snapshots, a panel of daily risk measures across assets.
+Recurrent neural networks, specifically the Long Short-Term Memory (LSTM) and the Gated Recurrent Unit (GRU), are purpose-built for sequences.
+
+\begin{intuition}[Why Sequences Need Special Architecture]
+A standard feedforward network treats its inputs as an unordered bag of numbers.
+If you feed it $(\RV_{t-1}, \RV_{t-2}, \ldots, \RV_{t-22})$, it does not know that $\RV_{t-1}$ is yesterday and $\RV_{t-22}$ is a month ago.
+A recurrent network processes inputs one step at a time, maintaining a hidden state $\bh_t$ that summarizes everything it has seen so far.
+This hidden state is the network's ``memory.''
+\end{intuition}
+
+\subsection{LSTM Cell Architecture}
+
+The LSTM cell solves the vanishing gradient problem that cripples simple recurrent networks.
+It uses three gates (forget, input, output) and a cell state $\mathbf{c}_t$ that acts as a conveyor belt for information.
+
+\begin{center}
+\begin{tikzpicture}[
+  gate/.style={draw, rounded corners, minimum height=0.7cm, minimum width=1.4cm, align=center, font=\small},
+  op/.style={circle, draw, minimum size=0.5cm, font=\small},
+  arr/.style={-{Stealth[length=2.5mm]}, thick},
+  scale=0.95
+]
+  % Cell state line
+  \draw[arr, line width=1.2pt, blue!60] (-1, 3) -- node[above, font=\small] {$\mathbf{c}_{t-1}$} (1.5, 3);
+  \draw[arr, line width=1.2pt, blue!60] (5.5, 3) -- node[above, font=\small] {$\mathbf{c}_t$} (8, 3);
+
+  % Hidden state line
+  \draw[arr, line width=1.2pt, orange!70] (-1, 0) -- node[below, font=\small] {$\bh_{t-1}$} (0.5, 0);
+  \draw[arr, line width=1.2pt, orange!70] (7, 0) -- node[below, font=\small] {$\bh_t$} (8, 0);
+
+  % Input
+  \node[font=\small] at (3.5, -1.5) {$\bx_t$};
+  \draw[arr] (3.5, -1.2) -- (3.5, -0.5);
+
+  % Forget gate
+  \node[gate, fill=red!10] (fg) at (2, 0) {Forget\\$\mathbf{f}_t$};
+  \node[op] (fgmul) at (2, 3) {$\odot$};
+  \draw[arr] (fg) -- (fgmul);
+  \draw[arr] (0.5, 0) -- (fg);
+
+  % Input gate
+  \node[gate, fill=green!10] (ig) at (4, 0) {Input\\$\mathbf{i}_t$};
+  \node[gate, fill=blue!8] (cand) at (4, 1.5) {$\tilde{\mathbf{c}}_t$};
+  \node[op] (igmul) at (4, 3) {$\odot$};
+  \node[op] (add) at (3, 3) {$+$};
+  \draw[arr] (ig) -- (igmul);
+  \draw[arr] (cand) -- (igmul);
+  \draw[arr] (fgmul) -- (add);
+  \draw[arr] (igmul) -- (add);
+
+  % Connect add to cell state out
+  \draw[line width=1.2pt, blue!60] (1.5, 3) -- (fgmul);
+  \draw[line width=1.2pt, blue!60] (add) -- (5.5, 3);
+
+  % Output gate
+  \node[gate, fill=purple!10] (og) at (6, 0) {Output\\$\mathbf{o}_t$};
+  \node[op] (tanh) at (5.5, 1.5) {$\tanh$};
+  \node[op] (ogmul) at (6.5, 1.5) {$\odot$};
+  \draw[arr] (og) -- (ogmul);
+  \draw[arr] (5.5, 3) -- (tanh);
+  \draw[arr] (tanh) -- (ogmul);
+  \draw[arr] (ogmul) -- (7, 0);
+
+  % Connections from input
+  \draw[arr] (3.5, -0.5) -| (fg);
+  \draw[arr] (3.5, -0.5) -| (ig);
+  \draw[arr] (3.5, -0.5) -| (og);
+  \draw[arr] (3.5, -0.5) -| (cand);
+\end{tikzpicture}
+\end{center}
+
+\begin{definition}[LSTM Cell Equations]
+At each time step $t$, given input $\bx_t$ and previous hidden state $\bh_{t-1}$:
+\begin{align}
+  \mathbf{f}_t &= \sigmoid\!\bigl(\bW_f [\bh_{t-1}; \bx_t] + \mathbf{b}_f\bigr)
+    && \text{(forget gate)} \label{eq:lstm:forget} \\
+  \mathbf{i}_t &= \sigmoid\!\bigl(\bW_i [\bh_{t-1}; \bx_t] + \mathbf{b}_i\bigr)
+    && \text{(input gate)} \label{eq:lstm:input} \\
+  \tilde{\mathbf{c}}_t &= \tanh\!\bigl(\bW_c [\bh_{t-1}; \bx_t] + \mathbf{b}_c\bigr)
+    && \text{(candidate cell state)} \label{eq:lstm:candidate} \\
+  \mathbf{c}_t &= \mathbf{f}_t \odot \mathbf{c}_{t-1}
+    + \mathbf{i}_t \odot \tilde{\mathbf{c}}_t
+    && \text{(cell state update)} \label{eq:lstm:cell} \\
+  \mathbf{o}_t &= \sigmoid\!\bigl(\bW_o [\bh_{t-1}; \bx_t] + \mathbf{b}_o\bigr)
+    && \text{(output gate)} \label{eq:lstm:output} \\
+  \bh_t &= \mathbf{o}_t \odot \tanh(\mathbf{c}_t)
+    && \text{(hidden state)} \label{eq:lstm:hidden}
+\end{align}
+where:
+\begin{itemize}[nosep]
+  \item $[\bh_{t-1}; \bx_t]$ is the concatenation of previous hidden state and current input.
+  \item $\bW_f, \bW_i, \bW_c, \bW_o$ are learned weight matrices.
+  \item $\mathbf{b}_f, \mathbf{b}_i, \mathbf{b}_c, \mathbf{b}_o$ are bias vectors.
+  \item $\odot$ denotes element-wise (Hadamard) multiplication.
+  \item $\sigmoid(\cdot)$ squashes values to $[0,1]$; each gate is a ``soft switch.''
+\end{itemize}
+\end{definition}
+
+\begin{intuition}[The Three Gates in Plain English]
+\begin{itemize}[nosep]
+  \item \textbf{Forget gate} $\mathbf{f}_t$: ``How much of the old memory should I keep?'' Values near 0 erase; near 1 retain.
+  \item \textbf{Input gate} $\mathbf{i}_t$: ``How much of the new candidate should I write to memory?''
+  \item \textbf{Output gate} $\mathbf{o}_t$: ``How much of the current memory should I expose as my prediction?''
+\end{itemize}
+The cell state $\mathbf{c}_t$ flows through the network with only linear interactions (multiply and add), so gradients flow back through many time steps without vanishing.
+This is why LSTMs can learn long-range dependencies that simple RNNs cannot.
+\end{intuition}
+
+The GRU simplifies the LSTM by merging the forget and input gates into a single ``update gate'' and eliminating the separate cell state.
+GRUs have fewer parameters and train faster; in practice, performance differences between LSTM and GRU are small for volatility tasks.
+
+\subsection{LSTMs for Realized Volatility}
+
+\citet{Bucci2020} provides the cleanest comparison.
+He tests LSTM and NARX (nonlinear autoregressive with exogenous inputs) networks against HAR for daily $\RV$ forecasting across multiple assets.
+
+\begin{keyresult}[Bucci (2020): LSTM for Daily RV]
+LSTM networks are competitive with HAR for daily $\RV$ forecasting, but they do not consistently dominate.
+Gains are asset-dependent and sensitive to hyperparameter tuning.
+The LSTM's advantage appears mainly during volatile periods when the relationship between past and future $\RV$ is nonlinear.
+\end{keyresult}
+
+This result is consistent with the lesson from Chapter~\ref{ch:trees}: on daily $\RV$ with only lagged $\RV$ as inputs, simple models are hard to beat.
+The LSTM becomes genuinely useful when you change what you feed it.
+
+\citet{SirignanoCont2019} demonstrate a powerful idea: \emph{pooling} data across assets.
+Instead of training one LSTM per stock, they train a single ``universal'' LSTM on all stocks simultaneously.
+
+\begin{keyresult}[Sirignano--Cont (2019): Universal Features via Pooling]
+A single LSTM trained on pooled data across 1,000+ stocks learns universal features of price formation.
+Pooling works because volatility dynamics are similar across assets (the same ``rough'' kernel from Chapter~\ref{ch:rough}).
+The pooled model outperforms asset-specific models, especially for assets with short histories.
+\end{keyresult}
+
+\begin{keyidea}[Cross-Asset Pooling]
+Trees cannot easily share learned representations across assets; you train one model per asset or flatten everything into rows.
+Neural networks naturally pool: a single LSTM processes sequences from many assets, learning shared dynamics while allowing asset-specific variation through the hidden state.
+If volatility dynamics are truly universal (Hurst $H \approx 0.1$ across assets, as Chapter~\ref{ch:rough} showed), pooling should help, and it does.
+\end{keyidea}
+
+\citet{RosenbaumZhang2022} connect LSTMs directly to rough volatility.
+They show that a universal LSTM, trained to forecast volatility, learns a kernel that matches the fractional kernel of the RFSV model from Chapter~\ref{ch:rough}.
+
+\begin{keyresult}[Rosenbaum--Zhang (2022): LSTM Rediscovers Roughness]
+An LSTM trained on raw volatility data learns the same power-law kernel $K(t) \propto t^{H-1/2}$ with $H \approx 0.1$ that defines the rough fractional stochastic volatility (RFSV) model.
+The LSTM and the RFSV forecast are nearly identical, suggesting both learn the same underlying structure.
+\end{keyresult}
+
+This is a beautiful result. The LSTM was given no prior knowledge of rough volatility, fractional Brownian motion, or Hurst exponents. It discovered roughness from data alone.
+
+\citet{RahimikiaPoon2020} push the LSTM further by adding LOB features and news sentiment as inputs alongside standard $\RV$ lags.
+
+\begin{keyresult}[Rahimikia--Poon (2020): LSTM with LOB + Sentiment]
+An LSTM incorporating limit order book features and news sentiment beats HAR on approximately 90\% of trading days.
+However, the model fails during extreme stress events, precisely when accurate forecasts matter most.
+\end{keyresult}
+
+\begin{warning}[Stress-Period Failure]
+Deep learning models trained on normal-regime data can fail catastrophically during crises.
+The LSTM in \citet{RahimikiaPoon2020} underperforms HAR during high-volatility episodes because the training data contains few such events.
+This is not specific to LSTMs; it affects all flexible models.
+Always evaluate forecast performance conditional on volatility regime (see Chapter~\ref{ch:evaluation}).
+\end{warning}
+
+\begin{keyidea}[When LSTMs Beat Trees for Volatility]
+LSTMs shine when you feed them \emph{raw sequences} (intraday returns, LOB snapshots, tick data) rather than pre-computed features.
+On pre-computed tabular features, trees are usually better (Chapter~\ref{ch:trees}).
+The LSTM's value comes from learning feature representations that you did not know to engineer by hand.
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Temporal Convolutional Networks}\label{sec:dl:tcn}
+% ──────────────────────────────────────────────────────────────
+
+LSTMs process sequences one step at a time. This is conceptually clean but creates a computational bottleneck: you cannot parallelize across time steps because each step depends on the previous hidden state.
+Temporal Convolutional Networks (TCNs) solve this by using \emph{causal convolutions}: filters that only look backward in time, applied in parallel across the entire sequence.
+
+\subsection{Dilated Causal Convolutions}
+
+The key innovation is \emph{dilation}.
+A standard 1D convolution with kernel size $k$ looks at $k$ consecutive time steps.
+A dilated convolution with dilation factor $d$ skips $d-1$ steps between inputs, so a kernel of size $k$ covers a receptive field of $k + (k-1)(d-1)$ steps.
+By doubling the dilation factor at each layer ($d = 1, 2, 4, 8, \ldots$), the receptive field grows exponentially while the number of parameters grows only linearly.
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=0.6cm,
+  dot/.style={circle, fill=defblue, minimum size=5pt, inner sep=0pt},
+  dotgray/.style={circle, fill=gray!30, minimum size=5pt, inner sep=0pt},
+  conn/.style={thick, defblue},
+  scale=0.85,
+  transform shape
+]
+  % Input layer (bottom)
+  \foreach \i in {0,...,15} {
+    \node[dot] (in\i) at (\i*0.7, 0) {};
+  }
+  \node[font=\small, left] at (-0.8, 0) {Input};
+
+  % Layer 1: dilation = 1
+  \foreach \i in {0,...,14} {
+    \node[dot] (l1\i) at (\i*0.7 + 0.35, 1.2) {};
+  }
+  \node[font=\small, left] at (-0.8, 1.2) {$d=1$};
+  % Connections for one highlighted unit
+  \draw[conn] (in6) -- (l1\the\numexpr6\relax);
+  \draw[conn] (in7) -- (l1\the\numexpr6\relax);
+
+  % Layer 2: dilation = 2
+  \foreach \i in {0,...,12} {
+    \node[dot] (l2\i) at (\i*0.7 + 0.7, 2.4) {};
+  }
+  \node[font=\small, left] at (-0.8, 2.4) {$d=2$};
+  \draw[conn] (l1\the\numexpr4\relax) -- (l2\the\numexpr4\relax);
+  \draw[conn] (l1\the\numexpr6\relax) -- (l2\the\numexpr4\relax);
+
+  % Layer 3: dilation = 4
+  \foreach \i in {0,...,8} {
+    \node[dot] (l3\i) at (\i*0.7 + 1.4, 3.6) {};
+  }
+  \node[font=\small, left] at (-0.8, 3.6) {$d=4$};
+  \draw[conn] (l2\the\numexpr0\relax) -- (l3\the\numexpr0\relax);
+  \draw[conn] (l2\the\numexpr4\relax) -- (l3\the\numexpr0\relax);
+
+  % Layer 4: dilation = 8
+  \foreach \i in {0,...,4} {
+    \node[dot] (l4\i) at (\i*0.7 + 2.1, 4.8) {};
+  }
+  \node[font=\small, left] at (-0.8, 4.8) {$d=8$};
+  \draw[conn] (l3\the\numexpr0\relax) -- (l4\the\numexpr0\relax);
+
+  % Output
+  \node[circle, fill=keyorange, minimum size=7pt, inner sep=0pt] (out) at (2.1, 5.8) {};
+  \node[font=\small, left] at (-0.8, 5.8) {Output};
+  \draw[conn, keyorange] (l4\the\numexpr0\relax) -- (out);
+
+  % Receptive field annotation
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}, thick]
+    (0, -0.4) -- (6*0.7, -0.4) node[midway, below=6pt, font=\small] {Receptive field: 16 steps};
+\end{tikzpicture}
+\end{center}
+
+\begin{definition}[Dilated Causal Convolution]
+For a 1D input sequence $(x_0, x_1, \ldots, x_T)$, a dilated causal convolution with kernel $\bw = (w_0, \ldots, w_{k-1})$ and dilation factor $d$ computes:
+\begin{equation}\label{eq:dilated-conv}
+  y_t = \sum_{j=0}^{k-1} w_j \cdot x_{t - j \cdot d}
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $k$ is the kernel size (typically 2 or 3).
+  \item $d$ is the dilation factor; layer $\ell$ uses $d = 2^{\ell-1}$.
+  \item \textbf{Causal}: $y_t$ depends only on $x_s$ for $s \le t$. No future information leaks.
+  \item With $L$ layers and kernel size $k=2$, the receptive field is $2^L$ time steps.
+\end{itemize}
+\end{definition}
+
+\begin{intuition}[Why Dilation Works]
+Think of each layer as a zoom level.
+Layer 1 (dilation 1) sees adjacent time steps: tick-by-tick patterns.
+Layer 2 (dilation 2) sees every other step: short-term trends.
+Layer 4 (dilation 8) sees steps 8 apart: the overall shape of the day.
+With just 8 layers and kernel size 2, you cover $2^8 = 256$ time steps.
+That is an entire trading day of 5-minute bars (78 bars) with room to spare.
+\end{intuition}
+
+\subsection{DeepVol}
+
+\citet{MorenoPinoZohren2022DeepVol} build \textbf{DeepVol}, a TCN that forecasts daily $\RV$ directly from raw intraday returns.
+Instead of computing $\RV_t$ from 5-minute returns and then modeling $\RV_{t+1}$ as HAR does, DeepVol feeds the raw 5-minute returns into a dilated causal convolution stack and predicts $\RV_{t+1}$ end-to-end.
+
+\begin{keyresult}[DeepVol: TCN for Daily RV from Raw Returns]
+DeepVol achieves state-of-the-art daily $\RV$ forecasting by processing raw 5-minute returns directly, bypassing the $\RV$ aggregation step entirely.
+The dilated causal convolution architecture provides two advantages over LSTMs:
+\begin{enumerate}[nosep]
+  \item \textbf{Parallelizable training}: all time steps are processed simultaneously.
+  \item \textbf{Interpretable receptive field}: you know exactly how many past time steps influence each prediction.
+\end{enumerate}
+\end{keyresult}
+
+\begin{workedexample}{DeepVol Receptive Field Calculation}
+Suppose DeepVol uses $L = 7$ layers with kernel size $k = 2$ and dilation factors $d = 1, 2, 4, 8, 16, 32, 64$.
+
+\textbf{Receptive field per layer:}
+Each layer with dilation $d$ and kernel size 2 adds $d$ new time steps to the receptive field.
+Total receptive field:
+\[
+  \text{RF} = 1 + \sum_{\ell=0}^{L-1} (k-1) \cdot 2^\ell
+  = 1 + \sum_{\ell=0}^{6} 2^\ell
+  = 1 + 127 = 128 \text{ steps.}
+\]
+
+\textbf{In trading time:}
+At 5-minute sampling, one trading day has $78$ bars (6.5 hours $\times$ 12 bars/hour).
+A receptive field of 128 steps covers $128 / 78 \approx 1.6$ trading days.
+This means each prediction uses roughly today's and yesterday's intraday data.
+
+\textbf{To cover one trading week} (5 days, 390 bars), you need:
+\[
+  L = \lceil \log_2(390) \rceil = 9 \text{ layers} \quad (\text{RF} = 512 \text{ steps}).
+\]
+\end{workedexample}
+
+\begin{keyidea}[TCN vs.\ LSTM for Volatility]
+\begin{itemize}[nosep]
+  \item TCN processes the entire input sequence in one forward pass; LSTM must step through sequentially.
+  \item TCN's receptive field is explicit ($2^L$ with kernel size 2); LSTM's effective memory is learned and opaque.
+  \item TCN has no vanishing gradient problem by construction (parallel paths through residual connections).
+  \item LSTM is more flexible for variable-length sequences; TCN requires fixed-length input (or padding).
+  \item For fixed-length volatility sequences (e.g., one day of 5-min returns), TCN is generally preferred.
+\end{itemize}
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{DeepLOB: Learning from Limit Order Books}\label{sec:dl:deeplob}
+% ──────────────────────────────────────────────────────────────
+
+The limit order book (LOB) is the richest source of short-horizon information in modern markets.
+At each moment, the LOB shows the queue of buy and sell orders at every price level.
+Chapter~\ref{ch:features} discussed hand-crafted LOB features (order imbalance, depth ratios, spread).
+\citet{ZhangZohrenRoberts2019DeepLOB} ask: can a neural network learn better features directly from the raw LOB?
+
+\subsection{Architecture}
+
+DeepLOB combines CNNs (for spatial features across price levels) with LSTMs (for temporal dynamics across snapshots).
+
+\begin{center}
+\begin{tikzpicture}[
+  block/.style={draw, rounded corners, minimum height=0.9cm, minimum width=2.8cm, align=center, font=\small},
+  arr/.style={-{Stealth[length=2.5mm]}, thick},
+  scale=0.9, transform shape
+]
+  % Input
+  \node[block, fill=gray!10] (input) at (0, 0)
+    {Raw LOB Data\\$10 \times 4 \times T$};
+  \node[font=\footnotesize, below=0.1cm of input, text=gray]
+    {(levels $\times$ features $\times$ time)};
+
+  % Conv block 1
+  \node[block, fill=blue!10] (conv1) at (0, 2)
+    {Conv Layer 1\\spatial filters};
+  \draw[arr] (input) -- (conv1);
+
+  % Conv block 2
+  \node[block, fill=blue!15] (conv2) at (0, 3.5)
+    {Conv Layer 2\\cross-level patterns};
+  \draw[arr] (conv1) -- (conv2);
+
+  % Inception module
+  \node[block, fill=green!10] (incep) at (0, 5)
+    {Inception Module\\multi-scale features};
+  \draw[arr] (conv2) -- (incep);
+
+  % LSTM
+  \node[block, fill=orange!10] (lstm) at (0, 6.5)
+    {LSTM Layer\\temporal dynamics};
+  \draw[arr] (incep) -- (lstm);
+
+  % Output
+  \node[block, fill=red!8] (out) at (0, 8)
+    {Prediction\\$\hat{y}_{t+k}$};
+  \draw[arr] (lstm) -- (out);
+
+  % Annotations
+  \node[font=\footnotesize, right=0.8cm of conv1, text=defblue, align=left]
+    {Extract features within\\each price level};
+  \node[font=\footnotesize, right=0.8cm of conv2, text=defblue, align=left]
+    {Combine features\\across price levels};
+  \node[font=\footnotesize, right=0.8cm of incep, text=intgreen, align=left]
+    {Capture patterns at\\multiple time scales};
+  \node[font=\footnotesize, right=0.8cm of lstm, text=keyorange, align=left]
+    {Model evolution of\\LOB state over time};
+\end{tikzpicture}
+\end{center}
+
+\begin{definition}[DeepLOB Input Representation]
+The input to DeepLOB at time $t$ is a tensor $\bX_t \in \R^{T \times 10 \times 4}$:
+\begin{itemize}[nosep]
+  \item \textbf{$T$ time steps}: a rolling window of LOB snapshots (e.g., $T = 100$).
+  \item \textbf{10 price levels}: the 5 best bid and 5 best ask levels.
+  \item \textbf{4 features per level}: price, volume, price difference from mid, volume difference from mid (on each side).
+\end{itemize}
+The CNN layers convolve across the 10 price levels (spatial dimension), extracting patterns like order imbalance and depth concentration.
+The LSTM then processes the sequence of CNN-extracted features over time.
+\end{definition}
+
+\begin{keyresult}[DeepLOB: End-to-End LOB Prediction]
+DeepLOB outperforms hand-crafted LOB features for short-horizon ($k = 10, 20, 50$ tick) mid-price movement prediction.
+The convolutional layers learn features that resemble (but improve upon) classical order imbalance measures.
+The architecture generalizes across stocks without retraining, consistent with the universal-features finding of \citet{SirignanoCont2019}.
+\end{keyresult}
+
+\begin{application}[DeepLOB for Volatility]
+DeepLOB was designed for mid-price direction prediction, but the same architecture predicts short-horizon $\RV$ from LOB data.
+Project~2 (Intraday RV from LOB) adapts DeepLOB by replacing the classification output with a regression head predicting $\RV$ over the next $k$ ticks.
+The key insight: LOB state (depth imbalance, spread dynamics, queue lengths) contains predictive information about short-term volatility that is not captured by price-based features alone.
+\end{application}
+
+\begin{workedexample}{DeepLOB Input Dimensions}
+Consider S\&P 500 E-mini futures (ES) with LOB snapshots every 100 milliseconds.
+
+\textbf{Input window:} $T = 100$ snapshots (10 seconds of data).
+
+\textbf{Tensor shape:} $100 \times 10 \times 4 = 4{,}000$ input values per sample.
+
+\textbf{Training data:} One trading day has $6.5 \times 3{,}600 \times 10 = 234{,}000$ snapshots.
+With $T = 100$, this yields $\approx 234{,}000$ training samples per day per instrument.
+
+\textbf{Contrast with tabular features:} A tree-based model using hand-crafted LOB features might have 20--30 features computed from the same raw data.
+DeepLOB uses 4,000 raw values and lets the CNN learn the right features.
+This is why deep learning wins on raw sequential data: the feature space is too rich for manual engineering.
+\end{workedexample}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Transformers and Attention}\label{sec:dl:transformers}
+% ──────────────────────────────────────────────────────────────
+
+Transformers replaced LSTMs as the dominant sequence model in NLP (GPT, BERT) and are now being applied to financial time series.
+The core mechanism is \emph{self-attention}: instead of processing the sequence step-by-step, the transformer computes a weighted sum over all positions, where the weights are learned from the data.
+
+\begin{definition}[Scaled Dot-Product Attention]
+Given queries $\mathbf{Q}$, keys $\mathbf{K}$, and values $\mathbf{V}$ (all derived from the input via learned linear projections):
+\begin{equation}\label{eq:attention}
+  \text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V})
+  = \softmax\!\left(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_k}}\right) \mathbf{V}
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $\mathbf{Q} \in \R^{T \times d_k}$: queries (``what am I looking for?'').
+  \item $\mathbf{K} \in \R^{T \times d_k}$: keys (``what do I contain?'').
+  \item $\mathbf{V} \in \R^{T \times d_v}$: values (``what information do I carry?'').
+  \item $\sqrt{d_k}$: scaling factor to prevent dot products from growing large.
+  \item The $\softmax$ produces a $T \times T$ attention weight matrix; entry $(i, j)$ is how much position $i$ attends to position $j$.
+\end{itemize}
+\end{definition}
+
+\begin{intuition}[Attention for Volatility]
+In an LSTM, the influence of a past observation on the current prediction decays as it recedes into the hidden state.
+With attention, every past observation can directly influence the current prediction with a learned weight.
+For volatility, this means the model can learn that, say, last Tuesday's intraday pattern is highly relevant to today's forecast (perhaps both are FOMC days) without relying on the hidden state to carry that information across the intervening days.
+\end{intuition}
+
+\subsection{Graph Transformers for Cross-Asset Volatility}
+
+\citet{ChenRobert2022} extend the transformer with a graph structure over assets.
+Instead of treating each asset's time series independently, the attention mechanism defines a \emph{learned graph}: the attention weight between asset $i$ and asset $j$ captures how much asset $j$'s history informs the forecast for asset $i$.
+
+\begin{keyidea}[Attention Weights as a Volatility Network]
+The attention weight matrix $\mathbf{A} \in \R^{N \times N}$ across $N$ assets is a learned adjacency matrix.
+High attention from asset $i$ to asset $j$ means ``$j$'s recent volatility is informative for predicting $i$'s volatility.''
+This connects directly to the spillover analysis in Chapter~\ref{ch:spillovers} and the multivariate models in Chapter~\ref{ch:multivariate}, but learns the network structure from data rather than imposing it via a VAR or DCC.
+\end{keyidea}
+
+Transformer variants have also been applied to LOB data (TLOB), replacing the LSTM component of DeepLOB with multi-head self-attention.
+Early results are promising but not yet conclusive.
+
+\begin{warning}[Transformer Evidence on Volatility Is Thin]
+Transformer results on volatility are preliminary.
+Most published results use short evaluation periods or small asset universes.
+Be skeptical of claims that lack Diebold-Mariano tests or Model Confidence Set analysis (Chapter~\ref{ch:evaluation}).
+The core problem: transformers have many parameters and volatility datasets are small.
+A daily $\RV$ series for one asset gives you $\sim$252 observations per year.
+Even 20 years is only 5,000 observations, far fewer than the millions of sentences used to train language models.
+Pooling across assets helps (Section~\ref{sec:dl:lstm}), but the evidence base is still thin compared to LSTMs and TCNs.
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Modern Time-Series Architectures}\label{sec:dl:modern}
+% ──────────────────────────────────────────────────────────────
+
+The deep-learning-for-time-series field has produced a rapid succession of architectures: N-BEATS, N-HiTS, TiDE, TSMixer, PatchTST, and others.
+These were designed for general time-series forecasting (energy demand, weather, retail sales) and tested primarily on benchmarks like M4, M5, and the Monash archive.
+Their application to realized volatility is limited but worth knowing about.
+
+\textbf{N-BEATS} (Neural Basis Expansion Analysis) uses a stack of fully-connected blocks with residual connections.
+Each block produces a ``backcast'' (reconstruction of the input) and a ``forecast,'' and the blocks are organized into stacks that can be given interpretable basis functions (trend, seasonality).
+
+\textbf{N-HiTS} extends N-BEATS with hierarchical interpolation, allowing different blocks to operate at different temporal resolutions (similar in spirit to the dilated convolutions of TCN).
+
+\textbf{PatchTST} (Patch Time Series Transformer) divides the input time series into non-overlapping patches (subsequences) and treats each patch as a token for a transformer.
+This is conceptually similar to treating multi-day windows of 5-minute returns as input tokens.
+
+\textbf{TiDE} (Time-series Dense Encoder) and \textbf{TSMixer} use MLP-based architectures that are simpler and faster than transformers while achieving competitive performance on standard benchmarks.
+
+\begin{keyidea}[Modern Architectures: Solutions Looking for a Problem?]
+These architectures are well-engineered for general forecasting, but their evidence on $\RV$ specifically is thin.
+Most have not been tested with proper volatility evaluation ($\QLIKE$ loss, Diebold-Mariano tests against HAR, Model Confidence Set).
+PatchTST is the most promising for volatility because its patching mechanism naturally handles the multi-scale structure of intraday data (5-minute patches within daily windows within weekly patterns).
+Test them if you have the engineering bandwidth, but do not expect them to dominate purpose-built approaches like DeepVol or the well-tuned HAR.
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Generative and Latent-Variable Approaches}\label{sec:dl:generative}
+% ──────────────────────────────────────────────────────────────
+
+The methods above produce point forecasts: a single number $\widehat{\RV}_{t+1}$.
+Generative models instead learn the \emph{full distribution} of future volatility, or learn compressed representations of complex objects like the implied volatility surface.
+These are frontier methods with thin evidence, but they represent the direction the field is heading.
+
+\subsection{Neural SDEs and CDEs}
+
+\citet{Kidger2021NeuralSDE} develops the mathematical framework for embedding stochastic differential equations into neural networks.
+A neural SDE parameterizes both the drift and diffusion functions with neural networks:
+\begin{equation}\label{eq:neural-sde}
+  dX_t = f_\btheta(X_t, t)\,dt + g_\btheta(X_t, t)\,dW_t
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $f_\btheta(\cdot)$: drift function, parameterized by a neural network with weights $\btheta$.
+  \item $g_\btheta(\cdot)$: diffusion function, also a neural network.
+  \item $W_t$: standard Brownian motion.
+\end{itemize}
+
+This is appealing for volatility because the ground truth \emph{is} an SDE (Chapter~\ref{ch:rv}).
+The neural SDE learns the drift and diffusion from data without committing to a specific parametric form (Heston, SABR, rough Bergomi).
+The controlled differential equation (CDE) variant handles irregularly-spaced observations, which is natural for tick data.
+
+\begin{warning}[Neural SDEs Are Data-Hungry]
+Training neural SDEs requires backpropagation through the SDE solver (adjoint method), which is computationally expensive.
+The diffusion function $g_\btheta$ is especially hard to learn because it governs the noise, not the signal.
+With typical volatility dataset sizes (a few thousand daily observations), neural SDEs are prone to overfitting.
+They are most promising when combined with cross-asset pooling and intraday data, where sample sizes are orders of magnitude larger.
+\end{warning}
+
+\subsection{Autoencoders for the Implied Volatility Surface}
+
+The implied volatility (IV) surface from Chapter~\ref{ch:options} is high-dimensional: IV values at dozens of strikes and maturities, updated continuously.
+\citet{DingLuCheung2025} use autoencoders to compress this surface into a low-dimensional latent space.
+
+\begin{definition}[Autoencoder for IV Surface]
+An autoencoder consists of:
+\begin{itemize}[nosep]
+  \item \textbf{Encoder} $f_\btheta: \R^{K \times M} \to \R^d$: maps the IV surface ($K$ strikes $\times$ $M$ maturities) to a latent vector $\bz \in \R^d$ with $d \ll K \times M$.
+  \item \textbf{Decoder} $g_\btheta: \R^d \to \R^{K \times M}$: reconstructs the surface from the latent vector.
+  \item \textbf{Training objective}: minimize reconstruction error $\|\text{surface} - g_\btheta(f_\btheta(\text{surface}))\|^2$.
+\end{itemize}
+The latent vector $\bz$ is a compressed summary of the entire IV surface.
+Typical latent dimensions are $d = 3$ to $8$, meaning the IV surface (perhaps $20 \times 10 = 200$ values) is compressed to fewer than 10 numbers.
+\end{definition}
+
+\begin{application}[IV Latent Factors as Volatility Features]
+The latent dimensions often correspond to interpretable factors: level (parallel shift in IV), slope (term structure tilt), and smile (convexity across strikes).
+These latent factors can be used as features for $\RV$ forecasting (Chapter~\ref{ch:features}).
+This connects the options-implied information from Chapter~\ref{ch:options} to the ML pipeline in a compact, learnable way.
+\end{application}
+
+\subsection{Deep Stochastic Volatility}
+
+\citet{XuChen2021} propose a deep stochastic volatility model that combines the structure of classical stochastic vol (latent variance process driving observed returns) with the flexibility of neural networks.
+The latent variance follows a neural-network-parameterized transition, and inference uses variational methods (a VAE-like architecture).
+This produces a full posterior distribution over future volatility, not just a point forecast.
+
+\subsection{Normalizing Flows for RV Distribution}
+
+\citet{DuMoriyamaTanakaIshii2023} use normalizing flows co-trained with a VAE to model the full distribution of future $\RV$.
+
+\begin{definition}[Normalizing Flow (Sketch)]
+A normalizing flow transforms a simple base distribution $\bz \sim \N(\mathbf{0}, \mathbf{I})$ through a sequence of invertible, differentiable transformations $T_1, T_2, \ldots, T_K$:
+\begin{equation}\label{eq:nflow}
+  \bx = T_K \circ T_{K-1} \circ \cdots \circ T_1(\bz)
+\end{equation}
+The log-density of the output is computed via the change-of-variables formula:
+\begin{equation}\label{eq:nflow-density}
+  \log p(\bx) = \log p(\bz) - \sum_{k=1}^{K} \log \left| \det \frac{\partial T_k}{\partial T_{k-1}} \right|
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item Each $T_k$ is designed to be invertible with a tractable Jacobian determinant.
+  \item The composition of simple transformations can model complex, non-Gaussian distributions.
+  \item For $\RV$ forecasting, the flow learns to map a Gaussian to the empirical distribution of future $\RV$ conditional on past information.
+\end{itemize}
+\end{definition}
+
+\begin{keyidea}[Why Distributional Forecasts Matter for Volatility]
+A point forecast $\widehat{\RV}_{t+1} = 15\%$ tells you the expected level.
+A distributional forecast tells you ``15\% is the median, but there is a 10\% probability that $\RV$ exceeds 30\%.''
+This matters for risk management (you care about the tail, not the mean) and for the variance risk premium (Chapter~\ref{ch:vrp}), where the entire distribution of future $\RV$ determines the fair price of variance swaps.
+Normalizing flows and VAEs produce these distributional forecasts naturally.
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{The Honest Bottom Line}\label{sec:dl:bottomline}
+% ──────────────────────────────────────────────────────────────
+
+Deep learning is neither a silver bullet nor useless for volatility forecasting.
+The evidence, taken honestly, points to a clear division of labor.
+
+\begin{center}
+\begin{tikzpicture}[
+  decision/.style={draw, diamond, aspect=2.5, minimum height=1cm, align=center, font=\small, fill=orange!8},
+  result/.style={draw, rounded corners, minimum height=0.8cm, minimum width=2.5cm, align=center, font=\small},
+  arr/.style={-{Stealth[length=2.5mm]}, thick},
+  scale=0.85, transform shape
+]
+  % Start
+  \node[decision] (q1) at (0, 0) {What is your\\input data?};
+
+  % Branch 1: Raw sequential
+  \node[decision] (q2) at (-5, -2.5) {Multiple\\assets?};
+  \node[result, fill=green!10] (dl) at (-7.5, -5) {\textbf{Deep Learning}\\LSTM, TCN, DeepLOB};
+  \node[result, fill=green!10] (dlpool) at (-2.5, -5) {\textbf{DL + Pooling}\\Universal LSTM};
+
+  % Branch 2: Tabular features
+  \node[decision] (q3) at (5, -2.5) {Rich features\\or RV lags only?};
+  \node[result, fill=blue!10] (trees) at (3, -5) {\textbf{Trees}\\LightGBM, XGBoost};
+  \node[result, fill=purple!10] (har) at (7.5, -5) {\textbf{HAR}\\(Chapter~\ref{ch:har})};
+
+  % Arrows
+  \draw[arr] (q1) -- node[above left, font=\footnotesize] {Raw sequences} (q2);
+  \draw[arr] (q1) -- node[above right, font=\footnotesize] {Tabular features} (q3);
+  \draw[arr] (q2) -- node[left, font=\footnotesize] {Single} (dl);
+  \draw[arr] (q2) -- node[right, font=\footnotesize] {Yes} (dlpool);
+  \draw[arr] (q3) -- node[left, font=\footnotesize] {Rich} (trees);
+  \draw[arr] (q3) -- node[right, font=\footnotesize] {RV only} (har);
+\end{tikzpicture}
+\end{center}
+
+Here is the evidence, scenario by scenario:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Daily horizon, RV lags only.}
+    HAR often matches deep learning \citep{Bucci2020}.
+    Trees are slightly better than DL due to less overfitting on small datasets (Chapter~\ref{ch:trees}).
+    Do not use a 50,000-parameter LSTM when three coefficients suffice.
+
+  \item \textbf{Daily horizon, rich tabular features.}
+    Trees still usually win.
+    The ``tabular data advantage'' of gradient-boosted trees over neural networks is well-documented: trees handle heterogeneous features, missing values, and small samples more gracefully.
+
+  \item \textbf{Raw sequential data (intraday returns, LOB snapshots).}
+    Deep learning wins clearly.
+    DeepVol \citep{MorenoPinoZohren2022DeepVol} beats HAR and trees by processing raw 5-minute returns.
+    DeepLOB \citep{ZhangZohrenRoberts2019DeepLOB} beats hand-crafted LOB features.
+    This is where DL adds genuine value: learning representations from raw, high-dimensional, sequential inputs.
+
+  \item \textbf{Cross-asset pooling.}
+    Deep learning enables pooled training across assets \citep{SirignanoCont2019}.
+    Trees cannot easily share learned representations between assets.
+    If volatility dynamics are universal (Chapter~\ref{ch:rough}), pooling helps, and neural networks make it natural.
+
+  \item \textbf{Distributional forecasts.}
+    Normalizing flows, VAEs, and neural SDEs produce full predictive distributions.
+    Trees and HAR produce point forecasts (or require separate quantile models).
+    If you need the full distribution (for VRP pricing or tail risk), generative models have an architectural advantage.
+
+  \item \textbf{Longer horizons (weekly, monthly).}
+    Evidence is mixed.
+    DL can exploit richer temporal patterns at longer horizons, but the sample size shrinks (52 weekly observations per year), which favors simpler models.
+\end{enumerate}
+
+\begin{keyidea}[The Decision Rule]
+Use deep learning when your data is sequential and raw, or when you want to pool across assets.
+Use trees when your data is tabular features.
+Use HAR when you have nothing but RV lags.
+If in doubt, start with HAR, add trees if you have features, and only reach for DL if you have raw sequential data or need cross-asset pooling.
+\end{keyidea}
+
+\begin{warning}[Overfitting Is the Central Risk]
+Deep learning models have orders of magnitude more parameters than HAR or trees.
+A 2-layer LSTM with 64 hidden units has $\sim$50,000 parameters.
+A HAR model has 4.
+A LightGBM with max\_depth=4 and 200 trees has $\sim$3,000 leaf values.
+On a daily $\RV$ series with 2,500 observations (10 years), the LSTM has 20 parameters per observation.
+Regularization (dropout, weight decay, early stopping) is not optional; it is survival.
+Always compare against the HAR baseline on identical data.
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Summary}\label{sec:dl:summary}
+% ──────────────────────────────────────────────────────────────
+
+\begin{itemize}
+  \item LSTMs and GRUs are the default sequential architecture for volatility.
+    They use gates (forget, input, output) and a cell state to maintain long-range memory.
+
+  \item On daily $\RV$ with only lagged $\RV$ inputs, LSTMs are competitive with but do not consistently beat HAR \citep{Bucci2020}.
+    The value of LSTMs comes from feeding them raw sequences, not pre-computed features.
+
+  \item Cross-asset pooling is a genuine advantage of neural networks.
+    A universal LSTM trained on many assets outperforms asset-specific models \citep{SirignanoCont2019} because volatility dynamics are similar across assets.
+
+  \item LSTMs trained on raw volatility data rediscover the rough-volatility kernel ($H \approx 0.1$) without any prior knowledge of fractional processes \citep{RosenbaumZhang2022}.
+
+  \item Temporal Convolutional Networks (TCNs) use dilated causal convolutions to grow the receptive field exponentially while maintaining parallelizable training.
+    DeepVol \citep{MorenoPinoZohren2022DeepVol} achieves state-of-the-art daily $\RV$ forecasting from raw 5-minute returns.
+
+  \item DeepLOB \citep{ZhangZohrenRoberts2019DeepLOB} combines CNNs (spatial features across LOB levels) with LSTMs (temporal dynamics) and outperforms hand-crafted LOB features for short-horizon prediction.
+
+  \item Transformers and attention mechanisms can capture long-range dependencies and learn cross-asset networks via attention weights \citep{ChenRobert2022}, but evidence on volatility tasks remains thin. Be skeptical of results without proper statistical testing.
+
+  \item Modern time-series architectures (N-BEATS, PatchTST, TiDE, TSMixer) are well-engineered but have limited evidence on $\RV$. PatchTST is the most promising due to its natural handling of multi-scale temporal structure.
+
+  \item Generative methods (neural SDEs, autoencoders, normalizing flows) produce distributional forecasts or compressed representations of complex surfaces, but require large datasets and careful regularization.
+
+  \item \textbf{The honest bottom line}: use DL for raw sequential data and cross-asset pooling; use trees for tabular features; use HAR for RV-only lags.
+    Always compare against HAR as a baseline.
+
+  \item Overfitting is the central risk. A 2-layer LSTM has $\sim$50,000 parameters; HAR has 4. Regularization (dropout, early stopping, weight decay) is mandatory, not optional.
+
+  \item LSTMs can fail during extreme stress \citep{RahimikiaPoon2020}. Always evaluate performance conditional on volatility regime.
+\end{itemize}
+
+\begin{center}
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Paper} & \textbf{Architecture} & \textbf{Key Result} & \textbf{Relevance} \\
+\midrule
+\citet{Bucci2020}
+  & LSTM, NARX
+  & Competitive with HAR, not dominant
+  & Daily RV baseline \\[3pt]
+\citet{SirignanoCont2019}
+  & Universal LSTM
+  & Pooling across assets improves forecasts
+  & Cross-asset pooling \\[3pt]
+\citet{RosenbaumZhang2022}
+  & Universal LSTM
+  & Learns rough-vol kernel ($H \approx 0.1$)
+  & Theory validation \\[3pt]
+\citet{RahimikiaPoon2020}
+  & LSTM + LOB + sentiment
+  & Beats HAR 90\% of days; fails in stress
+  & Feature richness \\[3pt]
+\citet{MorenoPinoZohren2022DeepVol}
+  & TCN (DeepVol)
+  & SOTA daily RV from raw 5-min returns
+  & Raw sequence input \\[3pt]
+\citet{ZhangZohrenRoberts2019DeepLOB}
+  & CNN + LSTM (DeepLOB)
+  & Beats hand-crafted LOB features
+  & LOB prediction \\[3pt]
+\citet{ChenRobert2022}
+  & Graph Transformer
+  & Learned cross-asset attention network
+  & Multi-asset vol \\[3pt]
+\citet{Kidger2021NeuralSDE}
+  & Neural SDE/CDE
+  & Principled SDE inside neural network
+  & Distributional forecasts \\[3pt]
+\citet{DingLuCheung2025}
+  & Autoencoder
+  & IV surface compressed to $d \le 8$ factors
+  & Feature extraction \\[3pt]
+\citet{XuChen2021}
+  & Deep stochastic vol
+  & Full posterior over future volatility
+  & Uncertainty quantification \\[3pt]
+\citet{DuMoriyamaTanakaIshii2023}
+  & Normalizing flow + VAE
+  & Full predictive distribution of RV
+  & Distributional forecasts \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\bigskip
+\noindent\textit{Next:} Chapter~\ref{ch:hybrid} combines the strengths of HAR, trees, and deep learning into hybrid and ensemble models.
+
+\bibliography{bib/ch12}

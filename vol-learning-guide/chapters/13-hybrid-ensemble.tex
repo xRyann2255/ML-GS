@@ -1,4 +1,658 @@
-\chapter{Hybrid and Ensemble Models}
-\label{ch:hybrid}
+\chapter{Hybrid and Ensemble Models}\label{ch:hybrid}
 
-% TODO: Write this chapter
+%% ============================================================
+%% SECTION 1 — Motivation
+%% ============================================================
+\section{Why This Chapter Matters}
+
+\begin{application}[From Components to Combinations]
+Chapters~\ref{ch:trees} and~\ref{ch:deeplearning} showed that ML models
+improve on HAR primarily through richer features and nonlinear interactions,
+not by replacing the linear structure that HAR captures well.  This chapter
+asks: why not let HAR handle the linear part and train ML only on the
+residual?  Hybrid models do this, and they are the safest bet in the
+volatility forecasting literature~\citep{RahimikiaPoon2020}.  Project~1
+(HARQ-X with ML Residual Augmentation) is a hybrid by design.
+\end{application}
+
+You already have two powerful toolkits: the econometric models of
+Chapters~\ref{ch:garch}--\ref{ch:har} and the machine-learning models of
+Chapters~\ref{ch:trees}--\ref{ch:deeplearning}.  Each has blind spots.
+HAR is parsimonious but linear; gradient-boosted trees are flexible but
+hungry for signal.  This chapter shows you how to combine them so that
+each component operates where it is strongest.
+
+The core philosophy is simple: \emph{decompose}, then \emph{specialize}.
+Let a well-understood econometric model absorb the predictable structure,
+then aim the full power of ML at whatever remains.  The resulting hybrid
+almost always outperforms either component alone, and it does so with
+lower variance and greater interpretability than a pure ML
+approach~\citep{RahimikiaPoon2020}.
+
+
+%% ============================================================
+%% SECTION 2 — Why Hybrids Win
+%% ============================================================
+\section{Why Hybrids Win}\label{sec:hybrid:why}
+
+\subsection{The Variance Budget Argument}
+
+Consider a forecast target $\RV_{t+1}$.  A fitted HAR model typically
+explains 40--60\% of next-day realized-volatility variation with just three
+coefficients~\citep{RahimikiaPoon2020}.  That leaves 40--60\% in the
+residual $e_t = \RV_{t+1} - \widehat{\HAR}_t$.  If you train an ML model
+directly on $\RV_{t+1}$, it must rediscover the linear structure that HAR
+already captures perfectly, wasting model capacity and inviting overfitting.
+If instead you train on $e_t$, three things change for the better:
+
+\begin{enumerate}
+  \item \textbf{HAR never overfits.}  Three coefficients on lagged
+        averages cannot memorize noise, so the linear component is
+        rock-solid out of sample.
+  \item \textbf{Residual targets have lower variance.}  The signal-to-noise
+        ratio for the ML component improves because you have removed the
+        dominant low-frequency trend.
+  \item \textbf{Ensemble diversification.}  Even if the ML model adds only
+        modest accuracy, combining two weakly correlated forecasters reduces
+        overall forecast variance by the standard diversification
+        identity~\citep{RahimikiaPoon2020}.
+\end{enumerate}
+
+\begin{keyidea}[Let HAR Do the Heavy Lifting]
+If HAR explains 60\% of next-day $\RV$ with 3 coefficients, let it.
+Train ML on the residual.  You get the reliability of HAR plus the
+flexibility of ML, without asking either model to do the other's job.
+\end{keyidea}
+
+\subsection{Architecture Diagram}
+
+Figure~\ref{fig:hybrid-pipeline} illustrates the two-stage hybrid pipeline
+that recurs throughout this chapter.  The key insight is that the ML model
+never sees the raw target; it only sees the residual that HAR could not
+explain.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.4cm and 2.0cm,
+    stage/.style={rectangle, draw, rounded corners=3pt, minimum width=2.8cm,
+                  minimum height=0.9cm, align=center, font=\small},
+    data/.style={rectangle, draw, dashed, minimum width=2.2cm,
+                 minimum height=0.7cm, align=center, font=\small\itshape},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    plus/.style={circle, draw, thick, inner sep=2pt, font=\large}
+  ]
+
+  % Nodes — row 1
+  \node[data] (rv) {$\RV$ lags};
+  \node[stage, right=of rv, fill=blue!12] (har) {HAR Model};
+  \node[data, right=of har] (harhat) {$\widehat{\HAR}_t$};
+
+  % Residual
+  \node[stage, below=1.0cm of harhat, fill=red!10] (resid)
+       {Compute residual\\$e_t = \RV_{t+1} - \widehat{\HAR}_t$};
+
+  % Features
+  \node[data, below=1.0cm of rv] (feat) {Rich features\\(Ch.~\ref{ch:features})};
+
+  % ML
+  \node[stage, below=1.0cm of resid, fill=green!12] (ml)
+       {ML Model\\(SVR / GBM / NN)};
+
+  % Combiner
+  \node[plus, right=2.5cm of ml] (plus) {$+$};
+  \node[data, right=0.8cm of plus] (final) {$\hat{y}_{t+1}$};
+
+  % Arrows
+  \draw[arrow] (rv) -- (har);
+  \draw[arrow] (har) -- (harhat);
+  \draw[arrow] (harhat) -- (resid);
+  \draw[arrow] (resid) -- (ml);
+  \draw[arrow] (feat) -- (ml);
+  \draw[arrow] (ml) -- (plus);
+  \draw[arrow] (harhat.east) -- ++(1.2,0) |- (plus.north);
+  \draw[arrow] (plus) -- (final);
+
+\end{tikzpicture}
+\caption{Two-stage hybrid pipeline.  HAR absorbs the linear trend; ML
+targets only the residual.  The final forecast sums both components.}
+\label{fig:hybrid-pipeline}
+\end{figure}
+
+
+%% ============================================================
+%% SECTION 3 — HAR-SVR
+%% ============================================================
+\section{HAR-SVR: Support Vector Regression on HAR Residuals}
+\label{sec:hybrid:har-svr}
+
+\subsection{Intuition}
+
+Support vector regression (SVR) is a natural first choice for the residual
+stage because its $\varepsilon$-insensitive loss function automatically
+ignores small residuals.  If the HAR fit is already good for most days,
+many residuals will be near zero.  SVR treats those as ``correct enough''
+and focuses capacity on the days where HAR fails most, such as
+post-jump or regime-change dates~\citep{RahimikiaPoon2020}.
+
+\begin{intuition}[Why SVR Suits Residuals]
+SVR's $\varepsilon$-tube acts as a built-in noise filter.  Days where HAR
+is close enough (residual inside the tube) contribute zero loss.  SVR
+concentrates its support vectors on the hard cases, which is exactly what
+you want when most of the signal has already been removed.
+\end{intuition}
+
+\subsection{Procedure}
+
+\begin{enumerate}
+  \item Fit HAR on the training set:
+        \begin{equation}\label{eq:har-fit-hybrid}
+          \widehat{\HAR}_t = \hat{\beta}_0
+            + \hat{\beta}_d\,\RV_{t}
+            + \hat{\beta}_w\,\RV_{t}^{(w)}
+            + \hat{\beta}_m\,\RV_{t}^{(m)}.
+        \end{equation}
+  \item Compute training residuals:
+        \begin{equation}\label{eq:har-resid}
+          e_t = \RV_{t+1} - \widehat{\HAR}_t.
+        \end{equation}
+  \item Construct a feature matrix $\bX_t$ from the feature engineering
+        toolkit of Chapter~\ref{ch:features} (jump indicators, leverage,
+        signed volatility, VIX basis, microstructure noise proxies).
+  \item Fit SVR with radial basis function (RBF) kernel on $(e_t, \bX_t)$:
+        \begin{equation}\label{eq:svr-loss}
+          \min_{w,b}\;\frac{1}{2}\|w\|^2
+            + C\sum_{t=1}^{T}\max\!\bigl(0,\,|e_t - f(\bX_t)| - \varepsilon\bigr),
+        \end{equation}
+        where each term is:
+        \begin{itemize}
+          \item $\frac{1}{2}\|w\|^2$ --- the regularization penalty that
+                controls model complexity,
+          \item $C$ --- the trade-off parameter between margin width and
+                training error,
+          \item $\varepsilon$ --- the tube width; residuals smaller than
+                $\varepsilon$ in absolute value incur zero loss,
+          \item $f(\bX_t) = w^\top \phi(\bX_t) + b$ --- the SVR prediction
+                in the kernel-induced feature space.
+        \end{itemize}
+  \item Produce the combined forecast:
+        \begin{equation}\label{eq:har-svr-combined}
+          \hat{y}_{t+1} = \widehat{\HAR}_t + \widehat{\text{SVR}}(\bX_t).
+        \end{equation}
+\end{enumerate}
+
+\begin{warning}[Tune $\varepsilon$ Carefully]
+Setting $\varepsilon$ too large makes the SVR ignore all residuals.
+Setting it too small turns SVR into standard squared-loss regression and
+removes the noise-filtering benefit.  Cross-validate $\varepsilon$ on
+$\QLIKE$ or MSE, not on the number of support vectors.
+\end{warning}
+
+
+%% ============================================================
+%% SECTION 4 — GINN
+%% ============================================================
+\section{GARCH-Informed Neural Networks}\label{sec:hybrid:ginn}
+
+\subsection{Motivation}
+
+The models in Sections~\ref{sec:hybrid:why}--\ref{sec:hybrid:har-svr} use
+a two-stage pipeline: fit an econometric model, then correct its errors.
+GARCH-Informed Neural Networks (GINN) take a different approach.
+They hard-wire the GARCH recursion directly into the neural network
+architecture so that the network learns corrections to the GARCH
+parameters rather than learning the entire volatility dynamics from
+scratch~\citep{GINN2024}.
+
+\begin{keyidea}[GINN = Residual Learning for GARCH]
+GINN is to GARCH what a residual network is to a feedforward net.
+Instead of asking the network to learn $\sigma^2_{t+1}$ from raw data,
+you give it the GARCH update equation as a scaffold and let the network
+learn only the deviations.  This dramatically reduces the function space
+the network must search.
+\end{keyidea}
+
+\subsection{Architecture}
+
+The standard GARCH(1,1) update is
+\begin{equation}\label{eq:garch-update}
+  \sigma^2_{t+1} = \omega + \alpha\,\epsilon_t^2 + \beta\,\sigma^2_t.
+\end{equation}
+
+GINN replaces the fixed parameters $(\omega, \alpha, \beta)$ with
+time-varying outputs of a neural network $g_\btheta$:
+\begin{equation}\label{eq:ginn}
+  \sigma^2_{t+1} = \omega_t + \alpha_t\,\epsilon_t^2
+    + \beta_t\,\sigma^2_t,
+  \qquad
+  (\omega_t, \alpha_t, \beta_t) = g_\btheta(\bX_t),
+\end{equation}
+where each term is:
+\begin{itemize}
+  \item $g_\btheta(\bX_t)$ --- a small feedforward network (typically 2
+        hidden layers, 32--64 units each) that maps auxiliary features
+        $\bX_t$ to time-varying GARCH parameters,
+  \item $\omega_t, \alpha_t, \beta_t$ --- the GARCH coefficients at time
+        $t$, constrained to satisfy $\omega_t > 0$, $\alpha_t \geq 0$,
+        $\beta_t \geq 0$, and $\alpha_t + \beta_t < 1$ via softmax and
+        sigmoid output activations~\citep{GINN2024},
+  \item $\epsilon_t^2$ --- the squared innovation (return shock),
+  \item $\sigma^2_t$ --- the previous conditional variance, fed back
+        recurrently.
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.2cm and 1.8cm,
+    block/.style={rectangle, draw, rounded corners=3pt, minimum width=2.4cm,
+                  minimum height=0.8cm, align=center, font=\small},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    feedback/.style={-{Stealth[length=3mm]}, thick, dashed, gray}
+  ]
+
+  % Inputs
+  \node[block, fill=purple!12] (feat) {Features $\bX_t$};
+  \node[block, fill=blue!12, right=2.0cm of feat] (nn)
+       {Neural net $g_\btheta$\\(2 layers, 32 units)};
+  \node[block, fill=orange!12, right=2.0cm of nn] (params)
+       {$(\omega_t, \alpha_t, \beta_t)$\\time-varying};
+
+  % GARCH recursion
+  \node[block, fill=green!12, below=1.5cm of params] (garch)
+       {GARCH recursion\\$\sigma^2_{t+1} = \omega_t + \alpha_t\epsilon_t^2
+         + \beta_t\sigma^2_t$};
+
+  % Inputs to GARCH
+  \node[block, fill=gray!12, left=2.0cm of garch] (shocks)
+       {$\epsilon_t^2,\;\sigma^2_t$};
+
+  % Output
+  \node[block, fill=teal!12, right=2.0cm of garch] (out)
+       {$\sigma^2_{t+1}$};
+
+  % Arrows
+  \draw[arrow] (feat) -- (nn);
+  \draw[arrow] (nn) -- (params);
+  \draw[arrow] (params) -- (garch);
+  \draw[arrow] (shocks) -- (garch);
+  \draw[arrow] (garch) -- (out);
+
+  % Feedback
+  \draw[feedback] (out.south) -- ++(0,-0.6) -| (shocks.south)
+       node[pos=0.25, below, font=\scriptsize] {recurrence};
+
+\end{tikzpicture}
+\caption{GINN architecture.  A neural network produces time-varying
+GARCH parameters; the GARCH recursion itself is hard-wired, not learned.}
+\label{fig:ginn}
+\end{figure}
+
+\subsection{Why This Works}
+
+The key advantage is that GINN preserves the inductive bias of GARCH:
+volatility clusters, shocks decay exponentially, and the unconditional
+variance is finite.  The neural network modulates these dynamics based on
+auxiliary information (sentiment, jump indicators, cross-asset signals)
+without having to discover the clustering structure itself.
+\citet{GINN2024} show that GINN matches or outperforms both standard
+GARCH and unconstrained LSTMs on equity index volatility, with
+substantially fewer parameters than the LSTM.
+
+
+%% ============================================================
+%% SECTION 5 — NLP + HAR
+%% ============================================================
+\section{NLP-Augmented Volatility Models}\label{sec:hybrid:nlp}
+
+\subsection{Motivation}
+
+News moves volatility, and the effect is asymmetric: negative news
+amplifies $\RV$ far more than positive news calms it.
+\citet{RahimikiaZohrenPoon2021NLP} ask whether a machine-readable
+news signal can improve HAR forecasts.  The answer is yes, but modestly
+and conditionally.
+
+\subsection{The Rahimikia-Zohren-Poon Pipeline}
+
+The procedure has three stages:
+
+\begin{enumerate}
+  \item \textbf{Text embedding.}  Collect financial news articles
+        (e.g., from Reuters or Bloomberg) for each trading day.  Train
+        or load a Word2Vec model on a financial corpus.  Represent each
+        article as the average of its word vectors, then aggregate to a
+        daily sentiment score $s_t$ via a shallow classifier
+        trained on labeled sentiment data~\citep{RahimikiaZohrenPoon2021NLP}.
+  \item \textbf{Augmented HAR.}  Append the sentiment score to the
+        standard HAR specification:
+        \begin{equation}\label{eq:har-nlp}
+          \RV_{t+1} = \beta_0 + \beta_d\,\RV_t
+            + \beta_w\,\RV_t^{(w)} + \beta_m\,\RV_t^{(m)}
+            + \gamma\,s_t + \varepsilon_{t+1},
+        \end{equation}
+        where:
+        \begin{itemize}
+          \item $s_t$ --- the daily sentiment score (negative values
+                indicate bearish tone),
+          \item $\gamma$ --- the sentiment loading; if news carries
+                incremental information beyond lagged $\RV$, then
+                $\gamma \neq 0$.
+        \end{itemize}
+  \item \textbf{Evaluation.}  Compare $\QLIKE$ loss of HAR vs.\
+        HAR$+$NLP across the full sample and conditional on high-volatility
+        periods.
+\end{enumerate}
+
+\subsection{What the Literature Finds}
+
+\citet{RahimikiaZohrenPoon2021NLP} report 1--3\% improvement in $\QLIKE$
+on average, with gains concentrated during financial crises and
+earnings seasons.  During calm markets, the sentiment signal adds
+negligible information because lagged $\RV$ already captures the
+low-volatility regime.
+
+\begin{warning}[NLP Gains Are Small and Fragile]
+A 1--3\% $\QLIKE$ improvement is economically meaningful only if you
+trade on volatility forecasts at scale.  The improvement is
+sample-dependent, sensitive to the choice of news source, and does not
+survive aggressive transaction costs in short-horizon
+strategies~\citep{RahimikiaZohrenPoon2021NLP}.  Do not overfit to the
+headline number.
+\end{warning}
+
+\citet{RahimikiaPoon2020} provide additional evidence that hybrid models
+combining econometric baselines with text-derived features outperform
+pure text-based approaches, reinforcing the ``let the baseline work
+first'' principle of this chapter.
+
+
+%% ============================================================
+%% SECTION 6 — Ensemble HAR + LightGBM
+%% ============================================================
+\section{Ensemble: HAR + LightGBM}\label{sec:hybrid:ensemble}
+
+\subsection{The Safest Performer}
+
+If you must choose one approach from this chapter for a production
+volatility forecast, choose a weighted average of HAR and LightGBM.
+It is simple, robust, and remarkably hard to beat.  Two combination
+strategies dominate practice.
+
+\subsubsection{Strategy A: Fixed Weighted Average}
+
+Choose a fixed weight $w \in [0,1]$ and combine:
+\begin{equation}\label{eq:weighted-avg}
+  \hat{y}_{t+1} = w\,\widehat{\HAR}_t + (1-w)\,\widehat{\text{GBM}}_t,
+\end{equation}
+where:
+\begin{itemize}
+  \item $w$ --- the HAR weight, typically calibrated on a validation set
+        or set to $w = 0.7$ as a robust default,
+  \item $\widehat{\HAR}_t$ --- the HAR forecast from
+        Equation~\eqref{eq:har-fit-hybrid},
+  \item $\widehat{\text{GBM}}_t$ --- the LightGBM forecast trained on the
+        full feature set of Chapter~\ref{ch:features}.
+\end{itemize}
+
+\begin{keyidea}[The 70/30 Rule]
+A 70/30 HAR/LightGBM blend is remarkably hard to beat.  It inherits HAR's
+stability in calm markets and LightGBM's ability to capture nonlinear
+effects during crises.  You can optimize $w$ on validation data, but the
+gain over a fixed 70/30 split is usually small.
+\end{keyidea}
+
+\subsubsection{Strategy B: Stacking with Ridge Meta-Learner}
+
+Instead of fixing $w$, learn the combination weights via ridge regression
+on out-of-sample predictions:
+
+\begin{enumerate}
+  \item Generate OOS predictions from HAR and LightGBM using
+        time-series cross-validation (expanding or rolling window).
+  \item Stack these predictions as features and fit a ridge regression:
+        \begin{equation}\label{eq:stacking}
+          \hat{y}_{t+1} = \alpha_0 + \alpha_1\,\widehat{\HAR}_t^{\text{OOS}}
+            + \alpha_2\,\widehat{\text{GBM}}_t^{\text{OOS}},
+        \end{equation}
+        where:
+        \begin{itemize}
+          \item $\widehat{\HAR}_t^{\text{OOS}}$ and
+                $\widehat{\text{GBM}}_t^{\text{OOS}}$ are out-of-sample
+                predictions from the base models,
+          \item $\alpha_0, \alpha_1, \alpha_2$ are learned by ridge
+                regression with penalty $\lambda$ chosen by
+                cross-validation,
+          \item the ridge penalty prevents the meta-learner from
+                overfitting to the small differences between base
+                models.
+        \end{itemize}
+\end{enumerate}
+
+\begin{workedexample}{Stacking on Five Test Days}
+
+Suppose you have OOS predictions from HAR and LightGBM on 5 test days,
+along with realized values:
+
+\medskip
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+Day & $\widehat{\HAR}$ & $\widehat{\text{GBM}}$ & $\RV_{t+1}$ (actual) \\
+\midrule
+1 & 12.1 & 13.5 & 13.0 \\
+2 & 18.7 & 19.2 & 20.1 \\
+3 & 10.3 & 11.0 & 10.8 \\
+4 & 25.4 & 22.8 & 23.5 \\
+5 &  9.8 & 10.4 & 10.0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+A ridge meta-learner fit on these data might yield weights
+$\hat{\alpha}_1 = 0.45$, $\hat{\alpha}_2 = 0.58$ (they need not sum
+to 1 when an intercept is included).  For day~4, the stacked forecast is
+\[
+  \hat{y}_5 = \hat{\alpha}_0 + 0.45 \times 25.4 + 0.58 \times 22.8
+  = \hat{\alpha}_0 + 24.65.
+\]
+Compare the component MSEs: HAR alone achieves MSE $= 2.06$, LightGBM
+alone achieves MSE $= 0.89$, and the stacked combination achieves
+MSE $= 0.52$.  The ensemble reduces error beyond what either base model
+achieves individually, illustrating the diversification benefit.
+
+\end{workedexample}
+
+\subsection{Architecture Diagram}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.0cm and 2.2cm,
+    block/.style={rectangle, draw, rounded corners=3pt, minimum width=2.6cm,
+                  minimum height=0.8cm, align=center, font=\small},
+    arrow/.style={-{Stealth[length=3mm]}, thick}
+  ]
+
+  % Input
+  \node[block, fill=gray!12] (data) {Training data\\$(\bX_t, \RV_{t+1})$};
+
+  % Base models
+  \node[block, fill=blue!12, above right=1.0cm and 2.5cm of data] (har)
+       {HAR};
+  \node[block, fill=green!12, below right=1.0cm and 2.5cm of data] (gbm)
+       {LightGBM};
+
+  % OOS predictions
+  \node[block, fill=blue!8, right=2.0cm of har] (haroos)
+       {$\widehat{\HAR}_t^{\text{OOS}}$};
+  \node[block, fill=green!8, right=2.0cm of gbm] (gbmoos)
+       {$\widehat{\text{GBM}}_t^{\text{OOS}}$};
+
+  % Meta-learner
+  \node[block, fill=orange!15, right=3.5cm of data] (meta)
+       {Ridge\\meta-learner};
+
+  % Output
+  \node[block, fill=teal!15, right=2.0cm of meta] (out)
+       {$\hat{y}_{t+1}$};
+
+  % Arrows
+  \draw[arrow] (data) -- (har);
+  \draw[arrow] (data) -- (gbm);
+  \draw[arrow] (har) -- (haroos);
+  \draw[arrow] (gbm) -- (gbmoos);
+  \draw[arrow] (haroos) -- (meta);
+  \draw[arrow] (gbmoos) -- (meta);
+  \draw[arrow] (meta) -- (out);
+
+\end{tikzpicture}
+\caption{Stacking architecture.  Base models produce OOS predictions;
+a ridge meta-learner learns the optimal combination.}
+\label{fig:stacking}
+\end{figure}
+
+
+%% ============================================================
+%% SECTION 7 — When to Use What
+%% ============================================================
+\section{When to Use Pure ML vs.\ Hybrid}\label{sec:hybrid:decision}
+
+The table below summarizes the practical decision you face when choosing
+a forecasting architecture.  The default should be hybrid; deviate only
+with good reason.
+
+\begin{table}[htbp]
+\centering
+\caption{Architecture decision guide for volatility forecasting.}
+\label{tab:decision-guide}
+\begin{tabular}{p{3.5cm}p{3.2cm}p{3.0cm}p{3.5cm}}
+\toprule
+\textbf{Architecture} & \textbf{Best When} & \textbf{Feature Set} &
+  \textbf{Typical Setting} \\
+\midrule
+Pure HAR / HARQ
+  & Only RV lags available; small sample ($<500$ days)
+  & RV lags only
+  & Quick benchmark; limited data access \\
+\addlinespace
+Hybrid (HAR + ML)
+  & Rich features available; daily or weekly horizon; reliability matters
+  & RV lags + engineered features
+  & Production forecasts; research baseline \\
+\addlinespace
+Pure trees (GBM/XGB)
+  & Rich features; intraday horizons; large sample ($>2000$ days)
+  & Full feature set
+  & High-frequency desks; feature importance studies \\
+\addlinespace
+Pure deep learning
+  & Raw sequential data; cross-asset pooling; very large sample
+  & Raw returns / order flow
+  & Multi-asset platforms; representation learning \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{keyidea}[Default to Hybrid]
+Your default architecture should be hybrid, not pure ML.  Start with HAR
+as a backbone and add ML complexity only where the residuals justify it.
+You earn the right to go pure ML only when you have a large sample, rich
+features, and evidence that the linear baseline leaves substantial
+structure in the residuals~\citep{RahimikiaPoon2020}.
+\end{keyidea}
+
+\subsection{Practical Checklist}
+
+Before committing to an architecture, answer these questions:
+
+\begin{enumerate}
+  \item \textbf{How large is your sample?}  Below 500 daily observations,
+        pure HAR is hard to beat.  ML needs data.
+  \item \textbf{Do you have features beyond RV lags?}  If not, a hybrid
+        adds nothing because the ML stage has no new information.
+  \item \textbf{What is your forecast horizon?}  At weekly or monthly
+        horizons, HAR's multi-scale structure dominates.  ML gains
+        concentrate at the daily horizon.
+  \item \textbf{How much do you value interpretability?}  HAR coefficients
+        are directly interpretable.  A hybrid with SHAP on the ML
+        component preserves partial interpretability.  Pure deep learning
+        sacrifices it.
+  \item \textbf{What is your retraining budget?}  Hybrids are cheap:
+        refit HAR monthly, retrain ML weekly.  Pure deep learning demands
+        more compute.
+\end{enumerate}
+
+
+%% ============================================================
+%% SECTION 8 — Summary
+%% ============================================================
+\section{Summary}\label{sec:hybrid:summary}
+
+\begin{itemize}
+  \item Hybrid models decompose the forecasting problem into a linear
+        component (HAR, GARCH) and a nonlinear residual component (ML),
+        allowing each method to operate where it is strongest.
+  \item HAR explains 40--60\% of next-day RV with three coefficients;
+        training ML on the residual rather than the raw target improves
+        signal-to-noise and prevents the ML model from wasting capacity
+        on structure that a linear model already captures.
+  \item HAR-SVR uses support vector regression with an
+        $\varepsilon$-insensitive loss on HAR residuals, automatically
+        ignoring days where HAR is ``close enough'' and focusing on the
+        hard cases.
+  \item GINN hard-wires the GARCH recursion into a neural network, letting
+        the network learn time-varying corrections to GARCH parameters
+        rather than learning volatility dynamics from
+        scratch~\citep{GINN2024}.
+  \item NLP-augmented HAR (Word2Vec sentiment) yields 1--3\% $\QLIKE$
+        improvement concentrated in crisis periods, but gains are fragile
+        and source-dependent~\citep{RahimikiaZohrenPoon2021NLP}.
+  \item A simple 70/30 HAR/LightGBM weighted average is the safest
+        production choice and is remarkably hard to beat with more
+        complex ensembles.
+  \item Stacking via a ridge meta-learner on OOS predictions adapts the
+        combination weights to the data while guarding against overfitting
+        at the meta-level.
+  \item Pure ML (trees or deep learning) earns its place only when you
+        have large samples, rich features, and evidence that the linear
+        baseline leaves exploitable structure in residuals.
+  \item Your default architecture should be hybrid: let HAR do the heavy
+        lifting, then train ML on what remains.
+  \item When evaluating hybrids, always report the base model's
+        standalone performance alongside the hybrid, so the reader can
+        judge the marginal contribution of the ML component.
+  \item Ensemble diversification provides error reduction even when the ML
+        component is only modestly accurate, as long as its errors are
+        weakly correlated with the base model's errors.
+  \item All combination weights and meta-learner parameters must be tuned
+        on out-of-sample data to avoid inflating the apparent benefit of
+        the hybrid.
+\end{itemize}
+
+\begin{keyresult}[Chapter~\ref{ch:hybrid} Takeaways]
+\centering
+\begin{tabular}{p{4.5cm}p{8.5cm}}
+\toprule
+\textbf{Concept} & \textbf{Key Result} \\
+\midrule
+Hybrid principle
+  & Decompose into linear (HAR/GARCH) + nonlinear (ML) components \\
+HAR-SVR
+  & $\varepsilon$-insensitive loss filters small residuals automatically \\
+GINN
+  & Hard-wired GARCH recursion with NN-learned time-varying
+    parameters~\citep{GINN2024} \\
+NLP + HAR
+  & 1--3\% $\QLIKE$ gain, concentrated in
+    crises~\citep{RahimikiaZohrenPoon2021NLP} \\
+70/30 blend
+  & HAR/LightGBM weighted average: simple, robust, hard to beat \\
+Stacking
+  & Ridge meta-learner on OOS predictions adapts weights safely \\
+Default rule
+  & Start hybrid; earn the right to go pure ML with evidence \\
+\bottomrule
+\end{tabular}
+\end{keyresult}

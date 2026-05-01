@@ -1,4 +1,857 @@
-\chapter{Realized Covariance and Multivariate Forecasting}
-\label{ch:multivariate}
+% ══════════════════════════════════════════════════════════════
+% Chapter 14 — Realized Covariance and Multivariate Forecasting
+% ══════════════════════════════════════════════════════════════
 
-% TODO: Write this chapter
+\chapter{Realized Covariance and Multivariate Forecasting}\label{ch:multivariate}
+
+\begin{application}[From One Asset to Many]
+Chapters~\ref{ch:returns}--\ref{ch:vrp} focused on the volatility of a single asset.
+In practice, portfolios hold many assets, and the \emph{covariance structure} matters as
+much as individual volatilities. Minimum-variance portfolios, risk parity, hedging, and
+option pricing on baskets all require a full covariance matrix, not just a list of
+variances. This chapter extends realized volatility to the multivariate setting:
+estimating, modeling, and forecasting entire covariance matrices. Project~3
+(Multivariate RC with GNNs) builds directly on this material.
+\end{application}
+
+% ──────────────────────────────────────────────────────────────
+\section{Realized Covariance}\label{sec:multivariate:rc}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  You know how to build realized variance for one asset
+(Chapter~\ref{ch:rv}). The natural multivariate extension replaces squared returns
+with outer products.
+
+\begin{intuition}[From Variance to Covariance]
+Realized variance sums squared intraday returns: $\RV_t = \sum_i r_{t,i}^2$.
+If you have a $p$-vector of returns (one entry per asset), the analogous
+quantity is the outer product $\mathbf{r}_{t,i}\,\mathbf{r}_{t,i}^\top$,
+a $p \times p$ matrix. Summing these outer products over intraday intervals
+gives you a realized covariance matrix.
+\end{intuition}
+
+\begin{definition}[Realized Covariance Matrix]
+Let $\mathbf{r}_{t,i} \in \R^p$ be the $i$-th intraday return vector on day $t$,
+for $i = 1, \ldots, M$. The \textbf{realized covariance} (RC) matrix is
+\begin{equation}\label{eq:rc}
+  \mathbf{RC}_t \;=\; \sum_{i=1}^{M} \mathbf{r}_{t,i}\,\mathbf{r}_{t,i}^\top
+  \;\in\; \R^{p \times p}.
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\mathbf{r}_{t,i} \in \R^p$: intraday return vector for $p$ assets at
+        interval $i$.
+  \item $M$: number of intraday intervals (e.g., 78 for 5-minute sampling of
+        a 6.5-hour trading day).
+  \item Diagonal entries $[\mathbf{RC}_t]_{jj}$: realized variances of each asset
+        (as in Chapter~\ref{ch:rv}).
+  \item Off-diagonal entries $[\mathbf{RC}_t]_{jk}$: realized covariances between
+        assets $j$ and $k$.
+\end{itemize}
+Under no noise and synchronous trading, $\mathbf{RC}_t$ converges to the
+integrated covariance matrix as $M \to \infty$
+\citep{BarndorffNielsenHansenLundeShephard2011}.
+\end{definition}
+
+\subsection{The Synchronicity Problem}
+
+In theory, you form each $\mathbf{r}_{t,i}$ by observing all $p$ assets at the
+same timestamps. In practice, different assets trade at different times. A
+thinly traded stock might have no trade in a given 5-minute window. If you
+simply ignore missing observations, you bias realized covariance toward zero
+(the ``Epps effect'').
+
+% ── TikZ: Non-synchronous trading ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth, xscale=1.1]
+  % time axis
+  \draw[->, thick] (0,0) -- (11.5,0) node[right]{\small time};
+
+  % Asset A trades
+  \node[left] at (0,1.2) {\textbf{Asset A}};
+  \foreach \x in {0.5, 2.0, 3.8, 5.5, 7.0, 8.2, 10.0, 11.0} {
+    \draw[defblue, thick] (\x, 0.9) -- (\x, 1.5);
+    \fill[defblue] (\x, 1.2) circle (2pt);
+  }
+
+  % Asset B trades
+  \node[left] at (0,2.4) {\textbf{Asset B}};
+  \foreach \x in {1.0, 1.8, 4.2, 6.0, 6.8, 9.5, 10.5} {
+    \draw[warnred, thick] (\x, 2.1) -- (\x, 2.7);
+    \fill[warnred] (\x, 2.4) circle (2pt);
+  }
+
+  % Refresh times
+  \foreach \x in {1.0, 2.0, 4.2, 6.0, 7.0, 9.5, 10.5} {
+    \draw[intgreen, dashed] (\x, -0.3) -- (\x, 3.0);
+  }
+  \node[intgreen, below] at (5.5, -0.5) {\small Refresh times (both assets have traded)};
+\end{tikzpicture}
+\caption{Non-synchronous trading. Asset A (blue) and Asset B (red) trade at
+different times. Refresh times (green dashed) mark points where both assets
+have at least one new observation since the last refresh time.}
+\label{fig:nonsync}
+\end{figure}
+
+\subsection{Refresh-Time Sampling}
+
+The simplest fix: wait until \emph{all} $p$ assets have traded at least once,
+then record a synchronized return vector. These ``refresh times'' are the green
+lines in Figure~\ref{fig:nonsync}. Formally, define $\tau_0 = 0$ and
+\[
+  \tau_k \;=\; \max_{j=1,\ldots,p}\; \min\bigl\{t_{j,n} : t_{j,n} > \tau_{k-1}\bigr\},
+\]
+where $t_{j,n}$ is the $n$-th trade time for asset $j$. You compute returns at
+refresh times and plug them into \eqref{eq:rc}. The cost: you lose observations,
+sometimes dramatically for illiquid assets.
+
+\subsection{Hayashi--Yoshida Estimator}
+
+\citet{HayashiYoshida2005} proposed a more efficient solution. Instead of aligning
+timestamps, you sum the products of all \emph{overlapping} returns.
+
+\begin{definition}[Hayashi--Yoshida Estimator]
+For two assets with (possibly different) trade times, let $r_{t,i}^{(A)}$ denote
+asset A's return over interval $[t_{i-1}^A, t_i^A)$ and similarly for B. The
+Hayashi--Yoshida realized covariance is
+\begin{equation}\label{eq:hy}
+  \widehat{\sigma}_{AB,t}^{\mathrm{HY}}
+  \;=\; \sum_{i}\sum_{j}\; r_{t,i}^{(A)}\, r_{t,j}^{(B)}\;
+  \mathbf{1}\!\Bigl\{
+    [t_{i-1}^A, t_i^A) \cap [t_{j-1}^B, t_j^B) \neq \emptyset
+  \Bigr\}.
+\end{equation}
+\begin{itemize}[nosep]
+  \item Sum over all pairs of intervals that overlap in time.
+  \item No data is discarded; every trade contributes.
+  \item Unbiased and consistent for the integrated covariance under mild conditions.
+  \item Not guaranteed positive semi-definite (PSD) for $p > 2$.
+\end{itemize}
+\end{definition}
+
+\begin{workedexample}{Hayashi--Yoshida with 2 Assets}
+Suppose on one day, asset A trades at times $\{0, 2, 5, 8\}$ with prices
+$\{100, 101, 99, 100.5\}$ and asset B trades at times $\{0, 3, 6, 8\}$ with
+prices $\{50, 50.5, 49.8, 50.2\}$.
+
+\textbf{Step 1: compute returns.}
+\begin{align*}
+  r_1^A &= \ln(101/100) \approx 0.00995, &\quad &\text{interval } [0,2), \\
+  r_2^A &= \ln(99/101) \approx -0.02005, &\quad &\text{interval } [2,5), \\
+  r_3^A &= \ln(100.5/99) \approx 0.01511, &\quad &\text{interval } [5,8). \\[4pt]
+  r_1^B &= \ln(50.5/50) \approx 0.00995, &\quad &\text{interval } [0,3), \\
+  r_2^B &= \ln(49.8/50.5) \approx -0.01399, &\quad &\text{interval } [3,6), \\
+  r_3^B &= \ln(50.2/49.8) \approx 0.00802, &\quad &\text{interval } [6,8).
+\end{align*}
+
+\textbf{Step 2: identify overlapping pairs.}
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+$r_i^A$ interval & $r_j^B$ interval & Overlap? \\
+\midrule
+$[0,2)$ & $[0,3)$ & Yes \\
+$[0,2)$ & $[3,6)$ & No  \\
+$[2,5)$ & $[0,3)$ & Yes \\
+$[2,5)$ & $[3,6)$ & Yes \\
+$[5,8)$ & $[3,6)$ & Yes \\
+$[5,8)$ & $[6,8)$ & Yes \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Step 3: sum products of overlapping pairs.}
+\begin{align*}
+  \widehat{\sigma}_{AB}^{\mathrm{HY}}
+  &= (0.00995)(0.00995) + (-0.02005)(0.00995) \\
+  &\quad + (-0.02005)(-0.01399) + (0.01511)(-0.01399) \\
+  &\quad + (0.01511)(0.00802) \\
+  &= 9.90 \times 10^{-5} - 1.99 \times 10^{-4} + 2.81 \times 10^{-4}
+     - 2.11 \times 10^{-4} + 1.21 \times 10^{-4} \\
+  &\approx 9.1 \times 10^{-5}.
+\end{align*}
+The positive value indicates slight positive comovement. Note: no observations
+were discarded.
+\end{workedexample}
+
+\begin{warning}[PSD is Not Guaranteed]
+For $p = 2$, the Hayashi--Yoshida estimator is always PSD (it is a scalar
+covariance). For $p \geq 3$, the matrix assembled from pairwise HY estimates
+can have negative eigenvalues. You may need to project the result onto the
+PSD cone (e.g., by zeroing out negative eigenvalues), which introduces bias.
+Section~\ref{sec:multivariate:psd} discusses this systematically.
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Multivariate Realized Kernel}\label{sec:multivariate:mrk}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  You have two problems: non-synchronous trading
+(Section~\ref{sec:multivariate:rc}) and microstructure noise
+(Chapter~\ref{ch:noise}). The multivariate realized kernel handles both
+simultaneously.
+
+\begin{intuition}[Extending the Realized Kernel]
+In Chapter~\ref{ch:noise}, the univariate realized kernel applied a weighting
+function to autocovariances of returns at different lags, suppressing noise
+while remaining consistent. The multivariate version does exactly the same
+thing, but with cross-autocovariance matrices instead of scalar autocovariances.
+\end{intuition}
+
+\begin{definition}[Multivariate Realized Kernel]
+\citet{BarndorffNielsenHansenLundeShephard2011} define the multivariate
+realized kernel as
+\begin{equation}\label{eq:mrk}
+  \mathbf{K}_t \;=\; \sum_{h=-H}^{H} k\!\left(\frac{h}{H+1}\right)
+  \;\bm{\Gamma}_h,
+\end{equation}
+where
+\begin{itemize}[nosep]
+  \item $\bm{\Gamma}_h = \sum_{i} \mathbf{r}_{t,i}\,\mathbf{r}_{t,i+h}^\top$
+        is the $h$-th cross-autocovariance matrix of intraday returns.
+  \item $k(\cdot)$: a kernel function satisfying $k(0) = 1$, $k(1) = 0$
+        (e.g., Parzen kernel). Same options as the univariate case in
+        Chapter~\ref{ch:noise}.
+  \item $H$: bandwidth, controlling how many lags to include.
+\end{itemize}
+\end{definition}
+
+\begin{keyresult}[PSD Guarantee Under Noise]
+The multivariate realized kernel with a non-negative kernel function (e.g.,
+Parzen) is guaranteed PSD by construction, even with non-synchronous trading
+and microstructure noise \citep{BarndorffNielsenHansenLundeShephard2011}. This
+is a major advantage over refresh-time RC and the Hayashi--Yoshida estimator.
+The rate of convergence is $M^{-1/5}$ (slower than the noise-free $M^{-1/2}$),
+the same price paid in the univariate case.
+\end{keyresult}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{DCC-GARCH}\label{sec:multivariate:dcc}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  You can now \emph{estimate} a daily covariance matrix
+using high-frequency data. Next, you need to \emph{forecast} tomorrow's
+covariance matrix. DCC-GARCH is the multivariate analog of GARCH
+(Chapter~\ref{ch:garch}): a parametric, easy-to-estimate baseline.
+
+% ── TikZ: DCC decomposition ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth, node distance=1.5cm]
+  % Blocks
+  \node[flowblock, fill=defblue!10, minimum width=3cm] (vol) {
+    \textbf{Step 1: Volatility}\\
+    Univariate GARCH\\
+    per asset $\to \sigma_{j,t}$
+  };
+  \node[flowblock, fill=keyorange!10, minimum width=3cm, right=2.5cm of vol] (corr) {
+    \textbf{Step 2: Correlation}\\
+    DCC dynamics\\
+    $\to R_t$
+  };
+  \node[flowblock, fill=intgreen!10, minimum width=3cm, right=2.5cm of corr] (cov) {
+    \textbf{Output}\\
+    $\Sigma_t = D_t\, R_t\, D_t$
+  };
+
+  % Arrows
+  \draw[arrow] (vol) -- node[above, font=\small]{$D_t = \diag(\sigma_{1,t}, \ldots, \sigma_{p,t})$} (corr);
+  \draw[arrow] (corr) -- (cov);
+\end{tikzpicture}
+\caption{DCC-GARCH decomposes the covariance matrix into volatilities (modeled
+separately per asset) and a dynamic correlation matrix.}
+\label{fig:dcc}
+\end{figure}
+
+\begin{keyidea}[DCC-GARCH --- \citet{Engle2002DCC}]
+The Dynamic Conditional Correlation (DCC) model has two steps:
+
+\textbf{Step 1 (volatilities).}  Fit a univariate GARCH(1,1) (or any variant)
+to each asset's return series separately, producing conditional standard
+deviations $\sigma_{j,t}$ for $j = 1, \ldots, p$. Stack them into a diagonal
+matrix:
+\[
+  D_t = \diag(\sigma_{1,t}, \sigma_{2,t}, \ldots, \sigma_{p,t}).
+\]
+
+\textbf{Step 2 (correlations).}  Compute standardized residuals
+$\mathbf{z}_t = D_t^{-1}\,\mathbf{r}_t$ and model their quasi-correlation:
+\begin{equation}\label{eq:dcc}
+  Q_t \;=\; (1 - \alpha - \beta)\,\bar{Q}
+  \;+\; \alpha\,\mathbf{z}_{t-1}\,\mathbf{z}_{t-1}^\top
+  \;+\; \beta\, Q_{t-1},
+\end{equation}
+where
+\begin{itemize}[nosep]
+  \item $\bar{Q}$: unconditional covariance of $\mathbf{z}_t$ (estimated from
+        the full sample).
+  \item $\alpha > 0$: weight on yesterday's innovation (analogous to ARCH
+        coefficient).
+  \item $\beta > 0$: persistence (analogous to GARCH coefficient).
+  \item $\alpha + \beta < 1$: stationarity condition.
+\end{itemize}
+Then rescale to a proper correlation matrix:
+\[
+  R_t = \diag(Q_t)^{-1/2}\; Q_t\; \diag(Q_t)^{-1/2}.
+\]
+The conditional covariance matrix is $\Sigma_t = D_t\, R_t\, D_t$.
+\end{keyidea}
+
+\begin{intuition}[Why DCC is the ``HAR of Multivariate Vol'']
+DCC is to multivariate volatility what HAR (Chapter~\ref{ch:har}) is to
+univariate: not the most accurate model, but easy to estimate, hard to beat
+consistently, and the first thing you should try. It scales well to large $p$
+because Step~1 is embarrassingly parallel (one GARCH per asset) and Step~2 has
+only two free parameters ($\alpha$, $\beta$) regardless of dimension.
+\end{intuition}
+
+\begin{warning}[DCC Limitations]
+\begin{itemize}[nosep]
+  \item Correlations follow a single $(\alpha, \beta)$ dynamic for all pairs.
+        In reality, the IBM--MSFT correlation may move differently from the
+        IBM--gold correlation.
+  \item DCC uses daily returns, not intraday data. It ignores the richer
+        information in realized covariance.
+  \item The two-step estimation is not fully efficient (but it is consistent).
+\end{itemize}
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Wishart Autoregressive (WAR) Model}\label{sec:multivariate:war}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  DCC models correlations parametrically using daily
+returns. Can you instead build a direct time-series model for the realized
+covariance matrix, analogous to HAR for realized variance?
+
+\begin{keyidea}[Wishart Autoregressive Model]
+The WAR model treats the sequence of realized covariance matrices as a
+matrix-variate time series. In its simplest form:
+\begin{equation}\label{eq:war}
+  \mathbf{RC}_{t+1} \;=\; C + A\,\mathbf{RC}_t\,A^\top + E_{t+1},
+\end{equation}
+where
+\begin{itemize}[nosep]
+  \item $C \in \R^{p \times p}$: intercept matrix (symmetric, PSD).
+  \item $A \in \R^{p \times p}$: autoregressive coefficient matrix.
+  \item $E_{t+1}$: innovation matrix (Wishart-distributed).
+  \item The Wishart distribution is the matrix generalization of the
+        chi-squared distribution and is the natural distribution for covariance
+        matrices.
+\end{itemize}
+Higher-order and HAR-style variants (daily, weekly, monthly lags) follow
+naturally:
+\[
+  \mathbf{RC}_{t+1} = C
+  + A_d\,\mathbf{RC}_t\, A_d^\top
+  + A_w\,\overline{\mathbf{RC}}_t^{(w)}\, A_w^\top
+  + A_m\,\overline{\mathbf{RC}}_t^{(m)}\, A_m^\top
+  + E_{t+1},
+\]
+where $\overline{\mathbf{RC}}_t^{(w)}$ and $\overline{\mathbf{RC}}_t^{(m)}$
+are averages over the past 5 and 22 trading days.
+\end{keyidea}
+
+\begin{warning}[Parameter Explosion]
+Each coefficient matrix $A$ has $p^2$ free parameters. For $p = 50$ assets,
+$A$ alone has 2{,}500 parameters. With daily, weekly, and monthly lags, that
+is 7{,}500 parameters plus the intercept. The sample sizes available
+(typically 1{,}000--3{,}000 trading days) are far too small. WAR is practical
+only for small $p$ (say, $p \leq 5$) unless you impose strong structure
+(diagonal $A$, block-diagonal, etc.).
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{HAR-DRD and Multivariate HARQ}\label{sec:multivariate:drd}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  WAR is theoretically clean but does not scale. The next
+idea: decompose the covariance matrix into pieces that are easier to model
+separately.
+
+\begin{keyidea}[DRD Decomposition --- \citet{BollerslevPattonQuaedvlieg2018}]
+Write the realized covariance matrix as
+\begin{equation}\label{eq:drd}
+  \mathbf{RC}_t \;=\; D_t\; R_t\; D_t,
+\end{equation}
+where
+\begin{itemize}[nosep]
+  \item $D_t = \diag\!\bigl(\sqrt{[\mathbf{RC}_t]_{11}}, \ldots,
+        \sqrt{[\mathbf{RC}_t]_{pp}}\bigr)$: diagonal matrix of realized
+        standard deviations.
+  \item $R_t = D_t^{-1}\,\mathbf{RC}_t\, D_t^{-1}$: realized correlation
+        matrix (unit diagonal).
+\end{itemize}
+Then model $D_t$ and $R_t$ separately:
+\begin{itemize}[nosep]
+  \item \textbf{Variances:} fit a univariate HAR (or HARQ, from
+        Chapter~\ref{ch:har}) to each diagonal element $[\mathbf{RC}_t]_{jj}$.
+  \item \textbf{Correlations:} fit a univariate HAR to each unique off-diagonal
+        element of $R_t$, using Fisher $z$-transform to map $[-1,1]$ to
+        $(-\infty, \infty)$.
+\end{itemize}
+Reassemble: $\widehat{\mathbf{RC}}_{t+1} = \hat{D}_{t+1}\,\hat{R}_{t+1}\,\hat{D}_{t+1}$.
+\end{keyidea}
+
+\begin{keyresult}[Separate Modeling Beats Joint]
+\citet{BollerslevPattonQuaedvlieg2018} show that the DRD decomposition, where
+variances and correlations are modeled with separate HAR regressions,
+significantly outperforms both (a) direct vech-HAR on all elements jointly and
+(b) DCC-GARCH. The HARQ variant (adding $\sqrt{\operatorname{RQ}}$ interactions
+from Chapter~\ref{ch:har}) further improves the variance forecasts, especially
+on high-noise days.
+\end{keyresult}
+
+\begin{workedexample}{HAR-DRD for 2 Assets}
+Suppose you have daily realized covariance matrices for stocks A and B.
+
+\textbf{Step 1: extract components.}
+\[
+  \mathbf{RC}_t = \begin{pmatrix} 0.00040 & 0.00012 \\ 0.00012 & 0.00025 \end{pmatrix}.
+\]
+Then $D_t = \diag(0.0200, 0.0158)$ and
+\[
+  R_t = D_t^{-1}\,\mathbf{RC}_t\, D_t^{-1}
+  = \begin{pmatrix} 1.000 & 0.379 \\ 0.379 & 1.000 \end{pmatrix}.
+\]
+
+\textbf{Step 2: model variances.}  Fit HAR to $\{\RV_t^A\}$ and $\{\RV_t^B\}$
+separately (as in Chapter~\ref{ch:har}).
+
+\textbf{Step 3: model correlation.}  Apply Fisher $z$-transform:
+$z_t = \frac{1}{2}\ln\!\bigl(\frac{1 + 0.379}{1 - 0.379}\bigr) \approx 0.399$.
+Fit HAR to the $\{z_t\}$ series. Invert the transform on the forecast to get
+$\hat{\rho}_{t+1}$.
+
+\textbf{Step 4: reassemble.}
+$\hat{\mathbf{RC}}_{t+1} = \hat{D}_{t+1}\,\hat{R}_{t+1}\,\hat{D}_{t+1}$.
+\end{workedexample}
+
+\begin{warning}[PSD Not Guaranteed]
+The separately forecasted $\hat{R}_{t+1}$ is not guaranteed to be a valid
+correlation matrix (it may have eigenvalues outside $[0,1]$ or a diagonal
+different from 1). In practice, you project onto the nearest correlation
+matrix, e.g., via the alternating projections algorithm of Higham (2002).
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Cholesky-HAR}\label{sec:multivariate:cholesky}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  HAR-DRD decomposes the matrix into variances and
+correlations. Cholesky-HAR takes a different decomposition that guarantees PSD
+by construction.
+
+\begin{keyidea}[Cholesky-HAR --- \citet{ChiriacVoev2011}]
+Every PSD matrix $\mathbf{RC}_t$ has a unique Cholesky decomposition:
+\[
+  \mathbf{RC}_t = L_t\, L_t^\top,
+\]
+where $L_t$ is lower triangular with positive diagonal entries. The idea:
+\begin{enumerate}[nosep]
+  \item Compute $L_t$ for each day.
+  \item Take the log of diagonal elements (to ensure positivity upon
+        exponentiation).
+  \item Stack all $p(p+1)/2$ unique elements of the modified $L_t$ into a
+        vector.
+  \item Fit a separate HAR model to each element.
+  \item Forecast, exponentiate diagonals, unstack into $\hat{L}_{t+1}$,
+        and reassemble:
+        $\widehat{\mathbf{RC}}_{t+1} = \hat{L}_{t+1}\,\hat{L}_{t+1}^\top$.
+\end{enumerate}
+Since any lower triangular matrix with positive diagonal gives a valid PSD
+matrix via $LL^\top$, the forecast is PSD by construction.
+\end{keyidea}
+
+\begin{workedexample}{Cholesky-HAR for 2 Assets}
+Using the same $\mathbf{RC}_t$ from the DRD example:
+\[
+  \mathbf{RC}_t = \begin{pmatrix} 0.00040 & 0.00012 \\ 0.00012 & 0.00025 \end{pmatrix}.
+\]
+
+\textbf{Step 1: Cholesky decomposition.}
+\[
+  L_t = \begin{pmatrix} 0.02000 & 0 \\ 0.00600 & 0.01470 \end{pmatrix}.
+\]
+Check: $l_{11} = \sqrt{0.00040} = 0.02$,\;
+$l_{21} = 0.00012 / 0.02 = 0.006$,\;
+$l_{22} = \sqrt{0.00025 - 0.006^2} = \sqrt{0.000214} \approx 0.01470$.
+
+\textbf{Step 2: transform.}
+Log-transform diagonal: $(\ln 0.02, \ln 0.01470) \approx (-3.912, -4.220)$.
+Off-diagonal left as-is: $0.006$.
+
+\textbf{Step 3: fit HAR to each of the 3 elements} (daily, weekly, monthly
+lags, as in Chapter~\ref{ch:har}).
+
+\textbf{Step 4: forecast and reassemble.}
+Suppose HAR forecasts yield $(\hat{\ell}_{11}^*, \hat{\ell}_{21}, \hat{\ell}_{22}^*)
+= (-3.900, 0.0058, -4.210)$. Exponentiate diagonals:
+$\hat{l}_{11} = e^{-3.900} \approx 0.02020$, $\hat{l}_{22} = e^{-4.210} \approx 0.01483$.
+Then
+\[
+  \widehat{\mathbf{RC}}_{t+1}
+  = \begin{pmatrix} 0.02020 & 0 \\ 0.00580 & 0.01483 \end{pmatrix}
+    \begin{pmatrix} 0.02020 & 0.00580 \\ 0 & 0.01483 \end{pmatrix}
+  = \begin{pmatrix} 0.000408 & 0.000117 \\ 0.000117 & 0.000254 \end{pmatrix}.
+\]
+This is PSD by construction (it is $LL^\top$).
+\end{workedexample}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Graph-Based Methods}\label{sec:multivariate:graph}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  All methods so far treat each element (or factor) of
+the covariance matrix independently. Graph-based methods exploit the fact that
+assets are \emph{connected}: if asset A's volatility spills over to asset B
+(Chapter~\ref{ch:spillovers} formalizes this), modeling them jointly through
+a graph should help.
+
+% ── TikZ: Asset graph ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth]
+  % Nodes
+  \node[obs, fill=defblue!20] (A) at (0, 2) {AAPL};
+  \node[obs, fill=defblue!20] (B) at (3, 3.2) {MSFT};
+  \node[obs, fill=defblue!20] (C) at (5.5, 1.5) {GOOG};
+  \node[obs, fill=warnred!20] (D) at (1.5, -0.5) {XOM};
+  \node[obs, fill=warnred!20] (E) at (4.5, -0.8) {CVX};
+
+  % Edges with weights
+  \draw[thick, defblue] (A) -- node[above, font=\scriptsize, sloped]{$w=0.72$} (B);
+  \draw[thick, defblue] (B) -- node[above, font=\scriptsize, sloped]{$w=0.68$} (C);
+  \draw[thick, defblue!40] (A) -- node[below, font=\scriptsize, sloped]{$w=0.35$} (C);
+  \draw[thick, warnred] (D) -- node[below, font=\scriptsize, sloped]{$w=0.81$} (E);
+  \draw[thick, gray!60] (A) -- node[left, font=\scriptsize]{$w=0.15$} (D);
+  \draw[thick, gray!60] (C) -- node[right, font=\scriptsize]{$w=0.18$} (E);
+  \draw[thick, gray!60] (B) -- node[right, font=\scriptsize]{$w=0.12$} (E);
+
+  % Legend
+  \node[right, font=\small] at (6.5, 3) {Edge weight = realized};
+  \node[right, font=\small] at (6.5, 2.5) {correlation $|\rho_{ij}|$};
+  \node[right, font=\small, defblue] at (6.5, 1.7) {Tech cluster};
+  \node[right, font=\small, warnred] at (6.5, 1.2) {Energy cluster};
+\end{tikzpicture}
+\caption{Assets as nodes in a graph with edge weights derived from realized
+correlations. Within-sector edges (tech, energy) are strong; cross-sector edges
+are weak. Graph-based models exploit this structure.}
+\label{fig:asset-graph}
+\end{figure}
+
+\begin{keyidea}[Graph-HAR --- \citet{ZhangPuCucuringuDong2024}]
+Graph-HAR augments the standard HAR model with graph-based features. The
+adjacency matrix $W$ is constructed from realized correlations (or partial
+correlations). For each asset $j$:
+\begin{equation}\label{eq:graph-har}
+  \RV_{j,t+1} \;=\; \beta_0 + \beta_d\,\RV_{j,t}
+  + \beta_w\,\RV_{j,t}^{(w)}
+  + \beta_m\,\RV_{j,t}^{(m)}
+  + \gamma\, \sum_{k \neq j} W_{jk}\,\RV_{k,t}
+  + \varepsilon_{j,t+1},
+\end{equation}
+where
+\begin{itemize}[nosep]
+  \item The first three terms are the standard HAR (Chapter~\ref{ch:har}).
+  \item $\sum_{k \neq j} W_{jk}\,\RV_{k,t}$: a graph-weighted average of
+        neighbors' volatilities. This is exactly one step of graph diffusion.
+  \item $\gamma$: spillover coefficient. If $\gamma > 0$, high volatility in
+        neighbors predicts higher volatility for asset $j$.
+  \item $W$: adjacency matrix, typically from thresholded correlation or LASSO
+        partial correlation.
+\end{itemize}
+\end{keyidea}
+
+\begin{keyidea}[GNN for Covariance --- \citet{ZhangCucuringuDong2023}]
+Going further, Graph Neural Networks (GNNs) replace the linear spillover term
+with learnable message-passing layers:
+\begin{enumerate}[nosep]
+  \item \textbf{Node features:} each asset's HAR-style inputs (daily, weekly,
+        monthly RV, plus optional firm characteristics).
+  \item \textbf{Graph structure:} adjacency from realized correlation, GICS
+        sector membership, or learned adaptively.
+  \item \textbf{Message passing:} each node aggregates features from its
+        neighbors through learned weight matrices (as in Chapter~\ref{ch:deeplearning}).
+  \item \textbf{Output:} node-level volatility forecasts or, with a symmetric
+        readout layer, full covariance matrix forecasts.
+\end{enumerate}
+The advantage over Graph-HAR: nonlinear aggregation and multi-hop
+information flow (asset A learns from asset C through intermediary B).
+\end{keyidea}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{CNN-RCOV}\label{sec:multivariate:cnn}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  Graph methods treat assets as nodes. An alternative:
+treat the realized covariance matrix itself as an image.
+
+\begin{keyidea}[Covariance Matrices as Images]
+A $p \times p$ realized covariance matrix is a symmetric, real-valued ``image.''
+If you sort assets by sector (tech, energy, financials, \ldots), block structure
+emerges: within-sector blocks have high covariance, cross-sector blocks have
+low covariance. Convolutional neural networks (CNNs, Chapter~\ref{ch:deeplearning})
+are designed to detect such local spatial patterns.
+
+\textbf{Architecture.}  Stack $T$ past covariance matrices as ``channels''
+(like RGB channels in image classification) and use 2D convolutions to
+extract temporal and cross-sectional patterns:
+\begin{enumerate}[nosep]
+  \item Input: $\mathbf{RC}_{t}, \mathbf{RC}_{t-1}, \ldots, \mathbf{RC}_{t-T+1}$
+        $\in \R^{T \times p \times p}$.
+  \item 2D convolutional layers detect local block patterns.
+  \item Fully connected layers map to the $p(p+1)/2$ unique elements of
+        $\widehat{\mathbf{RC}}_{t+1}$.
+\end{enumerate}
+\end{keyidea}
+
+\begin{warning}[CNN-RCOV Caveats]
+\begin{itemize}[nosep]
+  \item The literature is thin; this is more ``conceptually appealing'' than
+        empirically proven at scale.
+  \item Ordering assets by sector is a design choice. Different orderings yield
+        different spatial patterns, and CNNs are not permutation-invariant.
+        GNNs (Section~\ref{sec:multivariate:graph}) handle this more
+        naturally.
+  \item The output is not guaranteed PSD; post-hoc projection is required.
+  \item For large $p$, the output layer has $O(p^2)$ parameters, which grows
+        fast.
+\end{itemize}
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Geometric Deep Learning on the SPD Manifold}\label{sec:multivariate:spd}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  Every method so far either ignores the PSD constraint
+or enforces it with post-hoc projection. SPDNet takes a fundamentally different
+approach: work directly on the manifold where covariance matrices live.
+
+\begin{prereq}[What is a Manifold?]
+A manifold is a curved space that locally looks like Euclidean space, much like
+the surface of a sphere locally looks flat. The set of $p \times p$ symmetric
+positive definite matrices (denoted $\mathcal{S}_{++}^p$) forms a smooth
+manifold. It is \emph{not} a flat (Euclidean) space: the straight line
+between two PSD matrices can pass through matrices with zero or negative
+eigenvalues, leaving the PSD cone.
+\end{prereq}
+
+% ── TikZ: SPD manifold ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth, scale=1.2]
+  % PSD cone (simplified 2D projection)
+  \fill[intgreen!10] (0.5,0) .. controls (1,3) and (4,3.5) .. (6,3)
+    .. controls (5,1) and (2,0.5) .. (0.5,0);
+  \draw[intgreen, thick] (0.5,0) .. controls (1,3) and (4,3.5) .. (6,3)
+    .. controls (5,1) and (2,0.5) .. (0.5,0);
+  \node[intgreen, font=\small] at (3.5, 2.8) {$\mathcal{S}_{++}^p$ (PSD cone)};
+
+  % Two PSD matrices
+  \fill[defblue] (1.5, 1.5) circle (3pt) node[above left, font=\small]{$\Sigma_A$};
+  \fill[defblue] (4.5, 1.8) circle (3pt) node[above right, font=\small]{$\Sigma_B$};
+
+  % Euclidean line (leaves cone)
+  \draw[warnred, thick, dashed] (1.5, 1.5) -- (4.5, 1.8);
+  \node[warnred, font=\scriptsize, below] at (3.0, 1.2) {Euclidean interpolation};
+  \fill[warnred] (3.0, 1.65) circle (2pt);
+  \node[warnred, font=\scriptsize] at (3.0, 0.8) {(may leave PSD cone!)};
+
+  % Geodesic (stays inside)
+  \draw[defblue, thick] (1.5, 1.5) .. controls (2.5, 2.5) and (3.5, 2.6) .. (4.5, 1.8);
+  \node[defblue, font=\scriptsize] at (2.8, 2.6) {Riemannian geodesic};
+  \node[defblue, font=\scriptsize] at (2.8, 2.3) {(stays inside PSD cone)};
+
+  % Boundary
+  \draw[gray, thick, ->] (0, -0.2) -- (6.5, -0.2);
+  \node[gray, font=\scriptsize, right] at (6.5, -0.2) {boundary: $\det = 0$};
+\end{tikzpicture}
+\caption{The SPD manifold. A straight (Euclidean) line between two PSD matrices
+$\Sigma_A$ and $\Sigma_B$ can pass through singular matrices (red dashed). The
+Riemannian geodesic (blue curve) stays inside the PSD cone by definition.}
+\label{fig:spd-manifold}
+\end{figure}
+
+\begin{definition}[Affine-Invariant Riemannian Metric on $\mathcal{S}_{++}^p$]
+The standard Riemannian metric on $\mathcal{S}_{++}^p$ is
+\[
+  d(\Sigma_A, \Sigma_B)
+  \;=\; \bigl\|\log\bigl(\Sigma_A^{-1/2}\,\Sigma_B\,\Sigma_A^{-1/2}\bigr)\bigr\|_F,
+\]
+where $\log$ is the matrix logarithm and $\|\cdot\|_F$ is the Frobenius norm.
+This distance is affine-invariant: $d(A\Sigma_A A^\top, A\Sigma_B A^\top) =
+d(\Sigma_A, \Sigma_B)$ for any invertible $A$.
+\end{definition}
+
+\begin{keyidea}[SPDNet]
+SPDNet replaces standard neural network operations with Riemannian analogs that
+preserve positive definiteness:
+\begin{enumerate}[nosep]
+  \item \textbf{BiMap layer} (analog of linear layer):
+        $\Sigma \mapsto W\,\Sigma\, W^\top$, where $W$ is a learnable
+        $d \times p$ matrix with $d \leq p$. If $\Sigma \succ 0$ and $W$ has
+        full row rank, then $W\Sigma W^\top \succ 0$. This also reduces
+        dimension from $p$ to $d$.
+  \item \textbf{ReEig layer} (analog of ReLU):
+        eigendecompose $\Sigma = U\Lambda U^\top$, then
+        $\Sigma \mapsto U\,\max(\Lambda, \epsilon I)\, U^\top$. Clips small
+        eigenvalues to $\epsilon > 0$, keeping the matrix strictly PSD.
+  \item \textbf{LogEig layer} (analog of final feature extraction):
+        $\Sigma \mapsto U\,\log(\Lambda)\,U^\top$. Maps from the SPD manifold
+        to the tangent space (symmetric matrices), where standard Euclidean
+        operations apply.
+\end{enumerate}
+The output of LogEig lives in a flat space, so you can apply a standard linear
+classifier or regressor on top.
+\end{keyidea}
+
+\begin{keyresult}[SPDNet: PSD by Design]
+Because every layer in SPDNet maps PSD inputs to PSD outputs, intermediate
+representations are always valid covariance matrices. No post-hoc projection
+is needed. This is the only deep learning architecture for covariance
+forecasting with a built-in PSD guarantee.
+\end{keyresult}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{The PSD Constraint}\label{sec:multivariate:psd}
+% ──────────────────────────────────────────────────────────────
+
+\textbf{Where we are.}  Every multivariate volatility model must produce a
+valid (positive semi-definite) covariance matrix. Some methods guarantee this;
+others require fixing after the fact. This section provides a systematic
+comparison.
+
+\begin{intuition}[Why PSD Matters]
+A covariance matrix that is not PSD implies negative variance for some portfolio.
+Specifically, if $\Sigma$ has a negative eigenvalue with eigenvector
+$\mathbf{v}$, then the portfolio $\mathbf{v}$ has predicted variance
+$\mathbf{v}^\top \Sigma\, \mathbf{v} < 0$. This is nonsensical and causes
+optimizers to blow up (infinite leverage on the ``negative variance'' direction).
+\end{intuition}
+
+\begin{table}[ht]
+\centering
+\caption{PSD guarantees across multivariate volatility methods.}
+\label{tab:psd}
+\begin{tabular}{lll}
+\toprule
+\textbf{Method} & \textbf{PSD Guarantee} & \textbf{Mechanism} \\
+\midrule
+DCC-GARCH (Sec.~\ref{sec:multivariate:dcc})
+  & Yes & By construction ($D_t R_t D_t$, $R_t$ from rescaling) \\
+WAR (Sec.~\ref{sec:multivariate:war})
+  & No  & Post-hoc projection needed \\
+HAR-DRD (Sec.~\ref{sec:multivariate:drd})
+  & No  & Post-hoc projection on $\hat{R}_{t+1}$ \\
+Cholesky-HAR (Sec.~\ref{sec:multivariate:cholesky})
+  & Yes & $\hat{L}\hat{L}^\top$ is PSD by construction \\
+Graph-HAR (Sec.~\ref{sec:multivariate:graph})
+  & No  & Post-hoc projection needed \\
+CNN-RCOV (Sec.~\ref{sec:multivariate:cnn})
+  & No  & Post-hoc projection needed \\
+SPDNet (Sec.~\ref{sec:multivariate:spd})
+  & Yes & Riemannian operations preserve PSD \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{keyidea}[Post-Hoc PSD Projection]
+When a method does not guarantee PSD, the standard fix is eigenvalue clipping:
+\begin{enumerate}[nosep]
+  \item Eigendecompose: $\hat{\Sigma} = U\Lambda U^\top$.
+  \item Set $\tilde{\Lambda} = \max(\Lambda, 0)$ (zero out negative
+        eigenvalues).
+  \item Reconstruct: $\tilde{\Sigma} = U\tilde{\Lambda} U^\top$.
+\end{enumerate}
+This gives the nearest PSD matrix in Frobenius norm. The cost: it introduces
+bias, and the projected matrix no longer minimizes whatever loss function the
+model was trained on. For correlation matrices, the Higham (2002) alternating
+projection algorithm additionally enforces unit diagonal.
+\end{keyidea}
+
+\begin{warning}[PSD Violations in Practice]
+For small $p$ (2--5 assets), PSD violations are rare and small. For large $p$
+(50--500), they are common and can be severe, especially with element-wise
+models (HAR-DRD, Graph-HAR) that do not enforce cross-element consistency.
+If PSD is critical for your application (portfolio optimization, risk
+management), prefer methods with built-in guarantees: DCC, Cholesky-HAR, or
+SPDNet.
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
+\section{Summary}\label{sec:multivariate:summary}
+% ──────────────────────────────────────────────────────────────
+
+Key takeaways from this chapter:
+
+\begin{itemize}[nosep]
+  \item Realized covariance (RC) extends realized variance to matrices via
+        outer products of intraday return vectors (\eqref{eq:rc}).
+  \item Non-synchronous trading biases RC toward zero (Epps effect).
+        Refresh-time sampling and the Hayashi--Yoshida estimator
+        (\eqref{eq:hy}) address this, with HY being more data-efficient.
+  \item The multivariate realized kernel (\eqref{eq:mrk}) handles both noise
+        and non-synchronicity while guaranteeing PSD
+        \citep{BarndorffNielsenHansenLundeShephard2011}.
+  \item DCC-GARCH \citep{Engle2002DCC} is the standard parametric baseline:
+        easy to estimate, scales to large $p$, but uses only daily data and
+        imposes a single correlation dynamic.
+  \item WAR models RC directly as a matrix time series, but suffers from
+        parameter explosion for $p > 5$.
+  \item HAR-DRD \citep{BollerslevPattonQuaedvlieg2018} decomposes RC into
+        variances and correlations, models each with HAR, and outperforms
+        both joint modeling and DCC.
+  \item Cholesky-HAR \citep{ChiriacVoev2011} models Cholesky factors with HAR,
+        guaranteeing PSD by construction.
+  \item Graph-HAR \citep{ZhangPuCucuringuDong2024} and GNN methods
+        \citep{ZhangCucuringuDong2023} model volatility spillovers through
+        asset graphs, capturing network effects that element-wise models miss.
+  \item CNN-RCOV treats RC matrices as images; conceptually appealing but
+        empirically limited and not permutation-invariant.
+  \item SPDNet operates on the Riemannian manifold of PSD matrices, the only
+        deep learning approach with a built-in PSD guarantee.
+  \item Methods either guarantee PSD (DCC, Cholesky-HAR, SPDNet) or require
+        post-hoc eigenvalue projection, which introduces bias.
+  \item For most applications, start with HAR-DRD (best accuracy in large-scale
+        comparisons) or Cholesky-HAR (if PSD is essential). Use DCC-GARCH as
+        the parametric baseline. Graph and manifold methods are promising but
+        still maturing.
+\end{itemize}
+
+\begin{table}[ht]
+\centering
+\caption{Key results: multivariate volatility methods.}
+\label{tab:multivariate-summary}
+\begin{tabular}{p{3.2cm} p{3cm} p{3cm} p{3cm}}
+\toprule
+\textbf{Method} & \textbf{Data Input} & \textbf{Key Advantage} & \textbf{Key Limitation} \\
+\midrule
+DCC-GARCH & Daily returns & Scales to large $p$; PSD guaranteed & Single correlation dynamic; ignores HF data \\
+WAR & Realized covariance & Theoretically clean matrix AR & $O(p^4)$ parameters \\
+HAR-DRD & Realized covariance & Best accuracy (BPQ 2018); flexible & PSD not guaranteed \\
+Cholesky-HAR & Realized covariance & PSD by construction & Cholesky ordering arbitrary \\
+Graph-HAR / GNN & RV + graph & Models spillovers & Graph construction is a design choice \\
+CNN-RCOV & RC as image & Detects block structure & Not permutation-invariant \\
+SPDNet & RC on manifold & PSD by design; principled geometry & Complex; limited empirical evidence \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\bigskip
+\noindent\textbf{Next.}  Chapter~\ref{ch:spillovers} formalizes the volatility
+spillovers that Graph-HAR exploits, using the Diebold--Yilmaz connectedness
+framework and network topology.
+
+\bibliographystyle{plainnat}
+\bibliography{bib/ch14}
