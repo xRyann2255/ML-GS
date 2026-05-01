@@ -1,4 +1,649 @@
 \chapter{Rough Volatility}
 \label{ch:rough}
 
-% TODO: Write this chapter
+\begin{application}[Why This Chapter]
+Rough volatility provides an alternative explanation for the slow decay in volatility autocorrelation that HAR (Chapter~\ref{ch:har}) captures with three components and FIGARCH (Chapter~\ref{ch:garch}) captures with fractional integration.
+The RFSV model is a parsimonious forecaster competitive with HAR and LSTM.
+The Cont--Das counterargument warns against taking roughness as ground truth.
+Project 4 (rough vol vs.\ deep learning) directly tests RFSV against universal LSTM.
+\end{application}
+
+Chapter~\ref{ch:har} showed that HAR's three-component structure (daily, weekly, monthly) approximates the slow power-law decay of volatility autocorrelations.
+Chapter~\ref{ch:garch} showed that FIGARCH (Section~\ref{sec:figarch}) captures the same slow decay with a fractional differencing parameter $d$.
+Both approaches are empirically motivated heuristics: they match the shape of the autocorrelation function, but neither explains \emph{why} the decay is so slow.
+
+This chapter presents a different starting point.
+Instead of asking ``how should I model the autocorrelation structure?'' it asks: ``what kind of stochastic process would \emph{generate} the autocorrelation structure we observe?''
+The answer, proposed by \citet{GJR2018}, is that the log of realized volatility behaves like a \emph{fractional Brownian motion} with a very low Hurst exponent, around $H \approx 0.1$.
+This makes the volatility path much rougher (more jagged) than standard Brownian motion ($H = 0.5$).
+
+
+% ═══════════════════════════════════════════════════
+\section{What Is Roughness?}
+\label{sec:roughness}
+% ═══════════════════════════════════════════════════
+
+The central concept is the \emph{Hurst exponent}, a single number that describes how jagged or smooth a random path looks.
+
+\begin{prereq}[Brownian Motion (Standard)]
+A standard Brownian motion $W_t$ is the canonical ``random walk in continuous time.''
+Its key properties:
+\begin{itemize}[nosep]
+  \item $W_0 = 0$.
+  \item Increments $W_{t+h} - W_t$ are Gaussian with mean zero and variance $h$.
+  \item Increments over non-overlapping intervals are independent.
+  \item Paths are continuous but nowhere differentiable (they look jagged at every magnification).
+\end{itemize}
+If you zoom into a Brownian path, the zoomed-in portion looks statistically identical to the original.
+This property is called \emph{self-similarity}, and the scaling factor is $H = 1/2$: rescaling time by a factor $c$ rescales the path by $c^{1/2}$.
+\end{prereq}
+
+\begin{prereq}[Fractional Brownian Motion (fBM)]
+\emph{Fractional Brownian motion} $B^H_t$, introduced by \citet{MandelbrotVanNess1968}, generalizes standard Brownian motion by allowing the self-similarity exponent $H$ to take any value in $(0, 1)$.
+Its key properties:
+\begin{itemize}[nosep]
+  \item $B^H_0 = 0$, and increments are Gaussian with mean zero.
+  \item $\operatorname{Var}(B^H_{t+h} - B^H_t) = h^{2H}$.
+  \item The path is self-similar with exponent $H$: rescaling time by $c$ rescales the path by $c^H$.
+  \item When $H = 1/2$, fBM reduces to standard Brownian motion.
+  \item When $H \neq 1/2$, increments are \emph{not} independent. They are negatively correlated if $H < 1/2$ and positively correlated if $H > 1/2$.
+\end{itemize}
+The parameter $H$ is called the \emph{Hurst exponent} (after the hydrologist Harold Edwin Hurst, who studied long-range dependence in Nile river levels).
+\end{prereq}
+
+The Hurst exponent controls two things simultaneously: the roughness of the path and the correlation structure of increments.
+
+\begin{definition}[Hurst Exponent and Path Regularity]
+\label{def:hurst}
+For a fractional Brownian motion $B^H_t$ with Hurst exponent $H \in (0,1)$:
+\begin{equation}
+  \operatorname{Var}(B^H_{t+h} - B^H_t) = h^{2H}
+  \label{eq:fbm-variance}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $H$: the Hurst exponent, controlling both path roughness and increment correlation
+  \item $h$: the time lag
+  \item $h^{2H}$: the variance of the increment over a window of length $h$
+  \item When $H < 1/2$: increments are negatively correlated (a move up makes a move down more likely); the path is \emph{rougher} than Brownian motion
+  \item When $H = 1/2$: increments are independent; standard Brownian motion
+  \item When $H > 1/2$: increments are positively correlated (trending behavior); the path is \emph{smoother} than Brownian motion
+\end{itemize}
+\end{definition}
+
+\begin{intuition}[Roughness = Anti-Persistence]
+Think of $H$ as a dial.
+Turn it below $0.5$ and the path becomes ``anti-persistent'': every upward wiggle is likely followed by a downward wiggle, creating a jagged, rapidly oscillating trajectory.
+Turn it above $0.5$ and the path becomes persistent: moves tend to continue in the same direction, creating smooth, trend-like trajectories.
+At $H = 0.1$, the path is so anti-persistent that it reverses direction almost constantly.
+The result is a path so jagged that it looks qualitatively different from standard Brownian motion.
+\end{intuition}
+
+Figure~\ref{fig:hurst-paths} shows sample paths at four values of $H$.
+This is the most important visual in the chapter.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+% ── Panel 1: H = 0.1 (very rough) ──
+\begin{axis}[
+  name=p1,
+  width=0.48\textwidth, height=4.5cm,
+  title={\small $H = 0.1$ (very rough)},
+  title style={at={(0.5,1.0)}, anchor=south},
+  xmin=0, xmax=100, ymin=-2.5, ymax=2.5,
+  xtick=\empty, ytick={-2,0,2},
+  ylabel style={font=\scriptsize},
+  tick label style={font=\scriptsize},
+  axis lines=left,
+  grid=major, grid style={gray!15},
+  clip=true,
+]
+\addplot[warnred, thick, mark=none, smooth] coordinates {
+  (0,0.00) (2,0.18) (4,-0.25) (6,0.40) (8,-0.10) (10,0.35)
+  (12,-0.30) (14,0.50) (16,-0.15) (18,0.42) (20,-0.38)
+  (22,0.55) (24,-0.20) (26,0.30) (28,-0.45) (30,0.60)
+  (32,-0.25) (34,0.48) (36,-0.50) (38,0.35) (40,-0.60)
+  (42,0.40) (44,-0.35) (46,0.55) (48,-0.48) (50,0.30)
+  (52,-0.55) (54,0.65) (56,-0.40) (58,0.50) (60,-0.62)
+  (62,0.45) (64,-0.30) (66,0.58) (68,-0.50) (70,0.35)
+  (72,-0.45) (74,0.60) (76,-0.55) (78,0.42) (80,-0.38)
+  (82,0.50) (84,-0.60) (86,0.38) (88,-0.42) (90,0.55)
+  (92,-0.50) (94,0.45) (96,-0.35) (98,0.48) (100,-0.40)
+};
+\end{axis}
+
+% ── Panel 2: H = 0.3 (rough) ──
+\begin{axis}[
+  name=p2, at={(p1.east)}, anchor=west, xshift=0.8cm,
+  width=0.48\textwidth, height=4.5cm,
+  title={\small $H = 0.3$ (rough)},
+  title style={at={(0.5,1.0)}, anchor=south},
+  xmin=0, xmax=100, ymin=-2.5, ymax=2.5,
+  xtick=\empty, ytick={-2,0,2},
+  tick label style={font=\scriptsize},
+  axis lines=left,
+  grid=major, grid style={gray!15},
+  clip=true,
+]
+\addplot[keyorange, thick, mark=none, smooth] coordinates {
+  (0,0.00) (4,0.30) (8,0.10) (12,0.55) (16,0.20)
+  (20,0.65) (24,0.30) (28,0.70) (32,0.40) (36,0.85)
+  (40,0.50) (44,0.25) (48,0.60) (52,0.15) (56,0.50)
+  (60,0.80) (64,0.45) (68,0.90) (72,0.55) (76,0.30)
+  (80,0.70) (84,0.35) (88,0.75) (92,0.40) (96,0.85)
+  (100,0.50)
+};
+\end{axis}
+
+% ── Panel 3: H = 0.5 (standard BM) ──
+\begin{axis}[
+  name=p3, at={(p1.below south west)}, anchor=north west, yshift=-0.8cm,
+  width=0.48\textwidth, height=4.5cm,
+  title={\small $H = 0.5$ (standard Brownian motion)},
+  title style={at={(0.5,1.0)}, anchor=south},
+  xmin=0, xmax=100, ymin=-2.5, ymax=2.5,
+  xtick=\empty, ytick={-2,0,2},
+  ylabel style={font=\scriptsize},
+  tick label style={font=\scriptsize},
+  axis lines=left,
+  grid=major, grid style={gray!15},
+  clip=true,
+]
+\addplot[defblue, thick, mark=none, smooth] coordinates {
+  (0,0.00) (5,0.25) (10,-0.10) (15,0.40) (20,0.80)
+  (25,0.50) (30,0.90) (35,0.60) (40,1.10) (45,0.75)
+  (50,1.20) (55,0.85) (60,0.50) (65,0.80) (70,1.30)
+  (75,1.00) (80,0.70) (85,1.15) (90,0.90) (95,1.40)
+  (100,1.10)
+};
+\end{axis}
+
+% ── Panel 4: H = 0.7 (smooth) ──
+\begin{axis}[
+  name=p4, at={(p3.east)}, anchor=west, xshift=0.8cm,
+  width=0.48\textwidth, height=4.5cm,
+  title={\small $H = 0.7$ (smooth, trending)},
+  title style={at={(0.5,1.0)}, anchor=south},
+  xmin=0, xmax=100, ymin=-2.5, ymax=2.5,
+  xtick=\empty, ytick={-2,0,2},
+  tick label style={font=\scriptsize},
+  axis lines=left,
+  grid=major, grid style={gray!15},
+  clip=true,
+]
+\addplot[intgreen, thick, mark=none, smooth] coordinates {
+  (0,0.00) (7,0.20) (14,0.50) (21,0.85) (28,1.15)
+  (35,1.40) (42,1.55) (49,1.60) (56,1.50) (63,1.30)
+  (70,1.15) (77,1.05) (84,1.10) (91,1.25) (100,1.50)
+};
+\end{axis}
+
+\end{tikzpicture}
+\caption{Sample paths of fractional Brownian motion at four values of the Hurst exponent $H$.
+Top left ($H = 0.1$, red): extremely rough, rapidly oscillating.
+Top right ($H = 0.3$, orange): rough but with visible short-range structure.
+Bottom left ($H = 0.5$, blue): standard Brownian motion, the familiar random walk.
+Bottom right ($H = 0.7$, green): smooth, trending trajectory.
+Empirically, $\log \RV$ behaves like the top-left panel.}
+\label{fig:hurst-paths}
+\end{figure}
+
+\begin{keyidea}[Roughness Means $H < 1/2$]
+A process is called ``rough'' when its Hurst exponent satisfies $H < 1/2$.
+The path is more jagged than Brownian motion, and its increments are negatively correlated.
+The lower $H$ is, the rougher the path.
+Empirical log-volatility has $H \approx 0.1$, which is far into the rough regime.
+\end{keyidea}
+
+
+% ═══════════════════════════════════════════════════
+\section{Volatility Is Rough}
+\label{sec:vol-is-rough}
+% ═══════════════════════════════════════════════════
+
+With the concept of roughness in hand, the central empirical claim of the rough volatility literature can be stated precisely.
+
+\citet{GJR2018} studied the time series of $\log \RV_t$ (5-minute realized variance, as defined in Chapter~\ref{ch:rv}) across a wide range of assets: equity indices, individual stocks, and foreign exchange.
+For each asset, they estimated the Hurst exponent $H$ of the $\log \RV$ series.
+The finding was striking.
+
+\begin{keyresult}[\citet{GJR2018}: Volatility Is Rough]
+Across equity indices, individual stocks, and FX, the Hurst exponent of $\log \RV_t$ is consistently around $H \approx 0.1$, far below the $H = 0.5$ of standard Brownian motion.
+This means that log-volatility paths are much rougher (more jagged, more rapidly oscillating) than any standard diffusion model would predict.
+\end{keyresult}
+
+To put $H = 0.1$ in context: standard stochastic volatility models (Heston, SABR) assume that the volatility process is driven by a standard Brownian motion, which has $H = 0.5$.
+An $H$ of $0.1$ means the volatility path reverses direction roughly five times more frequently than a standard diffusion would.
+
+\subsection{How to Estimate $H$: The Variogram Method}
+
+The estimation approach in \citet{GJR2018} uses the scaling relationship in Equation~\eqref{eq:fbm-variance}.
+If $X_t$ is an fBM with exponent $H$, then the variance of its increments scales as $h^{2H}$.
+In log-log coordinates, this becomes a straight line.
+
+\begin{definition}[Variogram Estimator of $H$]
+\label{def:variogram}
+For a time series $X_1, X_2, \ldots, X_T$, define the empirical $q$-th moment of increments at lag $h$:
+\begin{equation}
+  m(q, h) = \frac{1}{T - h} \sum_{t=1}^{T-h} |X_{t+h} - X_t|^q
+  \label{eq:variogram}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $X_t$: the time series (here, $\log \RV_t$)
+  \item $h$: the lag (number of days)
+  \item $q$: the moment order (typically $q = 2$ for the variance, or $q = 1$ for the mean absolute increment)
+  \item $T$: the number of observations
+\end{itemize}
+If $X_t$ behaves like fBM with exponent $H$, then $m(q, h) \propto h^{qH}$.
+Taking logs: $\log m(q, h) = qH \cdot \log h + \text{const}$.
+Regressing $\log m(q, h)$ on $\log h$ across multiple lags gives a slope of $qH$, from which $H$ is recovered.
+\end{definition}
+
+\begin{workedexample}{Estimating $H$ from a Variogram}
+You have $T = 1{,}000$ daily observations of $\log \RV_t$ for the S\&P~500.
+Using $q = 2$, you compute the average squared increment at lags $h = 1, 2, 5, 10, 20$ days:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} c c c @{}}
+\toprule
+\textbf{Lag $h$ (days)} & \textbf{$m(2, h)$} & \textbf{$\log_{10} m(2,h)$} \\
+\midrule
+1   & 0.050 & $-1.301$ \\
+2   & 0.059 & $-1.229$ \\
+5   & 0.074 & $-1.131$ \\
+10  & 0.088 & $-1.056$ \\
+20  & 0.104 & $-0.983$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+\textbf{Step 1: Set up the regression.}
+Plot $\log_{10} m(2,h)$ against $\log_{10} h$:
+\begin{center}
+\begin{tabular}{@{} c c @{}}
+\toprule
+$\log_{10} h$ & $\log_{10} m(2,h)$ \\
+\midrule
+0.000 & $-1.301$ \\
+0.301 & $-1.229$ \\
+0.699 & $-1.131$ \\
+1.000 & $-1.056$ \\
+1.301 & $-0.983$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Step 2: Fit the slope.}
+The OLS slope through these five points is approximately $0.245$.
+
+\textbf{Step 3: Recover $H$.}
+Since $\text{slope} = qH = 2H$, we get $H = 0.245 / 2 = 0.12$.
+
+This is close to the $H \approx 0.1$ reported by \citet{GJR2018}.
+The slow increase of $m(2,h)$ with lag (i.e., the low slope) reflects the anti-persistent, rapidly oscillating nature of log-volatility.
+For comparison, a standard Brownian motion would give a slope of $2 \times 0.5 = 1.0$, meaning the variance of increments grows linearly with lag.
+\end{workedexample}
+
+\begin{keyresult}[\citet{BLP2022}: Cross-Asset Universality]
+\citet{BLP2022} extend the analysis of \citet{GJR2018} to a broad cross-section of asset classes (equities, equity indices, FX, fixed income, commodities) and confirm that $H \approx 0.1$ is universal.
+The Hurst exponent does not vary meaningfully across asset classes, geographies, or time periods.
+This universality suggests that $H \approx 0.1$ reflects a deep structural property of volatility dynamics, not a peculiarity of any particular market.
+\end{keyresult}
+
+
+% ═══════════════════════════════════════════════════
+\section{The RFSV Forecasting Formula}
+\label{sec:rfsv}
+% ═══════════════════════════════════════════════════
+
+The observation that $\log \RV$ behaves like fBM with $H \approx 0.1$ has a direct forecasting payoff.
+If you know the process is fBM, the optimal linear forecast is known in closed form.
+This gives a volatility forecasting model called RFSV (Rough Fractional Stochastic Volatility).
+
+The intuition is simple.
+For fBM, the best forecast of the future value is a weighted average of all past observations, where the weights are determined by $H$.
+When $H$ is small (rough regime), the weights decay slowly, meaning distant past observations still carry information.
+This slow weight decay is what produces the long-memory behavior that HAR approximates with three components.
+
+\begin{prereq}[Conditional Expectation for Gaussian Processes]
+If $(X_1, \ldots, X_T, X_{T+1})$ is jointly Gaussian, the conditional expectation $\E[X_{T+1} \mid X_1, \ldots, X_T]$ is a linear combination of the past values.
+The weights are determined by the covariance structure of the process.
+For fBM, the covariance function is known analytically, so the optimal weights can be computed exactly.
+\end{prereq}
+
+\begin{definition}[RFSV Forecast]
+\label{def:rfsv}
+Model $\log \RV_t$ as fractional Brownian motion with Hurst exponent $H$ and a constant mean $\mu$:
+\begin{equation}
+  \log \RV_t = \mu + \sigma_v \, B^H_t
+  \label{eq:rfsv-model}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\log \RV_t$: the natural logarithm of day $t$'s realized variance
+  \item $\mu$: the unconditional mean of log-volatility
+  \item $\sigma_v$: the volatility-of-volatility (a scaling constant)
+  \item $B^H_t$: fractional Brownian motion with exponent $H$
+\end{itemize}
+The optimal one-step-ahead forecast, given observations through day $T$, is:
+\begin{equation}
+  \widehat{\log \RV}_{T+1} = \sum_{k=0}^{T-1} w_k \, \log \RV_{T-k}
+  \label{eq:rfsv-forecast}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $w_k$: the weight on the observation $k$ days in the past
+  \item The weights $\{w_k\}$ are determined by the covariance structure of fBM (i.e., by $H$)
+  \item They sum to 1 and decay as a power law: $w_k \propto k^{H - 3/2}$ for large $k$
+  \item When $H = 0.1$, the decay is $k^{-1.4}$, which is slow enough that observations from weeks ago still contribute meaningfully
+\end{itemize}
+\end{definition}
+
+\begin{keyidea}[One Parameter Does the Work of Three]
+RFSV achieves HAR-level forecasting accuracy with essentially one free parameter ($H$), because the Hurst exponent $H \approx 0.1$ encodes the entire autocorrelation structure.
+HAR uses three coefficients ($\beta_d$, $\beta_w$, $\beta_m$) to approximate the same slow decay.
+RFSV derives the weights from first principles given $H$.
+The fact that both approaches perform similarly is evidence that the slow power-law decay really is the dominant structure in volatility dynamics.
+\end{keyidea}
+
+\begin{intuition}[Why RFSV Weights Decay Slowly]
+Consider two forecasting extremes.
+If $H = 0.5$ (standard BM), increments are independent and only the most recent observation matters; the weights drop to zero immediately.
+If $H = 0.01$ (extremely rough), the process is so anti-persistent that every past reversal carries information about the current level; the weights decay very slowly.
+At $H = 0.1$, you are close to the second extreme.
+The weight on an observation from 22 days ago (one month) is still roughly 15--20\% of the weight on yesterday's observation.
+This is why HAR's monthly component ($\RV^{(m)}$) carries a large coefficient in Chapter~\ref{ch:har}: it is picking up the long tail of the RFSV weight function.
+\end{intuition}
+
+\begin{workedexample}{Comparing RFSV Weights to HAR Structure}
+Consider a simplified RFSV with $H = 0.1$ and 22 past observations.
+The weights decay approximately as $w_k \propto k^{-1.4}$.
+Normalizing so they sum to 1:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{} l c c @{}}
+\toprule
+\textbf{Lag group} & \textbf{Sum of RFSV weights} & \textbf{HAR analog} \\
+\midrule
+Lag 1 (yesterday)     & $\approx 0.35$ & $\beta_d \approx 0.36$ \\
+Lags 2--5 (rest of week)  & $\approx 0.30$ & Embedded in $\beta_w \approx 0.28$ \\
+Lags 6--22 (rest of month) & $\approx 0.35$ & Embedded in $\beta_m \approx 0.28$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+The RFSV weight distribution across lag groups is strikingly similar to the HAR coefficient values from \citet{Corsi2009}.
+HAR is an efficient three-bin approximation of the smooth RFSV weight function.
+\end{workedexample}
+
+
+% ═══════════════════════════════════════════════════
+\section{Rough Volatility for Pricing}
+\label{sec:rough-pricing}
+% ═══════════════════════════════════════════════════
+
+This guide focuses on realized volatility estimation and forecasting, not on derivatives pricing.
+But the rough volatility framework has had its greatest quantitative-finance impact in the pricing domain, so a brief mention is warranted for completeness.
+
+\begin{prereq}[The Volatility Smile Problem]
+Standard stochastic volatility models (e.g., Heston) can generate ``smiles'' in implied volatility across strike prices.
+But they struggle to simultaneously fit two empirical patterns: (1) the steep short-maturity smile in S\&P~500 options and (2) the term structure of the VIX implied volatility (the ``VVIX'' smile).
+Fitting both at once has been a long-standing challenge in quantitative finance.
+\end{prereq}
+
+\citet{BFG2016} introduced the \emph{rough Bergomi} model, the first pricing model built on rough volatility.
+In the rough Bergomi model, the variance process is driven by fractional Brownian motion with $H \approx 0.07$, rather than the standard Brownian motion used in models like Heston.
+
+Two key results from the pricing literature:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Rough Bergomi} \citep{BFG2016}: the short-maturity behavior of the implied volatility smile is controlled by the Hurst exponent $H$. With $H \approx 0.07$, the model generates steep short-dated smiles that match market data far better than Heston. Simulation is required for pricing (no closed-form solution), but the model is parsimonious.
+
+  \item \textbf{Quadratic rough Heston}: a tractable variant that jointly fits SPX option smiles and VIX option smiles, a combination that no standard model can achieve. The roughness parameter is again $H \approx 0.05$--$0.1$.
+\end{enumerate}
+
+\begin{keyidea}[Forecasting vs.\ Pricing: Same $H$, Different Models]
+The forecasting model (RFSV) and the pricing models (rough Bergomi, quadratic rough Heston) both use $H \approx 0.1$ but serve different purposes.
+RFSV forecasts $\RV_{t+1}$ from past $\RV$ values.
+The pricing models compute option prices under risk-neutral dynamics.
+This chapter is about forecasting; the pricing models are mentioned here because they provide independent confirmation that the roughness parameter $H \approx 0.1$ is relevant across different uses of volatility modeling.
+\end{keyidea}
+
+
+% ═══════════════════════════════════════════════════
+\section{Fact or Artefact?}
+\label{sec:fact-or-artefact}
+% ═══════════════════════════════════════════════════
+
+The rough volatility paradigm rests on an empirical observation: $\log \RV_t$ has $H \approx 0.1$.
+But $\RV_t$ is not the true spot volatility $\sigma^2_t$.
+It is a noisy estimate of it, contaminated by the microstructure noise discussed in Chapter~\ref{ch:noise} (Section~\ref{sec:sampling-frequency}).
+Could the apparent roughness be an artefact of this noise?
+
+\citet{ContDas2024} argue that the answer is yes, at least in part.
+
+\begin{keyresult}[\citet{ContDas2024}: Roughness as a Noise Artefact]
+Observed roughness of realized volatility estimates is partly a microstructure-noise artefact.
+When i.i.d.\ noise contaminates the high-frequency returns used to compute $\RV$, the resulting $\RV$ series appears rougher than the true spot volatility process.
+Even if the true $\sigma^2_t$ follows a standard semimartingale with $H = 0.5$, the estimated $\log \RV_t$ can exhibit $H \approx 0.1$ due to the noise channel.
+\end{keyresult}
+
+The mechanism is intuitive and illustrated in Figure~\ref{fig:noise-roughness}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+
+% ── Panel 1: True spot volatility (smooth) ──
+\begin{axis}[
+  name=top,
+  width=0.85\textwidth, height=4.5cm,
+  title={\small True spot volatility $\sigma^2_t$ (smooth, $H = 0.5$)},
+  title style={at={(0.5,1.0)}, anchor=south},
+  xmin=0, xmax=100, ymin=0.5, ymax=2.5,
+  xtick=\empty,
+  ylabel={\scriptsize $\sigma^2_t$},
+  ylabel style={font=\scriptsize},
+  tick label style={font=\scriptsize},
+  axis lines=left,
+  grid=major, grid style={gray!15},
+]
+\addplot[intgreen, very thick, mark=none, smooth] coordinates {
+  (0,1.0) (5,1.05) (10,1.15) (15,1.25) (20,1.40)
+  (25,1.50) (30,1.55) (35,1.50) (40,1.40) (45,1.35)
+  (50,1.30) (55,1.35) (60,1.45) (65,1.55) (70,1.60)
+  (75,1.55) (80,1.45) (85,1.35) (90,1.30) (95,1.25) (100,1.20)
+};
+\end{axis}
+
+% ── Panel 2: Estimated RV (noisy, looks rough) ──
+\begin{axis}[
+  name=bottom, at={(top.below south west)}, anchor=north west, yshift=-0.6cm,
+  width=0.85\textwidth, height=4.5cm,
+  title={\small Estimated $\RV_t$ (noisy, \emph{looks} rough, $\hat{H} \approx 0.1$)},
+  title style={at={(0.5,1.0)}, anchor=south},
+  xmin=0, xmax=100, ymin=0.5, ymax=2.5,
+  xtick=\empty,
+  xlabel={\scriptsize Trading day},
+  ylabel={\scriptsize $\RV_t$},
+  ylabel style={font=\scriptsize},
+  xlabel style={font=\scriptsize},
+  tick label style={font=\scriptsize},
+  axis lines=left,
+  grid=major, grid style={gray!15},
+]
+% Underlying smooth curve (dashed)
+\addplot[intgreen, dashed, thick, mark=none, smooth] coordinates {
+  (0,1.0) (5,1.05) (10,1.15) (15,1.25) (20,1.40)
+  (25,1.50) (30,1.55) (35,1.50) (40,1.40) (45,1.35)
+  (50,1.30) (55,1.35) (60,1.45) (65,1.55) (70,1.60)
+  (75,1.55) (80,1.45) (85,1.35) (90,1.30) (95,1.25) (100,1.20)
+};
+% Noisy RV path
+\addplot[warnred, thick, mark=none] coordinates {
+  (0,1.05) (2,0.82) (4,1.20) (6,0.90) (8,1.30) (10,1.00)
+  (12,1.35) (14,1.10) (16,1.40) (18,1.15) (20,1.55)
+  (22,1.30) (24,1.60) (26,1.35) (28,1.55) (30,1.70)
+  (32,1.40) (34,1.65) (36,1.45) (38,1.55) (40,1.25)
+  (42,1.50) (44,1.20) (46,1.45) (48,1.30) (50,1.15)
+  (52,1.40) (54,1.20) (56,1.50) (58,1.30) (60,1.55)
+  (62,1.40) (64,1.65) (66,1.45) (68,1.70) (70,1.50)
+  (72,1.65) (74,1.45) (76,1.60) (78,1.35) (80,1.50)
+  (82,1.30) (84,1.45) (86,1.20) (88,1.40) (90,1.15)
+  (92,1.35) (94,1.10) (96,1.30) (98,1.15) (100,1.25)
+};
+\end{axis}
+
+% Arrow between panels
+\draw[-{Stealth[length=3mm]}, thick, gray]
+  ([xshift=3cm]top.south) -- ([xshift=3cm]bottom.north)
+  node[midway, right, font=\scriptsize, text=gray, align=left] {add estimation\\noise};
+
+\end{tikzpicture}
+\caption{How microstructure noise creates apparent roughness.
+Top: the true spot volatility $\sigma^2_t$ is a smooth process ($H = 0.5$).
+Bottom: the estimated $\RV_t$ (red) adds i.i.d.\ estimation noise around the true level (dashed green).
+The noisy $\RV_t$ series looks rough (anti-persistent, rapidly oscillating) even though the underlying process is smooth.
+Applying the variogram estimator to the red series yields $\hat{H} \approx 0.1$, but this reflects noise contamination, not true roughness of $\sigma^2_t$.}
+\label{fig:noise-roughness}
+\end{figure}
+
+The \citet{ContDas2024} argument proceeds in three steps:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Noise adds independent errors.} Each day's $\RV_t$ differs from the true $\IVol_t$ by an estimation error $\eta_t$ (Chapter~\ref{ch:rv}, Equation~\ref{eq:rv-clt}). These errors are approximately independent across days.
+
+  \item \textbf{Independent errors create anti-persistence.} If you add i.i.d.\ noise to a smooth signal, the increments of the noisy series are negatively autocorrelated. An unusually high noise draw today will be followed (on average) by a smaller one tomorrow, creating artificial ``reversals'' in the series.
+
+  \item \textbf{Anti-persistence lowers $\hat{H}$.} The variogram estimator interprets these reversals as roughness and produces $\hat{H} \ll 0.5$.
+\end{enumerate}
+
+\begin{warning}[Do Not Equate $\hat{H} = 0.1$ with True Roughness]
+The observed $H \approx 0.1$ from $\log \RV_t$ data does not establish that the true spot volatility process $\sigma^2_t$ is rough.
+The noise channel documented by \citet{ContDas2024} is a plausible alternative explanation.
+The truth may lie in between: some genuine roughness in $\sigma^2_t$, amplified by estimation noise in $\RV_t$.
+For forecasting, this distinction does not matter much (see Section~\ref{sec:universal-lstm}).
+For model calibration and theoretical claims about the nature of volatility, it matters a great deal.
+\end{warning}
+
+\begin{intuition}[The Coin-Flip Analogy]
+Suppose you flip a fair coin 100 times and record the running total of heads minus tails.
+The resulting path is a standard random walk ($H = 0.5$).
+Now suppose someone records your totals but makes small random errors (e.g., occasionally miscounting by $\pm 1$).
+If you estimate $H$ from their error-contaminated records, you will get $\hat{H} < 0.5$, because the errors introduce artificial reversals.
+The path \emph{looks} rougher than it is.
+Cont--Das argue that $\RV_t$ is the error-contaminated record and $\sigma^2_t$ is the true total.
+\end{intuition}
+
+
+% ═══════════════════════════════════════════════════
+\section{The Universal LSTM Connection}
+\label{sec:universal-lstm}
+% ═══════════════════════════════════════════════════
+
+\citet{RosenbaumZhang2022} train a single LSTM (Long Short-Term Memory neural network) on hundreds of individual stocks simultaneously.
+The trained network, which they call the ``universal LSTM,'' matches the forecasting performance of the RFSV model and the Quadratic Rough Heston parametric forecaster.
+
+\begin{prereq}[LSTM (Brief)]
+An LSTM is a type of recurrent neural network designed to learn sequential patterns.
+It processes a time series one step at a time, maintaining an internal ``memory cell'' that selectively remembers and forgets past information.
+LSTMs are widely used for time series forecasting.
+Chapter~\ref{ch:dl-vol} covers LSTMs in detail.
+\end{prereq}
+
+This convergence is suggestive.
+Two very different approaches (a parametric fBM model with one parameter and a nonparametric neural network with thousands of parameters) arrive at the same forecast.
+The natural interpretation is that both are learning the same underlying statistical regularity in $\RV$ data.
+
+\begin{keyidea}[Practical Equivalence Despite Theoretical Ambiguity]
+Whether spot volatility is truly rough or the roughness is an artefact of estimation noise (Section~\ref{sec:fact-or-artefact}), both RFSV and universal LSTM exploit the same statistical regularity in realized volatility estimates.
+The practical forecasting value is the same either way.
+The debate about the nature of the spot process is theoretically important but does not affect your forecast accuracy.
+\end{keyidea}
+
+\citet{RosenbaumZhang2022} also document a ``universality'' property: the LSTM trained on a broad cross-section of stocks transfers well to assets it has never seen, including out-of-sample asset classes.
+This is consistent with the cross-asset universality of $H \approx 0.1$ documented by \citet{BLP2022}.
+
+\begin{keyresult}[\citet{RosenbaumZhang2022}: Universal LSTM Matches RFSV]
+A single LSTM trained on hundreds of stocks achieves the same forecasting performance as the RFSV parametric model.
+Both produce forecasts that are competitive with HAR.
+The universal LSTM also transfers to out-of-sample assets, suggesting that the learned kernel is asset-independent, just as the Hurst exponent $H \approx 0.1$ is.
+\end{keyresult}
+
+The connection to the rest of this guide is direct.
+Chapter~\ref{ch:dl-vol} develops LSTM and transformer-based forecasting models in full detail.
+When you reach that chapter, the key question will be: does your deep learning model learn something \emph{beyond} the rough-vol kernel, or is it just a complicated way to recover the same $H \approx 0.1$ decay structure?
+If the latter, RFSV with one parameter is preferable on parsimony grounds.
+If the former, you need to demonstrate the improvement with a proper out-of-sample test (Chapter~\ref{ch:evaluation}).
+
+
+% ═══════════════════════════════════════════════════
+\section*{Summary}
+\addcontentsline{toc}{section}{Summary}
+% ═══════════════════════════════════════════════════
+
+\begin{itemize}[nosep]
+  \item The \textbf{Hurst exponent} $H$ of a fractional Brownian motion controls path roughness. $H = 0.5$ is standard Brownian motion; $H < 0.5$ is rougher (more jagged); $H > 0.5$ is smoother.
+
+  \item \textbf{Fractional Brownian motion} (fBM) generalizes standard BM by allowing correlated increments: negatively correlated when $H < 0.5$ (anti-persistent), positively correlated when $H > 0.5$ (persistent).
+
+  \item \citet{GJR2018} showed that $\log \RV_t$ behaves like fBM with $H \approx 0.1$ across equity indices, individual stocks, and FX. This is the ``volatility is rough'' result.
+
+  \item $H$ can be estimated from data using the \textbf{variogram method}: regress $\log m(q,h)$ on $\log h$ and divide the slope by $q$.
+
+  \item \citet{BLP2022} confirmed the \textbf{cross-asset universality} of $H \approx 0.1$ across equities, FX, fixed income, and commodities.
+
+  \item The \textbf{RFSV model} forecasts $\log \RV_{t+1}$ as a weighted average of past $\log \RV$ values, with weights derived from the fBM covariance structure. It achieves HAR-level accuracy with essentially one parameter ($H$).
+
+  \item RFSV weights decay as $k^{H - 3/2}$. At $H = 0.1$, the decay is slow ($k^{-1.4}$), explaining why HAR's monthly component carries a large coefficient.
+
+  \item \textbf{Rough Bergomi} \citep{BFG2016} and quadratic rough Heston use $H \approx 0.07$--$0.1$ for option pricing. They fit short-maturity smiles and VIX smiles better than standard models. This guide focuses on forecasting, not pricing.
+
+  \item \citet{ContDas2024} argue that observed roughness ($H \approx 0.1$) is \textbf{partly a microstructure-noise artefact}. Estimation noise in $\RV_t$ creates artificial anti-persistence that the variogram interprets as roughness.
+
+  \item The practical implication: $H \approx 0.1$ from $\log \RV_t$ is a useful forecasting input but does not prove that the true spot volatility $\sigma^2_t$ is rough.
+
+  \item \citet{RosenbaumZhang2022} show that a \textbf{universal LSTM} trained on hundreds of stocks matches RFSV and transfers to unseen assets. Both approaches likely learn the same statistical kernel.
+
+  \item Whether spot vol is truly rough or the roughness is a noise artefact, the \textbf{forecasting value is identical}. The distinction matters for pricing-model calibration and theory, not for forecasting accuracy.
+
+  \item RFSV connects to FIGARCH (Chapter~\ref{ch:garch}, Section~\ref{sec:figarch}) and HAR (Chapter~\ref{ch:har}) as three different parameterizations of the same long-memory phenomenon. It connects forward to deep learning (Chapter~\ref{ch:dl-vol}) as a benchmark that any LSTM must beat to justify its complexity.
+\end{itemize}
+
+
+% ═══════════════════════════════════════════════════
+\section*{Key Results}
+\addcontentsline{toc}{section}{Key Results}
+% ═══════════════════════════════════════════════════
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{} p{3.5cm} l p{6.5cm} @{}}
+\toprule
+\textbf{Result} & \textbf{Source} & \textbf{Finding} \\
+\midrule
+Volatility is rough
+  & \citet{GJR2018}
+  & $\log \RV_t$ behaves like fBM with $H \approx 0.1$ across equity
+    indices, stocks, and FX; far below $H = 0.5$ of standard models \\[4pt]
+Cross-asset universality
+  & \citet{BLP2022}
+  & $H \approx 0.1$ is universal across asset classes, geographies,
+    and time periods \\[4pt]
+Rough Bergomi pricing
+  & \citet{BFG2016}
+  & First rough-vol pricing model; $H \approx 0.07$ generates steep
+    short-maturity implied volatility smiles \\[4pt]
+Roughness as artefact
+  & \citet{ContDas2024}
+  & Microstructure noise in $\RV$ estimates creates apparent roughness;
+    $\hat{H} \approx 0.1$ may not reflect true spot-vol dynamics \\[4pt]
+Universal LSTM
+  & \citet{RosenbaumZhang2022}
+  & Single LSTM trained on hundreds of stocks matches RFSV;
+    both learn the same universal forecasting kernel \\
+\bottomrule
+\end{tabular}
+\end{center}
