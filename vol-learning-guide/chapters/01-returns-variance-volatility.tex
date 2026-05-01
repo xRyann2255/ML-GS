@@ -1,0 +1,694 @@
+\chapter{Returns, Variance, and Why Volatility Matters}
+\label{ch:returns}
+
+\begin{application}[Why This Chapter]
+Volatility is the central quantity in quantitative finance.
+Options pricing, risk management, portfolio construction, and trade execution all depend on accurate volatility estimates.
+Every chapter in this guide builds on the concepts introduced here.
+All five project directions (Chapter~\ref{ch:applications}) start from the returns and variance foundations covered in this chapter.
+\end{application}
+
+Financial markets produce a stream of prices.
+To do anything quantitative with those prices, you first need to convert them into \emph{returns}, measure how much those returns vary, and understand \emph{why} that variation matters.
+This chapter covers that ground.
+
+% ═══════════════════════════════════════════════════
+\section{What Are Returns?}
+\label{sec:returns-definition}
+% ═══════════════════════════════════════════════════
+
+A stock price on its own tells you almost nothing about performance.
+Knowing that Apple closed at \$187 today is useless without knowing where it closed yesterday.
+\emph{Returns} solve this: they express price changes as fractions (or percentages), making different assets and time periods comparable.
+
+There are two standard ways to compute a return.
+
+\begin{prereq}[Natural Logarithm Properties]
+The natural logarithm $\ln(\cdot)$ is the inverse of the exponential function: $\ln(e^x) = x$.
+Three properties matter here:
+\begin{itemize}[nosep]
+  \item $\ln(A/B) = \ln A - \ln B$ (quotients become differences)
+  \item $\ln(AB) = \ln A + \ln B$ (products become sums)
+  \item For small $x$: $\ln(1+x) \approx x$ (so log returns $\approx$ simple returns when returns are small)
+\end{itemize}
+\end{prereq}
+
+\subsection{Simple Returns}
+\label{sec:simple-returns}
+
+The simple (arithmetic) return over one period measures the fractional price change:
+
+\begin{equation}
+  R_t = \frac{P_t - P_{t-1}}{P_{t-1}}
+  \label{eq:simple-return}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $R_t$: simple return from period $t-1$ to $t$
+  \item $P_t$: price at the end of period $t$
+  \item $P_{t-1}$: price at the end of the previous period
+\end{itemize}
+
+A simple return of $0.05$ means the price rose by 5\%.
+
+\subsection{Log Returns}
+\label{sec:log-returns}
+
+The log (continuously compounded) return uses the natural logarithm of the price ratio:
+
+\begin{equation}
+  r_t = \ln\!\left(\frac{P_t}{P_{t-1}}\right) = \ln P_t - \ln P_{t-1}
+  \label{eq:log-return}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $r_t$: log return from period $t-1$ to $t$
+  \item $\ln(\cdot)$: natural logarithm
+\end{itemize}
+
+\begin{keyidea}[Why Log Returns?]
+Log returns have two properties that make them the default in volatility research:
+\begin{enumerate}[nosep]
+  \item \textbf{Time additivity.}
+  The multi-period log return is the sum of single-period log returns:
+  $r_{1:T} = r_1 + r_2 + \cdots + r_T$.
+  Simple returns compound multiplicatively, which is harder to work with.
+  \item \textbf{Approximate symmetry.}
+  A log return of $+0.05$ followed by $-0.05$ returns you close to your starting price.
+  Simple returns do not: a $+5\%$ gain followed by a $-5\%$ loss leaves you at $\$99.75$, not $\$100$.
+\end{enumerate}
+Throughout this guide, $r_t$ always means the log return unless stated otherwise.
+\end{keyidea}
+
+\begin{workedexample}{Computing Returns}
+A stock closes at \$100.00 on Monday, \$105.00 on Tuesday, and \$102.00 on Wednesday.
+
+\textbf{Tuesday (price rises from \$100 to \$105):}
+\begin{align*}
+  R_{\text{Tue}} &= \frac{105 - 100}{100} = 0.0500 \quad (+5.00\%) \\[4pt]
+  r_{\text{Tue}} &= \ln\!\left(\frac{105}{100}\right) = \ln(1.05) = 0.0488 \quad (+4.88\%)
+\end{align*}
+
+\textbf{Wednesday (price falls from \$105 to \$102):}
+\begin{align*}
+  R_{\text{Wed}} &= \frac{102 - 105}{105} = -0.0286 \quad (-2.86\%) \\[4pt]
+  r_{\text{Wed}} &= \ln\!\left(\frac{102}{105}\right) = \ln(0.9714) = -0.0290 \quad (-2.90\%)
+\end{align*}
+
+\textbf{Two-day log return (time additivity in action):}
+\[
+  r_{\text{Mon}\to\text{Wed}} = r_{\text{Tue}} + r_{\text{Wed}} = 0.0488 + (-0.0290) = 0.0198
+\]
+Check directly: $\ln(102/100) = \ln(1.02) = 0.0198$. \checkmark
+
+The simple returns are close to the log returns because the magnitudes are small (under 5\%).
+For daily equity returns, which are typically well under 1\%, the two are nearly identical.
+\end{workedexample}
+
+% ═══════════════════════════════════════════════════
+\section{Variance and Standard Deviation}
+\label{sec:variance}
+% ═══════════════════════════════════════════════════
+
+With returns in hand, the next question is: how spread out are they?
+Variance answers this by measuring the average squared deviation from the mean return.
+
+\begin{definition}[Sample Variance and Standard Deviation]
+Given $T$ log returns $r_1, r_2, \ldots, r_T$ with sample mean $\bar{r} = \frac{1}{T}\sum_{t=1}^T r_t$, the sample variance is:
+
+\begin{equation}
+  \hat{\sigma}^2 = \frac{1}{T-1}\sum_{t=1}^{T}\bigl(r_t - \bar{r}\bigr)^2
+  \label{eq:sample-variance}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\hat{\sigma}^2$: sample variance (the hat denotes an estimate)
+  \item $T$: number of observations
+  \item $r_t$: log return at time $t$
+  \item $\bar{r}$: sample mean of returns
+  \item $T-1$: Bessel's correction (dividing by $T-1$ instead of $T$ gives an unbiased estimate)
+\end{itemize}
+
+The sample standard deviation is $\hat{\sigma} = \sqrt{\hat{\sigma}^2}$.
+\end{definition}
+
+\begin{prereq}[Why $T-1$?]
+Dividing by $T-1$ instead of $T$ corrects for the fact that you estimated $\bar{r}$ from the same data.
+Using $\bar{r}$ instead of the true mean $\mu$ systematically shrinks the deviations, so dividing by the smaller number $T-1$ compensates.
+This is called Bessel's correction.
+For large $T$ the difference is negligible.
+\end{prereq}
+
+\subsection{Annualizing Volatility}
+\label{sec:annualizing}
+
+Raw daily standard deviations are tiny numbers (around 0.01 for a typical equity index), so practitioners report volatility on an annual scale.
+If daily returns are independent, the variance over $n$ days is $n$ times the one-day variance, so the standard deviation scales by $\sqrt{n}$.
+
+\begin{equation}
+  \hat{\sigma}_{\text{annual}} = \hat{\sigma}_{\text{daily}} \times \sqrt{252}
+  \label{eq:annualize}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $252$: approximate number of trading days per year in U.S.\ equity markets
+  \item $\sqrt{252} \approx 15.87$
+\end{itemize}
+
+\begin{warning}[The Square-Root-of-Time Rule]
+The $\sqrt{252}$ scaling assumes returns are independent and identically distributed.
+When volatility clusters (Section~\ref{sec:stylized-facts}), this assumption fails, and multi-day volatility may be higher or lower than the square-root rule predicts.
+Chapters~\ref{ch:garch} and \ref{ch:har} develop models that handle this.
+\end{warning}
+
+\begin{workedexample}{From Daily Returns to Annualized Volatility}
+Five consecutive daily log returns for the S\&P~500 (in decimal):
+\[
+  r_1 = 0.0032,\quad r_2 = -0.0051,\quad r_3 = 0.0018,\quad r_4 = 0.0074,\quad r_5 = -0.0028
+\]
+
+\textbf{Step 1: Mean.}
+\[
+  \bar{r} = \frac{0.0032 + (-0.0051) + 0.0018 + 0.0074 + (-0.0028)}{5} = \frac{0.0045}{5} = 0.0009
+\]
+
+\textbf{Step 2: Squared deviations.}
+\begin{align*}
+  (r_1 - \bar{r})^2 &= (0.0032 - 0.0009)^2 = (0.0023)^2 = 0.00000529 \\
+  (r_2 - \bar{r})^2 &= (-0.0051 - 0.0009)^2 = (-0.0060)^2 = 0.00003600 \\
+  (r_3 - \bar{r})^2 &= (0.0018 - 0.0009)^2 = (0.0009)^2 = 0.00000081 \\
+  (r_4 - \bar{r})^2 &= (0.0074 - 0.0009)^2 = (0.0065)^2 = 0.00004225 \\
+  (r_5 - \bar{r})^2 &= (-0.0028 - 0.0009)^2 = (-0.0037)^2 = 0.00001369
+\end{align*}
+
+\textbf{Step 3: Variance.}
+\[
+  \hat{\sigma}^2 = \frac{0.00000529 + 0.00003600 + 0.00000081 + 0.00004225 + 0.00001369}{4}
+               = \frac{0.00009804}{4}
+               = 0.00002451
+\]
+
+\textbf{Step 4: Daily and annualized volatility.}
+\[
+  \hat{\sigma}_{\text{daily}} = \sqrt{0.00002451} = 0.00495 \quad (0.50\%\text{ per day})
+\]
+\[
+  \hat{\sigma}_{\text{annual}} = 0.00495 \times \sqrt{252} = 0.00495 \times 15.87 = 0.0786 \quad (7.9\%)
+\]
+
+For context, the S\&P~500's long-run annualized volatility is roughly 15--20\%.
+Our five-day sample yields a lower figure because five observations cannot capture the full range of market conditions.
+\end{workedexample}
+
+% ═══════════════════════════════════════════════════
+\section{Why Volatility Matters}
+\label{sec:why-vol-matters}
+% ═══════════════════════════════════════════════════
+
+You now know how to compute returns and measure their spread.
+The next question: why does that spread matter so much?
+Variance and standard deviation sit at the center of four major problems in finance.
+
+\begin{prereq}[Finance Concepts Preview]
+The following four applications are covered briefly here to motivate the rest of the guide.
+You do not need to understand them fully yet; each connects to a later chapter.
+\end{prereq}
+
+\paragraph{Options pricing.}
+An option gives the holder the right (not obligation) to buy or sell an asset at a fixed price by a future date.
+The value of this right depends critically on how much the underlying price might move, which is volatility.
+The Black-Scholes model \citep{Black1973} takes volatility as an \emph{input} and produces an option price as output.
+If your volatility estimate is wrong, your price is wrong.
+Chapter~\ref{ch:volsurface} explores this connection.
+
+\paragraph{Risk management.}
+Value-at-Risk ($\VaR$) estimates the worst-case loss over a holding period at a given confidence level.
+In the simplest (Gaussian) version, $\VaR$ is proportional to portfolio volatility:
+$\VaR_\alpha = -\mu + z_\alpha \,\sigma$,
+where $z_\alpha$ is the normal quantile.
+When volatility doubles, the risk bound roughly doubles.
+
+\paragraph{Portfolio construction.}
+Mean-variance optimization \citep{Markowitz1952} and risk-parity strategies both require a covariance matrix as input.
+Volatility is the diagonal of that matrix.
+Better volatility forecasts produce better-diversified portfolios.
+
+\paragraph{Trade execution.}
+When a desk needs to buy a large position, it splits the order over time to reduce market impact.
+The participation rate (fraction of daily volume per time slice) depends on intraday volatility: higher volatility means wider price swings, which changes optimal execution speed.
+
+\begin{keyidea}[What Makes Volatility Special]
+Volatility is one of the few quantities in finance that is (a)~directly observable from intraday data (Chapter~\ref{ch:rv}), (b)~economically central to pricing, hedging, and risk control, and (c)~forecastable with meaningful accuracy (Chapters~\ref{ch:garch}--\ref{ch:hybrid}).
+That combination makes it the right place to apply ML carefully.
+\end{keyidea}
+
+% ═══════════════════════════════════════════════════
+\section{Stylized Facts of Financial Returns}
+\label{sec:stylized-facts}
+% ═══════════════════════════════════════════════════
+
+Before building models, you need to know what patterns actually appear in return data.
+\citet{Cont2001} catalogued a set of ``stylized facts'': statistical regularities observed across equities, foreign exchange, and commodities, across decades and geographies.
+Four of these facts matter most for volatility modeling.
+
+\subsection{Fact 1: Returns Are Approximately Uncorrelated}
+\label{sec:fact-uncorrelated}
+
+Daily return autocorrelations are statistically indistinguishable from zero for lags beyond a few minutes \citep{Cont2001}.
+In plain terms: knowing today's return tells you almost nothing about tomorrow's return.
+This is consistent with market efficiency; if returns were predictable, traders would exploit the pattern until it disappeared.
+
+\begin{intuition}[No Free Lunch in Means]
+If positive returns reliably followed positive returns, everyone would buy after an up day, driving the price up immediately and eliminating the pattern.
+Competition among traders keeps return autocorrelations near zero.
+Volatility, by contrast, is \emph{not} a quantity you can directly trade on the same way, so its autocorrelation can persist.
+\end{intuition}
+
+\subsection{Fact 2: Volatility Clusters}
+\label{sec:fact-clustering}
+
+Although returns themselves are uncorrelated, \emph{squared} returns and \emph{absolute} returns show strong, slowly decaying positive autocorrelation \citep{Cont2001, Mandelbrot1963}.
+Large moves tend to follow large moves, and calm periods tend to follow calm periods.
+
+\citet{Engle1982} formalized this observation with the ARCH model: the variance of next period's return depends on recent squared returns.
+Chapter~\ref{ch:garch} develops this family of models in detail.
+
+\begin{keyresult}[\citet{Cont2001}, Stylized Fact: Volatility Clustering]
+The autocorrelation of absolute returns remains significantly positive over lags of several weeks and decays slowly (approximately as a power law with exponent $\beta \in [0.2, 0.4]$), a pattern that is remarkably stable across asset classes and time periods.
+\end{keyresult}
+
+Figure~\ref{fig:vol-clustering-ts} shows volatility clustering visually: returns alternate between calm and turbulent stretches.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=\textwidth,
+  height=6cm,
+  xlabel={Trading day},
+  ylabel={Daily log return (\%)},
+  xmin=0, xmax=500,
+  ymin=-5, ymax=5,
+  grid=major,
+  grid style={gray!20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={Simulated Daily Returns Exhibiting Volatility Clustering},
+]
+% Calm regime (days 1-100): low vol ~0.5%
+\addplot[defblue, mark=none, thick, opacity=0.8] coordinates {
+(1,0.12)(2,-0.31)(3,0.45)(4,-0.18)(5,0.27)(6,0.08)(7,-0.42)(8,0.33)(9,-0.15)(10,0.22)
+(11,-0.38)(12,0.19)(13,0.05)(14,-0.28)(15,0.41)(16,-0.11)(17,0.35)(18,-0.22)(19,0.14)(20,-0.06)
+(21,0.29)(22,-0.33)(23,0.17)(24,-0.41)(25,0.23)(26,0.09)(27,-0.36)(28,0.28)(29,-0.13)(30,0.44)
+(31,-0.21)(32,0.16)(33,-0.38)(34,0.31)(35,-0.09)(36,0.25)(37,-0.19)(38,0.37)(39,-0.27)(40,0.11)
+(41,0.03)(42,-0.34)(43,0.26)(44,-0.15)(45,0.39)(46,-0.22)(47,0.18)(48,-0.41)(49,0.32)(50,-0.08)
+(51,0.21)(52,-0.29)(53,0.13)(54,0.36)(55,-0.24)(56,0.07)(57,-0.33)(58,0.28)(59,-0.17)(60,0.42)
+(61,-0.11)(62,0.25)(63,-0.38)(64,0.19)(65,-0.06)(66,0.31)(67,-0.23)(68,0.14)(69,-0.35)(70,0.27)
+(71,0.04)(72,-0.29)(73,0.21)(74,-0.16)(75,0.38)(76,-0.12)(77,0.33)(78,-0.25)(79,0.09)(80,-0.41)
+(81,0.22)(82,-0.07)(83,0.35)(84,-0.28)(85,0.15)(86,-0.33)(87,0.26)(88,-0.18)(89,0.40)(90,-0.14)
+(91,0.08)(92,-0.31)(93,0.24)(94,-0.19)(95,0.36)(96,-0.10)(97,0.29)(98,-0.37)(99,0.16)(100,-0.23)
+};
+% Turbulent regime (days 101-220): high vol ~2.5%
+\addplot[warnred, mark=none, thick, opacity=0.8] coordinates {
+(101,-1.82)(102,2.45)(103,-2.91)(104,1.67)(105,-3.12)(106,2.78)(107,-1.95)(108,3.41)(109,-2.53)(110,1.89)
+(111,-3.28)(112,2.14)(113,-1.73)(114,2.96)(115,-2.41)(116,1.52)(117,-3.05)(118,2.63)(119,-1.88)(120,3.17)
+(121,-2.72)(122,1.94)(123,-2.36)(124,3.08)(125,-1.61)(126,2.49)(127,-2.87)(128,1.75)(129,-3.33)(130,2.21)
+(131,-1.56)(132,2.84)(133,-2.19)(134,1.43)(135,-2.95)(136,2.57)(137,-1.81)(138,3.22)(139,-2.64)(140,1.98)
+(141,-2.11)(142,2.73)(143,-3.45)(144,1.67)(145,-2.38)(146,2.91)(147,-1.79)(148,3.14)(149,-2.52)(150,1.86)
+(151,-2.97)(152,2.33)(153,-1.64)(154,2.78)(155,-3.21)(156,1.91)(157,-2.46)(158,2.65)(159,-1.73)(160,3.08)
+(161,-2.89)(162,2.17)(163,-1.58)(164,2.94)(165,-2.31)(166,1.76)(167,-3.15)(168,2.48)(169,-1.92)(170,2.71)
+(171,-2.54)(172,1.83)(173,-3.07)(174,2.39)(175,-1.66)(176,2.86)(177,-2.23)(178,1.57)(179,-2.98)(180,2.61)
+(181,-1.84)(182,3.19)(183,-2.67)(184,1.95)(185,-2.42)(186,2.74)(187,-1.71)(188,3.11)(189,-2.55)(190,1.88)
+(191,-3.24)(192,2.16)(193,-1.59)(194,2.93)(195,-2.37)(196,1.72)(197,-3.09)(198,2.52)(199,-1.87)(200,2.68)
+(201,-2.18)(202,1.54)(203,-2.81)(204,2.36)(205,-1.69)(206,2.97)(207,-2.49)(208,1.83)(209,-3.16)(210,2.24)
+(211,-1.62)(212,2.79)(213,-2.34)(214,1.91)(215,-2.73)(216,2.47)(217,-1.78)(218,3.05)(219,-2.58)(220,1.86)
+};
+% Calm regime (days 221-350)
+\addplot[defblue, mark=none, thick, opacity=0.8] coordinates {
+(221,-0.28)(222,0.34)(223,-0.17)(224,0.41)(225,-0.23)(226,0.09)(227,-0.36)(228,0.28)(229,-0.14)(230,0.32)
+(231,-0.21)(232,0.15)(233,-0.39)(234,0.26)(235,-0.08)(236,0.43)(237,-0.31)(238,0.18)(239,-0.24)(240,0.37)
+(241,-0.12)(242,0.29)(243,-0.35)(244,0.22)(245,-0.06)(246,0.38)(247,-0.27)(248,0.13)(249,-0.41)(250,0.25)
+(251,-0.19)(252,0.33)(253,-0.16)(254,0.44)(255,-0.29)(256,0.11)(257,-0.37)(258,0.24)(259,-0.08)(260,0.36)
+(261,-0.22)(262,0.17)(263,-0.34)(264,0.28)(265,-0.13)(266,0.42)(267,-0.26)(268,0.09)(269,-0.38)(270,0.31)
+(271,-0.15)(272,0.27)(273,-0.33)(274,0.19)(275,-0.07)(276,0.41)(277,-0.25)(278,0.14)(279,-0.36)(280,0.23)
+(281,-0.18)(282,0.35)(283,-0.29)(284,0.12)(285,-0.43)(286,0.26)(287,-0.11)(288,0.38)(289,-0.22)(290,0.16)
+(291,-0.31)(292,0.24)(293,-0.09)(294,0.37)(295,-0.28)(296,0.13)(297,-0.35)(298,0.21)(299,-0.06)(300,0.39)
+(301,-0.23)(302,0.17)(303,-0.34)(304,0.28)(305,-0.14)(306,0.41)(307,-0.26)(308,0.11)(309,-0.38)(310,0.22)
+(311,-0.19)(312,0.33)(313,-0.16)(314,0.44)(315,-0.29)(316,0.08)(317,-0.36)(318,0.25)(319,-0.12)(320,0.37)
+(321,-0.21)(322,0.15)(323,-0.32)(324,0.27)(325,-0.09)(326,0.43)(327,-0.24)(328,0.18)(329,-0.35)(330,0.23)
+(331,-0.17)(332,0.31)(333,-0.14)(334,0.39)(335,-0.27)(336,0.12)(337,-0.36)(338,0.24)(339,-0.08)(340,0.42)
+(341,-0.23)(342,0.16)(343,-0.33)(344,0.29)(345,-0.11)(346,0.38)(347,-0.25)(348,0.13)(349,-0.37)(350,0.22)
+};
+% Turbulent regime (days 351-420)
+\addplot[warnred, mark=none, thick, opacity=0.8] coordinates {
+(351,-1.42)(352,2.15)(353,-2.63)(354,1.87)(355,-2.28)(356,1.54)(357,-2.91)(358,2.36)(359,-1.73)(360,2.84)
+(361,-2.17)(362,1.62)(363,-2.79)(364,2.43)(365,-1.88)(366,2.11)(367,-2.56)(368,1.79)(369,-3.01)(370,2.27)
+(371,-1.65)(372,2.72)(373,-2.34)(374,1.91)(375,-2.48)(376,2.16)(377,-1.83)(378,2.69)(379,-2.25)(380,1.57)
+(381,-2.87)(382,2.38)(383,-1.74)(384,2.93)(385,-2.41)(386,1.68)(387,-2.76)(388,2.14)(389,-1.59)(390,2.81)
+(391,-2.33)(392,1.86)(393,-2.67)(394,2.42)(395,-1.78)(396,2.55)(397,-2.19)(398,1.63)(399,-2.88)(400,2.31)
+(401,-1.71)(402,2.64)(403,-2.27)(404,1.94)(405,-2.53)(406,2.18)(407,-1.82)(408,2.76)(409,-2.39)(410,1.61)
+(411,-2.84)(412,2.29)(413,-1.67)(414,2.91)(415,-2.46)(416,1.85)(417,-2.72)(418,2.13)(419,-1.58)(420,2.47)
+};
+% Return to calm (days 421-500)
+\addplot[defblue, mark=none, thick, opacity=0.8] coordinates {
+(421,-0.24)(422,0.31)(423,-0.18)(424,0.42)(425,-0.27)(426,0.13)(427,-0.35)(428,0.22)(429,-0.09)(430,0.38)
+(431,-0.21)(432,0.16)(433,-0.33)(434,0.28)(435,-0.14)(436,0.41)(437,-0.25)(438,0.11)(439,-0.37)(440,0.23)
+(441,-0.19)(442,0.34)(443,-0.15)(444,0.29)(445,-0.36)(446,0.17)(447,-0.26)(448,0.39)(449,-0.12)(450,0.32)
+(451,-0.22)(452,0.14)(453,-0.38)(454,0.27)(455,-0.08)(456,0.43)(457,-0.31)(458,0.19)(459,-0.24)(460,0.36)
+(461,-0.16)(462,0.28)(463,-0.34)(464,0.21)(465,-0.07)(466,0.41)(467,-0.23)(468,0.15)(469,-0.32)(470,0.26)
+(471,-0.11)(472,0.38)(473,-0.25)(474,0.17)(475,-0.36)(476,0.22)(477,-0.13)(478,0.33)(479,-0.29)(480,0.08)
+(481,-0.37)(482,0.24)(483,-0.18)(484,0.42)(485,-0.26)(486,0.12)(487,-0.35)(488,0.28)(489,-0.14)(490,0.31)
+(491,-0.21)(492,0.16)(493,-0.39)(494,0.23)(495,-0.09)(496,0.34)(497,-0.27)(498,0.18)(499,-0.33)(500,0.25)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Simulated daily log returns exhibiting volatility clustering.
+Calm periods (blue, days 1--100, 221--350, 421--500) have returns within $\pm 0.5\%$;
+turbulent periods (red, days 101--220, 351--420) reach $\pm 3\%$.
+The clustering is visible by eye: large returns beget large returns.}
+\label{fig:vol-clustering-ts}
+\end{figure}
+
+Figure~\ref{fig:acf-comparison} quantifies this.
+Return autocorrelations hover near zero at all lags, but squared-return autocorrelations remain positive for many lags, confirming that volatility is persistent.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  name=acf_returns,
+  width=0.48\textwidth,
+  height=5.5cm,
+  xlabel={Lag (days)},
+  ylabel={Autocorrelation},
+  xmin=0, xmax=22,
+  ymin=-0.15, ymax=0.45,
+  grid=major,
+  grid style={gray!20},
+  xtick={1,5,10,15,20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={Returns $r_t$},
+  ybar,
+  bar width=4pt,
+]
+% Near-zero autocorrelations for returns
+\addplot[fill=defblue, draw=defblue!80] coordinates {
+(1,0.03)(2,-0.02)(3,0.01)(4,-0.04)(5,0.02)(6,0.01)(7,-0.03)(8,0.02)(9,-0.01)(10,0.03)
+(11,-0.02)(12,0.01)(13,-0.01)(14,0.02)(15,-0.03)(16,0.01)(17,0.02)(18,-0.02)(19,0.01)(20,-0.01)
+};
+% Significance bands
+\addplot[dashed, warnred, thick, mark=none] coordinates {(0,0.063)(22,0.063)};
+\addplot[dashed, warnred, thick, mark=none] coordinates {(0,-0.063)(22,-0.063)};
+\end{axis}
+
+\begin{axis}[
+  at={(acf_returns.east)},
+  anchor=west,
+  xshift=1.2cm,
+  width=0.48\textwidth,
+  height=5.5cm,
+  xlabel={Lag (days)},
+  ylabel={Autocorrelation},
+  xmin=0, xmax=22,
+  ymin=-0.15, ymax=0.45,
+  grid=major,
+  grid style={gray!20},
+  xtick={1,5,10,15,20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={Squared Returns $r_t^2$},
+  ybar,
+  bar width=4pt,
+]
+% Strong, slowly decaying autocorrelations for squared returns
+\addplot[fill=keyorange, draw=keyorange!80] coordinates {
+(1,0.38)(2,0.31)(3,0.27)(4,0.24)(5,0.21)(6,0.19)(7,0.17)(8,0.15)(9,0.14)(10,0.13)
+(11,0.12)(12,0.11)(13,0.10)(14,0.09)(15,0.09)(16,0.08)(17,0.08)(18,0.07)(19,0.07)(20,0.06)
+};
+% Significance bands
+\addplot[dashed, warnred, thick, mark=none] coordinates {(0,0.063)(22,0.063)};
+\addplot[dashed, warnred, thick, mark=none] coordinates {(0,-0.063)(22,-0.063)};
+\end{axis}
+\end{tikzpicture}
+\caption{Autocorrelation functions for returns (left) and squared returns (right), based on representative daily equity index data.
+Returns show no significant autocorrelation at any lag (all bars within the dashed 95\% significance bands).
+Squared returns show strong autocorrelation that decays slowly, reflecting volatility clustering.}
+\label{fig:acf-comparison}
+\end{figure}
+
+\subsection{Fact 3: Fat Tails}
+\label{sec:fact-fat-tails}
+
+If returns were normally distributed, a daily move of 4 standard deviations would occur about once every 126 years.
+In practice, moves this large happen several times per year.
+The return distribution has ``fat tails'' (also called heavy tails): extreme returns are far more frequent than a Gaussian model predicts.
+
+\citet{Mandelbrot1963} first documented this for cotton prices, proposing that returns follow a stable Paretian distribution rather than a Gaussian.
+\citet{Fama1965} confirmed the finding for stock returns, observing leptokurtic (heavy-tailed) distributions across U.S.\ equities.
+
+\begin{definition}[Kurtosis]
+The kurtosis of a distribution measures the weight of its tails relative to a normal distribution:
+\begin{equation}
+  \kappa = \frac{\E\bigl[(r_t - \mu)^4\bigr]}{\bigl(\E\bigl[(r_t - \mu)^2\bigr]\bigr)^2}
+  \label{eq:kurtosis}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\kappa$: kurtosis
+  \item $\mu = \E[r_t]$: population mean
+  \item For a normal distribution, $\kappa = 3$
+  \item \emph{Excess kurtosis} $= \kappa - 3$; values above zero indicate fatter tails than normal
+\end{itemize}
+Typical daily equity index returns have excess kurtosis in the range 5--10 \citep{Cont2001}.
+\end{definition}
+
+Figure~\ref{fig:fat-tails-qq} illustrates fat tails with a Q--Q plot.
+If the data were normal, all points would lie on the diagonal.
+The S-shaped departure shows that extreme returns occur more often than a normal distribution allows.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.55\textwidth,
+  height=7cm,
+  xlabel={Normal theoretical quantiles},
+  ylabel={Sample quantiles (daily returns, \%)},
+  xmin=-4, xmax=4,
+  ymin=-6, ymax=6,
+  grid=major,
+  grid style={gray!20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={Q--Q Plot: Daily Returns vs.\ Normal Distribution},
+]
+% Reference line (perfect normal)
+\addplot[dashed, gray, thick, mark=none, domain=-4:4] {x*1.1};
+
+% S-shaped Q-Q data showing fat tails
+% Lower tail: points fall below the line (more extreme than normal)
+\addplot[only marks, mark=*, mark size=1.2pt, defblue] coordinates {
+(-3.5,-5.8)(-3.2,-5.1)(-3.0,-4.6)(-2.8,-4.1)(-2.6,-3.7)
+(-2.5,-3.4)(-2.3,-3.1)(-2.2,-2.9)(-2.1,-2.7)(-2.0,-2.5)
+(-1.9,-2.35)(-1.8,-2.2)(-1.7,-2.05)(-1.6,-1.9)(-1.5,-1.75)
+(-1.4,-1.6)(-1.3,-1.48)(-1.2,-1.36)(-1.1,-1.24)(-1.0,-1.12)
+(-0.9,-1.01)(-0.8,-0.89)(-0.7,-0.78)(-0.6,-0.67)(-0.5,-0.55)
+(-0.4,-0.44)(-0.3,-0.33)(-0.2,-0.22)(-0.1,-0.11)(0.0,0.0)
+(0.1,0.11)(0.2,0.22)(0.3,0.33)(0.4,0.44)(0.5,0.55)
+(0.6,0.67)(0.7,0.78)(0.8,0.89)(0.9,1.01)(1.0,1.12)
+(1.1,1.24)(1.2,1.36)(1.3,1.48)(1.4,1.6)(1.5,1.75)
+(1.6,1.9)(1.7,2.05)(1.8,2.2)(1.9,2.35)(2.0,2.5)
+(2.1,2.7)(2.2,2.9)(2.3,3.1)(2.5,3.4)(2.6,3.7)
+(2.8,4.1)(3.0,4.6)(3.2,5.1)(3.5,5.8)
+};
+
+% Annotations
+\node[anchor=west, font=\small, warnred] at (axis cs: 2.4, 5.5) {Upper tail: heavier};
+\node[anchor=west, font=\small, warnred] at (axis cs: 2.4, 5.0) {than normal};
+\draw[-{Stealth}, warnred, thick] (axis cs: 2.3, 5.2) -- (axis cs: 3.3, 5.6);
+
+\node[anchor=east, font=\small, warnred] at (axis cs: -2.3, -5.5) {Lower tail: heavier};
+\node[anchor=east, font=\small, warnred] at (axis cs: -2.3, -6.0) {than normal};
+\draw[-{Stealth}, warnred, thick] (axis cs: -2.4, -5.3) -- (axis cs: -3.3, -5.6);
+
+\node[anchor=south, font=\small, gray] at (axis cs: 0.8, -1.5) {Normal reference line};
+\end{axis}
+\end{tikzpicture}
+\caption{Q--Q plot of representative daily equity returns against a normal distribution.
+If returns were Gaussian, the dots would lie on the dashed diagonal.
+The S-shaped departure, first documented by \citet{Fama1965}, shows that both tails of the empirical distribution are heavier than normal: extreme moves (positive and negative) occur much more often than a Gaussian model predicts.}
+\label{fig:fat-tails-qq}
+\end{figure}
+
+\begin{warning}[Why Fat Tails Matter for Models]
+Any model that assumes normally distributed returns will underestimate the probability of large moves.
+This affects risk management (VaR breaches), option pricing (mispricing of out-of-the-money options), and backtesting (understating drawdowns).
+Chapters~\ref{ch:jumps} and \ref{ch:garch} introduce models that accommodate fat tails.
+\end{warning}
+
+\subsection{Fact 4: The Leverage Effect}
+\label{sec:fact-leverage}
+
+Negative returns tend to increase future volatility more than positive returns of the same magnitude.
+\citet{Black1976} first noted this asymmetry and proposed a mechanism: when a stock price falls, the firm's equity value shrinks relative to its debt, so leverage (debt/equity) rises, making the stock riskier and more volatile.
+
+\begin{definition}[Leverage Effect]
+The leverage effect is the negative correlation between an asset's return and changes in its subsequent volatility:
+\begin{equation}
+  \operatorname{Corr}(r_t,\, \sigma_{t+1}^2) < 0
+  \label{eq:leverage-effect}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $r_t$: return at time $t$
+  \item $\sigma_{t+1}^2$: conditional variance at time $t+1$
+  \item The negative sign means: price drops $\to$ volatility rises
+\end{itemize}
+\end{definition}
+
+In equity markets, the leverage effect is pronounced.
+In foreign exchange and commodity markets, the asymmetry is weaker or sometimes reversed \citep{Cont2001}.
+Chapter~\ref{ch:garch} introduces GJR-GARCH and EGARCH models that capture this asymmetry directly.
+
+\subsection{Summary of Stylized Facts}
+
+\begin{keyidea}[Four Facts That Shape Every Volatility Model]
+\begin{enumerate}[nosep]
+  \item \textbf{Uncorrelated returns:} tomorrow's return direction is unpredictable from today's.
+  \item \textbf{Volatility clustering:} large moves follow large moves, small follow small.
+  \item \textbf{Fat tails:} extreme returns occur far more often than a Gaussian model predicts.
+  \item \textbf{Leverage effect:} negative returns raise future volatility more than positive returns.
+\end{enumerate}
+Any useful volatility model must reproduce (at minimum) facts 2 and 3.
+A good model also captures fact 4.
+\end{keyidea}
+
+% ═══════════════════════════════════════════════════
+\section{Conditional vs.\ Unconditional Volatility}
+\label{sec:cond-uncond}
+% ═══════════════════════════════════════════════════
+
+Everything so far has treated volatility as a single number: the standard deviation of the full return sample.
+That number is the \emph{unconditional} volatility.
+It answers the question ``what is the typical size of a daily return, averaging over all market conditions?''
+
+Traders need a different answer: given what has happened up to today, how volatile will the market be \emph{tomorrow}?
+That is the \emph{conditional} volatility.
+
+\begin{definition}[Unconditional vs.\ Conditional Variance]
+\textbf{Unconditional variance:}
+\begin{equation}
+  \sigma^2 = \operatorname{Var}(r_t)
+  \label{eq:uncond-var}
+\end{equation}
+A single number, constant over time. It is the long-run average variance.
+
+\textbf{Conditional variance:}
+\begin{equation}
+  \sigma_t^2 = \operatorname{Var}(r_t \mid \mathcal{F}_{t-1})
+  \label{eq:cond-var}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\sigma_t^2$: variance of the return at time $t$, conditional on past information
+  \item $\mathcal{F}_{t-1}$: the information set (filtration) available at time $t-1$, which includes all past returns, prices, and any other observable data up through time $t-1$
+\end{itemize}
+The conditional variance changes from day to day as new information arrives.
+\end{definition}
+
+\begin{intuition}[Weather Analogy]
+Unconditional volatility is like the average annual rainfall for your city: a useful summary, but it does not tell you whether to carry an umbrella tomorrow.
+Conditional volatility is the weather forecast: it uses recent data (yesterday's pressure, today's cloud cover) to predict tomorrow's conditions.
+This guide is about building the forecast, not computing the average.
+\end{intuition}
+
+The unconditional variance is related to the conditional variance by the law of total variance:
+\begin{equation}
+  \sigma^2 = \E[\sigma_t^2] + \operatorname{Var}\bigl(\E[r_t \mid \mathcal{F}_{t-1}]\bigr)
+  \label{eq:total-variance}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\E[\sigma_t^2]$: average of the conditional variances over time
+  \item $\operatorname{Var}\bigl(\E[r_t \mid \mathcal{F}_{t-1}]\bigr)$: variance of the conditional mean (small for equities, since expected returns are nearly constant at daily frequency)
+\end{itemize}
+
+When the conditional mean is approximately constant (a reasonable assumption for daily equity returns), the unconditional variance is simply the time average of the conditional variances.
+The gap between the two is what makes volatility modeling interesting.
+
+\begin{keyidea}[The Central Goal of This Guide]
+The goal of every model in Chapters~\ref{ch:garch}--\ref{ch:hybrid} is to produce accurate estimates of the conditional variance $\sigma_t^2$.
+Chapter~\ref{ch:rv} shows how to measure the realized conditional variance from high-frequency data.
+Chapters~\ref{ch:garch}--\ref{ch:hybrid} show how to forecast it.
+Chapter~\ref{ch:evaluation} shows how to tell whether your forecasts are any good.
+\end{keyidea}
+
+% ═══════════════════════════════════════════════════
+% SUMMARY
+% ═══════════════════════════════════════════════════
+
+\section*{Summary}
+\addcontentsline{toc}{section}{Summary}
+
+\begin{itemize}[nosep]
+  \item \textbf{Returns} convert raw prices into comparable, analyzable quantities.
+  Log returns ($r_t = \ln P_t - \ln P_{t-1}$) are preferred because they are additive over time.
+
+  \item \textbf{Simple vs.\ log returns} are nearly identical for small magnitudes (daily equities); they diverge for large moves.
+
+  \item \textbf{Sample variance} ($\hat{\sigma}^2$) measures dispersion around the mean return; standard deviation ($\hat{\sigma}$) is its square root.
+
+  \item \textbf{Annualized volatility} scales daily volatility by $\sqrt{252}$, assuming independent returns.
+
+  \item \textbf{Volatility matters} because it is a direct input to options pricing, risk management (VaR), portfolio optimization, and trade execution.
+
+  \item \textbf{Stylized fact 1:} Returns are approximately uncorrelated (no predictability in the mean).
+
+  \item \textbf{Stylized fact 2:} Squared and absolute returns are strongly autocorrelated (volatility clusters).
+
+  \item \textbf{Stylized fact 3:} Return distributions have fat tails (excess kurtosis of 5--10 for daily equity returns).
+
+  \item \textbf{Stylized fact 4:} The leverage effect makes volatility respond asymmetrically to negative vs.\ positive returns.
+
+  \item The \textbf{unconditional} variance is a single long-run number; the \textbf{conditional} variance $\sigma_t^2$ varies over time and is what we want to forecast.
+
+  \item The \textbf{central goal} of this guide is to estimate and forecast the conditional variance $\sigma_t^2$ using both classical and ML methods.
+
+  \item \citet{Cont2001} provides the canonical reference for stylized facts across asset classes.
+
+  \item \citet{Mandelbrot1963} and \citet{Fama1965} established that financial returns have fat tails, not Gaussian distributions.
+
+  \item \citet{Engle1982} introduced ARCH, the first formal model of time-varying conditional variance, covered in Chapter~\ref{ch:garch}.
+\end{itemize}
+
+% ═══════════════════════════════════════════════════
+% KEY RESULTS TABLE
+% ═══════════════════════════════════════════════════
+
+\begin{table}[htbp]
+\centering
+\caption{Key results referenced in this chapter.}
+\label{tab:ch01-key-results}
+\begin{tabular}{@{} p{4.5cm} p{6cm} p{4cm} @{}}
+\toprule
+\textbf{Paper} & \textbf{Result} & \textbf{Relevance} \\
+\midrule
+\citet{Mandelbrot1963} &
+Daily commodity returns follow a stable Paretian (fat-tailed) distribution, not Gaussian; sample variance does not converge. &
+First evidence that normal-distribution assumptions fail for financial data. \\[6pt]
+
+\citet{Fama1965} &
+Confirmed fat tails (leptokurtosis) in daily U.S.\ stock returns via S-shaped Q--Q departures from normality. &
+Extended Mandelbrot's finding to equities; supported the stable distribution hypothesis. \\[6pt]
+
+\citet{Black1976} &
+Documented negative correlation between stock returns and subsequent volatility changes (the leverage effect). &
+Motivates asymmetric volatility models (GJR-GARCH, EGARCH) in Chapter~\ref{ch:garch}. \\[6pt]
+
+\citet{Engle1982} &
+Introduced ARCH: conditional variance is a function of past squared residuals; applied to UK inflation. &
+Founded the entire field of conditional volatility modeling (Chapter~\ref{ch:garch}). \\[6pt]
+
+\citet{Cont2001} &
+Canonical enumeration of stylized facts (absence of return autocorrelation, volatility clustering with slow power-law decay, fat tails, leverage effect) across equities, FX, and commodities. &
+Benchmark reference for the empirical properties any volatility model must match. \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,739 @@
+\chapter{Options Basics and the Volatility Surface}
+\label{ch:volsurface}
+
+\begin{application}[Why This Chapter Matters]
+Options-implied information is a rich source of features for volatility forecasting (Chapter~\ref{ch:features}).
+The variance risk premium (Chapter~\ref{ch:vrp}) is defined as the gap between implied and realized volatility, both of which you need this chapter to understand.
+Project~5 (VRP ML trader) directly trades that gap.
+Even for non-options projects, understanding the volatility surface is necessary because VIX and IV-derived features appear in virtually every competitive feature set for realized volatility forecasting \citep{Gu2020}.
+\end{application}
+
+This chapter introduces options from scratch, builds up to the Black-Scholes formula (just enough to define implied volatility), and then shows how the entire volatility surface encodes the market's fears and expectations.
+You will finish with the model-free VIX, which connects options prices directly to expected future variance.
+
+% ═══════════════════════════════════════════════════════
+\section{What Is an Option?}
+\label{sec:what-is-option}
+% ═══════════════════════════════════════════════════════
+
+This section defines what an option contract is and what it pays at expiry.
+
+\begin{prereq}[Background for This Chapter]
+You need comfort with:
+\begin{itemize}[nosep]
+  \item Expected values and probability distributions (any intro probability course).
+  \item The standard normal CDF, $\Phi(z) = P(Z \leq z)$ for $Z \sim \N(0,1)$.
+  \item Logarithms, exponentials, and basic calculus (derivatives, integrals).
+  \item The concept of variance and standard deviation from Chapter~\ref{ch:returns}.
+\end{itemize}
+No prior knowledge of options, derivatives, or financial markets is assumed.
+\end{prereq}
+
+\begin{definition}[Option Contract]
+An \textbf{option} is a contract that gives the holder the \emph{right, but not the obligation}, to buy or sell an \textbf{underlying asset} (the stock, index, or commodity the option is written on) at a pre-agreed price.
+Two parameters define any option:
+\begin{itemize}[nosep]
+  \item \textbf{Strike price} $K$: the pre-agreed transaction price.
+  \item \textbf{Expiry date} $T$: the deadline by which the right must be exercised.
+\end{itemize}
+\end{definition}
+
+There are two types:
+\begin{itemize}[nosep]
+  \item A \textbf{call option} gives the right to \emph{buy} the underlying at price $K$ by time $T$.
+  \item A \textbf{put option} gives the right to \emph{sell} the underlying at price $K$ by time $T$.
+\end{itemize}
+
+The buyer pays an upfront price (the \textbf{premium}) for this right.
+The seller (``writer'') collects the premium but takes on the obligation.
+
+\subsection{Payoff at Expiry}
+\label{sec:option-payoff}
+
+At expiry, the option is worth exactly what you would gain by exercising it (or zero if exercising would lose money).
+Let $S_T$ denote the price of the underlying asset at expiry.
+
+\begin{definition}[Option Payoffs at Expiry]
+\begin{align}
+  \text{Call payoff} &= \max(S_T - K,\; 0) \label{eq:call-payoff} \\
+  \text{Put payoff}  &= \max(K - S_T,\; 0) \label{eq:put-payoff}
+\end{align}
+where:
+\begin{itemize}[nosep]
+  \item $S_T$ = price of the underlying asset at expiry.
+  \item $K$ = strike price (pre-agreed transaction price).
+  \item The $\max(\cdot, 0)$ reflects that you never exercise at a loss; you simply let the option expire.
+\end{itemize}
+\end{definition}
+
+\begin{intuition}[Why ``Right but Not Obligation'' Matters]
+Suppose you hold a call option with strike $K = 100$.
+If $S_T = 120$, you exercise: buy at 100, the asset is worth 120, you gain 20.
+If $S_T = 80$, you do nothing: buying at 100 when the market price is 80 would be foolish.
+Your payoff is never negative.
+This asymmetry is the entire reason options have value, and why someone must be paid a premium to write them.
+\end{intuition}
+
+Figure~\ref{fig:payoff-diagrams} shows the payoff profiles.
+The kink at $K$ is the signature of an option; linear instruments (stocks, futures) have straight-line payoffs.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+  % --- Long Call ---
+  \begin{scope}[shift={(0,0)}]
+    \draw[->] (0,-1.8) -- (0,2.5) node[above]{\small P\&L};
+    \draw[->] (-0.3,0) -- (4.5,0) node[right]{\small $S_T$};
+    \draw[ultra thick, warnred] (0,-1) -- (2.2,-1) -- (4.2,1);
+    \draw[dashed, gray] (2.2,-1.8) -- (2.2,2.2);
+    \node[below] at (2.2,-1.8) {\small $K$};
+    \node[above, font=\bfseries\small] at (2.2,2.4) {Long Call};
+    \node[left, font=\scriptsize] at (0,-1) {$-\text{premium}$};
+    \fill[warnred] (2.2,-1) circle (2pt);
+  \end{scope}
+  % --- Long Put ---
+  \begin{scope}[shift={(5.5,0)}]
+    \draw[->] (0,-1.8) -- (0,2.5) node[above]{\small P\&L};
+    \draw[->] (-0.3,0) -- (4.5,0) node[right]{\small $S_T$};
+    \draw[ultra thick, defblue] (0,1.2) -- (2.2,-1) -- (4.2,-1);
+    \draw[dashed, gray] (2.2,-1.8) -- (2.2,2.2);
+    \node[below] at (2.2,-1.8) {\small $K$};
+    \node[above, font=\bfseries\small] at (2.2,2.4) {Long Put};
+    \node[right, font=\scriptsize] at (4.2,-1) {$-\text{premium}$};
+    \fill[defblue] (2.2,-1) circle (2pt);
+  \end{scope}
+  % --- Short Call ---
+  \begin{scope}[shift={(0,-5.5)}]
+    \draw[->] (0,-2.2) -- (0,2.2) node[above]{\small P\&L};
+    \draw[->] (-0.3,0) -- (4.5,0) node[right]{\small $S_T$};
+    \draw[ultra thick, warnred, dashed] (0,1) -- (2.2,1) -- (4.2,-1);
+    \draw[dashed, gray] (2.2,-2) -- (2.2,2);
+    \node[below] at (2.2,-2) {\small $K$};
+    \node[above, font=\bfseries\small] at (2.2,2.1) {Short Call};
+    \node[left, font=\scriptsize] at (0,1) {$+\text{premium}$};
+    \fill[warnred] (2.2,1) circle (2pt);
+  \end{scope}
+  % --- Short Put ---
+  \begin{scope}[shift={(5.5,-5.5)}]
+    \draw[->] (0,-2.2) -- (0,2.2) node[above]{\small P\&L};
+    \draw[->] (-0.3,0) -- (4.5,0) node[right]{\small $S_T$};
+    \draw[ultra thick, defblue, dashed] (0,-1.2) -- (2.2,1) -- (4.2,1);
+    \draw[dashed, gray] (2.2,-2) -- (2.2,2);
+    \node[below] at (2.2,-2) {\small $K$};
+    \node[above, font=\bfseries\small] at (2.2,2.1) {Short Put};
+    \node[right, font=\scriptsize] at (4.2,1) {$+\text{premium}$};
+    \fill[defblue] (2.2,1) circle (2pt);
+  \end{scope}
+\end{tikzpicture}
+\caption{Option payoff diagrams (profit/loss including the premium paid or received).
+Long positions (top row) have limited downside and potentially large upside.
+Short positions (bottom row) are the mirror image: limited upside, potentially large downside.
+The kink at the strike $K$ is the defining feature of an option.}
+\label{fig:payoff-diagrams}
+\end{figure}
+
+\subsection{Moneyness}
+\label{sec:moneyness}
+
+Traders classify options by how the current spot price $S$ compares to the strike $K$:
+
+\begin{definition}[Moneyness]
+For a \textbf{call} option:
+\begin{itemize}[nosep]
+  \item \textbf{In-the-money (ITM)}: $S > K$ (exercising now would be profitable).
+  \item \textbf{At-the-money (ATM)}: $S \approx K$.
+  \item \textbf{Out-of-the-money (OTM)}: $S < K$ (exercising now would not be profitable).
+\end{itemize}
+For a \textbf{put}, the directions reverse: ITM when $S < K$, OTM when $S > K$.
+A common quantitative measure of moneyness is $m = K/S$ (or its log, $\ln(K/S)$).
+\end{definition}
+
+
+% ═══════════════════════════════════════════════════════
+\section{Black-Scholes in One Page}
+\label{sec:black-scholes}
+% ═══════════════════════════════════════════════════════
+
+Now that you know what options pay, the natural question is: what should you pay \emph{today} for an option that expires in the future?
+This section presents the answer that \citet{Black1973} derived, which earned a Nobel Prize and remains the bedrock of options pricing.
+
+The core idea: an option's value today equals the expected payoff at expiry, discounted to the present, under a probability measure that accounts for risk.
+\citet{Black1973} showed that under a specific set of assumptions, this expected value has a closed-form solution.
+
+\begin{keyidea}[The Black-Scholes Assumptions]
+The formula assumes:
+\begin{enumerate}[nosep]
+  \item The underlying price follows geometric Brownian motion (log-normal returns).
+  \item Volatility $\sigma$ is \textbf{constant} over the life of the option.
+  \item There are no jumps in the price.
+  \item Trading is continuous and frictionless (no transaction costs, unlimited short selling).
+  \item The risk-free interest rate $r$ is constant and known.
+  \item No dividends.
+\end{enumerate}
+Every single one of these assumptions is wrong in practice. This matters, and we will exploit it.
+\end{keyidea}
+
+\begin{definition}[The Black-Scholes Formula for a European Call\protect\footnote{A \textbf{European} option can only be exercised at expiry, not before. An \textbf{American} option can be exercised at any time up to expiry. For the purpose of defining implied volatility, the European version is standard.}]
+\label{def:bs-formula}
+\begin{equation}
+  C = S\,\Phi(d_1) - K e^{-rT}\Phi(d_2)
+  \label{eq:bs-call}
+\end{equation}
+where
+\begin{equation}
+  d_1 = \frac{\ln(S/K) + (r + \sigma^2/2)\,T}{\sigma\sqrt{T}}, \qquad
+  d_2 = d_1 - \sigma\sqrt{T}
+  \label{eq:bs-d1d2}
+\end{equation}
+and:
+\begin{itemize}[nosep]
+  \item $C$ = price of the call option today.
+  \item $S$ = current spot price of the underlying asset.
+  \item $K$ = strike price.
+  \item $r$ = continuously compounded risk-free interest rate (annualized).
+  \item $T$ = time to expiry in years (e.g., 3 months = 0.25).
+  \item $\sigma$ = annualized volatility of the underlying's log returns.
+  \item $\Phi(\cdot)$ = CDF of the standard normal distribution.
+  \item $d_1$ = a standardized measure of how far in-the-money the option is, adjusted for drift and time.
+  \item $d_2$ = $d_1$ minus a volatility-time adjustment; $\Phi(d_2)$ is the risk-neutral probability of exercise.
+\end{itemize}
+\end{definition}
+
+\begin{intuition}[Reading the Formula]
+Break Equation~\eqref{eq:bs-call} into two pieces:
+\begin{itemize}[nosep]
+  \item $S\,\Phi(d_1)$: what you expect to receive (the asset value, weighted by the probability-adjusted chance it ends up above $K$).
+  \item $K e^{-rT}\Phi(d_2)$: what you expect to pay (the strike, discounted to today, weighted by the risk-neutral probability of actually exercising).
+\end{itemize}
+The call price is the difference: expected receipt minus expected cost.
+\end{intuition}
+
+\begin{workedexample}{Black-Scholes Call Price}
+\label{ex:bs-calculation}
+Suppose the S\&P~500 is at $S = 100$, and you want to price a 3-month call with strike $K = 105$.
+The risk-free rate is $r = 5\%$ per year and volatility is $\sigma = 20\%$ per year.
+
+\textbf{Step 1: Compute $d_1$ and $d_2$.}
+\begin{align*}
+  d_1 &= \frac{\ln(100/105) + (0.05 + 0.04/2)(0.25)}{0.20\sqrt{0.25}}
+       = \frac{-0.04879 + 0.0175}{0.10}
+       = \frac{-0.03129}{0.10}
+       = -0.3129 \\
+  d_2 &= -0.3129 - 0.20\sqrt{0.25}
+       = -0.3129 - 0.10
+       = -0.4129
+\end{align*}
+
+\textbf{Step 2: Look up the normal CDF values.}
+\[
+  \Phi(-0.3129) = 0.3772, \qquad \Phi(-0.4129) = 0.3398
+\]
+
+\textbf{Step 3: Plug into the formula.}
+\begin{align*}
+  C &= 100 \times 0.3772 - 105\,e^{-0.05 \times 0.25} \times 0.3398 \\
+    &= 37.72 - 105 \times 0.9876 \times 0.3398 \\
+    &= 37.72 - 35.25 \\
+    &= \$2.47
+\end{align*}
+
+The call is out-of-the-money ($S < K$), so the premium is modest: \$2.47 on a \$100 underlying.
+You are paying for the \emph{possibility} that the index rises above 105 within three months.
+\end{workedexample}
+
+\begin{warning}[Black-Scholes Is Wrong, but Universal]
+Black-Scholes is wrong in nearly all its assumptions.
+Returns have fat tails (Chapter~\ref{ch:returns}), volatility is not constant (Chapters~\ref{ch:garch}--\ref{ch:rough}), and prices jump (Chapter~\ref{ch:jumps}).
+But the formula remains the market's common language for quoting option prices.
+When a trader says ``this option is trading at 25 vol,'' they mean the Black-Scholes implied volatility is 25\%.
+The formula is not a belief about reality; it is a translation device.
+\end{warning}
+
+
+% ═══════════════════════════════════════════════════════
+\section{Implied Volatility}
+\label{sec:implied-vol}
+% ═══════════════════════════════════════════════════════
+
+With Black-Scholes in hand, we now reverse-engineer it to extract the market's view of volatility.
+
+Every input to the Black-Scholes formula ($S$, $K$, $r$, $T$) is directly observable from market data, except one: $\sigma$.
+If you also observe the market price of the option $C_{\text{mkt}}$, you can back out the volatility the market is implicitly using.
+
+\begin{definition}[Implied Volatility]
+\label{def:implied-vol}
+The \textbf{implied volatility} $\sigma_{\text{imp}}$ is the value of $\sigma$ that makes the Black-Scholes formula match the observed market price:
+\begin{equation}
+  C_{\text{mkt}} = C_{\text{BS}}(S,\, K,\, r,\, T,\, \sigma_{\text{imp}})
+  \label{eq:iv-definition}
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $C_{\text{mkt}}$ = the option price observed in the market.
+  \item $C_{\text{BS}}(\cdot)$ = the Black-Scholes pricing function (Equation~\ref{eq:bs-call}).
+  \item $\sigma_{\text{imp}}$ = the implied volatility (the unknown being solved for).
+\end{itemize}
+There is no closed-form solution for $\sigma_{\text{imp}}$; it must be found numerically (e.g., Newton-Raphson or bisection).
+\end{definition}
+
+\begin{intuition}[The ``Wrong Number in the Wrong Formula'']
+Implied volatility is famously described as ``the wrong number to put in the wrong formula to get the right price'' \citep{Rebonato2004}.
+It is \emph{not} a forecast of future volatility.
+It is the market's consensus price of uncertainty, contaminated by:
+\begin{itemize}[nosep]
+  \item \textbf{Risk premia}: sellers of options demand compensation for bearing tail risk, inflating IV above expected realized vol.
+  \item \textbf{Supply and demand}: heavy demand for downside protection (put buying) pushes up IV for low-strike options.
+  \item \textbf{Model error}: since Black-Scholes is misspecified, IV absorbs all the model's errors into a single number.
+\end{itemize}
+Despite all this, IV is extremely useful. It is a real-time, forward-looking, market-priced measure of uncertainty.
+\end{intuition}
+
+\begin{workedexample}{Backing Out Implied Volatility}
+Continuing the example from Section~\ref{sec:black-scholes}: $S = 100$, $K = 105$, $r = 5\%$, $T = 0.25$.
+Suppose the market price of the call is $C_{\text{mkt}} = \$3.10$ (higher than the \$2.47 we computed with $\sigma = 20\%$).
+
+Since the market price exceeds our 20\%-vol price, the market is pricing in higher volatility.
+Using numerical root-finding on $C_{\text{BS}}(S, K, r, T, \sigma) = 3.10$, you would find $\sigma_{\text{imp}} \approx 23.5\%$.
+
+The market is telling you: the uncertainty priced into this option corresponds to roughly 23.5\% annualized volatility, not the 20\% we assumed.
+\end{workedexample}
+
+A critical point: implied volatility is \emph{not} a single number for a given underlying.
+Every (strike, maturity) pair has its own IV.
+This leads directly to the next section.
+
+
+% ═══════════════════════════════════════════════════════
+\section{The Implied Volatility Surface}
+\label{sec:iv-surface}
+% ═══════════════════════════════════════════════════════
+
+The implied volatility extracted from options depends on which option you look at, giving rise to a two-dimensional surface.
+
+\begin{definition}[Implied Volatility Surface]
+\label{def:iv-surface}
+The \textbf{implied volatility surface} is the function
+\begin{equation}
+  \sigma_{\text{imp}}(K, T)
+  \label{eq:iv-surface}
+\end{equation}
+mapping each (strike, maturity) pair to the implied volatility extracted from the corresponding option price.
+In practice, moneyness $m = K/S$ (or $\ln(K/S)$) replaces the raw strike to make the surface comparable across different underlying price levels.
+\begin{itemize}[nosep]
+  \item $K$ (or $m$) = strike price (or moneyness).
+  \item $T$ = time to expiry.
+  \item $\sigma_{\text{imp}}$ = implied volatility at that (strike, maturity) point.
+\end{itemize}
+\end{definition}
+
+\begin{keyidea}[What a Flat Surface Would Mean]
+If Black-Scholes were correct (constant volatility, log-normal returns, no jumps), every option on the same underlying would produce the \emph{same} implied volatility regardless of strike or maturity.
+The surface would be perfectly flat.
+The fact that the surface is \emph{not} flat is direct evidence that Black-Scholes is wrong, and the shape of the surface tells you \emph{how} it is wrong.
+\end{keyidea}
+
+\subsection{The Volatility Smile and Skew}
+\label{sec:smile-skew}
+
+The cross-section of IV at a fixed maturity reveals two patterns, shown in Figure~\ref{fig:iv-smile-skew}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=12cm, height=7cm,
+  xlabel={Moneyness ($K/S$)},
+  ylabel={Implied Volatility (\%)},
+  xmin=0.80, xmax=1.20,
+  ymin=12, ymax=32,
+  xtick={0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15},
+  ytick={14, 18, 22, 26, 30},
+  grid=major,
+  grid style={gray!30},
+  legend pos=north east,
+  legend style={font=\small},
+  axis lines=left,
+  every axis x label/.style={at={(ticklabel* cs:1.0)}, anchor=west},
+  every axis y label/.style={at={(ticklabel* cs:1.0)}, anchor=south},
+]
+% Equity skew (post-1987)
+\addplot[ultra thick, warnred, smooth] coordinates {
+  (0.80, 30) (0.85, 27) (0.90, 24) (0.95, 21.5) (1.00, 20)
+  (1.05, 19) (1.10, 18.5) (1.15, 18.2) (1.20, 18.0)
+};
+\addlegendentry{Equity skew (typical)}
+% Symmetric smile (FX)
+\addplot[ultra thick, defblue, smooth, dashed] coordinates {
+  (0.80, 26) (0.85, 23) (0.90, 20.5) (0.95, 19) (1.00, 18.5)
+  (1.05, 19) (1.10, 20.5) (1.15, 23) (1.20, 26)
+};
+\addlegendentry{FX smile (symmetric)}
+% Flat BS reference
+\addplot[thick, gray, dotted] coordinates {
+  (0.80, 20) (1.20, 20)
+};
+\addlegendentry{Black-Scholes (flat)}
+
+% Annotations
+\draw[-{Stealth}, thick, intgreen] (axis cs:0.85,28) -- (axis cs:0.85,25.5)
+  node[pos=0, above, font=\scriptsize, text=intgreen, align=center]{OTM puts\\(crash protection)};
+\draw[-{Stealth}, thick, intgreen] (axis cs:1.12,16.5) -- (axis cs:1.12,18.2)
+  node[pos=0, below, font=\scriptsize, text=intgreen, align=center]{OTM calls};
+
+\end{axis}
+\end{tikzpicture}
+\caption{Implied volatility vs.\ moneyness at a fixed maturity.
+The \textcolor{warnred}{red solid line} shows the typical equity skew: IV increases sharply for low strikes (OTM puts) due to crash-risk demand.
+The \textcolor{defblue}{blue dashed line} shows a symmetric ``smile'' common in FX markets, where both tails carry extra uncertainty.
+The \textcolor{gray}{gray dotted line} is the flat surface that Black-Scholes would predict.}
+\label{fig:iv-smile-skew}
+\end{figure}
+
+\textbf{The skew} (red curve): for equity index options, IV is much higher for low strikes ($K/S < 1$, OTM puts) than for high strikes ($K/S > 1$, OTM calls).
+This pattern emerged after the 1987 crash and has persisted ever since.
+It reflects the market's pricing of left-tail (crash) risk: investors pay a premium for downside protection.
+
+\textbf{The smile} (blue curve): for foreign exchange options, IV is elevated for both deep OTM puts and deep OTM calls, creating a U-shape.
+This reflects the market's view that large moves in either direction are more likely than the log-normal model assumes (fat tails on both sides).
+
+Both patterns are inconsistent with constant-volatility Black-Scholes, which would produce the flat gray line.
+
+\subsection{The Term Structure of Implied Volatility}
+\label{sec:iv-term-structure}
+
+The second dimension is maturity.
+At-the-money IV is not the same at 1~month as at 1~year.
+
+\begin{keyidea}[IV Term Structure]
+\begin{itemize}[nosep]
+  \item \textbf{Normal conditions}: the term structure slopes upward (long-dated IV $>$ short-dated IV), reflecting the greater uncertainty over longer horizons and mean-reversion in volatility.
+  \item \textbf{Crisis periods}: the term structure inverts (short-dated IV $>$ long-dated IV), because near-term fear spikes while the market expects volatility to eventually normalize.
+  \item Short-dated IV is more volatile than long-dated IV, consistent with the mean-reverting nature of volatility established in Chapters~\ref{ch:garch} and~\ref{ch:har}.
+\end{itemize}
+\end{keyidea}
+
+\subsection{The Full Surface}
+\label{sec:full-surface}
+
+Figure~\ref{fig:iv-surface-3d} combines both dimensions into a three-dimensional view.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=13cm, height=9cm,
+  view={-40}{30},
+  xlabel={Moneyness ($K/S$)},
+  ylabel={Maturity (months)},
+  zlabel={IV (\%)},
+  xmin=0.85, xmax=1.15,
+  ymin=1, ymax=12,
+  zmin=14, zmax=32,
+  xtick={0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15},
+  ytick={1, 3, 6, 9, 12},
+  ztick={16, 20, 24, 28, 32},
+  grid=major,
+  grid style={gray!20},
+  colormap/viridis,
+  mesh/ordering=y varies,
+  xlabel style={sloped},
+  ylabel style={sloped},
+]
+\addplot3[
+  surf,
+  opacity=0.85,
+  shader=interp,
+  samples=7,
+  samples y=6,
+  domain=0.85:1.15,
+  y domain=1:12,
+] {
+  % Skew component: steeper for short maturities
+  20
+  + 12*max(1-x, 0)^1.3 * (1 + 3/y)
+  - 3*max(x-1, 0)^1.1 * (1 + 1/y)
+  + 0.5*sqrt(y/12)
+  - 2*(1-abs(x-1)*4)*exp(-y/3)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{The implied volatility surface for a typical equity index.
+Left side (low moneyness, OTM puts): IV is elevated, especially at short maturities, reflecting concentrated crash-risk demand.
+Right side (high moneyness, OTM calls): IV is lower.
+Short maturities (front of the surface): the skew is steeper and IV levels are more extreme.
+Long maturities (back): the surface flattens as mean-reversion dampens both the level and the skew.}
+\label{fig:iv-surface-3d}
+\end{figure}
+
+\begin{keyidea}[What the Surface Shape Tells You]
+The shape of the IV surface encodes the market's collective view on:
+\begin{itemize}[nosep]
+  \item \textbf{Skew} (IV higher for low strikes): the market prices crash risk above what log-normal returns imply.
+  \item \textbf{Smile} (IV elevated at both extremes): the market prices fat tails in both directions.
+  \item \textbf{Steep term structure}: short-term uncertainty is elevated relative to long-term expectations (often a fear signal).
+  \item \textbf{Inverted term structure}: near-term panic; the market expects volatility to decline eventually.
+\end{itemize}
+Each of these shapes changes over time, and tracking those changes is a source of features for volatility forecasting.
+\end{keyidea}
+
+
+% ═══════════════════════════════════════════════════════
+\section{PCA of the Volatility Surface}
+\label{sec:pca-iv-surface}
+% ═══════════════════════════════════════════════════════
+
+The IV surface is a high-dimensional object (potentially hundreds of strike-maturity points), but its daily movements are driven by a small number of factors.
+
+\citet{Cont2002} applied principal component analysis (PCA) to the daily changes of S\&P~500 implied volatility surfaces and found a remarkably low-dimensional structure.
+
+\begin{prereq}[PCA in One Paragraph]
+PCA finds orthogonal directions of maximum variance in a dataset.
+The first principal component (PC1) captures the most variance, PC2 captures the most remaining variance orthogonal to PC1, and so on.
+If you have studied linear algebra, PCA extracts the eigenvectors of the covariance matrix, sorted by eigenvalue magnitude.
+\end{prereq}
+
+\begin{keyresult}[Three Factors Drive the IV Surface \citep{Cont2002}]
+\label{res:pca-iv}
+PCA on daily changes in the implied volatility surface yields three dominant factors:
+\begin{enumerate}[nosep]
+  \item \textbf{Level} (PC1, $\sim$70\% of variance): a parallel shift; the entire surface moves up or down together.
+  This is the ``VIX factor'' for equity indices.
+  \item \textbf{Slope} (PC2, $\sim$15\% of variance): the skew steepens or flattens; OTM put IV moves relative to OTM call IV.
+  \item \textbf{Curvature} (PC3, $\sim$10\% of variance): the smile becomes more or less convex; both tails move relative to ATM.
+\end{enumerate}
+Together, these three factors explain roughly 95\% of daily surface variation.
+\end{keyresult}
+
+Figure~\ref{fig:pca-factors} illustrates the three factor loadings.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=12cm, height=6.5cm,
+  xlabel={Moneyness ($K/S$)},
+  ylabel={Factor Loading},
+  xmin=0.85, xmax=1.15,
+  ymin=-0.6, ymax=0.8,
+  xtick={0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15},
+  grid=major,
+  grid style={gray!30},
+  legend pos=south east,
+  legend style={font=\small},
+  axis lines=left,
+]
+% PC1 — Level (roughly flat, positive)
+\addplot[ultra thick, defblue, smooth] coordinates {
+  (0.85, 0.55) (0.90, 0.58) (0.95, 0.60) (1.00, 0.60) (1.05, 0.58) (1.10, 0.55) (1.15, 0.52)
+};
+\addlegendentry{PC1: Level ($\sim$70\%)}
+% PC2 — Slope (negative for low K, positive for high K)
+\addplot[ultra thick, warnred, smooth, dashed] coordinates {
+  (0.85, -0.50) (0.90, -0.35) (0.95, -0.15) (1.00, 0.05) (1.05, 0.25) (1.10, 0.40) (1.15, 0.50)
+};
+\addlegendentry{PC2: Slope ($\sim$15\%)}
+% PC3 — Curvature (positive at extremes, negative at center)
+\addplot[ultra thick, intgreen, smooth, densely dotted] coordinates {
+  (0.85, 0.45) (0.90, 0.20) (0.95, -0.10) (1.00, -0.25) (1.05, -0.10) (1.10, 0.20) (1.15, 0.45)
+};
+\addlegendentry{PC3: Curvature ($\sim$10\%)}
+% Zero line
+\addplot[thin, gray] coordinates {(0.85, 0) (1.15, 0)};
+\end{axis}
+\end{tikzpicture}
+\caption{Stylized PCA factor loadings for the implied volatility surface at a fixed maturity, following \citet{Cont2002}.
+PC1 (level) loads uniformly across strikes.
+PC2 (slope) loads negatively on low strikes and positively on high strikes, capturing skew rotation.
+PC3 (curvature) loads positively at both extremes and negatively at ATM, capturing smile convexity changes.}
+\label{fig:pca-factors}
+\end{figure}
+
+\begin{keyidea}[Practical Use: Surface Compression]
+Instead of feeding hundreds of IV grid points into a forecasting model, you can represent each day's surface (or surface change) with just three numbers: the PC1, PC2, and PC3 scores.
+This is a powerful dimensionality reduction for feature engineering (Chapter~\ref{ch:features}): three features capture 95\% of the surface's information content.
+\end{keyidea}
+
+
+% ═══════════════════════════════════════════════════════
+\section{Model-Free Implied Variance and the VIX}
+\label{sec:vix}
+% ═══════════════════════════════════════════════════════
+
+The previous sections define implied volatility through the lens of Black-Scholes, which means the IV number carries the model's errors.
+This section presents a method that extracts expected future variance from option prices without assuming any pricing model.
+
+\subsection{Model-Free Implied Variance}
+\label{sec:model-free}
+
+\citet{BrittenJones2000} proved a striking result: under very general conditions, the expected integrated variance of the underlying (under the risk-neutral probability measure) can be read directly from option prices across all strikes, with no parametric model needed.
+
+\begin{prereq}[Risk-Neutral Measure]
+In derivatives pricing, the ``risk-neutral'' (or $\mathbb{Q}$) measure is a probability weighting under which all assets earn the risk-free rate on average.
+It is \emph{not} the real-world probability of outcomes; it is a mathematical device that makes pricing consistent with no-arbitrage.
+Expectations under $\mathbb{Q}$ incorporate risk premia: they overweight bad outcomes relative to real-world probabilities because investors demand compensation for bearing risk.
+\end{prereq}
+
+\begin{keyresult}[Model-Free Implied Variance \citep{BrittenJones2000}]
+\label{res:model-free}
+The risk-neutral expected integrated variance over horizon $[0, T]$ equals:
+\begin{equation}
+  \E^{\mathbb{Q}}\!\left[\int_0^T \sigma_t^2\,dt\right]
+  = \frac{2}{T}\int_0^{\infty} \frac{C(K,T)}{K^2}\,dK
+  + \frac{2}{T}\int_0^{\infty} \frac{P(K,T)}{K^2}\,dK
+  \label{eq:model-free-var}
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $\E^{\mathbb{Q}}[\cdot]$ = expectation under the risk-neutral probability measure.
+  \item $\sigma_t^2$ = instantaneous variance of the underlying at time $t$.
+  \item $\int_0^T \sigma_t^2\,dt$ = integrated variance over the period (the object that realized volatility estimates; see Chapter~\ref{ch:rv}).
+  \item $C(K,T)$ = price of a European call with strike $K$ and maturity $T$.
+  \item $P(K,T)$ = price of a European put with strike $K$ and maturity $T$.
+  \item The integration spans all possible strikes from zero to infinity.
+  \item The $1/K^2$ weighting gives proportionally more weight to OTM options at lower strikes.
+\end{itemize}
+The key insight: by integrating option prices across all strikes, the dependence on any particular volatility model cancels out.
+\end{keyresult}
+
+\begin{intuition}[Why It Works Without a Model]
+A portfolio of options across all strikes effectively replicates a contract on realized variance itself.
+Each option at strike $K$ provides local information about the probability of the price reaching $K$.
+By weighting them by $1/K^2$ and integrating, you reconstruct the full distribution and extract its second moment (variance) without ever assuming what that distribution looks like.
+\end{intuition}
+
+\subsection{The VIX Index}
+\label{sec:vix-index}
+
+The CBOE Volatility Index (VIX) is the market's most-watched ``fear gauge.''
+It implements the model-free approach of \citet{BrittenJones2000} on S\&P~500 options with a 30-day horizon.
+
+\begin{definition}[VIX Construction \citep{CBOE2019}]
+\label{def:vix}
+The VIX is defined as:
+\begin{equation}
+  \text{VIX}^2 = \frac{2}{T}\sum_i \frac{\Delta K_i}{K_i^2}\,e^{rT}\, Q(K_i)
+  - \frac{1}{T}\left(\frac{F}{K_0} - 1\right)^2
+  \label{eq:vix}
+\end{equation}
+and $\text{VIX} = 100 \times \sqrt{\text{VIX}^2/100^2}$, reported in annualized percentage points.
+\begin{itemize}[nosep]
+  \item $T$ = time to expiry (30 calendar days, $T \approx 30/365$).
+  \item $K_i$ = strike price of the $i$-th OTM option.
+  \item $\Delta K_i$ = spacing between adjacent strikes ($(K_{i+1} - K_{i-1})/2$).
+  \item $Q(K_i)$ = midpoint of the bid-ask spread for the OTM option at strike $K_i$ (puts for $K_i < F$, calls for $K_i > F$).
+  \item $F$ = forward index level derived from put-call parity.
+  \item $K_0$ = the first strike below $F$.
+  \item $r$ = risk-free rate.
+  \item The second term is a small correction for the difference between the forward and the first-below-forward strike.
+\end{itemize}
+In practice, the CBOE interpolates between the two nearest-to-30-day maturities to target exactly 30 days.
+\end{definition}
+
+Equation~\eqref{eq:vix} is the discrete approximation of the continuous integral in Equation~\eqref{eq:model-free-var}: the sum over OTM options across all available strikes replaces the integral, and the $\Delta K_i / K_i^2$ weighting mirrors the $1/K^2$ in the continuous formula.
+
+\begin{keyidea}[Interpreting VIX Levels]
+VIX is quoted in annualized percentage points.
+Typical values for the S\&P~500:
+\begin{itemize}[nosep]
+  \item \textbf{VIX $\approx$ 12--15}: calm markets, low uncertainty.
+  \item \textbf{VIX $\approx$ 20--25}: elevated uncertainty, moderate fear.
+  \item \textbf{VIX $>$ 30}: high fear; historically associated with market sell-offs.
+  \item \textbf{VIX $>$ 50}: extreme panic (2008 financial crisis peak: $\sim$80; March 2020: $\sim$82).
+\end{itemize}
+To convert VIX to expected 30-day realized vol: $\sigma_{30d} \approx \text{VIX}/100$.
+For example, VIX = 20 implies the options market prices roughly 20\% annualized vol over the next month.
+\end{keyidea}
+
+\begin{warning}[VIX Is Not a Volatility Forecast]
+VIX is the risk-neutral expected volatility, \emph{not} a forecast of realized volatility under real-world probabilities.
+VIX systematically overstates future realized volatility.
+The average gap between VIX-squared and subsequent 30-day realized variance is the \textbf{variance risk premium} (Chapter~\ref{ch:vrp}).
+Historically, VIX exceeds subsequent realized vol roughly 85\% of the time \citep{Carr2009}.
+Using VIX as a direct volatility forecast is a common and costly mistake: it confuses the risk-neutral measure $\mathbb{Q}$ with the real-world measure $\mathbb{P}$.
+\end{warning}
+
+\begin{workedexample}{From VIX to Expected Daily Moves}
+VIX is currently at 22.
+What daily price move does this imply?
+
+\textbf{Step 1:} Convert to a decimal: $22/100 = 0.22$ (22\% annualized).
+
+\textbf{Step 2:} Convert to daily.
+With approximately 252 trading days per year:
+\[
+  \sigma_{\text{daily}} \approx \frac{0.22}{\sqrt{252}} \approx 0.0139 = 1.39\%
+\]
+
+\textbf{Step 3:} Interpret.
+With the S\&P~500 at 5{,}000, a one-standard-deviation daily move is roughly $5{,}000 \times 0.0139 \approx 69$ points.
+
+This is only approximate (it assumes returns are normal and ignores the risk-premium bias), but it gives you the right order of magnitude for how much daily movement the options market is pricing.
+\end{workedexample}
+
+
+% ═══════════════════════════════════════════════════════
+\section{Connecting the Vol Surface to Volatility Forecasting}
+\label{sec:surface-to-forecasting}
+% ═══════════════════════════════════════════════════════
+
+This section previews how the concepts introduced here feed into the rest of the guide.
+
+\begin{keyidea}[IV Surface Features for ML Models]
+The volatility surface provides a rich set of features for realized volatility forecasting models (Chapters~\ref{ch:features}--\ref{ch:hybrid}):
+\begin{itemize}[nosep]
+  \item \textbf{VIX level}: the single most common implied-vol feature. Often the strongest univariate predictor of future realized vol \citep{Gu2020}.
+  \item \textbf{VVIX} (the ``vol of vol''): implied volatility of VIX options; captures uncertainty about uncertainty.
+  \item \textbf{Skew slope}: the difference in IV between OTM puts and ATM options; a proxy for tail-risk pricing.
+  \item \textbf{Term spread}: the difference between long-dated and short-dated ATM IV; signals mean-reversion expectations.
+  \item \textbf{PCA scores} (Section~\ref{sec:pca-iv-surface}): three-number summary of the entire surface.
+  \item \textbf{Variance risk premium}: VIX$^2$ minus recent realized variance; the subject of Chapter~\ref{ch:vrp}.
+\end{itemize}
+\end{keyidea}
+
+
+% ═══════════════════════════════════════════════════════
+\section{Summary}
+\label{sec:volsurface-summary}
+% ═══════════════════════════════════════════════════════
+
+\begin{itemize}[nosep]
+  \item An option gives the right (not obligation) to buy (call) or sell (put) at a fixed strike $K$ by expiry $T$.
+  \item Call payoff: $\max(S_T - K, 0)$; put payoff: $\max(K - S_T, 0)$.
+  \item Black-Scholes \citep{Black1973} provides a closed-form call price: $C = S\Phi(d_1) - Ke^{-rT}\Phi(d_2)$.
+  The formula assumes constant volatility, log-normal returns, no jumps, and frictionless markets.
+  \item Implied volatility $\sigma_{\text{imp}}$ is the $\sigma$ that makes Black-Scholes match the market price.
+  It is not a forecast; it is the market's price of uncertainty, contaminated by risk premia and model error.
+  \item The IV surface $\sigma_{\text{imp}}(K, T)$ varies across strikes and maturities.
+  Skew (higher IV for low strikes) reflects crash-risk pricing; smile (U-shape) reflects fat-tail pricing.
+  \item PCA of the IV surface \citep{Cont2002} yields three dominant factors (level, slope, curvature) explaining $\sim$95\% of daily variation.
+  \item Model-free implied variance \citep{BrittenJones2000} extracts expected future variance from the cross-section of option prices without assuming any pricing model.
+  \item VIX implements model-free implied variance for S\&P~500 options over 30 days.
+  VIX systematically overestimates future realized vol; the gap is the variance risk premium (Chapter~\ref{ch:vrp}).
+  \item VIX, skew, term structure, PCA scores, and VRP are all feature candidates for ML volatility models (Chapter~\ref{ch:features}).
+  \item The IV surface is observed daily, forward-looking, and market-priced, making it a uniquely valuable complement to backward-looking realized volatility measures.
+\end{itemize}
+
+\vspace{1em}
+
+\begin{table}[htbp]
+\centering
+\caption{Key Results from Chapter~\ref{ch:volsurface}}
+\label{tab:ch8-key-results}
+\begin{tabular}{p{3.5cm} p{4cm} p{5cm}}
+\toprule
+\textbf{Concept} & \textbf{Key Formula / Result} & \textbf{Significance} \\
+\midrule
+Black-Scholes & $C = S\Phi(d_1) - Ke^{-rT}\Phi(d_2)$ & Defines the common language for quoting option prices as volatilities \\
+\addlinespace
+Implied volatility & Solve $C_{\text{mkt}} = C_{\text{BS}}(\sigma_{\text{imp}})$ & Market-priced, forward-looking measure of uncertainty \\
+\addlinespace
+IV surface shape & Skew, smile, term structure & Reveals crash-risk pricing, fat-tail beliefs, and mean-reversion expectations \\
+\addlinespace
+PCA of IV surface & 3 factors $\approx$ 95\% of variance & Level, slope, curvature; compress the surface for feature engineering \\
+\addlinespace
+Model-free variance & $\frac{2}{T}\int \frac{O(K)}{K^2}\,dK$ & Extracts expected variance without model assumptions \\
+\addlinespace
+VIX & CBOE implementation, 30-day & Not a vol forecast; systematically overestimates realized vol (includes risk premium) \\
+\bottomrule
+\end{tabular}
+\end{table}
