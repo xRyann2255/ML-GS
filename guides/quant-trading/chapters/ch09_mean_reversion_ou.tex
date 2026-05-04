@@ -1,0 +1,1032 @@
+\chapter{Mean Reversion and the Ornstein--Uhlenbeck Process}
+\label{ch:mean_reversion_ou}
+\chaptermark{Mean reversion and OU}
+
+You have a time series that wanders around a constant value:
+strays high, comes back; strays low, comes back. Can you trade
+it? The naive answer is short the highs and buy the lows, but
+turning ``it looks mean-reverting'' into a strategy requires
+three quantitative answers in order:
+\begin{enumerate}
+  \item Is the series \emph{actually} mean-reverting, or does it
+  only look that way? Most series that visually appear to revert
+  are random walks that happened to visit the same level twice.
+  Trading them on a mean-reversion thesis loses money.
+  \item If the series \emph{is} mean-reverting, what is the
+  half-life --- how long does the average excursion take to fade?
+  A half-life of one minute is tradeable on a one-day horizon; a
+  half-life of six months is not.
+  \item Given the half-life, when do you enter, exit, and how do
+  you size? The standard answer is the \textbf{$z$-score rule}:
+  enter when the standardised deviation is large enough that the
+  expected reversion is worth the capital, exit when it has
+  decayed close to zero.
+\end{enumerate}
+This chapter answers all three with the
+\textbf{Ornstein--Uhlenbeck (OU) process}, the canonical
+continuous-time model of a mean-reverting variable. The OU model
+solves (2) with an explicit half-life formula in one parameter;
+it solves (3) by turning that parameter into entry and exit
+thresholds; and it gives partial answers to (1) via three
+statistical tests (Augmented Dickey--Fuller, variance ratio, Hurst
+exponent). We follow Chan \citeChan{} and the more rigorous
+Cartea--Jaimungal--Penalva \citeCartea{}, with one worked example
+carried through every section.
+
+Context. The Glosten--Milgrom posterior of \cref{ch:kyle_gm} is
+a \emph{martingale}: no reversion, best prediction is the current
+value. OU is the opposite. Efficient prices of tradeable
+securities are martingales by no-arbitrage; \emph{spreads},
+ETF \emph{premia}, and \emph{deviations} from a slow fair value
+are mean-reverting. Recognising which is which is half the work;
+the rest is the OU machinery.
+
+\begin{backgroundbox}[Prerequisites]
+From earlier in the book:
+\begin{itemize}
+  \item \Cref{ch:spreads_roll}: the Roll (1984) decomposition
+  $\Cov(\Delta p_t, \Delta p_{t+1}) = -s^2/4$. Roll is the
+  discrete-time trade-horizon mean-reverter; OU is the
+  continuous-time generalisation that separates reversion speed
+  from size.
+  \item \Cref{ch:kyle_gm}: the Glosten--Milgrom posterior is a
+  \emph{martingale}. Opposite worldview --- contrast deliberately.
+  \item \Cref{ch:order_flow}: Hawkes processes modelled clustered
+  \emph{arrivals}. OU is the mean-reversion analogue for
+  clustered \emph{values} (drifting back to a mean rather than
+  wandering off).
+  \item \Cref{ch:market_making}: the Avellaneda--Stoikov
+  $\volat$ for mid-price volatility is the same symbol and units
+  as the OU driving-Brownian volatility here.
+\end{itemize}
+From outside the book:
+\begin{itemize}
+  \item Stochastic calculus, informally: Brownian motion $W_t$,
+  It\^o integral $\int_0^t f(s)\, dW_s$, It\^o isometry
+  $\E[(\int_0^t f\, dW_s)^2] = \int_0^t f^2\, ds$. Full
+  machinery is built in \cref{ch:black_scholes}.
+  \item OLS linear regression; the $t$-statistic, AR(1), and
+  standard normal.
+\end{itemize}
+\end{backgroundbox}
+
+\section{The Ornstein--Uhlenbeck process}
+\label{sec:ch9_ou}
+
+Introduced in 1930 by Ornstein and Uhlenbeck for a particle
+subject to friction and thermal kicks, OU is the workhorse of
+stochastic mean reversion in finance: every short-rate model in
+\cref{ch:rates_derivatives} uses an OU-like SDE, every
+cointegrated pair in \cref{ch:pairs_cointegration} treats its
+residual as OU, and every mean-reversion strategy here is
+parameterised by the OU half-life. (Symbols: $\theta$
+mean-reversion rate, $\mu$ long-run mean, $\volat$ instantaneous
+volatility, $W_t$ Brownian motion, $\tau_{1/2}$ half-life, $z$
+standardised deviation.)
+
+\begin{definition}[Ornstein--Uhlenbeck process]
+\index{Ornstein--Uhlenbeck (OU) process|textbf}\index{OU process|textbf}\index{mean reversion!OU process|textbf}
+\label{def:ou}
+A stochastic process $(X_t)_{t \geq 0}$ taking values in $\R$ is
+an \emph{Ornstein--Uhlenbeck process} with parameters
+$(\theta, \mu, \volat)$ if it satisfies the stochastic
+differential equation
+\begin{equation}
+  dX_t \;=\; \theta\,(\mu - X_t)\,dt \;+\; \volat\,dW_t,
+  \qquad \theta > 0,\ \mu \in \R,\ \volat > 0,
+  \label{eq:ou_sde}
+\end{equation}
+where $W_t$ is a standard Brownian motion. The parameter $\theta$
+is the \emph{mean-reversion speed}, $\mu$ is the \emph{long-run
+mean}, and $\volat$ is the \emph{instantaneous volatility}.
+\end{definition}
+
+The drift $\theta(\mu - X_t)$ does the work. When $X_t > \mu$ the
+drift is negative and pulls down; when $X_t < \mu$ it pulls up,
+with strength proportional to the distance from $\mu$. Larger
+$\theta$ means faster reversion. The noise $\volat\, dW_t$ kicks
+$X_t$ around as it reverts; without it $X_t$ would decay
+exponentially toward $\mu$.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=10cm, height=5cm,
+  xlabel={Time $t$},
+  ylabel={$X_t$},
+  xmin=0, xmax=10,
+  ymin=-2.8, ymax=2.8,
+  ytick={-2,0,2},
+  xtick={0,2,4,6,8,10},
+  grid=major, grid style={dashed,gray!25},
+  title={Ornstein--Uhlenbeck sample path ($\mu=0$)},
+  title style={font=\small\bfseries},
+]
+\addplot[dashed, black!45, thick]
+  coordinates {(0,0)(10,0)} node[right, font=\small]{$\mu$};
+\addplot[blue!70, thick, smooth] coordinates {
+  (0,1.5)(0.5,1.8)(1.0,1.3)(1.5,0.6)(2.0,0.1)(2.5,-0.4)
+  (3.0,-0.9)(3.5,-1.5)(4.0,-1.9)(4.5,-1.4)(5.0,-0.7)
+  (5.5,-0.1)(6.0,0.5)(6.5,1.1)(7.0,1.7)(7.5,2.1)
+  (8.0,1.5)(8.5,0.9)(9.0,0.3)(9.5,-0.3)(10.0,0.1)
+};
+\draw[-Stealth, red!65, thick]
+  (axis cs:0.5,1.8) -- (axis cs:0.5,0.4)
+  node[right, font=\tiny, red!70]{pull};
+\draw[-Stealth, red!65, thick]
+  (axis cs:4.0,-1.9) -- (axis cs:4.0,-0.5)
+  node[right, font=\tiny, red!70]{pull};
+\draw[-Stealth, red!65, thick]
+  (axis cs:7.5,2.1) -- (axis cs:7.5,0.6)
+  node[right, font=\tiny, red!70]{pull};
+\end{axis}
+\end{tikzpicture}
+\caption{Simulated Ornstein--Uhlenbeck path. Red arrows show the
+mean-reversion force: whenever $X_t$ strays from $\mu = 0$,
+the drift term $\theta(\mu - X_t)$ pulls it back.
+The half-life $\tau_{1/2} = \log(2)/\theta$ sets the typical
+return-to-mean timescale. Larger $\theta$ produces faster, tighter
+oscillations; $\theta \to 0$ recovers a random walk.}
+\label{fig:ou_path}
+\end{figure}
+
+\subsection{Solving the SDE}
+\label{subsec:ch9_solve}
+
+Equation~\eqref{eq:ou_sde} is a first-order linear SDE and solves
+in closed form by the integrating-factor trick. Multiply both
+sides by $e^{\theta t}$:
+\begin{equation}
+  e^{\theta t}\,dX_t \;+\; \theta\,e^{\theta t}\,X_t\,dt
+  \;=\; \theta\,e^{\theta t}\,\mu\,dt \;+\; \volat\,e^{\theta t}\,dW_t.
+  \label{eq:ou_step1}
+\end{equation}
+The left-hand side is a perfect differential. Applying It\^o's
+product rule to $f(t, X_t) = e^{\theta t} X_t$ (linear in $X_t$,
+so the second-order term vanishes),
+\begin{align}
+  d\!\left(e^{\theta t} X_t\right)
+  \;&=\; \theta\,e^{\theta t}\,X_t\,dt
+       \;+\; e^{\theta t}\,dX_t \nonumber \\[0.25em]
+  \;&=\; e^{\theta t}\,dX_t \;+\; \theta\,e^{\theta t}\,X_t\,dt,
+  \label{eq:ou_step2}
+\end{align}
+which is exactly the left-hand side of \eqref{eq:ou_step1}. So
+\eqref{eq:ou_step1} reads
+\begin{equation}
+  d\!\left(e^{\theta t} X_t\right)
+  \;=\; \theta\,\mu\,e^{\theta t}\,dt
+  \;+\; \volat\,e^{\theta t}\,dW_t.
+  \label{eq:ou_step3}
+\end{equation}
+Integrate both sides from $0$ to $t$:
+\begin{align}
+  e^{\theta t}\,X_t \;-\; X_0
+  \;&=\; \theta\,\mu\,\int_0^t e^{\theta s}\,ds
+       \;+\; \volat\,\int_0^t e^{\theta s}\,dW_s \nonumber \\[0.25em]
+  \;&=\; \mu\,\bigl(e^{\theta t} - 1\bigr)
+       \;+\; \volat\,\int_0^t e^{\theta s}\,dW_s.
+  \label{eq:ou_step4}
+\end{align}
+Divide through by $e^{\theta t}$ and rearrange:
+\begin{equation}
+  \boxed{\;
+  X_t \;=\; X_0\,e^{-\theta t}
+       \;+\; \mu\,\bigl(1 - e^{-\theta t}\bigr)
+       \;+\; \volat\,\int_0^t e^{-\theta(t-s)}\,dW_s.
+  \;}
+  \label{eq:ou_solution}
+\end{equation}
+Three pieces. $X_0 e^{-\theta t}$ is the \emph{exponential decay
+of the initial condition}: the influence of $X_0$ shrinks at rate
+$\theta$. $\mu(1 - e^{-\theta t})$ is the \emph{exponential growth
+of the mean toward $\mu$}: the deterministic part heads to $\mu$
+regardless of start. The It\^o integral is the \emph{accumulated
+noise}, exponentially weighted so recent shocks count more --- old
+kicks have already reverted away.
+
+\subsection{Mean and variance at finite time}
+\label{subsec:ch9_meanvar}
+
+Take expectations of \eqref{eq:ou_solution}. The It\^o integral
+of a deterministic integrand is a zero-mean Gaussian, so it drops
+out of the expectation:
+\begin{equation}
+  \E[X_t]
+  \;=\; X_0\,e^{-\theta t} \;+\; \mu\,\bigl(1 - e^{-\theta t}\bigr).
+  \label{eq:ou_mean}
+\end{equation}
+The expected value moves exponentially from $X_0$ toward $\mu$ at
+rate $\theta$.
+
+For the variance, the deterministic terms contribute zero. The
+stochastic piece $\volat \int_0^t e^{-\theta(t-s)}\, dW_s$ yields
+by It\^o isometry
+\begin{align}
+  \Var\!\left[\volat\,\int_0^t e^{-\theta(t-s)}\,dW_s\right]
+  \;&=\; \volat^2\,\int_0^t e^{-2\theta(t-s)}\,ds.
+  \label{eq:ou_var_step1}
+\end{align}
+Substitute $u = t - s$ and flip the limits:
+\begin{align}
+  \int_0^t e^{-2\theta(t-s)}\,ds
+  \;&=\; \int_0^t e^{-2\theta u}\,du
+  \;=\; \frac{1 - e^{-2\theta t}}{2\theta}. \label{eq:ou_var_step2}
+\end{align}
+Therefore
+\begin{equation}
+  \Var[X_t] \;=\; \frac{\volat^2}{2\theta}\,
+                 \bigl(1 - e^{-2\theta t}\bigr).
+  \label{eq:ou_var_finite}
+\end{equation}
+At $t = 0$ this is zero; as $t \to \infty$ it grows monotonically
+to a finite limit:
+\begin{equation}
+  \Var[X_t] \;\xrightarrow{t \to \infty}\;
+  \sigma_\infty^2 \;\defeq\; \frac{\volat^2}{2\theta}.
+  \label{eq:ou_var_stationary}
+\end{equation}
+The finite limit is why a mean-reverter can be \emph{traded}.
+A random walk has variance growing linearly forever, so ``it
+will come back'' has unbounded downside. OU has \emph{bounded}
+variance --- values stay in a tight neighbourhood of $\mu$ with
+a finite typical excursion size.
+
+\subsection{The stationary distribution}
+\label{subsec:ch9_stationary}
+
+For each finite $t$, $X_t$ in \eqref{eq:ou_solution} is Gaussian
+(linear combination of Gaussian initial condition and Gaussian
+It\^o integral), with mean and variance
+\eqref{eq:ou_mean}--\eqref{eq:ou_var_finite}. As $t \to \infty$
+both converge: mean to $\mu$, variance to
+$\sigma_\infty^2 = \volat^2/(2\theta)$. The limiting distribution
+is
+\begin{equation}
+  X_\infty \;\sim\; \Normal\!\left(\mu,\;\frac{\volat^2}{2\theta}\right).
+  \label{eq:ou_stationary_dist}
+\end{equation}
+This is the \emph{stationary distribution}: if $X_0$ is drawn
+from it, $X_t$ has the same distribution for every $t \geq 0$.
+The process never settles to a single point --- noise keeps
+kicking it --- but it settles to a stable Gaussian envelope of
+typical width $\sigma_\infty = \volat/\sqrt{2\theta}$ around
+$\mu$.
+
+\subsection{Autocorrelation}
+\label{subsec:ch9_autocorr}
+
+Two snapshots of the OU process at times $t$ and $t + h$ are
+correlated; the correlation decays exponentially with the lag
+$h$. In the stationary regime,
+\begin{equation}
+  \Corr(X_t,\, X_{t+h}) \;=\; e^{-\theta h}.
+  \label{eq:ou_autocorr}
+\end{equation}
+The derivation starts from $\Cov(X_t, X_{t+h}) =
+\Cov(X_t, X_t e^{-\theta h} + \text{noise}) = e^{-\theta h}
+\sigma_\infty^2$ and divides by $\sigma_\infty^2$; Cartea
+\citeCartea{} (Ch.~5) reproduces the steps. The key fact: the
+autocorrelation of a stationary OU process is a \emph{single
+decaying exponential} with the same rate $\theta$ as the drift.
+The OU process has one timescale, $1/\theta$.
+
+\subsection{Half-life}
+\label{subsec:ch9_halflife}
+
+The mean of $X_t$, given a starting point $X_0$, decays toward
+$\mu$ as $\E[X_t] - \mu = (X_0 - \mu)\,e^{-\theta t}$ from
+\eqref{eq:ou_mean}. The \emph{half-life} of the process is the
+time it takes for the expected deviation from $\mu$ to shrink to
+half its initial size:
+\begin{equation}
+  e^{-\theta\,h_{1/2}} \;=\; \tfrac{1}{2}
+  \quad\Longleftrightarrow\quad
+  \theta\,h_{1/2} \;=\; \ln 2
+  \quad\Longleftrightarrow\quad
+  h_{1/2} \;=\; \frac{\ln 2}{\theta}.
+  \label{eq:ou_halflife}
+\end{equation}
+The half-life is the single most important quantity for a
+trader: in the natural units of the series, how long on average
+you must wait for an excursion to revert. Everything else ---
+entry threshold, exit threshold, trade duration, capital
+allocation --- is downstream.
+
+\begin{keyfactbox}[OU process summary]
+The Ornstein--Uhlenbeck SDE
+\(dX_t = \theta(\mu - X_t)\,dt + \volat\,dW_t\) with
+$\theta > 0$ has the following properties.
+\begin{itemize}
+  \item \textbf{Closed-form solution}
+  $X_t = X_0 e^{-\theta t} + \mu(1 - e^{-\theta t})
+       + \volat\int_0^t e^{-\theta(t-s)}\,dW_s$.
+  \item \textbf{Stationary distribution}
+  $X_\infty \sim \Normal(\mu,\, \volat^2/(2\theta))$.
+  Stationary standard deviation
+  $\sigma_\infty = \volat/\sqrt{2\theta}$.
+  \item \textbf{Autocorrelation}
+  $\Corr(X_t, X_{t+h}) = e^{-\theta h}$. Single exponential
+  timescale $1/\theta$.
+  \item \textbf{Half-life}
+  $h_{1/2} = (\ln 2)/\theta$. Time for an expected
+  excursion to fade by half.
+\end{itemize}
+\end{keyfactbox}
+
+\subsection{A worked numerical example}
+\label{subsec:ch9_worked_ou}
+
+Take $\mu = 100$, $\theta = 0.3$, $\volat = 2$, $X_0 = 105$
+(five units above the mean). Time units are arbitrary --- think
+``hours'' or ``Prosperity ticks''.
+
+\paragraph{Half-life.} From \eqref{eq:ou_halflife},
+\begin{equation}
+  h_{1/2} \;=\; \frac{\ln 2}{0.3}
+            \;\approx\; \frac{0.693147}{0.3}
+            \;\approx\; 2.310 \text{ time units}.
+  \label{eq:ch9_worked_halflife}
+\end{equation}
+A deviation of size $5$ above the mean is expected to shrink to
+$2.5$ in about $2.31$ time units, to $1.25$ after another $2.31$,
+and so on.
+
+\paragraph{Stationary spread.} The stationary standard deviation
+is
+\begin{equation}
+  \sigma_\infty \;=\; \frac{\volat}{\sqrt{2\theta}}
+                \;=\; \frac{2}{\sqrt{0.6}}
+                \;=\; \frac{2}{0.7746\ldots}
+                \;\approx\; 2.582.
+  \label{eq:ch9_worked_sigmainf}
+\end{equation}
+So $X_t$ stays mostly within $\mu \pm 2\sigma_\infty
+\approx [94.84, 105.16]$ ($95\%$ mass by the Gaussian rule).
+
+\paragraph{Expected trajectory and variance build-up.} From
+\eqref{eq:ou_mean} and \eqref{eq:ou_var_finite}, plug in:
+\begin{center}
+\begin{tabular}{rrr}
+\toprule
+$t$ & $\E[X_t]$ & $\Var[X_t]$ \\
+\midrule
+$0$        & $105.000$ & $0.000$ \\
+$1$        & $103.704$ & $3.008$ \\
+$2$        & $102.744$ & $4.659$ \\
+$h_{1/2}=2.310$ & $102.500$ & $5.000$ \\
+$5$        & $101.116$ & $6.335$ \\
+$10$       & $100.249$ & $6.650$ \\
+$20$       & $100.012$ & $6.667$ \\
+$\infty$   & $100.000$ & $6.667$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+Sanity checks: at $t = h_{1/2}$ the expected deviation is
+$2.5 = (105-100)/2$, as the half-life formula demands; at
+$t = \infty$ the variance is $\volat^2/(2\theta) = 4/0.6 = 6.667$,
+matching \eqref{eq:ou_var_stationary}, with
+$\sqrt{6.667} \approx 2.582$, matching
+\eqref{eq:ch9_worked_sigmainf}.
+
+\begin{intuitionbox}
+The half-life is the only number that matters. If it is one day
+and your holding window is five days, you live through several
+revert-and-reset cycles --- profitable in expectation. If it is
+six months and your window is five days, no excursion reverts in
+time; the strategy becomes a directional bet. Half-life $\ll$
+horizon is the gate that separates ``trade this'' from ``leave
+it alone''. Everything else is calibration.
+\end{intuitionbox}
+
+\section{Testing for mean reversion}
+\label{sec:ch9_tests}
+
+Most financial time series are \emph{not} OU --- they are random
+walks. Equities, FX rates, and commodity futures are
+martingale-like at any human-tradeable horizon. Trading a random
+walk on a mean-reversion thesis loses money: there is no
+reversion to trade against.
+
+Before applying OU machinery you must \emph{reject the
+random-walk null}. Three tests are standard and a sell-side
+stat-arb desk runs all three: they fail in different ways, so a
+series surviving all three is much more credible than one
+surviving only one.
+
+\subsection{The Augmented Dickey--Fuller test}
+\label{subsec:ch9_adf}
+
+The \textbf{Augmented Dickey--Fuller (ADF) test} is the canonical
+test of stationarity in a univariate time series. In plain terms
+it asks: ``is there a statistically significant force pulling
+this series back toward a constant level, or does it wander
+freely?'' The null is no such force (a random walk, technically a
+\emph{unit root}); rejecting the null is evidence of mean
+reversion. It runs the regression
+\begin{equation}
+  \Delta X_t \;=\; \alpha
+                  \;+\; \beta\,X_{t-1}
+                  \;+\; \sum_{i=1}^p \gamma_i\,\Delta X_{t-i}
+                  \;+\; \epsilon_t,
+  \label{eq:adf_regression}
+\end{equation}
+where $\Delta X_t \defeq X_t - X_{t-1}$ is the first difference,
+$\alpha$ an intercept (drift), and the $p$ lagged differences are
+nuisance terms that soak up serial correlation in $\epsilon_t$.
+The null is $H_0\colon \beta = 0$: under $H_0$ the level
+$X_{t-1}$ has no predictive power for $\Delta X_t$ --- $X_t$ is a
+random walk. Under $H_1\colon \beta < 0$, a high $X_{t-1}$ makes
+$\Delta X_t$ more negative on average --- mean reversion in
+difference form.
+
+The ADF test statistic is the $t$-statistic of $\hat\beta$. Under
+the null its distribution is \emph{not} Student's $t$: the
+regressor $X_{t-1}$ is itself a random walk and standard
+regression theory breaks. Correct critical values are tabulated
+by MacKinnon (cited via \citeChan); a typical $5\%$ critical
+value at long sample sizes is $\approx -2.86$, and the test
+rejects when the observed $t$-statistic is more \emph{negative}.
+Choose lag count $p$ by AIC or BIC; Chan recommends starting at
+$p = 1$ and increasing until residual autocorrelation
+disappears.
+
+For the running example ($\theta = 0.3$, $\mu = 100$,
+$\volat = 2$, $N = 1000$), ADF typically yields a statistic
+around $-7$, comfortably past $-2.86$, and rejects the
+random-walk null.
+
+\begin{pitfallbox}[The ADF test has low power in short samples]
+The ADF test is conservative: it fails to reject the random-walk
+null much more often than it should when the true process is OU
+but the sample is short or $\theta$ is small. With $N=200$ and
+$\theta = 0.05$ (half-life $\approx 14$), simulated ADF rejects
+at $5\%$ only $\sim 30\%$ of the time even though every
+simulation came from an OU. A non-rejecting ADF is consistent
+with both a random walk and a slow reverter. Corroborate with a
+half-life estimate and a variance-ratio test; never trust a
+single ADF reading on $< 250$ observations.
+\end{pitfallbox}
+
+\subsection{The variance ratio test}
+\label{subsec:ch9_vrt}
+
+The \textbf{variance ratio (VR) test} of Lo and MacKinlay uses a
+simpler observation: under a random walk the variance of
+$k$-period changes equals $k$ times the variance of one-period
+changes, because increments are independent. Define
+\begin{equation}
+  VR(k) \;\defeq\; \frac{\Var(X_t - X_{t-k})}{k\,\Var(X_t - X_{t-1})}.
+  \label{eq:vrt_def}
+\end{equation}
+Under the random-walk null $VR(k) = 1$ for every $k$. Under mean
+reversion, negatively-correlated changes (a step up tends to be
+followed by a step down) give $VR(k) < 1$; under trending,
+$VR(k) > 1$.
+
+For the running example, a direct calculation using the OU
+autocorrelation \eqref{eq:ou_autocorr} gives, in the stationary
+regime,
+\begin{equation}
+  VR(k) \;=\; \frac{1 - e^{-\theta k}}{k\,\bigl(1 - e^{-\theta}\bigr)},
+  \label{eq:vrt_ou}
+\end{equation}
+which at $\theta = 0.3$ takes values
+\begin{center}
+\begin{tabular}{rl}
+\toprule
+$k$ & $VR(k)$ \\
+\midrule
+$1$  & $1.000$ \\
+$2$  & $0.870$ \\
+$5$  & $0.600$ \\
+$10$ & $0.367$ \\
+$20$ & $0.192$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The ratio falls toward zero as $k$ grows: long-horizon changes
+are bounded by the OU range, while one-period changes are
+dominated by noise. The Lo--MacKinlay test maps these ratios to
+a $z$-statistic with known asymptotic distribution; for a
+long-enough sample, rejection at any $k \in [5, 20]$ is almost
+mechanical for a true OU with non-trivial $\theta$.
+
+\subsection{The Hurst exponent}
+\label{subsec:ch9_hurst}
+
+The \textbf{Hurst exponent} $H$ is a third diagnostic, defined so
+that the long-run scaling of the range of a process is
+$R_t \propto t^H$. Three regimes:
+\begin{itemize}
+  \item $H = 0.5$ --- pure random walk.
+  \item $H < 0.5$ --- mean-reverting (the range grows slower than
+  $\sqrt{t}$, indicating that excursions get pulled back).
+  \item $H > 0.5$ --- trending (the range grows faster than
+  $\sqrt{t}$, indicating persistent moves).
+\end{itemize}
+The classical estimator is the rescaled-range ($R/S$) procedure
+of Mandelbrot, reviewed in \citeChan{}; modern practice uses a
+multifractal extension. $H$ returns one number that classifies
+the regime, but it is the noisiest of the three tests --- Chan
+recommends using it only as a tiebreaker after ADF and VR.
+
+The three tests are not redundant: ADF asks ``can a linear
+mean-reversion regression beat a random walk?'', VR asks ``do
+multi-period variances accumulate sublinearly?'', Hurst asks
+``does the range scale slower than $\sqrt{t}$?''. Different
+summaries of the same series; a stat-arb shop runs all three
+before committing capital. The Frankfurt Hedgehogs Prosperity 3
+writeup (\texttt{imc-prosperity-3/README.md}) explicitly checked
+for OU-style mean reversion in PICNIC\_BASKET premia and
+VOLCANIC\_ROCK before turning on those strategies.
+
+\section{Estimating OU parameters from data}
+\label{sec:ch9_fit}
+
+Once a series is classed as mean-reverting, estimate $\theta$,
+$\mu$, $\volat$ from data. The standard trick: the OU SDE has an
+exact discrete-time representation as an AR(1), whose parameters
+fall out of a single OLS regression.
+
+\subsection{The discrete-time AR(1) representation}
+\label{subsec:ch9_ar1}
+
+Sample $X_t$ at uniform intervals of length $\Delta t$ and apply
+the closed-form solution \eqref{eq:ou_solution} between $t$ and
+$t + \Delta t$:
+\begin{equation}
+  X_{t+\Delta t}
+  \;=\; X_t\,e^{-\theta \Delta t}
+       \;+\; \mu\,\bigl(1 - e^{-\theta \Delta t}\bigr)
+       \;+\; \volat\,\int_t^{t+\Delta t} e^{-\theta(t+\Delta t - s)}\,dW_s.
+  \label{eq:ou_discrete_step}
+\end{equation}
+The integral is a zero-mean Gaussian with variance (by the same
+It\^o-isometry argument)
+\begin{equation}
+  \Var\!\left[\volat\,\int_t^{t+\Delta t} e^{-\theta(t+\Delta t - s)}\,dW_s\right]
+  \;=\; \frac{\volat^2}{2\theta}\,\bigl(1 - e^{-2\theta\Delta t}\bigr).
+  \label{eq:ou_eps_var}
+\end{equation}
+Define
+\begin{equation}
+  \phi \;\defeq\; e^{-\theta \Delta t}, \qquad
+  a   \;\defeq\; \mu\,(1 - \phi), \qquad
+  \sigma_\epsilon^2 \;\defeq\; \frac{\volat^2}{2\theta}\,\bigl(1 - \phi^2\bigr),
+  \label{eq:ou_ar1_reparam}
+\end{equation}
+and the discrete-time recursion \eqref{eq:ou_discrete_step}
+becomes
+\begin{equation}
+  X_{t+\Delta t} \;=\; \phi\,X_t \;+\; a \;+\; \epsilon_t,
+  \qquad \epsilon_t \overset{\iid}{\sim}\Normal(0,\,\sigma_\epsilon^2).
+  \label{eq:ou_ar1}
+\end{equation}
+An exact AR(1). Under uniform sampling the AR(1) is not an
+approximation: the OU SDE and the AR(1) are literally the same
+model.
+
+\subsection{OLS recovery of \texorpdfstring{$\theta$, $\mu$, $\volat$}{theta, mu, sigma}}
+\label{subsec:ch9_ols}
+
+Regress $X_{t+\Delta t}$ on $X_t$ by OLS. This returns slope
+$\hat\phi$, intercept $\hat a$, and residual std
+$\hat\sigma_\epsilon$. Invert \eqref{eq:ou_ar1_reparam}:
+\begin{align}
+  \hat\theta \;&=\; -\frac{\ln \hat\phi}{\Delta t},
+                                            \label{eq:ou_theta_hat} \\[0.25em]
+  \hat\mu    \;&=\; \frac{\hat a}{1 - \hat\phi},
+                                            \label{eq:ou_mu_hat} \\[0.25em]
+  \hat\volat \;&=\; \hat\sigma_\epsilon\,
+                  \sqrt{\frac{2\,\hat\theta}{1 - \hat\phi^2}}.
+                                            \label{eq:ou_sigma_hat}
+\end{align}
+The first inverts $\phi = e^{-\theta \Delta t}$; the second
+inverts $a = \mu(1-\phi)$; the third solves \eqref{eq:ou_eps_var}
+for $\volat$.
+
+\paragraph{Worked verification.} Simulate an OU trajectory with
+$\theta = 0.3$, $\mu = 100$, $\volat = 2$, $\Delta t = 1$,
+$N = 5000$; true $\phi = e^{-0.3} \approx 0.7408$. OLS returns
+$\hat\phi \approx 0.734$, $\hat\theta \approx 0.310$,
+$\hat\mu \approx 100.04$, $\hat\volat \approx 2.00$, within
+sampling error. On $N = 500$ points the same procedure returns
+$\hat\theta \in [0.2, 0.4]$ depending on seed --- $\theta$ is
+the hardest of the three to pin down, and narrow confidence
+intervals on the half-life require a lot of data.
+
+\begin{keyfactbox}[OU fitting via AR(1)]
+To fit $(\theta, \mu, \volat)$ to a uniformly sampled time
+series $\{X_t\}$ at spacing $\Delta t$:
+\begin{enumerate}
+  \item Regress $X_{t+\Delta t}$ on $X_t$ by OLS, obtaining
+  slope $\hat\phi$, intercept $\hat a$, residual standard
+  deviation $\hat\sigma_\epsilon$.
+  \item Recover $\hat\theta = -\ln(\hat\phi)/\Delta t$.
+  \item Recover $\hat\mu = \hat a / (1 - \hat\phi)$.
+  \item Recover
+  $\hat\volat = \hat\sigma_\epsilon\,\sqrt{2\hat\theta/(1-\hat\phi^2)}$.
+\end{enumerate}
+The half-life follows immediately:
+$\hat h_{1/2} = (\ln 2)/\hat\theta$.
+\end{keyfactbox}
+
+\section{The \texorpdfstring{$z$}{z}-score entry/exit rule}
+\label{sec:ch9_zscore}
+
+With $(\hat\theta, \hat\mu, \hat\volat)$ in hand, define the
+\emph{$z$-score} of $X_t$:
+\begin{equation}
+  z_t \;\defeq\; \frac{X_t - \hat\mu}{\hat\sigma_\infty},
+  \qquad
+  \hat\sigma_\infty \;=\; \frac{\hat\volat}{\sqrt{2\hat\theta}}.
+  \label{eq:zscore_def}
+\end{equation}
+The $z$-score is the current deviation from the long-run mean
+in stationary-std units. Under OU in steady state
+$z_t \sim \Normal(0, 1)$, so ``$z = 2$'' is a $\sim 2.5\%$ tail
+event. The threshold $z_{\text{entry}} = 2$ is therefore picked
+not arbitrarily but because a stationary OU process spends only
+$\sim 5\%$ of its time outside $\pm 2\sigma_\infty$: when it does
+stray that far, reversion is highly probable and the expected
+move back toward $\mu$ is large enough to pay for transaction
+costs.
+
+The standard \textbf{$z$-score trading rule}, used by
+practitioners since the 1980s and codified by Chan
+\citeChan{}, is:
+\begin{itemize}
+  \item \textbf{Enter short}: when $z_t > z_{\text{entry}}$
+  (e.g.\ $z_{\text{entry}} = 2$). The series is high relative
+  to its long-run mean and is expected to fall back.
+  \item \textbf{Enter long}: when $z_t < -z_{\text{entry}}$.
+  Symmetrically.
+  \item \textbf{Exit}: when $|z_t| < z_{\text{exit}}$ (e.g.\
+  $z_{\text{exit}} = 0.5$). The deviation has decayed back to
+  near zero and there is no further reversion to harvest.
+  \item \textbf{Stop out}: when $|z_t| > z_{\text{stop}}$ (e.g.\
+  $z_{\text{stop}} = 4$). Four standard deviations from the
+  supposed mean means the OU model is wrong, the parameters are
+  stale, or the regime has changed. Exit at a controlled loss
+  before the position blows up.
+\end{itemize}
+The asymmetry between $z_{\text{entry}}$ and $z_{\text{exit}}$
+is deliberate: requiring $|z_t| < z_{\text{entry}}$ to exit would
+never exit on a deviation that decayed to the entry level and
+bounced. The slack between $z_{\text{exit}}$ and
+$z_{\text{entry}}$ ensures most trades close on a meaningful
+reversion.
+
+\subsection{Expected trade duration}
+\label{subsec:ch9_duration}
+
+How long does the typical trade last? Use the OU mean trajectory
+$\E[X_t] - \mu = (X_0 - \mu)e^{-\theta t}$. In $z$-units, an
+excursion of size $z_{\text{entry}}$ decays in expectation to
+$z_{\text{exit}}$ after time $h$:
+\begin{equation}
+  z_{\text{entry}}\,e^{-\theta h} \;=\; z_{\text{exit}}
+  \;\;\Longrightarrow\;\;
+  h \;=\; \frac{1}{\theta}\,\ln\!\left(\frac{z_{\text{entry}}}{z_{\text{exit}}}\right).
+  \label{eq:zscore_duration}
+\end{equation}
+The expected trade duration. With $z_{\text{entry}} = 2$,
+$z_{\text{exit}} = 0.5$, $\theta = 0.3$,
+\begin{equation}
+  h \;=\; \frac{\ln 4}{0.3}
+       \;\approx\; \frac{1.3863}{0.3}
+       \;\approx\; 4.621 \text{ time units}.
+  \label{eq:ch9_worked_duration}
+\end{equation}
+Sanity check: about twice the half-life
+$h_{1/2} \approx 2.310$, as expected --- two halvings
+($z = 2 \to 1 \to 0.5$) rather than one.
+
+Equation~\eqref{eq:zscore_duration} is a
+deterministic-trajectory estimate, ignoring the noise around the
+mean trajectory. The exact mean first-passage time involves an
+integral over the OU generator with no closed form for general
+thresholds; for threshold-setting and Kelly sizing
+(\cref{ch:kelly_risk}) the deterministic approximation is
+adequate.
+
+\begin{keyfactbox}[The $z$-score OU strategy]
+Given OU parameter estimates $(\hat\theta, \hat\mu, \hat\volat)$
+and stationary std $\hat\sigma_\infty = \hat\volat/\sqrt{2\hat\theta}$:
+\begin{itemize}
+  \item Compute the live $z$-score
+  $z_t = (X_t - \hat\mu)/\hat\sigma_\infty$.
+  \item \textbf{Enter} a position of size
+  $-\operatorname{sgn}(z_t)$ when $|z_t| > z_{\text{entry}}$.
+  \item \textbf{Exit} when $|z_t| < z_{\text{exit}}$.
+  \item \textbf{Stop out} when $|z_t| > z_{\text{stop}}$.
+  \item \textbf{Expected duration} of a trade is
+  $h \approx \theta^{-1}\,\ln(z_{\text{entry}}/z_{\text{exit}})$.
+\end{itemize}
+Refit $(\hat\theta, \hat\mu, \hat\volat)$ on a rolling window
+(see \cref{sec:ch9_walkforward}) so the parameters track the
+current regime.
+\end{keyfactbox}
+
+\begin{intuitionbox}
+A $z$-score entry is a bet that the half-life is shorter than
+your deadline. With trading horizon $H$ and half-life $h_{1/2}$,
+you get $H/h_{1/2}$ revert-and-reset cycles in expectation. Ratio
+$\gg 1$: deviations come back inside the window and the strategy
+harvests them. Ratio $\ll 1$: you mark to market for many
+half-lives without reversion --- functionally a directional bet.
+The thresholds set how far from the mean you wait before
+entering, but they do not change the half-life. Pick the asset
+first ($h_{1/2} < H$), then the thresholds.
+\end{intuitionbox}
+
+\section{Walk-forward estimation}
+\label{sec:ch9_walkforward}
+
+OU parameters drift. The mean of a stat-arb residual shifts with
+the company's business; the mean-reversion speed shifts with
+regime; the volatility shifts continuously. A model fit in
+January is substantially wrong by July, and a model fit on the
+entire historical record uses post-trade information to compute
+pre-trade $z$-scores --- look-ahead bias that inflates simulated
+profits and disappears live.
+
+The fix is \textbf{walk-forward estimation}. Pick a fitting
+window $W$ and refit cadence $R$. At each time $t$:
+\begin{enumerate}
+  \item Fit the OU model on the most recent $W$ observations
+  $X_{t-W}, \ldots, X_{t-1}$, using only data \emph{strictly
+  before} time $t$.
+  \item Compute the live $z$-score
+  $z_t = (X_t - \hat\mu_t)/\hat\sigma_{\infty,t}$ from the
+  parameters fit on the prior window.
+  \item Generate the trading signal from $z_t$.
+  \item Every $R$ steps, repeat the fit on the latest window.
+\end{enumerate}
+Typical Prosperity-scale numbers: $W \in [500, 5000]$,
+$R \in [50, 1000]$, scaled by half-life (shorter half-life
+$\Rightarrow$ shorter $W$ and $R$). On a sell-side single-name
+desk, $W$ is one to two trading years and $R$ is one trading
+day.
+
+\begin{pitfallbox}[Look-ahead bias in OU fitting]
+The most common mistake on a first OU strategy: fit $\hat\mu$ on
+the entire dataset and use it for every historical $z$-score.
+This feeds \emph{future} data into the strategy. Simulated
+$z$-scores are systematically better-centred than in live
+trading, entries are timed more cleverly than possible, and the
+backtest shows fictional profit. Same trap for $\hat\theta$ and
+$\hat\volat$. The cure: parameter values used at time $t$ must
+depend only on $X_s$ for $s < t$. \Cref{ch:backtesting} returns
+to look-ahead bias as a category.
+\end{pitfallbox}
+
+\section{A short reference implementation}
+\label{sec:ch9_code}
+
+The OU fitting pipeline fits in under two dozen lines of Python.
+The reference below is a \emph{pure function} from a numpy array
+of past observations (with optional sampling interval) to
+$(\hat\theta, \hat\mu, \hat\volat)$. The signal generator on top
+is one line per the keyfactbox in \cref{sec:ch9_zscore}.
+
+\begin{lstlisting}[caption={OU fitting via AR(1) as a pure function.}]
+import numpy as np
+
+def fit_ou(x: np.ndarray,
+           dt: float = 1.0) -> tuple[float, float, float]:
+    """Fit OU parameters (theta, mu, sigma) via the AR(1) mapping."""
+    y, xp = x[1:], x[:-1]
+    # np.polyfit returns highest-order coef first => (slope, intercept)
+    phi, a = np.polyfit(xp, y, 1)
+    theta = -np.log(phi) / dt
+    mu    = a / (1.0 - phi)
+    resid = y - (phi * xp + a)
+    var_eps = float(np.var(resid, ddof=2))
+    sigma = float(np.sqrt(2.0 * theta * var_eps / (1.0 - phi**2)))
+    return float(theta), float(mu), sigma
+\end{lstlisting}
+
+Three production remarks not encoded above. First, the function
+assumes $\hat\phi \in (0, 1)$; $\hat\phi \leq 0$ does not satisfy
+OU and $-\ln(\hat\phi)$ is undefined, so the caller should guard
+and refuse to trade. Second, \texttt{ddof=2} accounts for the
+two OLS-estimated parameters $(\phi, a)$; without it
+$\hat\volat$ is slightly biased downward on small samples.
+Third, this function is meant to be called inside a walk-forward
+loop --- calling it once on full history is the look-ahead trap
+above.
+
+\begin{prosperitybox}[title={Prosperity example: KELP}]
+KELP is the canonical mildly-mean-reverting Prosperity product.
+Per Frankfurt Hedgehogs
+(\texttt{imc-prosperity-3/README.md}), KELP's true price follows
+a slow random walk with a small mean-reverting overlay from
+integer-tick rounding of an internal floating-point fair value:
+``a minor technical edge stemming from the fact that the true
+price was internally a floating-point value and orders could
+only be posted at integer levels (creating slight mean-reversion
+tendencies after ticks).'' KELP is the ideal teaching example
+for OU fitting on Prosperity data.
+
+\textbf{Procedure.}
+\begin{enumerate}
+  \item Pull the KELP wall-mid
+  (\cref{ch:price_value}) from the first $1000$ ticks of a round
+  --- the fitting window $W$.
+  \item Run \texttt{fit\_ou} from \cref{sec:ch9_code} with
+  $\Delta t = 1$.
+  \item Compute $h_{1/2} = (\ln 2)/\hat\theta$ and
+  $\hat\sigma_\infty = \hat\volat/\sqrt{2\hat\theta}$.
+  \item Typically $\hat\theta \in [0.02, 0.05]$, giving a
+  half-life of $15$--$30$ ticks.
+  \item Set $z_{\text{entry}} = 1.5$, $z_{\text{exit}} = 0.3$
+  (tighter than the section default because fills are quick and
+  waiting for $|z| > 2$ misses trades). Expected duration
+  $h = \ln(5)/\hat\theta \approx 1.61/\hat\theta$, so $30$--$80$
+  ticks per trade. Over a $10\,000$-tick episode, comfortably
+  more than $50$ trades.
+  \item Refit every $250$ ticks on a rolling $1000$-tick window.
+  $\hat\mu$ tracks the slow random walk; $\hat\theta$ stays
+  approximately constant (the rounding mechanism does not change).
+\end{enumerate}
+
+\textbf{What the top teams actually did.} The Frankfurt
+Hedgehogs' final KELP handler
+(\texttt{imc-prosperity-3/FrankfurtHedgehogs\_polished.py},
+\texttt{DynamicTrader.get\_orders()}) does \emph{not} run a
+literal $z$-score OU strategy on KELP. It quotes one tick inside
+the wall bid/ask --- the fixed-offset rule used on
+RAINFOREST\_RESIN in \cref{ch:market_making} --- and lets the
+wall-mid update absorb the slow random walk. They treated KELP
+as ``unpredictable apart from a tiny rounding effect'' and
+concluded the effect was too small to extract reliably
+($\sim 5\,000$ seashells per round, mostly market making). The
+lesson: OU is the right tool to \emph{diagnose} that KELP's
+reversion is too weak to trade as a pure stat-arb signal, and
+the right tool to \emph{trade} a stronger mean-reverter like the
+PICNIC\_BASKET premium of \cref{ch:basket_etf_arb}, where the
+half-life is minutes and $|z| > 2$ happens regularly.
+\end{prosperitybox}
+
+\begin{gsbox}
+On a sell-side equity stat-arb desk, every single-name
+mean-reversion signal is fitted by an overnight walk-forward OU
+pipeline owned end-to-end by the Strats group. A typical morning
+workflow on name \texttt{XYZ}:
+\begin{enumerate}
+  \item \textbf{Stationarity gate.} Run an ADF test on the
+  fitting window. If the test fails to reject the random-walk
+  null, the name does not trade today --- the $z$-score
+  signal is meaningless on a non-stationary series.
+  \item \textbf{Parameter estimation.} Fit
+  $(\hat\theta, \hat\mu, \hat\volat)$ on the fitting window
+  via the AR(1) mapping of \cref{subsec:ch9_ols}.
+  \item \textbf{Half-life sanity check.} Compute
+  $\hat h_{1/2} = (\ln 2)/\hat\theta$ and confirm it falls in
+  an asset-class plausible range (intraday: minutes to hours;
+  multi-day: days to weeks). Out-of-range flags the Strat to
+  inspect.
+  \item \textbf{$z$-score signal.} Stream live
+  $z_t = (X_t - \hat\mu)/\hat\sigma_\infty$ to the trader's
+  monitor and the automated execution layer.
+  \item \textbf{Kelly sizing.} Convert $z_t$ into position size
+  via Kelly (\cref{ch:kelly_risk}), capped at the desk's
+  per-name VaR contribution.
+\end{enumerate}
+A standard GS/quant interview question:
+\emph{``Your OU fit reports a half-life of $0.5$ days on this
+name, but the average holding period is $3$ days. What do you
+investigate?''} Three buckets in order: (i) a stale or
+mis-applied $\hat\mu$ that has drifted from the live mean, so
+$z_t$ takes longer to revert because the supposed mean is not
+where the series is heading; (ii) a regime change that has
+lengthened true $\theta$ since the fit, often visible by
+re-fitting on the most recent sub-window; (iii) overfitting,
+where $\hat\theta$ from a short window is biased toward larger
+values than the truth. All three are diagnosable; walking
+through them in order signals familiarity.
+\Cref{ch:strats_role} returns to this kind of diagnostic
+conversation.
+\end{gsbox}
+
+\section{Limitations and when OU breaks}
+\label{sec:ch9_limits}
+
+The OU model is the simplest non-trivial mean-reverter and the
+default tool of practitioners. Like every default, it has
+failure modes worth knowing before pointing it at production
+money.
+
+\paragraph{The mean is not constant.} OU assumes a \emph{single}
+long-run mean $\mu$. Real series typically have a slow-moving
+level on top of the fast-reverting noise --- for an equity, the
+company's growing earnings; for an FX rate, the inflation
+differential; for a Prosperity ETF premium, whatever the
+simulator calibrated. Fix: de-trend before fitting (subtract a
+moving average or a regression against a slow factor) or refit
+$\hat\mu$ on a rolling window short enough that the drift inside
+is small. Walk-forward handles this implicitly when the refit
+cadence is fast enough.
+
+\paragraph{The half-life is not constant.} OU assumes a single
+$\theta$. Real $\theta$ varies with regime: faster in calm
+markets, slower in stressed ones. Walk-forward picks this up to
+first order, but a calm-regime strategy quietly stops working
+when the half-life lengthens beyond the holding window.
+
+\paragraph{The series is not stationary in level.} Many
+``mean-reverting'' series are stationary only after
+transformation: log, first difference, or residual against a
+slow factor. Classic case: two cointegrated stocks --- each
+price is a random walk, but their difference (with the right
+hedge ratio) is OU. Trading the OU residual is
+\cref{ch:pairs_cointegration}; the technique here applies
+directly once cointegration is established. A related worry is
+\emph{over-differencing}: aggressive differencing destroys the
+long-run information carrying the signal. \citeAFML{} (Ch.~5)
+treats this via \emph{fractional differentiation}. Rule of
+thumb: use the \emph{lowest} order of transformation that makes
+the series stationary.
+
+\paragraph{Jumps and fat tails.} OU has Gaussian increments.
+Real series jump (news, earnings, central-bank decisions, or
+Prosperity's Olivia informed-trading windows) and the Gaussian
+envelope underestimates the tails. A live OU strategy should
+always layer a stop-out ($|z| > z_{\text{stop}}$, per
+\cref{sec:ch9_zscore}) to bail out before a jump turns a signal
+into a runaway position.
+
+\paragraph{Cointegration without OU.}
+\Cref{ch:pairs_cointegration} covers the next layer: many
+tradeable opportunities live in \emph{linear combinations} of
+series, where components are random walks but the combination
+reverts. OU applies as soon as the combination is identified;
+finding it, picking the hedge ratio, and testing it are the next
+chapter.
+
+\section{Key facts to memorise}
+\label{sec:ch9_keyfacts}
+
+\begin{itemize}
+  \item The Ornstein--Uhlenbeck SDE is
+  $dX_t = \theta(\mu - X_t)\,dt + \volat\,dW_t$, with
+  $\theta > 0$, $\mu \in \R$, $\volat > 0$. It has a unique
+  stationary distribution
+  $\Normal(\mu,\, \volat^2/(2\theta))$.
+  \item The closed-form solution
+  $X_t = X_0 e^{-\theta t} + \mu(1 - e^{-\theta t})
+       + \volat \int_0^t e^{-\theta(t-s)}\, dW_s$
+  is obtained by multiplying the SDE through by the integrating
+  factor $e^{\theta t}$ and integrating.
+  \item \textbf{Half-life.} $h_{1/2} = (\ln 2)/\theta$. The
+  single most important number for trading. If
+  $h_{1/2} \ll H$ (your trading horizon), the strategy is
+  viable; otherwise it is not.
+  \item \textbf{Stationary standard deviation.}
+  $\sigma_\infty = \volat/\sqrt{2\theta}$. The natural unit of
+  the $z$-score.
+  \item \textbf{Autocorrelation.}
+  $\Corr(X_t, X_{t+h}) = e^{-\theta h}$. A single exponential
+  with the same rate as the drift.
+  \item \textbf{Discrete-time mapping.} OU sampled at spacing
+  $\Delta t$ is exactly an AR(1) with $\phi = e^{-\theta \Delta t}$,
+  intercept $\mu(1 - \phi)$, and innovation variance
+  $\volat^2(1 - \phi^2)/(2\theta)$. Fit by OLS, recover
+  $\hat\theta = -\ln(\hat\phi)/\Delta t$.
+  \item \textbf{Stationarity tests.} ADF (regress
+  $\Delta X_t$ on $X_{t-1}$ plus lags), variance ratio (compare
+  $\Var(X_t - X_{t-k})$ against $k\,\Var(X_t - X_{t-1})$), and
+  Hurst exponent ($H < 0.5$ mean reverting). Run all three;
+  ADF alone has low power on short samples or slow reverters.
+  \item \textbf{$z$-score rule.} Enter when $|z| > z_{\text{entry}}$,
+  exit when $|z| < z_{\text{exit}}$, stop out when
+  $|z| > z_{\text{stop}}$. Asymmetry between entry and exit
+  thresholds is essential. Expected trade duration is
+  $h \approx \theta^{-1}\ln(z_{\text{entry}}/z_{\text{exit}})$.
+  \item \textbf{Walk-forward fitting is non-negotiable.} Fitting
+  $\hat\mu$ once on the entire dataset and then using it for
+  every historical $z$-score is the canonical look-ahead bias.
+  Always refit on a rolling window using only data strictly
+  before the trade time.
+  \item OU is a \emph{variance-control} mean-reverter with
+  Gaussian increments. It cannot model fat tails, jumps, or
+  regime changes by itself --- always pair with a hard stop-out
+  for protection.
+  \item On Prosperity, KELP is mildly mean-reverting via a
+  rounding artifact and is best traded with a fixed-offset
+  market-maker (Frankfurt Hedgehogs); the OU $z$-score
+  machinery shines on the PICNIC\_BASKET premium of
+  \cref{ch:basket_etf_arb}, where half-lives are short and
+  excursions large.
+  \item On a sell-side stat-arb desk every single-name
+  reversion signal is fitted by walk-forward OU; the Strat owns
+  the pipeline ADF gate $\to$ estimation $\to$ half-life check
+  $\to$ live $z$-score $\to$ Kelly sizing
+  (\cref{ch:kelly_risk}). Standard interview probe:
+  ``half-life says $X$, average holding is $Y$, what do you
+  investigate?'' --- three buckets: stale $\hat\mu$, regime
+  change, walk-forward overfitting.
+\end{itemize}

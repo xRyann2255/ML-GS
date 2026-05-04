@@ -1,0 +1,302 @@
+\chapter{How to Read This Book}
+\label{ch:how_to_read}
+
+This book defines every finance term on first use, derives every result
+that teaches something, and stops short of derivations that do not. It is
+written for a strong mathematics and computer science student with
+\emph{zero} prior exposure to finance. Existing resources either assume
+the reader already knows what a bid--ask spread is, or dilute the
+mathematics to the point where nothing can be derived; this book sits in
+the gap.
+
+Two concrete goals share a deadline in mid-April 2026. \textbf{IMC
+Prosperity~4} is a two-week algorithmic trading competition starting
+2026-04-14 in which teams write Python algorithms to trade simulated
+products against each other and scripted bots. Past editions rewarded
+market making, basket statistical arbitrage, options pricing, locational
+arbitrage, and exploitation of bot behaviour --- all taught here from
+first principles. The \textbf{Goldman Sachs Quant Strats off-cycle
+placement} begins around 2026-04-20; the reader will sit on a trading
+desk as a strategist (``Strats''). Since the desk assignment is not yet
+known, Part~VII covers every major asset class --- rates, equities, FX,
+credit, commodities --- at comparable depth, together with production
+risk, numerical methods, and firm-specific infrastructure (SecDB, Slang).
+
+Parts~I--V form the common core; Part~VI is Prosperity-specific and
+Part~VII Goldman-specific. A reader pursuing only one goal can skip the
+other Part entirely. The reading paths in
+Section~\ref{sec:reading_paths} make this concrete.
+
+\section{Who this book is for}
+\label{sec:who_for}
+
+The reader is assumed to have the following background.
+
+\paragraph{Mathematics.} Undergraduate probability (random variables,
+expectation, conditional expectation, the central limit theorem, basic
+hypothesis testing), linear algebra (vector spaces, eigenvectors, SVD at
+the mechanical level), multivariable calculus, and some exposure to
+stochastic processes at the level of Brownian motion, It\^o's lemma, and
+simple stochastic differential equations. Measure theory is \emph{not}
+assumed; where a measure-theoretic statement would be cleaner, the book
+states it informally and cites the rigorous version. Basic optimisation
+(Lagrange multipliers, convex objectives) is used without reintroduction.
+
+\paragraph{Computer science.} Python fluency, including \texttt{numpy},
+\texttt{pandas}, and standard data structures; time complexity; basic
+algorithms (sorting, hashing, dynamic programming); and the ability to
+read a moderately-sized Python codebase unaided. Code in this book is
+sparing --- at most one reference skeleton per strategy, typically
+15--30 lines, pedagogical rather than production-ready. Full runnable
+code lives outside the PDF.
+
+\paragraph{Finance.} Zero. The reader is not assumed to know what a stock
+is, what ``going long'' means, what an exchange does, what an option is,
+or what the terms ``bid'', ``ask'', ``mid'', ``spread'', ``tick'',
+``lot'', ``maker'', ``taker'', ``slippage'', ``delta'', ``vega'', or
+``hedge'' mean. Each is defined on first use; no finance jargon appears
+without a prior in-text definition. Appendix~B collects the master
+notation table and a glossary of trading terms as a reference backstop.
+
+Readers whose probability, linear algebra, or stochastic-calculus
+background is rusty should consult Appendix~A before Part~II
+(microstructure) and again before Part~IV (options). Appendix~A is a
+refresher, not a course: it restates the results used and points to
+standard sources for proofs. If the refresher is insufficient, spend a
+week with a probability textbook before continuing.
+
+\section{Three reading paths}
+\label{sec:reading_paths}
+
+The book has 39 numbered chapters across seven Parts. The three paths
+below are each \emph{complete and self-contained} for their target use
+case: a chapter not on a path is safe to skip for that goal; a chapter
+on a path is load-bearing.
+
+\subsection*{Path A: Prosperity speed-run}
+
+\[
+\begin{gathered}
+\text{Ch}\ 1 \to 2 \to 3 \to 8 \to 9 \to 11 \to 14 \to 15 \to 16 \\
+\to 23 \to 24 \to 25 \to 26.
+\end{gathered}
+\]
+
+For a reader whose sole immediate goal is Prosperity~4. It covers
+exchanges, participants, and price (Ch~1--3), then the minimum strategy
+vocabulary the competition historically rewards: market making (Ch~8),
+mean reversion (Ch~9), and basket statistical arbitrage (Ch~11). Enough
+options theory to price and delta-hedge the voucher products follows
+(Ch~14--16), then the full Prosperity playbook (Ch~23--26) --- tooling,
+algorithmic round strategies, manual rounds, and lessons from top-team
+writeups. Omitted: Parts~V and~VII, most of the arbitrage zoo beyond
+baskets, and the full vol surface (Ch~17). Roughly 130 pages; intended
+for a reader starting a week before Prosperity~4 begins.
+
+\subsection*{Path B: Goldman Sachs Strats prep}
+
+\[
+\begin{gathered}
+\text{Ch}\ 1 \to 2 \to 3 \to 14 \to 15 \to 16 \to 17 \to 27 \to 28 \to 29 \\
+\to 30 \to 31 \to 32 \to 33 \to 34 \to 35 \to 36 \to 37 \to 38.
+\end{gathered}
+\]
+
+For a reader showing up to a sell-side quant strats desk ready to
+contribute. It begins with the minimum market-structure vocabulary
+(Ch~1--3), then the full options stack (Ch~14--17) since every Part~VII
+chapter cross-references it, then every Part~VII chapter in order: the
+role itself (Ch~27), fixed income foundations --- the largest knowledge
+gap for a CS reader (Ch~28), rates derivatives and SABR (Ch~29), equity
+derivatives and variance swaps (Ch~30), FX derivatives (Ch~31), credit
+derivatives (Ch~32), commodities (Ch~33), numerical methods (Ch~34),
+production risk and P\&L Explain (Ch~35), SecDB and Slang (Ch~36),
+regulatory context (Ch~37), and interview-grade problems (Ch~38).
+Omitted: Parts~III, V, and VI, which teach buy-side strategy
+construction --- not the Strats job. Roughly 500 pages; intended for a
+reader with three to five weeks until the placement starts.
+
+\subsection*{Path C: Full cover-to-cover}
+
+All 39 chapters in order, plus Appendices~A--C. Intended for a reader
+building a permanent foundation rather than preparing for a deadline.
+Estimated effort: around 300 hours of focused reading, working every
+derivation and worked example by hand. Hard-flagged chapters (see
+Section~\ref{sec:hard_chapters}) should be budgeted at roughly double
+the time of an average chapter.
+
+\section{Chapter dependency map}
+\label{sec:dep_map}
+
+Any Part can be read after Parts~I and~II, but not before them.
+Figure~\ref{fig:dep_map} shows the coarse dependency structure; the
+prose below explains it.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=8mm and 14mm,
+  part/.style={draw, rounded corners, align=center, minimum height=9mm,
+               minimum width=22mm, font=\small},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+  \node[part, fill=gray!10] (P1) {Part I\\Foundations};
+  \node[part, fill=gray!10, right=of P1] (P2) {Part II\\Microstructure};
+  \node[part, fill=gray!10, right=of P2] (P3) {Part III\\Strategies};
+  \node[part, fill=gray!10, below=of P2] (P4) {Part IV\\Options};
+  \node[part, fill=gray!10, right=of P4] (P5) {Part V\\Execution / Risk};
+  \node[part, fill=gray!10, below=of P4] (P6) {Part VI\\Prosperity};
+  \node[part, fill=gray!10, right=of P6] (P7) {Part VII\\GS Strats};
+
+  \draw[arrow] (P1) -- (P2);
+  \draw[arrow] (P2) -- (P3);
+  \draw[arrow] (P1) -- (P4);
+  \draw[arrow] (P3) -- (P5);
+  \draw[arrow] (P4) -- (P5);
+  \draw[arrow] (P3) -- (P6);
+  \draw[arrow] (P4) -- (P6);
+  \draw[arrow] (P4) -- (P7);
+  \draw[arrow] (P5) -- (P7);
+\end{tikzpicture}
+\caption{Coarse dependency graph between Parts. An arrow $X \to Y$ means
+$Y$ assumes the content of $X$. Parts~I and~II are prerequisites for
+everything; Part~IV (options) is a prerequisite for both Part~VI and
+Part~VII; Part~V cross-references Parts~III and~IV.}
+\label{fig:dep_map}
+\end{figure}
+
+At chapter granularity: Part~I (Ch~1--3) introduces exchanges, the
+limit order book, market participants, and the many definitions of
+``the price''; every later chapter assumes this vocabulary. Part~II
+(Ch~4--7) builds the theory of \emph{why} spreads exist, underpinning
+every Part~III strategy --- Ch~8 (market making) in particular makes no
+sense without the adverse-selection argument of Ch~5. Inside Part~IV,
+Ch~14 (payoffs, no-arbitrage bounds, put--call parity) precedes Ch~15
+(Black--Scholes), which precedes Ch~16 (Greeks and delta hedging) and
+Ch~17 (the volatility surface and gamma scalping). Part~VII assumes the
+Part~IV options stack in full, then layers production, sell-side, and
+asset-class-specific content on top: Ch~29 (rates derivatives)
+cross-references Ch~15--17, Ch~30 extends Ch~17 with variance swaps,
+and Ch~34 (numerical methods) is where the pricing problems of
+Ch~29--32 get solved in practice. Part~V (execution and risk) sits
+between the strategy and options material and the two target-specific
+Parts: it covers how trades are actually placed without moving the
+market against oneself, and how positions are sized and monitored so a
+losing day does not become a career-ending one. Part~VI (Prosperity) is
+an applied layer over Parts~I--IV rather than a prerequisite for
+anything --- Part~VI is the most self-contained Part in the book.
+
+\section{Notation}
+\label{sec:notation}
+
+Every symbol used across multiple chapters is defined once and
+catalogued in Appendix~B, alongside a glossary of trading terms.
+Appendix~B is a reference --- consult it whenever a symbol introduced
+many chapters earlier needs refreshing. No chapter redefines a symbol
+that appears in the master table, so a symbol's meaning is fixed the
+first time it is used.
+
+A few symbols are introduced locally within a single chapter (for
+example, the half-life in the Ornstein--Uhlenbeck chapter, or the
+hazard rate in the credit chapter); these do not recur globally and
+are omitted from the master table.
+
+\section{Callout boxes}
+\label{sec:callouts}
+
+Seven coloured callout boxes recur throughout the book, introduced
+here so that a reader meeting one in Chapter~4 already knows what it
+signals. This chapter uses no boxes --- they are reserved for technical
+content.
+
+\begin{itemize}
+\item \textbf{Background} (gray). Prerequisite reminders at the start
+of most chapters, listing the earlier-chapter results assumed. Skim if
+confident, or follow the back-references if not.
+
+\item \textbf{Key fact} (blue). A formal result worth memorising ---
+the bid--ask spread formula, Kyle's $\lamk$, Avellaneda--Stoikov's
+reservation-price formula. Every major result appears in a key-fact
+box near where it is derived.
+
+\item \textbf{Intuition} (green). A plain-English restatement of what a
+formal result \emph{means}, placed immediately after the derivation.
+When the reader has followed the algebra but is unsure what was
+shown, the intuition box is the answer. \emph{Slow down and read these
+carefully.}
+
+\item \textbf{Prosperity example} (orange). A worked example using a
+specific Prosperity product from a prior edition. Appears inline in
+Parts~I--V wherever theory maps cleanly onto a Prosperity product. The
+full playbook is Part~VI.
+
+\item \textbf{On a Goldman Sachs desk} (teal). How the technique just
+taught is used on a sell-side trading desk: what the Strat writes,
+which system owns the calculation, and which desk cares most. Appears
+mostly in Parts~IV and~V; Part~VII treats the same material in depth.
+
+\item \textbf{Common mistake / Pitfall} (red). A wrong intuition that
+sounds right, or a failure mode the reader will otherwise walk into.
+\emph{Slow down and read these carefully.} These boxes are the highest
+value-per-word in the book --- they encode mistakes that cost
+professionals money.
+
+\item \textbf{Historical note} (purple). An aside on the origin of a
+result, a biographical note, or a short story about how a model came
+to dominate practice. Skip on a first read without losing anything
+technical.
+\end{itemize}
+
+\section{How to read a hard chapter}
+\label{sec:hard_chapters}
+
+Five chapters are flagged as \emph{hard}: Ch~5 (Glosten--Milgrom and
+Kyle), Ch~8 (Avellaneda--Stoikov market making), Ch~15 (Black--Scholes
+from first principles), Ch~22 (the ``which strategy when'' decision
+framework), and Ch~29 (SABR and the rates vol surface). Hard means the
+chapter contains a derivation or synthesis which, on first reading,
+feels dense regardless of the reader's mathematical background. These
+deserve extra time and, usually, a second pass.
+
+Every hard chapter follows the same four-stage pattern, mirroring the
+worked-example style of the NLP lecture-notes reference this book
+takes its form from.
+
+\begin{enumerate}
+\item \textbf{Toy example first.} The chapter opens with a concrete
+numerical example worked by hand with small integers, before any
+symbol is defined abstractly --- so the reader experiences the
+phenomenon before formalising it. Ch~5, for instance, opens with a
+Glosten--Milgrom game on two states $\{V=100, V=110\}$ with known
+probabilities; the reader computes the bid and ask by hand before
+seeing the general formula.
+
+\item \textbf{Formalise.} The same problem is restated in general
+notation. No new results are proved here; the goal is to translate
+the toy example into the language the derivation will use.
+
+\item \textbf{Derive.} The main result is derived line by line.
+Routine steps are flagged and skipped; illuminating ones are written
+out in full with underbraces labelling each term. Derivations follow
+rigour level~B: rigorous where the algebra teaches something,
+stated-with-citation where it does not.
+
+\item \textbf{Intuition box.} The chapter closes with an intuition box
+restating the result in one or two sentences of plain English, often
+with a picture. If the reader got lost in the derivation, the intuition
+box is the minimum they need to carry forward.
+\end{enumerate}
+
+Recommended reading protocol: work stage~1 carefully with a pen,
+checking every number in the toy example is reproducible from the
+rules. Read stages~2 and~3 once at normal speed, then re-read while
+writing down each line of algebra on paper. Finally, read the intuition
+box and ask whether it would have been obvious from the toy example
+alone --- if yes, the chapter has done its job. If no, re-read
+stages~3 and~4 together and look for what the intuition box points at
+that the derivation glossed over.
+
+Budget roughly double the time for a hard chapter versus an average
+chapter in the same Part. The five hard chapters contain most of the
+load-bearing theory; time spent on them compounds because every later
+chapter assumes the result without rederiving it.

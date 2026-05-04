@@ -1,0 +1,1017 @@
+\chapter{Optimal Execution: Almgren--Chriss}
+\label{ch:almgren_chriss}
+\chaptermark{Almgren--Chriss optimal execution}
+
+You need to sell $1{,}000{,}000$ shares of a stock by the end of the
+day. Selling them all at once walks the order book and moves the
+market against you by tens of basis points. Trailing them out
+one-by-one over the full session exposes you to all-day price risk,
+where a random adverse drift of half a percent on tens of millions
+of dollars notional wipes out a week of desk P\&L. Between the two
+extremes sits a schedule --- how many shares to sell at each minute
+--- that balances rushing against dawdling. Under linear impact
+and Gaussian price noise, ``when should you sell each share'' has
+a clean closed-form answer, and this chapter derives it from scratch.
+
+The answer is the \textbf{Almgren--Chriss (A--C) optimal execution
+trajectory} \citeAC{}, the benchmark every sell-side execution desk
+measures algorithms against. It \emph{assumes linear market impact},
+directly contradicting the empirical square-root law of
+\cref{ch:market_impact}; reconciling the two is part of this
+chapter's job. The objective resembles the inventory-averse market
+maker of \cref{ch:market_making} (the dual problem: earn spread
+subject to inventory risk vs.\ pay impact subject to price risk on
+unsold inventory), but here the closed form is in elementary
+functions and we derive it by calculus of variations on finite sums.
+
+\begin{backgroundbox}[Prerequisites]
+From earlier in the book:
+\begin{itemize}
+  \item \Cref{ch:market_impact}: the empirical square-root law
+  $I(Q) \approx Y\volat\sqrt{Q/V}$; temporary (reverting) vs.\
+  permanent (information-revealing) impact; linear impact
+  over-predicts cost by a factor
+  $\sqrt{Q_{\text{exec}}/Q_{\text{calib}}}$ when extrapolated out
+  of calibration range. This chapter assumes linear impact for
+  tractability; the contradiction is flagged in
+  \cref{sec:ac_vs_sqrt}.
+  \item \Cref{ch:market_making}: the Avellaneda--Stoikov
+  inventory-averse market maker. A market maker \emph{earns}
+  spread subject to price risk on inventory; the A--C
+  liquidator \emph{pays} impact subject to price risk on
+  not-yet-liquidated inventory. Same mean-variance objective
+  and HJB machinery, opposite ends of the client--dealer
+  relationship. Warning: A--S uses $\riskav$ for the
+  market-maker's risk aversion; here $\riskav$ is the
+  permanent-impact coefficient (pitfallbox below).
+  \item \Cref{ch:mean_reversion_ou}: mean-variance thinking ---
+  fix an expected cost, minimise variance, or vice versa. A--C
+  applies it to a schedule rather than a scalar.
+\end{itemize}
+From outside the book:
+\begin{itemize}
+  \item Elementary \textbf{Lagrange multipliers} / discrete
+  calculus of variations: differentiating a quadratic in a
+  trajectory $\{x_k\}$ under a linear terminal constraint.
+  \item \textbf{Linear recurrences}: the recurrence
+  $x_{k-1} - 2\cosh(\kappa\tau)x_k + x_{k+1} = 0$ has general
+  solution $x_k = A\sinh(\kappa k\tau) + B\cosh(\kappa k\tau)$,
+  fixed by two boundary conditions (same $y_k = r^k$ machinery
+  as solving $y_{k-1} - 2 y_k + y_{k+1} = 0$).
+  \item \textbf{Tridiagonal linear algebra}: the first-order
+  conditions form a tridiagonal system, the matrix version of
+  the recurrence.
+  \item Mean-variance thinking: minimising $\E[C] + \lambda\Var[C]$
+  traces an efficient frontier as $\lambda$ ranges over
+  $[0,\infty)$. No schedule is ``optimal'' without specifying
+  $\lambda$.
+\end{itemize}
+\end{backgroundbox}
+
+\section{The liquidation problem}
+\label{sec:ac_setup}
+
+\emph{Symbol anchor.} $X$ initial position, $T$ deadline, $N$
+intervals, $\tau = T/N$, $\volat$ vol, $\eta$ temporary-impact
+slope, $\riskav$ permanent-impact slope, $\lambda$ risk aversion,
+$\kappa = \volat\sqrt{\lambda/\eta}$ time-constant.
+
+A \emph{liquidator} holds $X$ shares at $t = 0$ and must hold $0$
+at $t = T$, trading at $N+1$ equally spaced times $t_0 = 0 < t_1 <
+\ldots < t_N = T$ with spacing $\tau \defeq T/N$. Write $x_k$ for
+the \textbf{holding after trade $k$}: $x_0 = X$, $x_N = 0$. The
+\textbf{trade at step $k$} is the signed change in holding,
+\begin{equation}
+  n_k \;\defeq\; x_{k-1} - x_k, \qquad k = 1, 2, \ldots, N.
+  \label{eq:ac_nk_def}
+\end{equation}
+Positive $n_k$ is a sell (holding falls), negative a buy. Trades
+sum to the full liquidation,
+\begin{equation}
+  \sum_{k=1}^{N} n_k \;=\; x_0 - x_N \;=\; X,
+  \label{eq:ac_ntotal}
+\end{equation}
+so the constraint $\sum n_k = X$ is automatic given
+$x_0 = X, x_N = 0$; no separate Lagrange multiplier is needed.
+
+\subsection{Three cost sources}
+\label{subsec:ac_costs}
+
+Each share sold incurs cost from three distinct mechanisms.
+\citeAC{} writes each as an affine function of trading rate $v_k
+\defeq n_k/\tau$ (shares per unit time in period $k$), with
+separate slopes.
+
+\paragraph{Temporary impact $g(v)$.} Selling $n_k$ shares in the
+$k$-th interval consumes visible liquidity on the bid side. The
+market maker fills the flow below the no-pressure mid; once the
+interval ends the book refills and the temporary component
+vanishes. \citeAC{} models this as
+\begin{equation}
+  g(v) \;=\; \epsilon\,\mathrm{sign}(v) \;+\; \eta\, v,
+  \label{eq:ac_temp}
+\end{equation}
+with two constants:
+\begin{itemize}
+  \item $\epsilon > 0$: fixed half-spread per share. Every market
+  order crosses the bid--ask by at least $\epsilon$. For a pure
+  liquidation $\epsilon\sum|n_k| = \epsilon X$ is a constant
+  offset and drops out of every optimisation.
+  \item $\eta > 0$: linear slope on rate. Twice the rate, twice
+  the temporary impact per share --- the term that makes ``rush''
+  expensive and shapes the optimal schedule.
+\end{itemize}
+With constant rate over the interval, the average execution price
+in period $k$ is the starting mid minus $g(n_k/\tau)$. Total
+temporary-impact cost over the session:
+\begin{equation}
+  C_{\text{temp}} \;=\; \sum_{k=1}^N n_k \cdot g(n_k/\tau)
+   \;=\; \epsilon X \;+\; \frac{\eta}{\tau}\sum_{k=1}^N n_k^2.
+   \label{eq:ac_ctemp}
+\end{equation}
+The constant $\epsilon X$ will be dropped everywhere below.
+
+\paragraph{Permanent impact $h(v)$.} Selling signals that somebody
+thinks fair value has moved; the market updates its belief and
+the mid drifts down. Unlike the temporary component, this drift
+does not revert --- it lives on the efficient price. \citeAC{}
+models it linearly:
+\begin{equation}
+  h(v) \;=\; \riskav\, v,
+  \label{eq:ac_perm}
+\end{equation}
+with $\riskav > 0$. Over interval $k$ the mid drifts down by
+$\tau\cdot h(n_k/\tau) = \riskav n_k$.
+
+\begin{pitfallbox}[A--C $\riskav$ is \emph{not} A--S $\riskav$]
+In \cref{ch:market_making}, Avellaneda--Stoikov's reservation price
+$r = \Spx - \invq\,\riskav\,\volat^2(T-t)$ used $\riskav$ for the
+market-maker's exponential-utility risk aversion. Same Greek, but
+here $\riskav$ is the \emph{permanent-impact slope} $h(v) = \riskav
+v$ --- a venue/asset property, not a trader preference. For the
+A--C liquidator, ``risk aversion'' is $\lambda$, introduced below.
+Henceforth: $\riskav$ means permanent-impact coefficient, $\lambda$
+means liquidator urgency.
+\end{pitfallbox}
+
+\paragraph{Price risk $\sigma\sqrt{\tau}\xi_k$.} The mid also moves
+for reasons unrelated to the liquidator: other flow, news, macro.
+\citeAC{} models this as arithmetic Brownian motion with vol
+$\volat$ per unit time, discretised into i.i.d.\ Gaussian shocks:
+\begin{equation}
+  S_k \;=\; S_{k-1} \;+\; \volat\sqrt{\tau}\,\xi_k
+    \;-\; \tau\, h(n_k/\tau),
+  \qquad \xi_k \sim \Normal(0,1)\ \iid
+  \label{eq:ac_Srecur}
+\end{equation}
+The Gaussian $\xi_k$ is the random part; $-\tau h(n_k/\tau)$ is
+the deterministic permanent-impact drift per interval. \citeAC{}
+uses arithmetic rather than geometric Brownian motion because
+over a single day the difference is second-order in total cost,
+and arithmetic BM admits closed forms where geometric does not.
+
+\begin{keyfactbox}[The six A--C parameters plus one]
+Six model parameters plus one decision parameter:
+\begin{center}\begin{tabular}{ll}\toprule
+  \textbf{Symbol} & \textbf{Meaning} \\ \midrule
+  $X$      & Total shares to liquidate \\
+  $T$      & Liquidation deadline \\
+  $N$      & Number of equal-length trade intervals \\
+  $\volat$ & Arithmetic volatility of the underlying per unit time \\
+  $\eta$   & Temporary-impact slope (linear part of $g$) \\
+  $\riskav$& Permanent-impact slope ($h(v) = \riskav v$) \\ \midrule
+  $\lambda$& Liquidator risk aversion (mean-variance penalty) \\
+  \bottomrule
+\end{tabular}\end{center}
+The half-spread $\epsilon$ is a seventh parameter, but since
+$\epsilon\sum|n_k| = \epsilon X$ is constant over schedules, it
+does not affect the optimal trajectory.
+\end{keyfactbox}
+
+\section{The mean-variance objective}
+\label{sec:ac_objective}
+
+Total cost of a schedule $\{n_k\}$ (equivalently trajectory
+$\{x_k\}$) is a random variable; we form a scalar objective that
+trades its mean against its variance. The tension is the whole
+point: trading fast pays more impact cost (each child order eats
+deeper into the book), trading slow leaves unsold shares exposed
+to adverse random drift for longer. Expected cost penalises the
+former, variance penalises the latter; A--C picks the schedule
+that minimises their weighted sum. The next two subsections unpack
+each in turn.
+
+\subsection{Expected cost}
+\label{subsec:ac_expectation}
+
+At the start of period $k$ the mid is $S_{k-1}$. The liquidator
+sells $n_k$ at average price $S_{k-1} - \eta n_k/\tau$ (dropping
+the $\epsilon$ constant), so cash received is $n_k(S_{k-1} - \eta
+n_k/\tau)$. The \textbf{implementation shortfall} (``slippage'') is
+what the liquidator would have received selling $X$ instantly at
+$S_0$ minus what they actually receive:
+\begin{equation}
+  C \;\defeq\; X\,S_0 \;-\; \sum_{k=1}^N n_k\left(S_{k-1} - \frac{\eta n_k}{\tau}\right).
+  \label{eq:ac_cost_def}
+\end{equation}
+Iterating~\eqref{eq:ac_Srecur} gives $S_{k-1} = S_0 +
+\volat\sqrt\tau\sum_{j=1}^{k-1}\xi_j - \riskav\sum_{j=1}^{k-1}n_j$;
+expanding the sum yields (\citeAC{} eq.~(4))
+\begin{equation}
+  C \;=\; \underbrace{\sum_{k=1}^N \tau\,\riskav\,x_k\,\frac{n_k}{\tau}}_{\text{permanent impact}}
+       \;+\; \underbrace{\frac{\eta}{\tau}\sum_{k=1}^N n_k^2}_{\text{temporary impact}}
+       \;-\; \underbrace{\volat\sqrt{\tau}\sum_{k=1}^N x_k\,\xi_k}_{\text{random price risk}}.
+  \label{eq:ac_cost_decomposed}
+\end{equation}
+Permanent impact is deterministic and quadratic in the trajectory;
+temporary impact is deterministic and quadratic in the rates; the
+price-risk term is the only random one, linear in Gaussian shocks.
+
+Taking the expectation, only the first two survive:
+\begin{equation}
+  \E[C] \;=\; \riskav \sum_{k=1}^N x_k\,n_k
+         \;+\; \frac{\eta}{\tau}\sum_{k=1}^N n_k^2.
+  \label{eq:ac_EC_raw}
+\end{equation}
+
+The permanent-impact sum $\sum x_k n_k$ simplifies by a
+telescoping identity central to everything below. With
+$n_k = x_{k-1} - x_k$,
+\begin{equation}
+  \sum_{k=1}^N x_k n_k
+    \;=\; \sum_{k=1}^N x_k(x_{k-1} - x_k)
+    \;=\; \sum_{k=1}^N \left(\tfrac{1}{2}(x_{k-1}^2 - x_k^2) - \tfrac{1}{2}n_k^2\right)
+    \;=\; \tfrac{1}{2}(X^2 - 0) - \tfrac{1}{2}\sum_{k=1}^N n_k^2,
+  \label{eq:ac_telescope}
+\end{equation}
+using $x_k(x_{k-1}-x_k) = \tfrac{1}{2}(x_{k-1}^2 - x_k^2) -
+\tfrac{1}{2}(x_{k-1}-x_k)^2$ term-by-term and telescoping. Expected
+cost becomes purely quadratic in the $n_k$, plus the constant
+$\tfrac{1}{2}\riskav X^2$:
+\begin{equation}
+  \E[C] \;=\; \tfrac{1}{2}\riskav X^2
+            \;+\; \frac{1}{\tau}\bigl(\eta - \tfrac{1}{2}\riskav\tau\bigr)
+                    \sum_{k=1}^N n_k^2.
+  \label{eq:ac_EC_clean}
+\end{equation}
+The \emph{adjusted temporary-impact coefficient} is
+\begin{equation}
+  \tilde\eta \;\defeq\; \eta \;-\; \tfrac{1}{2}\riskav\tau,
+  \label{eq:ac_etatilde}
+\end{equation}
+which replaces $\eta$ in the discrete problem. The
+$\tfrac{1}{2}\riskav\tau$ correction is the most-missed detail in
+re-derivations of A--C: discrete uses $\tilde\eta$, not $\eta$. In
+the $\tau \to 0$ limit (\cref{sec:ac_ct_limit}) $\tilde\eta \to
+\eta$, so continuous-time uses the un-adjusted $\eta$.
+
+\subsection{Variance of cost}
+\label{subsec:ac_variance}
+
+The only random term in~\eqref{eq:ac_cost_decomposed} is
+$-\volat\sqrt\tau\sum_k x_k \xi_k$. Its variance:
+\begin{equation}
+  \Var[C]
+  \;=\; \volat^2\tau\,\Var\!\left[\sum_{k=1}^N x_k\xi_k\right]
+  \;=\; \volat^2\tau \sum_{k=1}^N x_k^2,
+  \label{eq:ac_var}
+\end{equation}
+by independence of the $\xi_k$. The sum $\sum x_k^2$ is the
+discrete $L^2$-norm of the inventory path, so \textbf{variance is
+the area under the squared-inventory curve}, weighted by
+$\volat^2\tau$. A slow schedule (large $x_k$ throughout) carries
+more variance --- price moves act on more shares for longer.
+
+\subsection{The objective}
+\label{subsec:ac_obj}
+
+\citeAC{} combines them into a linear \textbf{mean-variance
+objective}:
+\begin{equation}
+  U(\{n_k\}) \;\defeq\; \E[C] + \lambda\Var[C],
+  \qquad \lambda \ge 0.
+  \label{eq:ac_obj}
+\end{equation}
+Minimise $U$ subject to $x_0 = X, x_N = 0$. $\lambda$ encodes
+how much variance the trader accepts to save a unit of expected
+cost: large $\lambda$ = urgent, risk-averse (``get me out, I don't
+want it overnight''); small $\lambda$ = patient, risk-tolerant
+(``minimise cost, I'll wear the mark-to-market risk'').
+
+\begin{keyfactbox}[The A--C objective]
+Given $X$ shares over $N$ intervals of length $\tau$, vol $\volat$,
+temporary slope $\eta$, permanent slope $\riskav$, and risk
+aversion $\lambda \ge 0$, the A--C objective is
+\[
+  \min_{\{n_k\}}\quad
+    \underbrace{\tfrac{1}{2}\riskav X^2 + \frac{\tilde\eta}{\tau}\sum_{k=1}^N n_k^2}_{\E[C]}
+    \;+\;
+    \lambda\,
+    \underbrace{\volat^2\tau\sum_{k=1}^N x_k^2}_{\Var[C]},
+\]
+with $\tilde\eta = \eta - \tfrac{1}{2}\riskav\tau$,
+$n_k = x_{k-1} - x_k$, $x_0 = X$, $x_N = 0$.
+\end{keyfactbox}
+
+\begin{intuitionbox}
+Two limiting cases before we derive the minimiser.
+
+\textit{$\lambda \to 0$: only expected cost.} The objective is
+$\tfrac{\tilde\eta}{\tau}\sum n_k^2$. By Cauchy--Schwarz, $\sum
+n_k^2$ at fixed $\sum n_k = X$ is minimised by equal $n_k = X/N$:
+\emph{TWAP} (Time-Weighted Average Price), linear inventory.
+
+\textit{$\lambda \to \infty$: only variance.} Minimising
+$\volat^2\tau\sum x_k^2$ under $x_0=X, x_N=0$ sends everything at
+$k=1$: all $x_k = 0$ thereafter, variance collapses, cost blows up.
+
+Intermediate $\lambda$: deterministic, monotone-decreasing,
+\emph{front-loaded} relative to TWAP --- trading some expected
+cost for variance reduction by shedding the large early positions
+that dominate $\sum x_k^2$.
+\end{intuitionbox}
+
+\section{Deriving the discrete optimal trajectory}
+\label{sec:ac_derivation}
+
+With the objective quadratic in the trajectory, take $\partial/
+\partial x_j$ at each interior $j \in \{1, \ldots, N-1\}$, set to
+zero, and recognise the finite-difference equation as a
+second-order linear recurrence.
+
+\subsection{First-order conditions}
+\label{subsec:ac_foc}
+
+Write $U = \tfrac{1}{2}\riskav X^2 + \tfrac{\tilde\eta}{\tau}\sum
+n_k^2 + \lambda\volat^2\tau\sum x_k^2$. For interior $x_j$, only
+$n_j = x_{j-1} - x_j$ and $n_{j+1} = x_j - x_{j+1}$ depend on it:
+\begin{align*}
+  \frac{\partial n_j^2}{\partial x_j}
+    &= 2\,n_j\,(-1) = -2(x_{j-1} - x_j), \\
+  \frac{\partial n_{j+1}^2}{\partial x_j}
+    &= 2\,n_{j+1}\,(+1) = 2(x_j - x_{j+1}).
+\end{align*}
+Adding them,
+\begin{equation*}
+  \frac{\partial}{\partial x_j}\sum_{k=1}^N n_k^2
+  \;=\; -2(x_{j-1} - x_j) + 2(x_j - x_{j+1})
+  \;=\; -2(x_{j-1} - 2x_j + x_{j+1}).
+\end{equation*}
+The variance sum contributes $2\lambda\volat^2\tau\,x_j$; the
+$\tfrac{1}{2}\riskav X^2$ constant drops. Hence:
+\begin{equation*}
+  \frac{\partial U}{\partial x_j}
+  \;=\; -\frac{2\tilde\eta}{\tau}(x_{j-1} - 2x_j + x_{j+1})
+       \;+\; 2\lambda\volat^2\tau\,x_j
+  \;=\; 0.
+\end{equation*}
+Dividing by $-2\tilde\eta/\tau$ and rearranging,
+\begin{equation}
+  x_{j-1} \;-\; 2\left(1 + \frac{\lambda\volat^2\tau^2}{2\tilde\eta}\right) x_j
+          \;+\; x_{j+1} \;=\; 0,
+  \qquad j = 1, 2, \ldots, N-1.
+  \label{eq:ac_foc_recur}
+\end{equation}
+A second-order linear recurrence with constant coefficient. Compare
+to the hyperbolic identity
+\begin{equation*}
+  2\cosh(\kappa\tau) \;=\; e^{\kappa\tau} + e^{-\kappa\tau},
+\end{equation*}
+and define $\kappa > 0$ by the implicit equation
+\begin{equation}
+  \boxed{\;
+  \cosh(\kappa\tau) \;=\; 1 \;+\; \frac{\lambda\volat^2\tau^2}{2\tilde\eta}
+  \;}
+  \label{eq:ac_kappa_exact}
+\end{equation}
+so that~\eqref{eq:ac_foc_recur} becomes, exactly,
+\begin{equation}
+  x_{j-1} \;-\; 2\cosh(\kappa\tau)\,x_j \;+\; x_{j+1} \;=\; 0.
+  \label{eq:ac_recur_sinh}
+\end{equation}
+Expanding $\cosh(\kappa\tau) = 1 + \tfrac{1}{2}(\kappa\tau)^2 +
+O(\tau^4)$ and matching~\eqref{eq:ac_foc_recur} gives the
+small-$\tau$ approximation:
+\begin{equation}
+  \boxed{\;\kappa^2 \;\approx\; \frac{\lambda\volat^2}{\tilde\eta}\;}
+  \label{eq:ac_kappa_approx}
+\end{equation}
+This is the $\kappa$ quoted in textbooks and code. The exact
+discrete $\kappa$ from~\eqref{eq:ac_kappa_exact} differs by
+$O(\tau^2)$, numerically negligible in practice, and matches the
+un-adjusted continuous-time definition as $\tau \to 0$.
+
+\subsection{Solving the recurrence}
+\label{subsec:ac_solve_recur}
+
+The recurrence~\eqref{eq:ac_recur_sinh} has characteristic equation
+$r^2 - 2\cosh(\kappa\tau) r + 1 = 0$ with roots $r_{\pm} =
+e^{\pm\kappa\tau}$, so
+\begin{equation*}
+  x_k \;=\; A\,e^{k\kappa\tau} + B\,e^{-k\kappa\tau}
+       \;=\; A'\,\sinh(\kappa k\tau) + B'\,\cosh(\kappa k\tau).
+\end{equation*}
+Boundary conditions pin the constants. $x_N = 0$ at $t_N = T$ gives
+\begin{equation*}
+  0 \;=\; A'\sinh(\kappa T) + B'\cosh(\kappa T)
+  \;\Rightarrow\;
+  B' \;=\; -A'\tanh(\kappa T).
+\end{equation*}
+Substituting back,
+\begin{align*}
+  x_k &= A'\bigl[\sinh(\kappa k\tau) - \tanh(\kappa T)\cosh(\kappa k\tau)\bigr] \\
+      &= \frac{A'}{\cosh(\kappa T)}\bigl[\sinh(\kappa k\tau)\cosh(\kappa T) - \sinh(\kappa T)\cosh(\kappa k\tau)\bigr].
+\end{align*}
+The bracketed expression is a hyperbolic-sine subtraction formula:
+$\sinh(\alpha)\cosh(\beta) - \sinh(\beta)\cosh(\alpha) = \sinh(\alpha -
+\beta)$, so
+\begin{equation*}
+  x_k = \frac{A'}{\cosh(\kappa T)}\sinh(\kappa k\tau - \kappa T)
+       = -\frac{A'}{\cosh(\kappa T)}\sinh(\kappa(T - k\tau)).
+\end{equation*}
+Finally, $x_0 = X$ sets $X = -A'\sinh(\kappa T)/\cosh(\kappa T)$, so
+$A' = -X\cosh(\kappa T)/\sinh(\kappa T)$, and
+\begin{equation}
+  \boxed{\;
+  x_k \;=\; X \cdot \frac{\sinh\!\bigl(\kappa(T - k\tau)\bigr)}{\sinh(\kappa T)},
+  \qquad k = 0, 1, \ldots, N.
+  \;}
+  \label{eq:ac_xstar}
+\end{equation}
+
+\subsection{Trade sizes}
+\label{subsec:ac_nstar}
+
+Differencing the trajectory,
+\begin{equation*}
+  n_k \;=\; x_{k-1} - x_k
+       \;=\; \frac{X}{\sinh(\kappa T)}\Bigl[\sinh(\kappa(T - (k-1)\tau))
+                             - \sinh(\kappa(T - k\tau))\Bigr].
+\end{equation*}
+Using $\sinh\alpha - \sinh\beta = 2\cosh\!\bigl(\tfrac{\alpha+\beta}{2}\bigr)
+\sinh\!\bigl(\tfrac{\alpha-\beta}{2}\bigr)$ with
+$\alpha = \kappa(T - (k-1)\tau)$, $\beta = \kappa(T - k\tau)$, so
+$\tfrac{\alpha+\beta}{2} = \kappa(T - (k-\tfrac{1}{2})\tau)$ and
+$\tfrac{\alpha-\beta}{2} = \tfrac{1}{2}\kappa\tau$, we get
+\begin{equation}
+  \boxed{\;
+  n_k \;=\; \frac{2\,X\,\sinh\!\bigl(\tfrac{1}{2}\kappa\tau\bigr)}{\sinh(\kappa T)}
+       \cdot \cosh\!\bigl(\kappa\bigl(T - (k-\tfrac{1}{2})\tau\bigr)\bigr),
+  \qquad k = 1, 2, \ldots, N.
+  \;}
+  \label{eq:ac_nstar}
+\end{equation}
+The factor $\cosh(\kappa(T - (k-\tfrac{1}{2})\tau))$ decreases
+monotonically from $\cosh(\kappa(T-\tau/2))$ at $k=1$ to
+$\cosh(\kappa\tau/2)$ at $k=N$: trades shrink over time, the
+schedule front-loads. The prefactor $2X\sinh(\kappa\tau/2)/
+\sinh(\kappa T)$ normalises the total to $X$ by telescoping.
+
+\begin{keyfactbox}[Almgren--Chriss optimal trajectory]
+The inventory and trade-size schedules that minimise the
+mean-variance objective $\E[C] + \lambda\Var[C]$ subject to
+$x_0 = X$, $x_N = 0$ are
+\[
+  x_k \;=\; X\,\frac{\sinh\!\bigl(\kappa(T - k\tau)\bigr)}{\sinh(\kappa T)},
+  \qquad
+  n_k \;=\; \frac{2X\sinh(\tfrac{1}{2}\kappa\tau)}{\sinh(\kappa T)}\,\cosh\!\bigl(\kappa(T - (k-\tfrac{1}{2})\tau)\bigr),
+\]
+with
+\[
+  \kappa^2 \;=\; \frac{\lambda\volat^2}{\tilde\eta},
+  \qquad
+  \tilde\eta \;=\; \eta - \tfrac{1}{2}\riskav\tau.
+\]
+Boundary conditions are automatic: $x_0 = X$ because
+$\sinh(\kappa T)/\sinh(\kappa T) = 1$, and $x_N = 0$ because
+$\sinh(0) = 0$.
+\end{keyfactbox}
+
+\section{Continuous-time limit}
+\label{sec:ac_ct_limit}
+
+Take $\tau \to 0, N \to \infty$ with $N\tau = T$ fixed:
+\begin{itemize}
+  \item $\tilde\eta = \eta - \tfrac{1}{2}\riskav\tau \to \eta$.
+  \item $\kappa^2 = \lambda\volat^2/\tilde\eta \to
+  \lambda\volat^2/\eta$, a function of continuous parameters only.
+  \item $x_k \to x(t)$, continuous in $t \in [0, T]$.
+\end{itemize}
+The discrete solution~\eqref{eq:ac_xstar} becomes
+\begin{equation}
+  \boxed{\;
+  x(t) \;=\; X\,\frac{\sinh\!\bigl(\kappa(T - t)\bigr)}{\sinh(\kappa T)},
+  \qquad \kappa \;=\; \volat\sqrt{\frac{\lambda}{\eta}}.
+  \;}
+  \label{eq:ac_ct}
+\end{equation}
+\citeAC{}~\S4 derives the continuous problem directly via
+Euler--Lagrange on $\int_0^T[\eta\dot{x}^2 + \lambda\volat^2
+x^2]\,\mathrm{d}t$, giving $\eta\ddot{x} - \lambda\volat^2 x = 0$
+and hence~\eqref{eq:ac_ct}; the two derivations agree.
+
+\section{Worked numerical example}
+\label{sec:ac_worked}
+
+A plug-in is worth a page of formulas. We take the canonical
+mid-cap US equity liquidation that appears in every textbook.
+
+\paragraph{Parameters.}
+\begin{itemize}
+  \item $X = 10^6$ shares (a round lot).
+  \item $T = 1$ trading day, $N = 13$ half-hour intervals,
+  $\tau \approx 0.0769$ day.
+  \item $\volat = 0.30$ fractional-price per $\sqrt{\text{day}}$;
+  for a $\$50$ stock, daily stdev $\approx \$15$.
+  \item $\eta = 2.5\times 10^{-6}$. At rate $10^7$ shares/day the
+  concession is $\eta v = 25$ (huge, because rate is huge); at a
+  realistic $X/T = 10^6$/day it is $2.5$ price units, a plausible
+  heavy-liquidation magnitude.
+  \item $\riskav = 2.5\times 10^{-7}$. Permanent impact over the
+  whole day is $\riskav X = 0.25$, an order of magnitude below
+  the temporary cost --- matching the empirical observation that
+  permanent impact is a minority of execution cost.
+  \item $\lambda = 10^{-6}$, mildly risk-averse.
+\end{itemize}
+
+\paragraph{Derived quantities.} From~\eqref{eq:ac_etatilde},
+\begin{equation*}
+  \tilde\eta \;=\; \eta - \tfrac{1}{2}\riskav\tau
+              \;=\; 2.5\times 10^{-6} - \tfrac{1}{2}(2.5\times 10^{-7})(0.0769)
+              \;=\; 2.4904\times 10^{-6}.
+\end{equation*}
+From~\eqref{eq:ac_kappa_approx},
+\begin{equation*}
+  \kappa^2 \;=\; \frac{\lambda\volat^2}{\tilde\eta}
+           \;=\; \frac{10^{-6}\cdot 0.09}{2.4904\times 10^{-6}}
+           \;=\; 0.03614,
+  \qquad
+  \kappa \;=\; 0.1901.
+\end{equation*}
+With $T = 1$, $\kappa T = 0.1901$ and $\sinh(\kappa T) = 0.19125$.
+
+\paragraph{Trajectory.} Applying~\eqref{eq:ac_xstar},
+
+\begin{center}
+\begin{tabular}{rrrr}\toprule
+  $k$ & $t_k$ (day) & $x_k$ (shares) & $n_k$ (shares) \\ \midrule
+  $0$ & $0.0000$ & $1\,000\,000.00$ & --- \\
+  $1$ & $0.0769$ & $922\,256.65$ & $77\,743.35$ \\
+  $2$ & $0.1538$ & $844\,710.53$ & $77\,546.13$ \\
+  $3$ & $0.2308$ & $767\,345.04$ & $77\,365.49$ \\
+  $4$ & $0.3077$ & $690\,143.64$ & $77\,201.40$ \\
+  $5$ & $0.3846$ & $613\,089.83$ & $77\,053.81$ \\
+  $6$ & $0.4615$ & $536\,167.12$ & $76\,922.71$ \\
+  $7$ & $0.5385$ & $459\,359.06$ & $76\,808.05$ \\
+  $8$ & $0.6154$ & $382\,649.24$ & $76\,709.82$ \\
+  $9$ & $0.6923$ & $306\,021.25$ & $76\,627.99$ \\
+  $10$ & $0.7692$ & $229\,458.69$ & $76\,562.55$ \\
+  $11$ & $0.8462$ & $152\,945.21$ & $76\,513.49$ \\
+  $12$ & $0.9231$ & $76\,464.43$ & $76\,480.78$ \\
+  $13$ & $1.0000$ & $0.00$ & $76\,464.43$ \\ \bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Boundary checks.} $x_0 = 10^6$ and $x_{13} = 0.00$ to the
+precision shown; $\sum_{k=1}^{13} n_k = 1\,000\,000.00 = X$ by
+construction.
+
+\textbf{Vs.\ TWAP.} TWAP sends $X/N \approx 76\,923.08$ per bin;
+A--C's first trade is $77\,743.35$ ($+1.07\%$ vs.\ TWAP), its
+last $76\,464.43$ ($-0.60\%$). At $\lambda = 10^{-6}$, A--C is
+almost indistinguishable from TWAP --- $\kappa T = 0.19$ is small,
+so $\sinh(\kappa(T-t))/\sinh(\kappa T) \approx (T-t)/T$. Curvature
+emerges at higher $\lambda$ (see \cref{sec:ac_frontier}). For a
+gently risk-averse trader, A--C says ``don't deviate from TWAP''.
+
+\begin{intuitionbox}
+The smallness of $\kappa T$ is not a parameter accident: for
+one-day liquidations of liquid names, linear impact and vol balance
+so $\kappa T \ll 1$, and optimal execution is only mildly
+front-loaded vs.\ TWAP. A--C's main payoff over TWAP is not a
+dramatic schedule change --- it is a principled way to pick
+$\lambda$ from client risk tolerance, and to compute the chosen
+schedule's expected cost and standard deviation for post-trade
+benchmarking.
+\end{intuitionbox}
+
+\section{The execution efficient frontier}
+\label{sec:ac_frontier}
+
+Sweeping $\lambda \in [0,\infty)$ at fixed $X, T, N, \volat,
+\eta, \riskav$ traces a curve in the $(\sqrt{\Var[C]}, \E[C])$
+plane: the \textbf{execution efficient frontier}, a Markowitz-style
+curve of minimum cost at given variance (or vice versa). The analogy
+is exact: where Markowitz portfolio selection trades expected return
+against variance over asset weights, A--C trades expected cost
+against variance over execution schedules. Each point on the curve
+is the best achievable $\E[C]$ at its $\sqrt{\Var[C]}$; no schedule
+lies below it, and picking $\lambda$ just picks which point on the
+curve you want.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=8.5cm, height=6cm,
+  xlabel={Variance of execution cost $\mathrm{Var}[\mathrm{cost}]$},
+  ylabel={Expected execution cost $\mathbb{E}[\mathrm{cost}]$},
+  xmin=0, xmax=1.1,
+  ymin=0, ymax=1.1,
+  xtick={0,0.5,1},
+  xticklabels={0, medium risk, high risk},
+  ytick={0,0.5,1},
+  yticklabels={0, , high cost},
+  title={Almgren--Chriss efficient frontier},
+  title style={font=\small\bfseries},
+  grid=major, grid style={dashed,gray!25},
+]
+\addplot[blue!70, thick] coordinates {
+  (0.04,1.0)(0.08,0.80)(0.15,0.58)(0.25,0.42)
+  (0.38,0.31)(0.53,0.24)(0.70,0.20)(0.88,0.17)(1.05,0.16)
+};
+\node[circle, fill=red!70, inner sep=2.5pt]
+  at (axis cs:0.53,0.24) {};
+\node[font=\footnotesize, above right, red!80]
+  at (axis cs:0.53,0.24) {TWAP};
+\node[circle, fill=green!60!black, inner sep=2.5pt]
+  at (axis cs:0.08,0.80) {};
+\node[font=\footnotesize, right, green!60!black, align=center]
+  at (axis cs:0.08,0.80) {fast execution\\(high impact)};
+\node[circle, fill=orange!80, inner sep=2.5pt]
+  at (axis cs:0.88,0.17) {};
+\node[font=\footnotesize, left, orange!80, align=center]
+  at (axis cs:0.88,0.17) {slow execution\\(high price risk)};
+\draw[-Stealth, dashed, gray!70]
+  (axis cs:0.80,0.28) -- (axis cs:0.18,0.60)
+  node[midway, above, sloped, font=\footnotesize]{$\lambda\uparrow$};
+\end{axis}
+\end{tikzpicture}
+\caption{Almgren--Chriss efficient frontier. Each point on the curve
+corresponds to a different risk-aversion parameter $\lambda$: high $\lambda$
+forces fast execution (low variance from price risk, high expected cost
+from market impact); low $\lambda$ allows slow execution (low impact cost,
+but high variance as price may drift). TWAP sits near the middle of the
+frontier. The optimal schedule for a given $\lambda$ is the point on this
+curve that minimises $\mathbb{E}[\mathrm{cost}] + \lambda\,\mathrm{Var}[\mathrm{cost}]$.}
+\label{fig:ac_frontier}
+\end{figure}
+
+Endpoints: $\lambda = 0$ sits at the rightmost (highest-variance,
+lowest-cost) point --- TWAP; $\lambda \to \infty$ sits at the
+leftmost --- the instant block trade. Interior points are
+hyperbolic-sine schedules.
+
+For the worked example parameters, using
+\begin{align*}
+  \E[C]   &\;=\; \tfrac{1}{2}\riskav X^2 + \frac{\tilde\eta}{\tau}\sum_k n_k^2, \\
+  \Var[C] &\;=\; \volat^2\tau\sum_k x_k^2,
+\end{align*}
+we compute:
+
+\begin{center}
+\begin{tabular}{rrrr}\toprule
+  $\lambda$ & $\E[C]$ (units) & $\sqrt{\Var[C]}$ (units) & $n_1$ as \% of $X$ \\ \midrule
+  $10^{-7}$ & $2{,}615{,}385$ & $163{,}135$ & $7.70\%$ \\
+  $10^{-6}$ & $2{,}615{,}456$ & $162{,}740$ & $7.77\%$ \\
+  $10^{-5}$ & $2{,}622{,}090$ & $158{,}944$ & $8.49\%$ \\
+  $10^{-4}$ & $3{,}017{,}007$ & $131{,}389$ & $14.28\%$ \\
+  $10^{-3}$ & $7{,}481{,}151$ & $67{,}447$  & $37.03\%$ \\ \bottomrule
+\end{tabular}
+\end{center}
+
+Increasing $\lambda$ drives $\sqrt{\Var[C]}$ down (good) and
+$\E[C]$ up (bad). At $\lambda = 10^{-3}$ the first trade is over
+a third of the position --- the trader pays nearly $3\times$ the
+expected cost to shed overnight variance. The desk's job is to
+pick the point matching client risk tolerance; A--C maps the
+qualitative ``client wants out fast'' to a specific $\lambda$ and
+hence a specific schedule.
+
+\begin{intuitionbox}
+Two observations. First, the permanent-impact term
+$\tfrac{1}{2}\riskav X^2 = 1.25\times 10^5$ is small vs.\ the
+$\sim 2.5\times 10^6$ expected-cost totals; most cost is temporary
+impact from $\sum n_k^2$. In this regime the $\tilde\eta$-vs-$\eta$
+distinction is a small correction --- but the one that makes the
+discrete closed form exact.
+
+Second, at $\lambda = 10^{-3}$ the trader pays an extra $\$4.9$m
+expected cost to save $\$95$k of cost standard deviation.
+Extreme risk aversion; no desk would pick it for a routine
+liquidation, but it fits regimes like an executing broker with a
+hard deadline and a client indifferent to average cost. The
+frontier is a menu, not a prescription.
+\end{intuitionbox}
+
+\section{VWAP, TWAP, POV, and A--C in context}
+\label{sec:ac_taxonomy}
+
+Sell-side execution algorithms come in a small zoo. Four matter
+for this book.
+
+\paragraph{TWAP --- Time-Weighted Average Price.} Equal size
+per interval, $n_k = X/N$. The name: when price is martingale, fill
+VWAP equals the mid's TWAP. TWAP is the $\lambda \to 0$ limit of
+A--C, default for ``lowest expected cost, don't care about timing
+risk''. Simple, benchmark-friendly, gaming-proof under martingale
+mid.
+
+\paragraph{VWAP --- Volume-Weighted Average Price.} Trade in
+proportion to the \emph{historical} intraday volume profile ($10\%$
+of daily volume in the first half-hour $\Rightarrow 10\%$ of the
+order). Benchmark: session realised VWAP. The default institutional
+equity algorithm because it mimics a ``typical'' participant and
+minimises tracking error to the market's average print. Not a
+direct A--C special case, but A--C re-weighted by a volume profile
+reproduces it.
+
+\paragraph{POV --- Percentage of Volume.} Trade a fixed fraction
+$\rho$ of \emph{realised} volume. If the last minute printed
+$10{,}000$ shares at $\rho = 5\%$, send $500$ next minute. Reactive:
+speeds up with the market, slows with it --- the liquidator's
+footprint stays proportional. Default for hiding in flow at the
+cost of deadline risk (insufficient volume $\Rightarrow$ incomplete
+fill).
+
+\paragraph{A--C / Implementation Shortfall.} Solve this chapter's
+trajectory problem for given $\lambda$ and execute the
+hyperbolic-sine schedule. The answer to ``minimise implementation
+shortfall (starting mid minus average fill) subject to a risk
+penalty''. Front-loaded vs.\ TWAP; equivalent to VWAP plus a risk
+correction under a flat volume profile. A--C (or a risk-aware
+cousin) is every modern desk's ``Implementation Shortfall''
+flagship.
+
+\begin{keyfactbox}[Execution algorithm taxonomy]
+\begin{center}\footnotesize\begin{tabular}{>{\raggedright\arraybackslash}p{1.3cm}
+                                 >{\raggedright\arraybackslash}p{5.8cm}
+                                 >{\raggedright\arraybackslash}p{5.8cm}}\toprule
+  \textbf{Algo} & \textbf{Schedule rule} & \textbf{Benchmark} \\ \midrule
+  TWAP & Equal per time bin & Session mid TWAP \\
+  VWAP & Proportional to historical volume profile & Session realised VWAP \\
+  POV  & Fixed \% of realised volume live & Realised VWAP (participation-matched) \\
+  A--C & Hyperbolic-sine, front-loaded by $\lambda$ & Arrival (decision) mid --- implementation shortfall \\
+  \bottomrule
+\end{tabular}\end{center}
+All four are deterministic given inputs; none uses a private
+signal. Signal-driven ``algo wheels'' sit on top of this layer.
+\end{keyfactbox}
+
+\section{Almgren--Chriss versus square-root reality}
+\label{sec:ac_vs_sqrt}
+
+The chapter's central pedagogical point, and the hardest to
+swallow first time. A--C models temporary impact linearly,
+$g(v) = \eta v$. \Cref{ch:market_impact} showed the empirical
+law, stable across decades and asset classes, is square-root:
+\begin{equation}
+  I(Q) \;\approx\; Y\volat\sqrt{Q/V_{\text{daily}}},
+  \label{eq:ch18_sqrt_recall}
+\end{equation}
+where $Q$ is metaorder size, $V_{\text{daily}}$ ADV, and $Y \sim
+0.5$ a dimensionless prefactor. Traded at constant rate over
+interval $\tau$, linear $g(v)$ gives $I(Q) = \eta Q/\tau \propto
+Q$ vs.\ the square-root's $I(Q) \propto \sqrt{Q}$. The two curves
+meet at exactly one order size --- where $\eta$ was calibrated ---
+and diverge elsewhere.
+
+\textbf{Why teach linear anyway?} Three reasons, none being
+``linear is empirically right'':
+\begin{enumerate}
+  \item \textbf{Closed form.} Linear impact yields the quadratic
+  objective~\eqref{eq:ac_obj}, linear first-order conditions, a
+  hyperbolic-sine solution, and a closed-form conic frontier.
+  Square-root impact gives a non-quadratic objective with no
+  closed form: a nonlinear BVP to solve numerically. For teaching
+  the structure of the cost--risk trade-off, the closed form wins.
+  \item \textbf{Local calibration.} In a narrow band around the
+  trader's typical size $Q_0$, linear can be tuned to match the
+  square-root slope: pick $\eta$ so $\eta Q_0/T = Y\volat\sqrt{Q_0/V}$.
+  Within a factor of $2$--$3$ of $Q_0$ it is not catastrophically
+  wrong.
+  \item \textbf{Industry inertia.} A--C became the industry
+  benchmark within five years. Serious desks run non-linear
+  engines, but A--C remains the lingua franca and
+  $(\eta, \riskav, \lambda)$ are what daily risk reports plot.
+\end{enumerate}
+
+\begin{pitfallbox}[Don't extrapolate A--C outside its calibration range]
+The cost of this contradiction is largest when a small-trade
+calibration is used to price a large one. Suppose $\eta$ is
+calibrated against child orders of $Q_{\text{calib}} = 10^5$ shares:
+\begin{itemize}
+  \item Child $Q = Q_{\text{calib}}$: predicted cost matches reality.
+  \item Parent $Q = 5\cdot 10^6$: linear predicts $\propto Q$,
+  reality is $\propto \sqrt{Q}$, so linear overpredicts by
+  $\sqrt{Q/Q_{\text{calib}}} = \sqrt{50} \approx 7.07$.
+\end{itemize}
+Running A--C with that over-stated slope tells the trader any
+parent liquidation is catastrophic, steering them to artificially
+slow schedules and ballooning variance. Fix: recalibrate $\eta$
+at the parent-order size band before running A--C, never scale up
+a child calibration. Empirical backing: \cref{ch:market_impact}.
+\end{pitfallbox}
+
+\section{Extensions and breakages}
+\label{sec:ac_extensions}
+
+Directions the basic model generalises in; doorways to further
+reading, not rederived here.
+
+\paragraph{Risk-neutral vs.\ risk-averse.} $\lambda = 0$ (TWAP as
+A--C solution) is the risk-neutral case; some authors treat it as
+a separate ``pure implementation shortfall'' problem. Replacing
+mean-variance with a full utility $U(C) = -\exp(\gamma C)$ gives
+the same closed form under Gaussian risk (CARA--Gaussian is
+mean-variance up to constants); CVaR or VaR break the closed form.
+
+\paragraph{Time-varying volatility.} $\volat \to \volat(t)$
+(higher at open/close, lower midday) generalises the trajectory:
+$\eta\ddot{x}(t) - \lambda\volat(t)^2 x(t) = 0$, a variable-coefficient
+ODE, numerical but not generally elementary. See \citeCartea{}
+Ch.~6.
+
+\paragraph{Multi-asset portfolio liquidation.} Vector positions
+$\bm{X} \in \R^n$ with covariance $\bm{\Sigma}$ and cross-impact
+$\bm{\eta}$ give a matrix quadratic with hyperbolic-sine matrix
+$\bm{\kappa} = \bm{\eta}^{-1/2}(\lambda\bm{\Sigma})^{1/2}\bm{\eta}^{-1/2}$.
+Closed form survives; bookkeeping doesn't. See \citeCartea{}
+Ch.~7.
+
+\paragraph{Non-linear impact.} With $g(v) \propto \sqrt{v}$ the
+objective is non-quadratic and has no closed form. Obizhaeva--Wang
+(2013) and Almgren (2003) give numerical treatments;
+large-order practitioners run non-linear optimisers on proprietary
+square-root curves.
+
+\paragraph{Dark pools and venue choice.} Dark (non-displayed)
+execution cuts temporary impact at the cost of uncertain fills.
+A--C with venue choice is an open research area; the simplest
+treatment mixes displayed and dark $\eta$'s with a dark fill
+probability. See \citeBouchaud{}.
+
+\section{Prosperity and sell-side applications}
+\label{sec:ac_applications}
+
+\begin{prosperitybox}
+End-of-round liquidation is where A--C earns its keep in
+Prosperity. Suppose you are long $30$ PICNIC\_BASKET1 entering the
+final $100$ timesteps after the basket--constituent spread you
+were harvesting has collapsed. You want flat by $T = 100$: the
+round ends and unliquidated inventory marks to the last mid
+regardless of realisable exit. You also want to avoid dumping all
+$30$ at once --- the basket is thin and a market order of that
+size walks the book down several ticks per unit.
+
+Take parameters $X = 30$, $T = 100$, $N = 10$ (one decision every
+$10$ timesteps), $\volat = 2.0$ seashells per timestep,
+$\eta = 0.05$ (each unit/timestep of selling rate drives the mid
+down by $0.05$), $\riskav = 0.001$ (permanent impact is small on
+the order book), and a mild $\lambda = 10^{-6}$. The A--C
+trajectory is computed exactly as in \cref{sec:ac_worked}:
+\[
+  \tilde\eta = 0.05 - \tfrac{1}{2}\cdot 0.001\cdot 10 = 0.045,
+  \qquad \kappa = \sqrt{10^{-6}\cdot 4 / 0.045} \approx 0.00943,
+\]
+so $\kappa T \approx 0.943$, larger than the equity example's
+$0.19$ --- the trader is closer to the deadline in P\&L-standard-deviation
+units. The schedule:
+\begin{center}
+\begin{tabular}{rrrr}\toprule
+  $k$ & $t_k$ & $x_k$ & $n_k$ \\ \midrule
+  $0$  & $0$   & $30.00$ & --- \\
+  $1$  & $10$  & $26.29$ & $3.71$ \\
+  $2$  & $20$  & $22.81$ & $3.48$ \\
+  $3$  & $30$  & $19.53$ & $3.28$ \\
+  $4$  & $40$  & $16.43$ & $3.10$ \\
+  $5$  & $50$  & $13.48$ & $2.96$ \\
+  $6$  & $60$  & $10.64$ & $2.84$ \\
+  $7$  & $70$  & $7.90$  & $2.74$ \\
+  $8$  & $80$  & $5.23$  & $2.67$ \\
+  $9$  & $90$  & $2.60$  & $2.63$ \\
+  $10$ & $100$ & $0.00$  & $2.60$ \\ \bottomrule
+\end{tabular}
+\end{center}
+TWAP sends $3.00$ per decision; A--C sends $3.71$ first ($+24\%$)
+and $2.60$ last ($-13\%$), trading a little early impact for tail
+variance reduction. $\sum n_k = 30.000$ exactly by construction.
+
+\textbf{Prosperity caveats.} (1) Position limits: if the limit is
+$\pm 30$, A--C does not help when flipping from $+30$ to $-30$ ---
+that is reversing, not liquidating. (2) Discrete units: round
+$n_k$ to integers and hold the slack in $x_k$; do not let rounding
+accumulate into a non-zero terminal. (3) Mid vs fill: A--C uses
+mid; Prosperity fills cross the spread, so the model slightly
+over-estimates cost.
+\end{prosperitybox}
+
+\begin{gsbox}
+On a Goldman execution desk, the default algorithm for a client
+order tagged ``IS'' (Implementation Shortfall) is an A--C
+descendant with venue routing, a dark-pool seeker, and a
+signal-based accelerator overlay. The owning \emph{Strat} does
+two unglamorous jobs. First, daily calibration of $\eta$ and
+$\riskav$ against the previous day's fills across tens of
+thousands of orders, regressing realised shortfall against $(Q/V)$
+and $(Q/T)^\alpha$ curves. Second, maintain $\lambda$ presets
+(``urgent'', ``neutral'', ``passive'') with a one-click override
+so traders pick at order entry without knowing the math. When
+asked ``why did my fill trail VWAP today?'' the Strat pulls a
+post-trade report decomposing realised shortfall into four
+A--C buckets: permanent impact, temporary impact, timing risk,
+spread. These reports are the team's daily bread.
+
+A second use is \emph{pre-trade cost estimation}: before a block,
+sales ask Strats ``how much to execute in two hours''. The answer
+is A--C $\E[C]$ at chosen $\lambda$, with $\sqrt{\Var[C]}$. It
+goes on the ticket the salesperson quotes. Getting it
+systematically wrong loses clients and gets the Strat paged.
+\end{gsbox}
+
+\section{A short reference implementation}
+\label{sec:ac_code}
+
+Twenty lines of Python compute the whole trajectory. Not production
+--- real engines need volume profiles, queue-position logic,
+child-order sizing against book depth, venue routing --- but this
+is the core calculation underneath any A--C execution stack.
+
+\begin{lstlisting}[caption={Almgren--Chriss optimal liquidation trajectory.}]
+import math
+
+def almgren_chriss_trajectory(X, T, N, sigma, eta, gamma, lam):
+    """Return the list of inventory levels [x_0, x_1, ..., x_N]
+    under the Almgren-Chriss optimal mean-variance schedule.
+
+    Parameters
+    ----------
+    X     : total shares to liquidate (x_0 = X, x_N = 0).
+    T     : deadline (same time units as sigma, eta, gamma).
+    N     : number of equal-length trade intervals.
+    sigma : arithmetic volatility per unit time.
+    eta   : temporary-impact slope (linear in trading rate).
+    gamma : permanent-impact slope (linear in trading rate).
+    lam   : mean-variance risk aversion (>= 0).
+    """
+    tau = T / N
+    eta_tilde = eta - 0.5 * gamma * tau
+    kappa = math.sqrt(lam * sigma * sigma / eta_tilde)
+    denom = math.sinh(kappa * T)
+    return [X * math.sinh(kappa * (T - k * tau)) / denom
+            for k in range(N + 1)]
+\end{lstlisting}
+
+Recover trade sizes by differencing: $n_k = x_{k-1} - x_k$. The
+$\lambda = 0$ case throws (\texttt{kappa = 0}, \texttt{sinh(0)} in
+the denominator); production code should trap it and return the
+TWAP schedule $[X(1 - k/N)]$ directly.
+
+\begin{historybox}
+Robert Almgren (Courant, NYU) and Neil Chriss wrote ``Optimal
+Execution of Portfolio Transactions'' in 1999; it appeared in the
+\emph{Journal of Risk} in 2000 and sits in every execution desk's
+literature folder. It was the first clean statement of the
+mean-variance execution problem; the hyperbolic-sine closed form
+turned ``how fast do we hit the button'' from craft into
+discipline. Almgren later founded Quantitative Brokers. Chriss
+had sell- and buy-side roles including Goldman Sachs Asset
+Management, Hutchin Hill, and Paloma. Newer models
+(Obizhaeva--Wang transient impact, Gatheral's no-dynamic-arbitrage
+framework) all frame themselves as departures from A--C.
+\end{historybox}
+
+\section{Key facts to memorise}
+\label{sec:ac_keyfacts}
+
+\begin{itemize}
+  \item Problem: sell $X$ over $[0,T]$ with $\sum n_k = X$,
+  minimising $\E[C] + \lambda\Var[C]$.
+  \item Three cost sources: temporary $g(v) = \eta v$ (reverts),
+  permanent $h(v) = \riskav v$ (sticks), price risk
+  $\volat\sqrt\tau\xi_k$ (Gaussian).
+  \item Telescoping $\sum x_k n_k = \tfrac{1}{2}(X^2 - \sum n_k^2)$
+  makes permanent impact quadratic in $n_k$.
+  \item Discrete: $\tilde\eta = \eta - \tfrac{1}{2}\riskav\tau$,
+  $\kappa^2 = \lambda\volat^2/\tilde\eta$. Continuous limit:
+  $\tilde\eta \to \eta$, $\kappa = \volat\sqrt{\lambda/\eta}$.
+  \item Optimal trajectory: $x_k = X\sinh(\kappa(T - k\tau))/
+  \sinh(\kappa T)$.
+  \item $\lambda \to 0$: TWAP. $\lambda \to \infty$: instant
+  block. Interior $\lambda$: front-loaded.
+  \item Efficient frontier: $\lambda \mapsto (\sqrt{\Var[C]},
+  \E[C])$ traces a convex curve.
+  \item Four baseline algos: TWAP, VWAP, POV, A--C. A--C is the
+  ``Implementation Shortfall'' default.
+  \item Linear impact contradicts the square-root law
+  (\cref{ch:market_impact}). Kept for tractability; practitioners
+  recalibrate $\eta$ locally to the square-root slope.
+  \item Goldman desk: Strat owns $(\eta, \riskav)$ calibration
+  against live fills; trader picks $\lambda$ from client risk
+  tolerance; overrides on news.
+  \item A--C $\riskav$ = permanent-impact slope, not the A--S
+  risk aversion of \cref{ch:market_making}.
+  \item Primary: \citeAC{}. Richer re-derivation: \citeCartea{}
+  Ch.~6--8. Empirical counter: \cref{ch:market_impact},
+  \citeBouchaud{}.
+\end{itemize}

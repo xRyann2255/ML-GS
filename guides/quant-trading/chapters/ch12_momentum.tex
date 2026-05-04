@@ -1,0 +1,598 @@
+\chapter{Momentum and Trend Following}
+\label{ch:momentum}
+\chaptermark{Momentum and trend following}
+
+Every chapter so far has bet \emph{against} the last move. The
+Roll estimator (\cref{ch:spreads_roll}) infers a bid--ask from
+negative autocovariance of trade-to-trade changes; the
+Glosten--Milgrom posterior (\cref{ch:kyle_gm}) is a martingale
+converging toward fair value as informed and uninformed flow
+average out; the OU machinery (\cref{ch:mean_reversion_ou}) trades
+the standardised deviation of a stationary process back to its
+long-run mean; the pairs and basket spreads
+(\cref{ch:pairs_cointegration,ch:basket_etf_arb}) are cointegrating
+residuals, traded with the same $z$-score rule. Five chapters, one
+instinct: when a price has moved, lean against the move.
+
+This chapter takes the opposite bet: the last move will
+\emph{continue}. The signal is the raw past return itself, used as
+a forecast of the next return with a positive coefficient. Mean
+reversion and momentum are statements about different time scales.
+On microsecond horizons, trends are absorbed by market-maker
+quoting within milliseconds; on monthly horizons, the opposite is
+empirically true. Time series momentum is one of the most robust
+anomalies in modern asset pricing, documented across $58$ liquid
+futures contracts in four asset classes over two decades by
+Moskowitz, Ooi, and Pedersen \citeMOP, and its canonical
+formulation fits on a single line. The chapter's job is to make
+the coexistence of momentum and mean reversion precise: when
+each, and what changes between them.
+
+\begin{backgroundbox}[Prerequisites]
+From earlier in the book:
+\begin{itemize}
+  \item \Cref{ch:mean_reversion_ou}: OU and the mean-reversion
+  worldview. Same machinery, sign of the coefficient flipped. A
+  return process can have one statistical signature on one horizon
+  and the opposite on another.
+  \item \Cref{ch:price_value}: the distinction between the
+  efficient price (a martingale) and a deviation from slow fair
+  value. Momentum is a claim about the efficient price itself, not
+  about a spread.
+  \item \Cref{ch:participants}: who trades and why. TSMOM's
+  behavioural explanation rests on slow-moving allocators (pension
+  funds, central banks) whose flow is predictable on monthly
+  horizons but invisible at the trade level.
+  \item \Cref{ch:order_flow}: Hawkes arrival clustering as the
+  microsecond version of trend persistence. ``Momentum'' applies
+  to the millisecond and the month, but the mechanism, the signal,
+  and the trade differ.
+  \item Elementary statistics: standard deviation, annualisation
+  ($\sigma_{\text{ann}} = \sigma_{\text{monthly}}\sqrt{12}$), the
+  $t$-statistic, sign function.
+\end{itemize}
+\end{backgroundbox}
+
+\section{Time series momentum (TSMOM)}
+\label{sec:ch12_tsmom}
+
+Time series momentum's signal is the simplest non-trivial function
+of past prices: the \emph{sign} of the past twelve-month excess
+return. Up over the past year: go long. Down: go short. Flat: do
+nothing. The position is sized inversely to recent realised
+volatility, so a volatile market gets a small position and a calm
+one a large position; every contract contributes the same ex-ante
+risk. That is the entire strategy.
+
+\begin{definition}[Time series momentum signal]
+\index{time series momentum|textbf}\index{momentum!time series|textbf}
+\label{def:tsmom_signal}
+Let $r_{t-12m,\,t}$ denote the excess return of a tradeable
+asset over the twelve months ending at time $t$. The
+\emph{time series momentum signal} at time $t$ is
+\begin{equation}
+  \text{signal}_t \;\defeq\; \operatorname{sign}\!\bigl(r_{t-12m,\,t}\bigr)
+  \;\in\; \{-1,\,0,\,+1\},
+  \label{eq:tsmom_signal}
+\end{equation}
+where $\operatorname{sign}(x) = +1$ for $x>0$, $-1$ for $x<0$,
+and $0$ for $x = 0$.
+\end{definition}
+
+The signal is binary in direction; the position is not. To make
+positions comparable across assets, scale notional inversely to a
+recent realised volatility estimate $\hat\volat_t$, targeting an
+annualised volatility $\volat_{\text{target}}$. \citeMOP{} use
+$\volat_{\text{target}} = 40\%$ annualised per instrument --- the
+level at which a forty-instrument diversified portfolio with
+realistic cross-instrument correlations reaches an aggregate target
+of about $12\%$ at the strategy level. It is an aggregate-vol
+decision projected back onto per-instrument level given
+diversification. Their volatility estimator is an exponentially
+weighted average of squared daily log-returns with centre-of-mass
+about sixty days; any recent realised-vol estimate will do. The
+worked example below uses an equally-weighted estimator; treat
+the choice as a tuning knob, not a load-bearing assumption.
+
+\begin{keyfactbox}[TSMOM position-sizing formula]
+\label{kf:tsmom_formula}
+The time series momentum position in a single instrument at
+time $t$, in units of notional exposure (positive for long,
+negative for short), is
+\begin{equation}
+  w_t \;=\; \operatorname{sign}\!\bigl(r_{t-12m,\,t}\bigr)
+  \cdot \frac{\volat_{\text{target}}}{\hat\volat_t},
+  \qquad \volat_{\text{target}} = 0.40 \text{ (annualised).}
+  \label{eq:tsmom_position}
+\end{equation}
+The signal contributes the direction; the volatility ratio
+contributes the magnitude. A volatile asset
+($\hat\volat_t$ large) gets a small position; a calm asset
+gets a large position. The position is rebalanced monthly as
+both the signal and the volatility estimate update.
+\end{keyfactbox}
+
+First, what the formula does \emph{not} say. Not ``buy the asset
+that went up the most,'' and not a cross-asset ranking. The signal
+for gold depends only on gold's own past return; an asset can be
+TSMOM-long even if it underperformed every other asset in the
+universe. Each instrument's signal is self-contained --- the
+contrast with cross-sectional momentum is the next section's
+subject.
+
+Second, what volatility scaling buys. Without it, one unit of S\&P
+futures and one unit of two-year Treasury futures contribute
+wildly different risk --- the equity index is $5$ to $10$ times
+more volatile than the short bond. A naive ``one unit per
+long-signal asset'' aggregate would be dominated by the most
+volatile contracts, and the portfolio would behave as its equity
+sleeve. Inverse-vol scaling forces every asset to contribute equal
+ex-ante risk, so diversification works \emph{across} asset
+classes.
+
+\subsection{A worked numerical example: gold futures}
+\label{sec:ch12_gold_example}
+
+Take gold futures at month-end. Past twelve-month return is
+$+15\%$; recent realised volatility is
+$\hat\volat_t = 12\%$ annualised. Plug into
+\eqref{eq:tsmom_position}:
+\begin{equation*}
+  w_t
+  \;=\;
+  \underbrace{\operatorname{sign}(+0.15)}_{=\,+1}
+  \;\cdot\;
+  \underbrace{\frac{0.40}{0.12}}_{=\,3.333\ldots}
+  \;=\;
+  +3.33.
+\end{equation*}
+The position is $+3.33$ units of notional --- $3.33$ times the
+dollar size of one ``baseline'' unit. The multiplier exceeds one
+because gold's $12\%$ volatility is below the $40\%$ target, so
+the strategy levers up by $0.40/0.12 \approx 3.333$ to reach
+target ex-ante volatility per instrument. At $40\%$ realised vol
+the multiplier would be $1$; at $80\%$, $0.5$. A $-15\%$
+twelve-month return would flip the sign, giving $-3.33$ (short).
+
+\begin{intuitionbox}
+Read TSMOM as ``which way did the slow money push, and how
+confident are we given how noisy the asset is?'' The sign of the
+past return is the direction slow allocators have collectively
+pushed over the past year. Vol-scaling is confidence weighting:
+when recent moves are small relative to the trend, the trend
+stands out above noise and the bet is bigger; otherwise smaller.
+Behavioural story: when a large institution decides to overweight
+a sector --- say, a sovereign wealth fund adding two percentage
+points of NAV to commodities --- it does not buy in an hour. It
+buys over weeks or months, for impact (\cref{ch:market_impact})
+and governance reasons (approval, cash clearing, benchmark
+updates). That flow pushes prices in one direction over a long
+horizon; TSMOM rides the wave.
+\end{intuitionbox}
+
+\subsection{The empirical result}
+\label{sec:ch12_empirical}
+
+TSMOM earns its place here on robustness. \citeMOP{} study $58$
+liquid futures contracts across four asset classes --- $24$
+commodity, $9$ equity-index, $13$ bond, $12$ currency forwards ---
+from January~$1985$ to December~$2009$. Their pooled regression of
+next-month vol-scaled return on the sign of the past twelve-month
+vol-scaled return,
+\begin{equation*}
+  \frac{r^s_t}{\sigma^s_{t-1}}
+  \;=\; \alpha + \beta_h \,\operatorname{sign}\!\bigl(r^s_{t-h}\bigr)
+  + \varepsilon^s_t,
+\end{equation*}
+yields a positive, statistically significant $\beta_h$ for
+$h = 1, 2, \ldots, 12$ months pooled, and within each asset class
+individually. The $t$-statistic on $\beta_{12}$ in the all-asset
+pooled regression exceeds $5$ with month-clustered standard
+errors.
+
+The diversified TSMOM strategy, equal-vol-weighting all $58$
+contracts, delivers a gross Sharpe around $1.5$ and monthly alpha
+of $1.58\%$ ($t \approx 8.0$) against the Fama--French three-factor
+model augmented with the cross-sectional momentum factor
+$\textit{UMD}$ of \citet{jegadeesh1993}. The alpha shrinks to
+$1.09\%$ ($t \approx 5.4$) with added controls for bond,
+commodity, and currency cross-sectional momentum, but survives.
+TSMOM is not a relabelling of cross-sectional momentum; it
+captures a distinct anomaly. The next section makes the
+distinction precise.
+
+\section{Cross-sectional vs time-series momentum}
+\label{sec:ch12_cross_vs_ts}
+
+The momentum literature has two parents; do not confuse them.
+\citet{jegadeesh1993} introduced \emph{cross-sectional} momentum
+(XSMOM) on US equities: rank stocks by past-window return (three
+to twelve months), go long the top decile and short the bottom
+decile, hold for a similar window. The signal is a \emph{rank}.
+The strategy is dollar-neutral and asset-class-neutral by
+construction. It works in equities, with variants in country
+indices, currencies, and commodities.
+
+Concretely, the two ask different questions. TSMOM asks ``has
+\emph{this} asset gone up over the past year?'' --- if yes, buy
+it; if no, short it. XSMOM asks ``has this asset gone up
+\emph{more than its peers}?'' --- buy the winners, short the
+laggards, regardless of absolute direction. In a year when every
+stock is up $20\%$, TSMOM is long everything; XSMOM is long the
+top-decile $+40\%$ names and short the bottom-decile $+5\%$ names
+for zero net exposure.
+
+The younger parent is \citeMOP ($2012$) time series momentum. The
+signal is each asset's own past return, not its rank: the strategy
+can simultaneously be long every asset (if all $58$ are up on the
+year) or short every asset (if all are down). There is no
+mechanical dollar- or asset-class-neutrality. Inverse-vol scaling
+equalises risk across instruments, but net market exposure is
+whatever the signs collectively dictate.
+
+\begin{keyfactbox}[Two kinds of momentum]
+\label{kf:two_momentums}
+\renewcommand{\arraystretch}{1.2}
+\begin{center}
+\begin{tabular}{p{0.27\linewidth} p{0.31\linewidth} p{0.31\linewidth}}
+\toprule
+ & \textbf{Cross-sectional (XSMOM)} & \textbf{Time series (TSMOM)} \\
+\midrule
+Signal &
+$\operatorname{rank}\!\bigl(r^s_{t-12,\,t}\bigr)$
+within universe &
+$\operatorname{sign}\!\bigl(r^s_{t-12,\,t}\bigr)$
+of own return \\
+Positions &
+Long top decile, short bottom decile (dollar neutral) &
+Long if own past return $> 0$, short if $< 0$ (any net) \\
+Net exposure &
+Zero by construction &
+Time-varying; can be net long, net short, or zero \\
+Canonical paper &
+Jegadeesh--Titman (1993) on US equities &
+Moskowitz--Ooi--Pedersen (2012) on $58$ futures \\
+Universe &
+Often single-asset-class (e.g.\ equities) &
+Multi-asset-class futures \\
+Captured by &
+Fama--French $\textit{UMD}$ factor &
+\emph{Not} fully captured by $\textit{UMD}$; has additional alpha \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{keyfactbox}
+
+The two are positively correlated --- if equities rally across
+the board, both XSMOM and TSMOM tend to be long equities --- but
+not identical. \citeMOP{} regress TSMOM returns on $\textit{UMD}$
+and find significant positive loading with residual alpha around
+$1.09\%$ per month ($t > 5$). Even after subtracting what
+cross-sectional momentum explains, TSMOM still earns money;
+time-series direction adds incremental information.
+
+Three operational consequences. First, Prosperity's typical
+universe is a handful of products with no sensible cross-section,
+so only the time-series formulation translates. Second, a Goldman
+macro desk's trend pod is multi-asset (currencies, rates,
+equities, commodities); even with XSMOM-style ranking within an
+asset class, the aggregate portfolio combines both kinds of
+momentum. Third, the two effects are independent, so blending
+yields a small Sharpe boost over either alone.
+
+\section{Why momentum works on monthly horizons but not microseconds}
+\label{sec:ch12_horizons}
+
+Five chapters have argued mean reversion; this one argues the
+opposite. Both cannot hold on the same time scale for the same
+object, so what is going on?
+
+They are true on \emph{different} time scales, with a different
+mechanism dominating each. Time scale, not asset class, is the
+key axis. From fastest to slowest:
+
+\paragraph{Microsecond horizon ($10^{-6}$ to $10^{-3}$ seconds).}
+A market-making algorithm sees an aggressive buy, infers a small
+adverse-selection signal, widens its ask and lifts its bid
+(\cref{ch:market_making}, Avellaneda--Stoikov skew). The next
+aggressive buy meets a higher quote; within milliseconds the
+quoting algorithm reverts price toward fair value. Market-makers
+\emph{eat} momentum on this horizon: any short-burst trend in
+trade prices is absorbed into the spread within milliseconds. The
+Roll spread of \cref{ch:spreads_roll} is this effect viewed
+through autocovariance: $\Cov(\Delta p_t, \Delta p_{t+1}) = -s^2/4
+< 0$; trade-level returns are \emph{negatively} autocorrelated.
+
+\paragraph{Sub-second to one-minute horizon ($10^{-3}$ to $60$
+seconds).} Mixed regime. Hawkes-style arrival clustering
+(\cref{ch:order_flow}) creates positive autocorrelation in
+\emph{order flow}, and imbalance predicts the next-second mid move
+with a small positive coefficient. It is the closest thing to
+``momentum'' in the millisecond--second band, but the prediction
+is about \emph{order flow} continuing, not trends. The signal
+decays within seconds and is invisible on monthly bars.
+
+\paragraph{Minutes to hours.} Genuinely mixed. Some markets trend
+because execution algorithms break parent orders into child orders
+(the \cref{ch:almgren_chriss} machinery spreads trades over an
+hour, generating predictable drift in the execution window);
+others mean-revert under contrarian market-maker inventory
+pressure. Tradeability depends on liquidity profile and
+participant mix.
+
+\paragraph{Days to weeks.} Mixed but momentum-leaning for liquid
+macro futures. The MOP regressions give positive coefficients down
+to one-month lookbacks; Chan \citeChan{} (Ch~$6$) reports
+practitioner experience with $1$--$5$ day momentum on FX carry
+pairs and commodity futures. Equity pairs and ETF baskets
+mean-revert on the same horizon because the dominant force is
+cointegration convergence. \Cref{ch:which_strategy_when} diagnoses
+which regime a product is in; the rule of thumb is that single
+instruments with macro drivers trend, and spreads of related
+instruments revert.
+
+\paragraph{One to twelve months.} Strongly momentum-favouring
+across all four asset classes \citeMOP. Three non-exclusive
+explanations coexist in the literature: (i)~\emph{underreaction}
+to gradual fundamental news --- a slow inflation trend, a
+multi-quarter earnings-revision drift --- means prices move in
+steps rather than jumps; (ii)~\emph{investor herding} and
+delegated-manager career concerns draw late capital toward
+already-moving assets; (iii)~\emph{slow capital allocation}
+(sovereign funds, pension plans, insurance asset-liability desks)
+moves on monthly-to-quarterly cycles, and once a flow direction
+is established it persists because allocator decisions are
+rebalanced infrequently. All three produce the same statistical
+signature --- positive autocorrelation of monthly returns --- and
+all three decay: the edge is strong over weeks to months but
+flips sign beyond about a year, as the next paragraph shows.
+
+\paragraph{Beyond one year.} The MOP regressions show
+\emph{negative} coefficients beyond about thirteen months ---
+long-horizon mean reversion that DeBondt and Thaler documented for
+equities in the $1980$s and that has been reproduced for
+commodities and currencies. The five-year reversal reads as slow
+correction of multi-year mispricing, as opposed to slow
+propagation of new information driving $1$--$12$ month momentum.
+
+\begin{pitfallbox}[Don't run monthly momentum on a five-minute bar]
+\label{pf:wrong_horizon}
+The \citeMOP{} edge is about \emph{monthly} horizons on
+\emph{liquid macro futures}. It does not translate to
+higher-frequency data without substantial modification:
+\begin{itemize}
+  \item At a five-minute lookback the sign-of-past-return signal
+  is dominated by microstructure noise. Roll and
+  Glosten--Milgrom both imply short-horizon \emph{negative}
+  autocorrelation at the trade level. Five-minute TSMOM buys
+  every uptick, sells every downtick, pays spread on every flip,
+  and loses to market-makers.
+  \item The $40\%$ annualised target was calibrated for monthly
+  rebalancing on contracts with single-digit monthly volatilities.
+  Five-minute realised vols give nonsense leverage: the
+  five-minute-to-annualised conversion factor is an order of
+  magnitude larger than the monthly one
+  ($\sqrt{78 \cdot 252} \approx 140$ on a $6.5$-hour equity
+  session, $\sqrt{288 \cdot 252} \approx 269$ round-the-clock).
+  Comparing scaled five-minute dispersion to
+  $\volat_{\text{target}} = 0.40$ gives ratios unrelated to the
+  investment-horizon risk the formula controls.
+  \item The behavioural mechanism --- slow allocator flow --- has
+  no analogue at the second or minute horizon. High-frequency
+  trend persistence comes from order-flow clustering
+  (\cref{ch:order_flow}) or parent-order execution drift
+  (\cref{ch:almgren_chriss}), not allocator behaviour.
+\end{itemize}
+Rule: pick the model whose mechanism matches the horizon. Hawkes
+for milliseconds, Roll for trade-level, OU for spreads on hours
+and days, TSMOM for macro futures on weeks and months, five-year
+reversal beyond a year.
+\end{pitfallbox}
+
+\section{Momentum crashes}
+\label{sec:ch12_crashes}
+
+TSMOM works on average over long samples, but its return
+distribution has a heavy left tail. It is occasionally the
+worst-positioned strategy in the world, exactly at regime turns;
+the $2009$ crash is the textbook case.
+
+The mechanism is mechanical. Momentum is long what has gone up,
+short what has gone down. After a sustained bear market, the longs
+concentrate in defensives (bonds, gold, defensive sectors) and the
+shorts in cyclicals (small caps, banks, materials). When the
+market bottoms and reverses violently --- as in March $2009$ ---
+the cyclical shorts rally hardest and the defensive longs lag. The
+portfolio is short the rally and long the laggards; both legs
+lose.
+
+Momentum is \emph{short gamma} with respect to regime turns. A
+gamma-positive position (a long option) profits from large moves
+in either direction; gamma-negative loses. Momentum is
+gamma-negative because it bets the recent direction continues:
+any large reversal moves the underlying against the position and
+forces a rebalance --- both losses. \citet{daniel2016momentum}
+formalise this as ``momentum is short a call option on the market
+when the market has been down, and short a put option when it has
+been up''.
+
+\begin{historybox}
+\label{hist:march2009}
+The March $2009$ momentum crash is the canonical failure mode.
+The S\&P~$500$ bottomed at $666$ on $6$~March~$2009$ after a $57\%$
+peak-to-trough drop from the October $2007$ high; by end-April it
+had rallied about $30\%$. Cross-sectional momentum in US equities
+--- short banks and cyclicals, long defensives and gold --- lost
+$25$--$30\%$ of NAV in March and April alone. AQR Capital's
+flagship momentum fund (Cliff Asness) took a comparable drawdown.
+This single episode explains a meaningful fraction of post-crisis
+underperformance of academic momentum factors. Cross-asset TSMOM fared better than
+equity-only XSMOM that quarter --- bond and currency sleeves
+diversified --- but still recorded one of its worst quarters in
+the MOP sample. Live trend-following CTAs reported single-month
+drawdowns of $5$--$15\%$ and several prominent funds closed. The
+industry lesson: \emph{trend-following needs a tail-risk overlay}
+--- stop-outs, cross-asset diversification, and (at the largest
+funds) options-based protection against violent reversals.
+\end{historybox}
+
+Practical mitigations fall into three buckets. \emph{Cross-asset
+diversification} is cheapest: bond and currency legs do not crash
+on the same days as equities, so a diversified $58$-instrument
+portfolio has shallower drawdowns. \emph{Strategy-level vol
+targeting} (added on top of per-instrument targeting in the
+position formula) cuts exposure when realised vol spikes, which
+approximates cutting exposure near regime turns. \emph{Explicit
+tail hedges} using OTM options on major equity indices are
+expensive in calm periods but pay off precisely when momentum
+crashes; the largest trend funds run a permanent options overlay.
+Option mechanics in \cref{ch:options_payoffs,ch:greeks_hedging};
+Kelly sizing of tail-protected portfolios in \cref{ch:kelly_risk}.
+
+\begin{prosperitybox}
+\label{prosp:tsmom_squidink}
+The cleanest Prosperity TSMOM application is \texttt{SQUID\_INK}
+in Round~$1$. The product was officially mean-reverting
+short-term, but the Frankfurt Hedgehogs'
+inspection (\texttt{imc-prosperity-3/README.md}, Round~$1$) found
+an anonymous bot, later identified as Olivia, consistently buying
+$15$ lots at the daily low and selling $15$ at the daily high.
+Whenever a trade printed at a daily extreme in a direction
+consistent with Olivia's pattern, the Hedgehogs flagged it as a
+directional signal and held to the opposing extreme. Their
+\texttt{InkTrader} class
+(\texttt{FrankfurtHedgehogs\_polished.py}, lines $382$--$405$)
+implements this: when \texttt{informed\_direction == LONG}, set
+\texttt{expected\_position = position\_limit} and bid the ask wall
+toward the cap; symmetrically for SHORT.
+
+A discrete cousin of TSMOM. The signal is not the sign of the past
+twelve-month return (twelve months exceeds a Prosperity round) but
+the sign of the inferred informed-trader direction --- a proxy for
+``which way is the slow money pushing''. Position sizing is
+hard-clipped to the limit rather than vol-scaled, a degenerate
+form of the same ``size-to-target-risk'' instinct. Once the trader
+is identified directly via trade ID in Round~$5$, false positives
+drop to near zero and the strategy becomes the dominant
+SQUID\_INK PnL contributor. A pure TSMOM with a five-tick lookback
+without the Olivia overlay yields only a modest edge ---
+noise-to-signal at five ticks is too high and the product only
+marginally trending --- but combined with the informed-trader
+detector the same time-series-direction instinct produced a
+clean, high-Sharpe contributor that depended on detecting slow
+capital flow, not predicting it. The overall pattern matches this
+chapter's trend-following theme: small but consistent, with upside
+from disciplined risk control rather than clever signal
+engineering.
+\end{prosperitybox}
+
+\begin{gsbox}
+\label{gs:tsmom_macro_desk}
+On a Goldman systematic macro desk, TSMOM is one ingredient in a
+``trend pod'' running on $50$--$100$ liquid futures and forwards
+(G$10$ FX, on-the-run government bonds, major equity indices,
+energy and metals). The Strat owns the signal pipeline:
+return-windowing on adjusted-rolled futures series, the vol
+estimator (EWMA with a $60$-day half-life), the $40\%$ target
+scaling, and the monthly rebalance schedule. The desk trader owns
+execution, which on a monthly rebalance with hundreds of positions
+is a small Almgren--Chriss problem (\cref{ch:almgren_chriss}) per
+name --- the Strat estimates the target, the trader spreads the
+trade across hours to manage impact, and post-trade attribution
+reconciles realised against model entry. Risk is monitored
+separately: strategy-level VaR, gross and net leverage, pairwise
+correlation with peer CTAs (Man AHL, Winton, Aspect, Lynx). When
+all trend funds are positioned identically, the risk team imposes
+a temporary gross cap against crowded-trade unwinds. Drawdowns are
+correlated across managers, so the primary defence is not
+within-strategy diversification (which trend cannot supply through
+a regime turn) but position limits and options overlays on the
+equity-index sleeve, sized via the gamma-and-vega framework of
+\cref{ch:greeks_hedging}.
+\end{gsbox}
+
+\section{A short reference implementation}
+\label{sec:ch12_implementation}
+
+The TSMOM signal fits in fewer than twenty lines of Python. The
+function below takes a 1-D array of historical prices (most recent
+last), the momentum lookback in months, the vol lookback, and the
+annualised target, and returns a signed notional position. No
+state, no portfolio code, no backtester --- those belong in
+\cref{ch:backtesting}. The point is to make
+\eqref{eq:tsmom_position} unambiguous and reproducible.
+
+\begin{lstlisting}[caption={Time series momentum signal with vol scaling.}]
+import numpy as np
+def tsmom_signal(prices: np.ndarray,
+                 lookback_months: int = 12,
+                 vol_lookback: int = 60,
+                 vol_target: float = 0.40) -> float:
+    """Time series momentum signal with vol scaling.
+    prices: array of monthly prices, most recent last.
+    Returns position size in units of notional, signed.
+    """
+    if len(prices) < max(lookback_months + 1, vol_lookback + 1):
+        return 0.0
+    past_ret = prices[-1] / prices[-lookback_months - 1] - 1.0
+    sign = 1.0 if past_ret > 0 else (-1.0 if past_ret < 0 else 0.0)
+    log_rets = np.diff(np.log(prices[-vol_lookback - 1:]))
+    vol_ann = log_rets.std(ddof=1) * np.sqrt(12.0)
+    if vol_ann < 1e-8:
+        return 0.0
+    return sign * (vol_target / vol_ann)
+\end{lstlisting}
+
+Three production notes not encoded in the snippet. First, the vol
+estimator is an equally-weighted standard deviation of the last
+\texttt{vol\_lookback} monthly log-returns; MOP use an EWMA with
+$60$-day-equivalent centre of mass computed on \emph{daily}
+returns and annualised. EWMA reacts faster to vol regime shifts,
+but the strategy is qualitatively robust. Second, the function is
+stateless and assumes a clean monthly price series; in practice
+the trader handles futures roll adjustments, missing data, and
+timing conventions. Third, the returned position is notional in
+an unspecified unit; the caller translates ``notional $+3.33$''
+into contracts given the multiplier and current price. None of
+these production concerns changes the core signal of
+\eqref{eq:tsmom_position}.
+
+\section{Key facts to memorise}
+\label{sec:ch12_keyfacts}
+
+\begin{itemize}
+  \item \textbf{TSMOM signal.} The sign of the past twelve-month
+  excess return predicts the next-month return with a positive
+  coefficient. Documented across $58$ liquid futures in four
+  asset classes over $1985$--$2009$ by \citeMOP.
+  \item \textbf{Position formula.}
+  $w_t = \operatorname{sign}(r_{t-12m,t}) \cdot
+  (\volat_{\text{target}}/\hat\volat_t)$ with
+  $\volat_{\text{target}} = 40\%$ annualised per instrument.
+  Direction from sign; magnitude from inverse-vol.
+  \item \textbf{Vol-scaling rationale.} Equalises ex-ante risk
+  across instruments so a diversified portfolio is not dominated
+  by the most volatile asset.
+  \item \textbf{XSMOM vs TSMOM.} XSMOM ranks within a universe
+  (dollar- and asset-class-neutral). TSMOM judges each asset
+  against its own history (time-varying net exposure). Positively
+  correlated but not identical; TSMOM retains alpha after
+  controlling for $\textit{UMD}$.
+  \item \textbf{Horizon beats asset class.} Momentum monthly, mean
+  reversion at milliseconds. Behavioural underreaction and slow
+  capital drive monthly momentum; adverse selection and
+  Glosten--Milgrom convergence drive trade-level reversion. Match
+  model to horizon.
+  \item \textbf{Crash risk.} Momentum is short gamma with respect
+  to regime turns: a violent reversal loses on both legs. March
+  $2009$: equity momentum lost $25$--$30\%$ in two months as
+  cyclical shorts rallied and defensive longs lagged.
+  \item \textbf{Mitigations.} Cross-asset diversification
+  (cheapest), strategy-level vol targeting, and options-based tail
+  hedges (most expensive, most effective in a crash).
+  \item \textbf{Operational rule.} The MOP edge is monthly bars on
+  liquid macro futures. It does \emph{not} translate to
+  five-minute bars without reformulation; intraday ``trend''
+  machinery is order-flow clustering (\cref{ch:order_flow}), not
+  TSMOM.
+\end{itemize}

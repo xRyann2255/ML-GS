@@ -1,0 +1,1122 @@
+\chapter{Notation and Glossary}
+\label{ch:app_notation}
+\chaptermark{Notation and glossary}
+
+This appendix is a reference, not a chapter to read. It has two halves.
+The first is the \emph{master notation table}: every symbol used in the
+book, what it means, and the chapter where it first appears. The second
+is the \emph{trading glossary}: roughly a hundred and seventy terms in
+alphabetical order, each with a one or two sentence definition and a
+pointer back to the chapter that develops it properly. Entries here are
+deliberately terse. Where they feel too brief, they are doing their
+job: sending you back to the chapter where the concept is built up
+properly.
+
+\section{Master notation table}
+\label{sec:app_notation_master}
+
+All symbols below are declared once in \texttt{latex/conventions.tex} and
+no chapter is permitted to redefine them. A handful of additional
+symbols are introduced locally (for example, the Ornstein--Uhlenbeck
+half-life $\tau$ in \cref{ch:mean_reversion_ou}, or the hazard rate
+$h(t)$ in \cref{ch:credit_derivatives}). Those are collected here
+alongside the global symbols so that this table serves as a single
+reference.
+
+\subsection{Probability, measure theory, and statistics}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\E[\cdot]$, $\E^{\Prob}[\cdot]$ & Expectation (physical measure by default) & \cref{ch:price_value} \\
+$\E^{\Qm}[\cdot]$ & Expectation under the risk-neutral measure $\Qm$ & \cref{ch:black_scholes} \\
+$\Prob(\cdot)$ & Probability of an event under the physical measure & \cref{ch:price_value} \\
+$\Qm$ & Risk-neutral (equivalent martingale) measure & \cref{ch:black_scholes} \\
+$\Var(\cdot)$ & Variance of a random variable & \cref{ch:price_value} \\
+$\Cov(\cdot,\cdot)$ & Covariance of two random variables & \cref{ch:price_value} \\
+$\Corr(\cdot,\cdot)$ & Pearson correlation coefficient & \cref{ch:pairs_cointegration} \\
+$\ind\{A\}$ & Indicator of event $A$: $1$ if $A$ holds, $0$ otherwise & \cref{ch:kyle_gm} \\
+$\R$ & The real numbers & \cref{ch:how_to_read} \\
+$\R_+$ & Non-negative reals $[0,\infty)$ & \cref{ch:black_scholes} \\
+$\Z$ & The integers & \cref{ch:how_to_read} \\
+$\N$ & The natural numbers $\{1,2,\dots\}$ & \cref{ch:how_to_read} \\
+$\iid$ & Independent and identically distributed & \cref{ch:price_value} \\
+$\Normal(\mu,\sigma^2)$ & Normal distribution, mean $\mu$, variance $\sigma^2$ & \cref{ch:price_value} \\
+$\CDFN(\cdot)$ & Standard normal CDF & \cref{ch:black_scholes} \\
+$\pdfN(\cdot)$ & Standard normal PDF & \cref{ch:black_scholes} \\
+$\Omega, \mathcal{F}, \Prob$ & Probability space; sample space, $\sigma$-algebra, measure & \cref{ch:black_scholes} \\
+$\mathcal{F}_t$ & Filtration: information available up to time $t$ & \cref{ch:black_scholes} \\
+$W_t, B_t$ & Standard Brownian motion / Wiener process & \cref{ch:black_scholes} \\
+$dW_t$ & Brownian increment (used inside It\^o SDEs) & \cref{ch:black_scholes} \\
+$\sim$ & ``Is distributed as'' & \cref{ch:price_value} \\
+$\xrightarrow{p}$, $\xrightarrow{d}$, $\xrightarrow{a.s.}$ & Convergence in probability, distribution, almost sure & \cref{ch:ml_trading} \\
+$\hat{\theta}$ & Estimator of parameter $\theta$ & \cref{ch:pairs_cointegration} \\
+$\bar{x}$, $s^2$ & Sample mean, sample variance & \cref{ch:pairs_cointegration} \\
+$\rho$ & Autocorrelation / correlation coefficient (context-dependent) & \cref{ch:mean_reversion_ou} \\
+$\chi^2_k$, $t_k$, $F_{k_1,k_2}$ & Chi-squared, Student-$t$, and $F$ distributions & \cref{ch:ml_trading} \\
+$\text{KL}(p\|q)$ & Kullback--Leibler divergence & \cref{ch:ml_trading} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Microstructure, order books, and execution}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\bidp$, $\bidp_t$ & Best bid price (highest buy quote) & \cref{ch:lob} \\
+$\askp$, $\askp_t$ & Best ask price (lowest sell quote) & \cref{ch:lob} \\
+$\midp$ & Mid price, $(\bidp+\askp)/2$ & \cref{ch:lob} \\
+$\mprice$ & Microprice, size-weighted fair value & \cref{ch:price_value} \\
+$\wallmid$ & Wall mid (Prosperity-specific fair value) & \cref{ch:price_value} \\
+$\spreads$ & Bid--ask spread, $\askp-\bidp$ (ticks or currency) & \cref{ch:lob} \\
+$Q^b_k$, $Q^a_k$ & Quantity at the $k$-th bid / ask level & \cref{ch:lob} \\
+$L^b$, $L^a$ & Number of price levels on bid / ask side & \cref{ch:lob} \\
+$\tau_{\text{queue}}$ & Time to front of queue at a given price & \cref{ch:order_flow} \\
+$\Delta p$ & Tick size (minimum price increment) & \cref{ch:lob} \\
+$\Delta t$ & Sample period between observations & \cref{ch:lob} \\
+$r_t$ & Log return, $\log(p_t/p_{t-1})$ & \cref{ch:spreads_roll} \\
+$\text{VWAP}$ & Volume-weighted average price & \cref{ch:almgren_chriss} \\
+$\text{TWAP}$ & Time-weighted average price & \cref{ch:almgren_chriss} \\
+$\text{IS}$ & Implementation shortfall & \cref{ch:almgren_chriss} \\
+$\eta, \epsilon$ & Almgren--Chriss temporary / permanent impact params & \cref{ch:almgren_chriss} \\
+$\lambda_{\text{AC}}$ & Almgren--Chriss risk-aversion parameter & \cref{ch:almgren_chriss} \\
+$\text{OFI}_t$ & Order-flow imbalance at time $t$ & \cref{ch:order_flow} \\
+$\text{VPIN}$ & Volume-synchronized PIN toxicity metric & \cref{ch:order_flow} \\
+$\text{PIN}$ & Probability of informed trading & \cref{ch:kyle_gm} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Market making (Avellaneda--Stoikov and extensions)}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\invq$, $q_t$ & Inventory (signed position held by the maker) & \cref{ch:market_making} \\
+$r(s,q,t)$ & Reservation / indifference price & \cref{ch:market_making} \\
+$\delta^b$, $\delta^a$ & Bid / ask quote distance from reference & \cref{ch:market_making} \\
+$\riskav$ & Risk-aversion parameter (A--S $\gamma$) & \cref{ch:market_making} \\
+$\arrate$ & Order-arrival intensity (A--S $\kappa$) & \cref{ch:market_making} \\
+$A$ & Arrival-rate scale parameter (A--S) & \cref{ch:market_making} \\
+$\sigma_q$ & Inventory variance & \cref{ch:market_making} \\
+$Q_{\max}$ & Hard position limit & \cref{ch:market_making} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Kyle / Glosten--Milgrom / adverse-selection models}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\lamk$ & Kyle's lambda: linear price-impact coefficient & \cref{ch:kyle_gm} \\
+$\noiseu$ & Noise-trader order flow & \cref{ch:kyle_gm} \\
+$\insidx$ & Informed (insider) order flow & \cref{ch:kyle_gm} \\
+$v$ & Fundamental value known to insider & \cref{ch:kyle_gm} \\
+$\Sigma_0$ & Prior variance of fundamental value & \cref{ch:kyle_gm} \\
+$\sigma_u^2$ & Variance of noise-trader flow & \cref{ch:kyle_gm} \\
+$\alpha$, $\mu$ & PIN model: informed probability, arrival rate & \cref{ch:kyle_gm} \\
+$\varepsilon_b, \varepsilon_s$ & PIN model: uninformed buy / sell arrival rates & \cref{ch:kyle_gm} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Options, Black--Scholes, and the vol surface}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\Spx$, $S_t$ & Spot price of the underlying & \cref{ch:options_payoffs} \\
+$\Kstrike$ & Strike price of an option & \cref{ch:options_payoffs} \\
+$\rrf$ & Risk-free rate (continuously compounded) & \cref{ch:options_payoffs} \\
+$\volat$ & Volatility (standard deviation of log returns) & \cref{ch:mean_reversion_ou} \\
+$\volat_{\text{imp}}$ & Implied volatility & \cref{ch:black_scholes} \\
+$\volat_{\text{rv}}$ & Realised volatility & \cref{ch:vol_surface} \\
+$\Tmat$, $T-t$ & Maturity; time to expiry & \cref{ch:options_payoffs} \\
+$\Call(S,t)$ & European call option price & \cref{ch:options_payoffs} \\
+$\Put(S,t)$ & European put option price & \cref{ch:options_payoffs} \\
+$F$, $F_t$ & Forward price of the underlying & \cref{ch:options_payoffs} \\
+$d_1, d_2$ & Black--Scholes auxiliary quantities & \cref{ch:black_scholes} \\
+$m = \log(K/F)$ & Log-moneyness & \cref{ch:vol_surface} \\
+$q_{\text{div}}$ & Continuous dividend yield & \cref{ch:black_scholes} \\
+$\beta_{\text{SABR}}$, $\alpha_{\text{SABR}}$, $\nu_{\text{SABR}}$ & SABR parameters & \cref{ch:vol_surface} \\
+$\rho_{\text{SABR}}$ & SABR spot/vol correlation & \cref{ch:vol_surface} \\
+$w(k,T)$ & Total implied variance, $\volat_{\text{imp}}^2 T$ & \cref{ch:vol_surface} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Greeks}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\Delta$ & Delta: $\partial V/\partial S$ & \cref{ch:greeks_hedging} \\
+$\Gamma$ & Gamma: $\partial^2 V/\partial S^2$ & \cref{ch:greeks_hedging} \\
+$\nu$, $\mathcal{V}$ & Vega: $\partial V/\partial \volat$ & \cref{ch:greeks_hedging} \\
+$\Theta$ & Theta: $\partial V/\partial t$ (time decay) & \cref{ch:greeks_hedging} \\
+$\rho_{\text{opt}}$ & Rho: $\partial V/\partial r$ & \cref{ch:greeks_hedging} \\
+$\text{vanna}$ & $\partial^2 V/\partial S\,\partial\volat$ & \cref{ch:greeks_hedging} \\
+$\text{volga}$ & $\partial^2 V/\partial\volat^2$ & \cref{ch:greeks_hedging} \\
+$\text{charm}$ & $\partial^2 V/\partial S\,\partial t$ & \cref{ch:greeks_hedging} \\
+$\text{speed}$ & $\partial^3 V/\partial S^3$ & \cref{ch:greeks_hedging} \\
+$\text{colour}$ & $\partial^3 V/\partial S^2 \partial t$ & \cref{ch:greeks_hedging} \\
+$\text{DDE}$ & Dual delta: $\partial V/\partial K$ & \cref{ch:greeks_hedging} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Mean reversion, stat arb, and time series}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\theta_{\text{OU}}$ & OU mean-reversion speed & \cref{ch:mean_reversion_ou} \\
+$\mu_{\text{OU}}$ & OU long-run mean & \cref{ch:mean_reversion_ou} \\
+$\sigma_{\text{OU}}$ & OU diffusion coefficient & \cref{ch:mean_reversion_ou} \\
+$\tau_{1/2}$ & Half-life of mean reversion, $\log 2/\theta$ & \cref{ch:mean_reversion_ou} \\
+$z_t$ & Standardised spread (z-score) & \cref{ch:pairs_cointegration} \\
+$\beta_{\text{coint}}$ & Cointegrating coefficient & \cref{ch:pairs_cointegration} \\
+$\text{ADF}$ & Augmented Dickey--Fuller test statistic & \cref{ch:pairs_cointegration} \\
+$H$ & Hurst exponent & \cref{ch:pairs_cointegration} \\
+$\text{MA}(q)$, $\text{AR}(p)$, $\text{ARMA}(p,q)$ & Time-series model orders & \cref{ch:ml_trading} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Risk, performance, and capital allocation}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\text{SR}$ & Sharpe ratio, $(\mu - r_f)/\sigma$ & \cref{ch:kelly_risk} \\
+$\text{SortR}$ & Sortino ratio (downside-deviation denominator) & \cref{ch:kelly_risk} \\
+$\text{Calmar}$ & Calmar ratio, return over max drawdown & \cref{ch:kelly_risk} \\
+$\text{IR}$ & Information ratio, active return over tracking error & \cref{ch:kelly_risk} \\
+$\text{MDD}$ & Maximum drawdown & \cref{ch:kelly_risk} \\
+$\text{VaR}_\alpha$ & Value-at-risk at confidence $\alpha$ & \cref{ch:risk_production} \\
+$\text{ES}_\alpha$, $\text{CVaR}_\alpha$ & Expected shortfall / conditional VaR & \cref{ch:risk_production} \\
+$f^*$ & Optimal Kelly fraction & \cref{ch:kelly_risk} \\
+$L$ & Leverage & \cref{ch:kelly_risk} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Fixed income and rates}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$z(T)$ & Zero / spot rate for maturity $T$ & \cref{ch:fixed_income_foundations} \\
+$D(T)$ & Discount factor to maturity $T$ & \cref{ch:fixed_income_foundations} \\
+$y$ & Yield to maturity & \cref{ch:fixed_income_foundations} \\
+$f(T_1, T_2)$ & Forward rate from $T_1$ to $T_2$ & \cref{ch:fixed_income_foundations} \\
+$f(0,T)$ & Instantaneous forward rate & \cref{ch:fixed_income_foundations} \\
+$\text{MacD}$ & Macaulay duration & \cref{ch:fixed_income_foundations} \\
+$\text{ModD}$ & Modified duration & \cref{ch:fixed_income_foundations} \\
+$\text{Conv}$ & Convexity & \cref{ch:fixed_income_foundations} \\
+$\text{DV01}$, $\text{BPV}$ & Dollar value of a basis point & \cref{ch:fixed_income_foundations} \\
+$s^*$ & Par swap rate & \cref{ch:rates_derivatives} \\
+$A(0;T_1,T_n)$ & Annuity / PV01 factor over swap tenor & \cref{ch:rates_derivatives} \\
+$\kappa_{\text{HW}}, \theta_{\text{HW}}, \sigma_{\text{HW}}$ & Hull--White mean reversion, level, vol & \cref{ch:rates_derivatives} \\
+$\alpha, \beta$ (SABR-rates) & Short-rate SABR skew parameters & \cref{ch:rates_derivatives} \\
+$\phi(t)$ & HJM drift adjustment & \cref{ch:rates_derivatives} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Credit}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\text{PD}$ & Probability of default (over horizon) & \cref{ch:credit_derivatives} \\
+$\text{LGD}$ & Loss given default, $1 - R$ & \cref{ch:credit_derivatives} \\
+$R$ & Recovery rate & \cref{ch:credit_derivatives} \\
+$S(t)$ & Survival probability to time $t$ & \cref{ch:credit_derivatives} \\
+$h(t), \lambda_c(t)$ & Hazard rate (credit intensity) & \cref{ch:credit_derivatives} \\
+$s_{\text{CDS}}$ & CDS par spread (running coupon) & \cref{ch:credit_derivatives} \\
+$\text{CVA}$, $\text{DVA}$, $\text{FVA}$, $\text{KVA}$ & Valuation adjustments (credit, debit, funding, capital) & \cref{ch:risk_production} \\
+$\text{EE}(t)$, $\text{PFE}_\alpha(t)$ & Expected / potential future exposure & \cref{ch:risk_production} \\
+\bottomrule
+\end{longtable}
+
+\subsection{FX, commodities, and equities}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$X_t$ & FX spot rate (domestic per foreign) & \cref{ch:fx_derivatives} \\
+$r_d, r_f$ & Domestic / foreign risk-free rates & \cref{ch:fx_derivatives} \\
+$\text{RR}$, $\text{BF}$ & Risk reversal, butterfly (FX vol quotes) & \cref{ch:fx_derivatives} \\
+$y_{\text{conv}}$ & Convenience yield & \cref{ch:commodities} \\
+$\kappa_S, \mu_S, \sigma_S$ & Schwartz one-factor model parameters & \cref{ch:commodities} \\
+$\text{basis}$ & Futures minus spot (or near minus far) & \cref{ch:commodities} \\
+$\beta_{\text{CAPM}}$ & Equity beta to benchmark & \cref{ch:equity_derivatives} \\
+$q_{\text{div}}$ & Continuous dividend yield (equity) & \cref{ch:equity_derivatives} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Miscellaneous notation and conventions}
+
+\begin{longtable}{@{}l >{\raggedright\arraybackslash}p{0.58\textwidth} l@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First use} \\
+\midrule
+\endhead
+$\defeq$ & LHS defined as RHS ($:=$) & \cref{ch:how_to_read} \\
+$\eqdef$ & RHS defined as LHS ($=:$) & \cref{ch:how_to_read} \\
+$\mathcal{O}(\cdot)$ & Big-O asymptotic notation & \cref{ch:how_to_read} \\
+$\lfloor x\rfloor$, $\lceil x\rceil$ & Floor, ceiling & \cref{ch:manual_rounds} \\
+$x^+, x^-$ & Positive and negative parts, $\max(x,0)$, $\max(-x,0)$ & \cref{ch:options_payoffs} \\
+$\|x\|_p$ & $\ell_p$ norm & \cref{ch:ml_trading} \\
+$\langle\cdot,\cdot\rangle$ & Inner product & \cref{ch:ml_trading} \\
+\bottomrule
+\end{longtable}
+
+\section{Trading glossary}
+\label{sec:app_glossary}
+
+Terms are arranged strictly alphabetically. Cross-references to other
+glossary entries are in \emph{italics}. Where a term has multiple
+meanings, the trading meaning is given first. Seeded from
+\texttt{prosperity-wiki/trading-glossary.md} and extended from all body
+chapters.
+
+\begin{description}
+\setlength{\itemsep}{2pt}
+
+\item[Adverse selection]
+Losses a liquidity provider incurs because counterparties with superior
+information trade against them. The core cost that widens bid--ask
+spreads in the Glosten--Milgrom model. See \cref{ch:kyle_gm,ch:market_making}.
+
+\item[Almgren--Chriss]
+Optimal execution framework balancing expected trading cost against
+variance of cost, yielding a characteristic exponentially-decaying
+trajectory. See \cref{ch:almgren_chriss}.
+
+\item[Amendment]
+Modification of a resting order's price or size; many venues treat an
+amendment to a more aggressive price as a new order for queue-priority
+purposes. See \cref{ch:lob}.
+
+\item[Ask (offer)]
+Price at which a seller is willing to sell. The \emph{best ask} is the
+lowest such price currently resting on the book. See \cref{ch:lob}.
+
+\item[At-the-money (ATM)]
+An option whose strike equals (or is closest to) the current spot or
+forward price. See \cref{ch:options_payoffs}.
+
+\item[Augmented Dickey--Fuller (ADF) test]
+Hypothesis test for a unit root in a time series. The null hypothesis
+is that the series has a unit root (is non-stationary). Rejecting the
+null at the chosen $p$-value is necessary (but not sufficient) for a
+mean-reverting or cointegrated spread; the Engle--Granger test applies
+ADF to regression residuals to test for cointegration.
+See \cref{ch:mean_reversion_ou,ch:pairs_cointegration}.
+
+\item[Authorised participant (AP)]
+Large financial institution (typically a bank or broker-dealer) with the
+contractual right to create and redeem ETF shares directly with the fund
+in exchange for the underlying basket of securities. AP arbitrage between
+the ETF market price and its net asset value keeps the two tethered.
+See \cref{ch:basket_etf_arb}.
+
+\item[Autocallable]
+Structured equity product that redeems early if the underlying is above
+a barrier on observation dates. See \cref{ch:equity_derivatives}.
+
+\item[Avellaneda--Stoikov]
+Stochastic-control market-making framework that derives the optimal
+bid and ask quotes for a dealer managing inventory risk. The key
+outputs are the \emph{reservation price} $r = s - q\gamma\sigma^2(T-t)$
+(mid adjusted for inventory) and the symmetric quote distance
+$\delta^* \approx \gamma\sigma^2(T-t) + \tfrac{2}{\gamma}\ln(1+\gamma/\kappa)$.
+See \cref{ch:market_making}.
+
+\item[Back-month]
+A futures contract with a more distant expiry than the \emph{front
+month}. See \cref{ch:commodities}.
+
+\item[Backtest]
+Simulation of a strategy on historical data. Must avoid look-ahead bias
+and survivorship bias. See \cref{ch:backtesting}.
+
+\item[Backwardation]
+Futures curve state where near contracts trade above far contracts.
+Typically signals scarcity or high convenience yield. See \cref{ch:commodities}.
+
+\item[Basel III]
+Post-2008 banking capital and liquidity framework (CET1, leverage
+ratio, LCR, NSFR). See \cref{ch:regulatory}.
+
+\item[Basis]
+Difference between two related prices --- spot vs futures, cash bond vs
+CDS, or near vs far contracts. See \cref{ch:commodities,ch:arbitrage_zoo}.
+
+\item[Basis point (bp)]
+One one-hundredth of a percent. $100\,\text{bp} = 1\%$. See \cref{ch:fixed_income_foundations}.
+
+\item[Bid]
+Price at which a buyer is willing to buy; the \emph{best bid} is the
+highest resting buy quote. See \cref{ch:lob}.
+
+\item[Binomial tree]
+Discrete-time lattice model for option pricing in which the underlying
+moves up by factor $u = e^{\sigma\sqrt{\Delta t}}$ or down by $d = 1/u$
+each step, with risk-neutral probability $p = (e^{r\Delta t}-d)/(u-d)$.
+The recombining property ($ud=du$) gives $N+1$ terminal nodes after $N$
+steps. Option prices follow by backward induction. The Cox--Ross--Rubinstein
+(CRR) choice of $u$ recovers Black--Scholes as $\Delta t\to 0$.
+See \cref{ch:numerical_methods}.
+
+\item[Black--Scholes equation]
+PDE $\partial_t V + \tfrac12\sigma^2 S^2 \partial_{SS}V + rS\partial_S V - rV = 0$
+for European options under log-normal spot dynamics. See \cref{ch:black_scholes}.
+
+\item[Book]
+(i) The full set of resting orders for an instrument; (ii) the
+portfolio a trading desk risk-manages (``running the book''). See \cref{ch:lob,ch:strats_role}.
+
+\item[Brownian motion]
+Continuous-time stochastic process with independent Gaussian
+increments; the driver of most continuous-time pricing models. See \cref{ch:black_scholes}.
+
+\item[Butterfly]
+(i) Option spread: long two wings, short twice the body --- bets on low
+realised movement around the body strike; (ii) FX vol quote convention,
+measuring smile curvature. See \cref{ch:options_payoffs,ch:fx_derivatives}.
+
+\item[Calendar spread]
+Long one maturity, short another on the same underlying and strike.
+Used to trade term structure of vol or of the forward curve. See \cref{ch:options_payoffs,ch:arbitrage_zoo}.
+
+\item[Calmar ratio]
+Annualised return divided by maximum drawdown. See \cref{ch:kelly_risk}.
+
+\item[Call option]
+Contract giving the holder the right (not obligation) to buy the
+underlying at strike $K$ by expiry $T$. Payoff $(S_T - K)^+$. See \cref{ch:options_payoffs}.
+
+\item[Cap / floor]
+An interest-rate \emph{cap} is a portfolio of call options (caplets)
+on a floating rate: each caplet pays $\max(\ell_t - K, 0)\cdot\text{notional}$
+for period $t$. A \emph{floor} is the equivalent with puts. Caps are used
+to hedge floating-rate borrowing; floors to hedge floating-rate lending.
+Priced via Black's model on the forward rate.
+See \cref{ch:rates_derivatives}.
+
+\item[Carry]
+Return from simply holding a position (funding rate, dividend,
+convenience yield). ``Positive carry'' strategies earn yield while
+waiting. See \cref{ch:fixed_income_foundations,ch:commodities}.
+
+\item[Cash-and-carry arbitrage]
+Long spot, short futures (or vice versa) to lock in the cost-of-carry
+relationship. See \cref{ch:arbitrage_zoo}.
+
+\item[CCAR]
+Comprehensive Capital Analysis and Review --- the Federal Reserve's
+annual stress test of large US banks. See \cref{ch:regulatory}.
+
+\item[CCP (central counterparty)]
+Clearing house that interposes itself between buyer and seller,
+becoming the legal counterparty to both sides of a trade. Eliminates
+bilateral counterparty risk via multilateral netting and daily
+variation margin. Examples: LCH, CME Clearing, Eurex Clearing.
+See \cref{ch:participants,ch:risk_production}.
+
+\item[CDO (collateralised debt obligation)]
+Structured security backed by a pool of debt instruments (loans,
+corporate bonds, or CDS contracts). Cash flows are split into tranches
+with different seniority: equity tranche absorbs first losses and earns
+highest spread; senior tranche absorbs last losses and earns lowest
+spread. Default correlation is the key risk driver.
+See \cref{ch:credit_derivatives}.
+
+\item[CDS (credit default swap)]
+Bilateral contract where the buyer pays a running premium and receives
+par-minus-recovery on a reference credit event. See \cref{ch:credit_derivatives}.
+
+\item[CDX, iTraxx]
+Standardised credit-default-swap indices for North America (CDX) and
+Europe / Asia (iTraxx). See \cref{ch:credit_derivatives}.
+
+\item[Charm]
+Second-order Greek $\partial^2 V/\partial S\partial t$; rate at which
+delta decays. Matters for overnight hedge resets. See \cref{ch:greeks_hedging}.
+
+\item[Cointegration]
+Property where two or more non-stationary series have a stationary
+linear combination. Foundation of pairs trading. See \cref{ch:pairs_cointegration}.
+
+\item[Contango]
+Futures curve state where far contracts trade above near contracts ---
+the ``normal'' shape for storable assets with positive cost of carry.
+See \cref{ch:commodities}.
+
+\item[Convenience yield]
+Implicit benefit of holding physical commodity rather than a futures
+contract (optionality of consumption, supply chain). See \cref{ch:commodities}.
+
+\item[Convexity]
+(i) Second derivative of bond price wrt yield; (ii) any second-order
+effect that makes a P\&L curve smile up or down. See \cref{ch:fixed_income_foundations,ch:greeks_hedging}.
+
+\item[Counterparty]
+The other side of a trade. On a central exchange the CCP interposes
+itself; OTC leaves bilateral counterparty risk. See \cref{ch:participants}.
+
+\item[Covered interest parity (CIP)]
+No-arbitrage condition linking the spot FX rate $S$, forward rate $F$,
+and interest rates in two currencies: $F = S\cdot e^{(r_d - r_f)T}$.
+Violations (CIP deviations) indicate funding stress, regulatory
+constraints, or segmented capital markets. Forms the basis of FX
+forward pricing. See \cref{ch:fx_derivatives,ch:arbitrage_zoo}.
+
+\item[Crack spread]
+The price difference between crude oil and its refined products
+(gasoline, heating oil, diesel). Represents the refiner's gross
+margin. A positive crack spread makes refining profitable. Traded
+via futures spreads on crude and products; also called the \emph{3-2-1
+crack} (3 barrels crude $\to$ 2 gasoline + 1 heating oil).
+See \cref{ch:commodities}.
+
+\item[CVA (credit valuation adjustment)]
+Market-value adjustment to a derivative to reflect the counterparty's
+default risk. See \cref{ch:risk_production}.
+
+\item[Dark pool]
+Non-displayed venue where orders are not visible pre-trade; used to
+execute large orders with reduced market impact. See \cref{ch:participants}.
+
+\item[Delta]
+Sensitivity of option value to underlying price, $\partial V/\partial
+S$. Approximate hedge ratio. See \cref{ch:greeks_hedging}.
+
+\item[Delta-hedging]
+Trading the underlying to keep portfolio delta at target (usually
+zero); exposes the book to gamma and vega. See \cref{ch:greeks_hedging}.
+
+\item[Depth]
+Total resting quantity on one side of the book, or at a particular
+price level. See \cref{ch:lob}.
+
+\item[Desk]
+A trading team sharing a book and mandate (e.g., ``cash equities
+desk'', ``rates vol desk''). See \cref{ch:strats_role}.
+
+\item[Drawdown]
+Peak-to-trough decline in equity curve. See \cref{ch:kelly_risk}.
+
+\item[DV01 (BPV)]
+Dollar value of a one-basis-point parallel shift in yields. See \cref{ch:fixed_income_foundations}.
+
+\item[DVA (debit valuation adjustment)]
+The mirror image of CVA: reflects the \emph{own-credit} effect in
+OTC derivative valuation. If you default, your liability disappears,
+so a higher own-credit spread \emph{increases} derivative value to you.
+DVA is controversial because it creates a perverse incentive and is
+difficult to hedge. See \cref{ch:credit_derivatives,ch:risk_production}.
+
+\item[Engle--Granger]
+Two-step cointegration test: estimate the cointegrating regression,
+then ADF-test its residuals. See \cref{ch:pairs_cointegration}.
+
+\item[Error correction model (ECM)]
+Time-series representation of a cointegrated pair. Each variable's
+change is driven partly by the previous period's deviation from the
+long-run equilibrium (the \emph{error-correction term}). In pairs
+trading, the ECM formalises how the spread is pulled back to its mean:
+a large positive deviation implies a negative drift in the next period.
+See \cref{ch:pairs_cointegration}.
+
+\item[ETF]
+Exchange-traded fund --- a basket instrument creating/redeeming in kind
+with authorised participants, enabling basket-vs-constituent arbitrage.
+See \cref{ch:basket_etf_arb}.
+
+\item[Exchange]
+Central venue matching buy and sell orders in a regulated, transparent
+way. See \cref{ch:lob}.
+
+\item[Expected shortfall (ES, CVaR)]
+Average loss conditional on being beyond VaR. Coherent risk measure. See \cref{ch:risk_production}.
+
+\item[Fair value]
+Best estimate of the true price of an instrument, usually blending
+mid, microprice, and model inputs. See \cref{ch:price_value}.
+
+\item[Feynman--Kac]
+Theorem representing solutions of certain parabolic PDEs as expectations
+of stochastic-process functionals; underpins risk-neutral pricing. See \cref{ch:black_scholes}.
+
+\item[Fill]
+The execution of all or part of an order. See \cref{ch:lob}.
+
+\item[FOK (fill-or-kill)]
+Order that must execute in full immediately or be cancelled entirely.
+See \cref{ch:lob}.
+
+\item[Forward]
+OTC bilateral contract to transact at a fixed price on a future date. See \cref{ch:options_payoffs}.
+
+\item[Forward rate]
+Implied rate of borrowing/lending between two future dates, derived
+from the zero curve. See \cref{ch:fixed_income_foundations}.
+
+\item[FRTB]
+Fundamental Review of the Trading Book; post-crisis market-risk capital
+regime replacing VaR with expected shortfall. See \cref{ch:regulatory}.
+
+\item[Funding leg]
+In a CDS or structured trade, the leg that pays or receives the
+funding cost. See \cref{ch:credit_derivatives,ch:risk_production}.
+
+\item[Futures]
+Exchange-traded, margined, standardised forward. Daily mark-to-market
+is the key difference from a forward. See \cref{ch:commodities}.
+
+\item[FVA (funding valuation adjustment)]
+Adjustment for the funding cost of uncollateralised derivative
+exposures. See \cref{ch:risk_production}.
+
+\item[Gamma]
+Second derivative of option value wrt underlying, $\partial^2
+V/\partial S^2$. Long gamma profits from realised movement. See \cref{ch:greeks_hedging}.
+
+\item[Gamma scalping]
+Delta-hedging a long-gamma position to monetise realised vs implied
+volatility differential. See \cref{ch:greeks_hedging}.
+
+\item[Glosten--Milgrom]
+Microstructure model where the spread arises purely from adverse
+selection on informed traders. See \cref{ch:kyle_gm}.
+
+\item[Greek]
+Partial derivative of derivative value wrt a model input (delta, gamma,
+vega, theta, rho, and higher-order). See \cref{ch:greeks_hedging}.
+
+\item[Half-life]
+Time for an OU process (or AR(1)) to revert half-way to its mean,
+$\log(2)/\theta$. See \cref{ch:mean_reversion_ou}.
+
+\item[Hazard rate]
+Instantaneous conditional default intensity, $h(t) = -S'(t)/S(t)$. See \cref{ch:credit_derivatives}.
+
+\item[Hedge]
+Offsetting position taken to neutralise a specific risk exposure. See \cref{ch:greeks_hedging}.
+
+\item[HJB (Hamilton--Jacobi--Bellman)]
+Continuous-time dynamic-programming PDE for optimal control; the tool
+that produces Avellaneda--Stoikov and Almgren--Chriss closed forms. See \cref{ch:market_making,ch:almgren_chriss}.
+
+\item[Iceberg order]
+Resting order displaying only a small tip of the true quantity. See \cref{ch:lob}.
+
+\item[Implementation shortfall (IS)]
+Difference between execution price and decision-time price, including
+opportunity cost. See \cref{ch:almgren_chriss}.
+
+\item[Implied volatility (IV)]
+Volatility input that, put into Black--Scholes, matches the market
+price. The market's implicit forecast plus a risk premium. See \cref{ch:black_scholes,ch:vol_surface}.
+
+\item[Informed trader]
+Market participant with a private signal about the fundamental value of
+an asset. In the Kyle and Glosten--Milgrom models, informed order flow
+is the source of adverse selection and drives bid--ask spread widening.
+Contrast with \emph{noise trader}, who trades for liquidity or
+portfolio reasons and provides cover for the informed.
+See \cref{ch:kyle_gm}.
+
+\item[In-the-money (ITM)]
+Option with positive intrinsic value. See \cref{ch:options_payoffs}.
+
+\item[Inventory]
+Signed position carried by a market maker; drives reservation-price
+skewing. See \cref{ch:market_making}.
+
+\item[IOC (immediate-or-cancel)]
+Order that executes whatever can fill immediately, the remainder
+cancelled. See \cref{ch:lob}.
+
+\item[Information ratio (IR)]
+Active return over tracking error of a portfolio vs its benchmark. See \cref{ch:kelly_risk}.
+
+\item[Intrinsic value]
+The immediate exercise payoff of an option: $(S-K)^+$ for calls, $(K-S)^+$
+for puts. See \cref{ch:options_payoffs}.
+
+\item[It\^o's lemma]
+Chain rule for stochastic calculus, adding a second-order $\tfrac12
+\sigma^2$ term. The workhorse for deriving SDE-based PDE prices. See \cref{ch:black_scholes}.
+
+\item[Johansen test]
+Multivariate cointegration test producing rank and cointegrating
+vectors. See \cref{ch:pairs_cointegration}.
+
+\item[KELP]
+Prosperity 4 product; semi-mean-reverting with moderate volatility ---
+classic market-making candidate. See \cref{ch:algo_rounds}.
+
+\item[Kelly criterion]
+Optimal log-utility bet-sizing rule $f^* = \mu/\sigma^2$ for normal
+returns. Maximises long-run growth. See \cref{ch:kelly_risk}.
+
+\item[KVA (capital valuation adjustment)]
+Adjustment for the lifetime capital cost of a derivative. See \cref{ch:risk_production}.
+
+\item[Kyle's lambda]
+Linear price-impact coefficient in the Kyle (1985) model. See \cref{ch:kyle_gm}.
+
+\item[Latency]
+End-to-end delay from market event to trading response. Measured in
+microseconds for competitive venues. See \cref{ch:participants}.
+
+\item[Level (book level)]
+Aggregated quantity at a single price in the order book. See \cref{ch:lob}.
+
+\item[LGD (loss given default)]
+Fraction of exposure lost on default, $1-R$. See \cref{ch:credit_derivatives}.
+
+\item[LIBOR]
+Legacy interbank offered rate, now replaced by risk-free rates (SOFR,
+SONIA, \textsc{\'e}STR). See \cref{ch:regulatory,ch:rates_derivatives}.
+
+\item[Limit order]
+Resting order to buy/sell at a specified price or better. See \cref{ch:lob}.
+
+\item[Liquidity]
+Ability to transact in size without moving the price much. See \cref{ch:lob,ch:market_making}.
+
+\item[Long]
+A position that profits when the price rises. See \cref{ch:participants}.
+
+\item[Look-ahead bias]
+Backtest flaw in which future information leaks into past decisions. See \cref{ch:backtesting}.
+
+\item[MAGNIFICENT\_MACARONS]
+Prosperity 4 product with imported variant, sunlight / sugar inputs and
+a transport cost --- a locational-arbitrage product. See \cref{ch:algo_rounds}.
+
+\item[Maker / taker]
+Exchange fee structure in which limit-order providers (\emph{makers})
+receive a rebate and market-order takers pay a fee. Inverted at some
+venues (\emph{inverted markets}). Maker/taker economics drive order
+routing decisions: brokers often route to venues that pay the highest
+maker rebate, creating potential conflicts of interest.
+See \cref{ch:lob,ch:market_making}.
+
+\item[Mark-to-market (MTM)]
+Valuation of a position at current market prices rather than historical
+cost. Daily MTM drives realised P\&L, margin calls, and risk limits.
+Futures are marked-to-market daily with cash variation margin exchanged.
+See \cref{ch:participants,ch:risk_production}.
+
+\item[Market impact]
+Adverse price movement caused by one's own trading. Temporary impact
+recovers; permanent impact does not. See \cref{ch:market_impact}.
+
+\item[Market maker]
+Participant continuously quoting two-sided prices and earning the
+spread. See \cref{ch:market_making}.
+
+\item[Market order]
+Immediate execution order at the best available prices, walking the
+book if necessary. See \cref{ch:lob}.
+
+\item[Matching engine]
+Exchange software that pairs compatible buy and sell orders according
+to the venue's priority rules. See \cref{ch:lob}.
+
+\item[Mean reversion]
+Tendency of a time series to pull back toward a long-run mean. See \cref{ch:mean_reversion_ou}.
+
+\item[MiFID II]
+European regulation on market transparency, best execution, and pre-
+and post-trade reporting. See \cref{ch:regulatory}.
+
+\item[Microprice]
+Size-weighted fair value, $\frac{Q^a \bidp + Q^b \askp}{Q^a + Q^b}$.
+Tilts mid toward the thinner side of the book. See \cref{ch:price_value}.
+
+\item[Momentum]
+Tendency of recent winners to continue to outperform over some horizon.
+See \cref{ch:momentum}.
+
+\item[Moneyness]
+How far an option is from the money. Usually expressed as $K/S$,
+$\log(K/F)$, or in delta. See \cref{ch:options_payoffs,ch:vol_surface}.
+
+\item[Monte Carlo simulation]
+Numerical method that estimates option prices, risk measures, or path-dependent
+payoffs by simulating many random paths of the underlying process and
+averaging the discounted payoffs. Standard errors shrink as
+$1/\sqrt{N_{\text{paths}}}$. Exact for path-dependent products
+(barriers, Asian options) that resist closed-form solution.
+See \cref{ch:numerical_methods}.
+
+\item[NAV (net asset value)]
+The fair value of an ETF's underlying basket per share, computed from
+current constituent prices. The authorised participant arbitrage mechanism
+keeps the ETF market price close to NAV: if the ETF trades at a premium,
+the AP creates new shares to sell; if at a discount, it redeems shares.
+See \cref{ch:basket_etf_arb}.
+
+\item[No-arbitrage]
+Assumption that no portfolio exists today that costs nothing and delivers
+a non-negative payoff tomorrow with strictly positive probability. The
+no-arbitrage condition is the foundation of derivative pricing: any
+instrument whose cash flows can be replicated by a traded portfolio must
+sell at the replication cost. Violations are called arbitrage opportunities.
+See \cref{ch:price_value,ch:options_payoffs,ch:arbitrage_zoo}.
+
+\item[Noise trader]
+Market participant who trades for liquidity or non-informational reasons
+(hedging, index rebalancing, portfolio adjustment). In Kyle and
+Glosten--Milgrom models, noise-trader flow provides cover for informed
+traders and is the source of market-making revenue. Contrast with
+\emph{informed trader}. See \cref{ch:kyle_gm}.
+
+\item[Notional]
+Face amount of a contract; for derivatives, the reference amount not
+exchanged at inception. See \cref{ch:fixed_income_foundations}.
+
+\item[OIS (overnight index swap)]
+Interest-rate swap in which one leg pays a fixed rate and the other leg
+pays the compounded daily overnight rate (SOFR for USD, SONIA for GBP,
+\textsc{\'e}STR for EUR). OIS discounting became the standard risk-free
+discount curve after the 2008 crisis revealed LIBOR's credit risk.
+CSA-collateralised derivatives are discounted at the OIS rate.
+See \cref{ch:rates_derivatives,ch:risk_production}.
+
+\item[Olivia]
+Prosperity 4 bot trader whose trading-ID pattern gave away informed
+flow in past editions. A ``trader-ID'' exploit example. See \cref{ch:algo_rounds,ch:top_team_lessons}.
+
+\item[Order book (LOB)]
+Collection of all resting buy and sell limit orders for an instrument.
+See \cref{ch:lob}.
+
+\item[Order-flow imbalance (OFI)]
+Signed net change in resting quantity at the top of the book; a
+short-horizon predictor. See \cref{ch:order_flow}.
+
+\item[Ornstein--Uhlenbeck (OU)]
+Continuous-time mean-reverting SDE: $dX_t = \theta(\mu-X_t)dt + \sigma
+dW_t$. See \cref{ch:mean_reversion_ou}.
+
+\item[OTC (over-the-counter)]
+Bilateral trade negotiated directly between two parties outside a
+central exchange. OTC derivatives (swaps, forwards, swaptions) are
+customisable to any size, maturity, or structure but carry bilateral
+counterparty credit risk and reduced pre-trade transparency. The CSA
+and ISDA Master Agreement govern the legal relationship.
+See \cref{ch:participants}.
+
+\item[Out-of-the-money (OTM)]
+Option with zero intrinsic value. See \cref{ch:options_payoffs}.
+
+\item[Out-of-sample]
+Data not used to fit the model; performance on it is the only honest
+measure. See \cref{ch:backtesting}.
+
+\item[PICNIC\_BASKET]
+Prosperity 4 product constructed as a weighted bundle of underlying
+items --- the canonical ETF-arbitrage example. See \cref{ch:basket_etf_arb,ch:algo_rounds}.
+
+\item[PD (probability of default)]
+Probability that a credit entity defaults over a horizon. See \cref{ch:credit_derivatives}.
+
+\item[Price-time priority]
+Matching rule: better price first; among equal prices, older order
+first. See \cref{ch:lob}.
+
+\item[Put option]
+Right to sell the underlying at strike by expiry. Payoff $(K-S_T)^+$.
+See \cref{ch:options_payoffs}.
+
+\item[Put--call parity]
+Identity $C - P = S - K e^{-rT}$ (no dividends). See \cref{ch:options_payoffs}.
+
+\item[POV (percent-of-volume)]
+Execution algo that trades a target fraction of realised market volume.
+See \cref{ch:almgren_chriss}.
+
+\item[Prosperity3bt]
+Community backtester for the Prosperity platform. See \cref{ch:prosperity_setup}.
+
+\item[QR (quantitative researcher)]
+Buy-side / prop research role focused on developing signals and models.
+See \cref{ch:strats_role}.
+
+\item[Quote]
+A displayed resting price with its size; a market maker's current bid
+or ask. See \cref{ch:lob}.
+
+\item[RAINFOREST\_RESIN]
+Prosperity 4 product with a very stable fair value around 10\,000;
+textbook market-making target. See \cref{ch:algo_rounds}.
+
+\item[Realised volatility]
+Sample standard deviation of log returns over a window. See \cref{ch:vol_surface}.
+
+\item[Recovery rate]
+Fraction of notional recovered on default. See \cref{ch:credit_derivatives}.
+
+\item[Reservation price]
+Market maker's risk-adjusted mid, tilted by inventory. See \cref{ch:market_making}.
+
+\item[RFR (risk-free rate)]
+Overnight benchmark replacing LIBOR: SOFR (USD), SONIA (GBP), \textsc{\'e}STR
+(EUR). See \cref{ch:regulatory,ch:rates_derivatives}.
+
+\item[Rho]
+Option's sensitivity to the risk-free rate, $\partial V/\partial r$. See \cref{ch:greeks_hedging}.
+
+\item[Risk limit]
+Hard bound on a risk metric (gross, net, VaR, greeks) enforced by
+risk management. See \cref{ch:risk_production}.
+
+\item[Roll]
+Act of closing a near-expiry position and opening the equivalent in a
+later expiry. See \cref{ch:commodities}.
+
+\item[Roll's spread estimator]
+Estimator of the effective spread from return autocovariance:
+$s = 2\sqrt{-\mathrm{Cov}(r_t, r_{t-1})}$. See \cref{ch:spreads_roll}.
+
+\item[SABR]
+Stochastic-$\alpha\beta\rho$ volatility model; industry standard for
+interest-rate smile fitting. See \cref{ch:vol_surface,ch:rates_derivatives}.
+
+\item[Schwartz model]
+One-factor mean-reverting log-price model for commodities. See \cref{ch:commodities}.
+
+\item[SecDB]
+Goldman Sachs' proprietary securities database; the canonical object
+store for trades, prices, risks. See \cref{ch:secdb_slang}.
+
+\item[Settlement]
+Exchange-of-cash-and-asset step that completes a trade. See \cref{ch:participants}.
+
+\item[Sharpe ratio]
+Risk-adjusted return, $(\mu - r_f)/\sigma$, annualised. See \cref{ch:kelly_risk}.
+
+\item[Short]
+Position profiting from price declines; in equities, often requires
+borrowing the asset. See \cref{ch:participants}.
+
+\item[Skew]
+Asymmetry of the implied-vol smile. Typically OTM puts trade above
+OTM calls in equities. See \cref{ch:vol_surface}.
+
+\item[Slang]
+Goldman Sachs' internal domain-specific language used on top of SecDB.
+See \cref{ch:secdb_slang}.
+
+\item[Slippage]
+Execution price minus expected price; combines impact, timing, and
+discretisation losses. See \cref{ch:almgren_chriss}.
+
+\item[SOFR]
+Secured Overnight Financing Rate; the USD risk-free rate replacing
+LIBOR. See \cref{ch:rates_derivatives,ch:regulatory}.
+
+\item[Sortino ratio]
+Sharpe variant using only downside deviation in the denominator. See \cref{ch:kelly_risk}.
+
+\item[Spread]
+Ask minus bid (book spread), or the quoted difference for a basket /
+relative-value trade. See \cref{ch:lob,ch:spreads_roll}.
+
+\item[Squid Ink]
+Prosperity 3 product whose highly-mean-reverting signature made OU/z-score
+strategies dominant. See \cref{ch:top_team_lessons}.
+
+\item[Stat arb]
+Statistical arbitrage --- systematic relative-value trading on
+cross-sectional mean-reversion signals. See \cref{ch:pairs_cointegration}.
+
+\item[Stop order]
+Order activated when the market trades through a trigger price;
+converts to a market or limit order. See \cref{ch:lob}.
+
+\item[Straddle]
+Long call plus long put at the same strike; payoff $|S_T - K|$. Buys
+volatility. See \cref{ch:options_payoffs}.
+
+\item[Strangle]
+Long OTM call plus long OTM put; cheaper than a straddle, needs bigger
+move. See \cref{ch:options_payoffs}.
+
+\item[Strat]
+Goldman Sachs role combining quant modelling, software engineering,
+and trader-adjacent work. See \cref{ch:strats_role,ch:secdb_slang}.
+
+\item[Strike]
+Price at which an option can be exercised. See \cref{ch:options_payoffs}.
+
+\item[Survival probability]
+Probability a credit has not defaulted by $t$: $S(t) =
+\exp(-\int_0^t h(u)\,du)$. See \cref{ch:credit_derivatives}.
+
+\item[Swap]
+OTC contract to exchange cash flows. Most common: fixed vs floating
+interest rate (IRS). See \cref{ch:rates_derivatives}.
+
+\item[Swaption]
+Option to enter a fixed/floating interest-rate swap at a specified
+future date. A \emph{payer swaption} is the right to pay fixed (a call
+on rates); a \emph{receiver swaption} is the right to receive fixed.
+The vol surface for swaptions is indexed by option expiry and
+underlying swap tenor. Priced via Black's or Bachelier's model.
+See \cref{ch:rates_derivatives}.
+
+\item[Theta]
+Option's time-decay Greek, $\partial V/\partial t$. See \cref{ch:greeks_hedging}.
+
+\item[Tick size]
+Minimum price increment on a venue. Constrains spreads and quoting. See \cref{ch:lob}.
+
+\item[Toxic flow]
+Counterparty flow that systematically predicts short-term price moves
+against you; adverse selection made concrete. See \cref{ch:order_flow}.
+
+\item[Tracking error]
+Standard deviation of portfolio return minus benchmark return. See \cref{ch:kelly_risk}.
+
+\item[Trend-following]
+Strategy family buying winners and selling losers at medium horizons.
+See \cref{ch:momentum}.
+
+\item[Triangular arbitrage]
+FX arbitrage across three currency pairs when implied cross-rates
+misalign. See \cref{ch:arbitrage_zoo}.
+
+\item[TWAP]
+Time-weighted average price; also an execution algo slicing uniformly
+in time. See \cref{ch:almgren_chriss}.
+
+\item[Uncrossed book]
+Book state where best bid $<$ best ask (no immediate matching
+possible). See \cref{ch:lob}.
+
+\item[Value-at-Risk (VaR)]
+Loss threshold exceeded with probability $1-\alpha$ over a horizon. See \cref{ch:risk_production}.
+
+\item[Vanna]
+Cross-Greek $\partial^2 V/\partial S\partial\sigma$. See \cref{ch:greeks_hedging}.
+
+\item[Variance swap]
+OTC contract paying the difference between realised variance
+$\hat{\sigma}^2_{\text{rv}}$ (measured daily over the swap's life)
+and a fixed strike $K_{\text{var}}$, scaled by notional:
+$\text{P\&L} = N_{\text{var}}\cdot(\hat\sigma^2_{\text{rv}} - K_{\text{var}})$.
+Provides pure exposure to realised volatility, independent of delta.
+Replication by a log-contract links fair variance to the implied vol
+surface. See \cref{ch:equity_derivatives}.
+
+\item[Vega]
+Option's sensitivity to implied volatility, $\partial V/\partial
+\sigma$. See \cref{ch:greeks_hedging}.
+
+\item[VOLCANIC\_ROCK\_VOUCHERS]
+Prosperity 4 option-like product tied to an underlying rock price;
+canonical volatility / Greeks case study. See \cref{ch:algo_rounds}.
+
+\item[Volatility surface]
+Implied-vol as a function of strike and maturity. Shape encodes skew,
+term structure, and higher-order moments. See \cref{ch:vol_surface}.
+
+\item[Volga]
+Second vega: $\partial^2 V/\partial\sigma^2$. See \cref{ch:greeks_hedging}.
+
+\item[VPIN]
+Volume-synchronized probability of informed trading; a flow-toxicity
+metric. See \cref{ch:order_flow}.
+
+\item[VWAP]
+Volume-weighted average price; both a benchmark and a common execution
+algo. See \cref{ch:almgren_chriss}.
+
+\item[Walk-forward]
+Out-of-sample evaluation in which the model is re-estimated on an
+expanding or rolling window. See \cref{ch:backtesting}.
+
+\item[Wall mid]
+Prosperity-specific fair-value construct using the deepest price levels
+as more robust reference points. See \cref{ch:price_value}.
+
+\item[Yield]
+Discount rate implied by a bond's price. See \cref{ch:fixed_income_foundations}.
+
+\item[Yield curve]
+Plot of zero (or par) rates against maturity. Key shapes: normal,
+inverted, flat, humped. See \cref{ch:fixed_income_foundations}.
+
+\item[Z-score]
+Standardised deviation $z = (x-\mu)/\sigma$. The workhorse signal for
+pairs/mean-reversion strategies. See \cref{ch:pairs_cointegration}.
+
+\item[Zero rate]
+Continuously-compounded yield on a zero-coupon bond to maturity $T$. See \cref{ch:fixed_income_foundations}.
+
+\end{description}
+
+\section{Further reading by topic}
+\label{sec:app_further_reading}
+
+The bibliography in \cref{ch:app_biblio} collects every source
+cited in the book with full publication details. This short appendix of
+pointers is intended as a fast-access map from a topic to the one or
+two sources that, in the author's opinion, repay the most effort.
+
+\begin{description}
+\item[Microstructure, orders and spreads] \citeHarris{} for the breadth
+and institutional detail; \citeBouchaud{} for the statistical-physics
+angle; \citeHasbrouck{} for empirical technique.
+\item[Market making] \citeCartea{} for the stochastic-control treatment
+from first principles; \citeAS{} for the original paper.
+\item[Stat arb and pairs] \citeChan{} and \citeChanQT{} for worked
+implementations; \citeAL{} for a clean exposition of the mean-reverting
+residual idea.
+\item[Options and Greeks] \citeHull{} as the canonical textbook;
+\citeNatenberg{} for practitioner intuition about the surface and
+trading greeks; \citeSinclair{} for vol arbitrage in practice.
+\item[Execution] \citeAC{} for the foundational framework;
+\citeCartea{} for modern extensions.
+\item[Machine learning and validation] \citeAFML{} for feature design
+and cross-validation traps; \citeJansen{} for a broader applied
+treatment.
+\item[Risk and capital] \citeThorp{} on Kelly sizing; \citeGlasserman{}
+on Monte Carlo for risk; \citeDerman{} for the culture.
+\item[Rates and credit] \citeHull{} again, complemented by
+\citeBlackSF{}, \citeHW{}, and \citeBGM{} for primary references.
+\item[Commodities] \citeSchwartz{}, \citeGibsonSchwartz{}, and
+\citeSchwartzSmith{} for the mean-reverting log-price framework.
+\item[Interview prep] \citeGreenBook{} for classic market-making and
+probability puzzles.
+\end{description}
+
+\medskip
+\noindent\emph{End of \cref{ch:app_notation}. Return to the chapter where
+you encountered the symbol or term, or proceed to \cref{ch:app_biblio}
+for full source details.}

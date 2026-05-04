@@ -1,0 +1,701 @@
+\chapter{Market Participants and Their Incentives}
+\label{ch:participants}
+\chaptermark{Market participants}
+
+Every trade has two sides. When your buy fills, \emph{someone} sold;
+when your sell fills, \emph{someone} bought. That someone's motivation,
+information, and pressures determine whether your trade was a good
+idea. The same resting quote is a free gift if the counterparty is an
+inattentive retail trader dumping a position, and a lethal trap if it
+is an insider with next-quarter's earnings release. Until you can
+reason about \emph{who is on the other side}, you cannot reason about
+your own edge.
+
+This chapter introduces the seven categories of participant you will
+meet repeatedly: why they trade, how their orders appear in the limit
+order book, and how to recognise them in market data. The centrepiece
+is the distinction between \textbf{informed} and \textbf{uninformed}
+traders --- the foundation of every microstructure model in
+\cref{ch:spreads_roll,ch:kyle_gm}, and the reason a market maker can
+earn money posting quotes, or lose it quickly if they misjudge who is
+hitting them.
+
+\begin{backgroundbox}[Prerequisites]
+From \cref{ch:lob}:
+\begin{itemize}
+  \item The \textbf{limit order book} as two sorted lists of resting
+  buy/sell orders.
+  \item \textbf{Limit} (post a price) vs \textbf{market} (cross the
+  book) orders; the \textbf{order lifecycle}: submit, queue, match,
+  report.
+  \item \textbf{Makers} (resting order) and \textbf{takers} (marketable
+  order crossing). Exchanges charge the taker a fee and pay the maker
+  a rebate.
+  \item \textbf{Bid}, \textbf{ask}, \textbf{spread}, \textbf{mid},
+  \textbf{tick size}.
+\end{itemize}
+No prior finance knowledge assumed beyond these mechanics.
+\end{backgroundbox}
+
+\section{The trader taxonomy}
+\label{sec:taxonomy}
+
+Larry Harris's \emph{Trading and Exchanges} \citeHarris{} organises
+market participants by why they trade, not what they trade. Motivation
+predicts behaviour: a participant trading on information acts
+differently from one rebalancing a pension fund, even sending identical
+orders to the same exchange. The seven categories below are not
+mutually exclusive --- one firm can run desks in several roles --- but
+they map cleanly onto the strategies in
+\cref{ch:market_making,ch:arbitrage_zoo}.
+
+\subsection{Market makers}
+\label{subsec:mm}
+
+\begin{definition}[Market maker]
+\index{market maker|textbf}
+A \emph{market maker} is a participant whose strategy is to
+continuously quote both a bid and an ask on a product, profiting from
+the spread $\spreads = \askp - \bidp$ between the two by being on the
+maker side of many trades in both directions. A pure market maker does
+not take a view on the direction of the underlying price; their goal
+is to end the trading session with roughly zero net position
+(\emph{flat}) and cash equal to their aggregated spread capture minus
+losses.
+\end{definition}
+
+The canonical mental picture is the airport currency booth: buy
+dollars from tourists at one rate, sell at a higher rate, and if flow
+balances, bank the difference. Electronically the market maker posts a
+buy limit at $\bidp$ and a sell limit at $\askp$, then waits. When a
+taker hits either side, position moves one unit and cash moves by the
+fill price. If a buy and a sell fill in close succession, they bought
+at $\bidp$ and sold at $\askp$, netting $\spreads$ per unit at zero
+end-of-session exposure.
+
+The behaviour is recognisable in the LOB. A market maker refreshes
+quotes on both sides, clustered near the top of the book in
+competition with other market makers, cancelling and re-posting as the
+mid moves. They rarely send a \emph{marketable} order (one that
+crosses the book) except to unwind a lopsided inventory.
+\Cref{ch:market_making} derives the optimal quoting strategy under
+inventory risk; for now, the takeaway is that market makers are
+maker-side, two-sided, and almost always present.
+
+\paragraph{Identification heuristic.} Very high fill count, near-equal
+split between buy and sell fills, tiny average holding time, positions
+that oscillate near zero, quotes that appear within one tick of the
+best on both sides.
+
+\subsection{Arbitrageurs}
+\label{subsec:arb}
+
+\begin{definition}[Arbitrageur]
+\index{arbitrageur|textbf}
+An \emph{arbitrageur} is a participant who trades simultaneously in
+two or more markets (or two or more products) to lock in a price
+discrepancy. A pure \emph{riskless} arbitrage requires the discrepancy
+to close with certainty; a \emph{statistical} arbitrage merely
+requires it to close in expectation.
+\end{definition}
+
+The archetype is triangular FX arbitrage: if EUR/USD/JPY cross-rates
+imply a loop EUR~$\to$~USD~$\to$~JPY~$\to$~EUR worth more than one
+euro, an arbitrageur sends three market orders in a race against
+everyone else doing the same. Each leg takes liquidity from a
+different book; the profit is the loop's excess; the risk is that a
+leg fails to fill at the expected price, leaving the position
+directionally exposed.
+
+In the LOB, arbitrageurs are almost exclusively \textbf{takers}: the
+opportunity closes in milliseconds, too fast to rest a limit order.
+Their flow is \emph{correlated across venues} --- simultaneous hits on
+EUR/USD at two venues are likely one arbitrageur firing two legs.
+\Cref{ch:arbitrage_zoo} catalogues the arbitrage types (triangular,
+cash-and-carry, put--call parity, ETF creation--redemption, and more);
+for now, note that arbitrageurs force prices across venues to stay in
+line.
+
+\paragraph{Identification heuristic.} Short bursts of taker orders,
+highly correlated timestamps across multiple venues or products,
+near-zero inventory held over the round, directionless aggregate P\&L
+(they do not care which way the market moves).
+
+\subsection{Informed traders}
+\label{subsec:informed}
+
+\begin{definition}[Informed trader]
+\index{informed trader|textbf}
+An \emph{informed trader} is a participant who possesses private
+information about the fair value of a product that is not yet
+reflected in the market price. They trade on that information: buying
+when their private signal says the product is underpriced, selling
+when it says overpriced, and exiting the position once the price moves
+to their target.
+\end{definition}
+
+The prototypical informed trader in academic models is an
+\emph{insider}: an executive who knows an earnings announcement is
+coming, an analyst who has done original research, a trader who has
+seen a regulatory filing minutes before it goes public. Harris's
+broader sense of ``informed'' covers any participant whose expected
+value for the product exceeds the market's information set --- not
+only illegal insider trading but also superior models, proprietary
+data feeds, or faster news parsing.
+
+From the market maker's point of view, they \emph{cannot see the
+information nor the label on the order}. An informed buy and a noise
+buy are indistinguishable at the message level; only the subsequent
+price move reveals which hit them. This is the setup for both
+classical theories of the bid--ask spread in \cref{ch:kyle_gm}:
+Glosten--Milgrom models informed trading as an adverse-selection tax
+on the market maker, and Kyle's 1985 model derives the equilibrium in
+which a single strategic informed trader hides inside noise flow while
+the market maker learns from order flow alone.
+
+\paragraph{Identification heuristic.} Consistently on the same side of
+a subsequent price move; buys precede up-moves and sells precede
+down-moves with far higher hit-rate than chance. The hardest
+counterparty to recognise in real time; the easiest in hindsight.
+
+\subsection{Noise traders (liquidity traders)}
+\label{subsec:noise}
+
+\begin{definition}[Noise trader]
+\index{noise trader|textbf}
+A \emph{noise trader}, also called a \emph{liquidity trader} or
+\emph{uninformed trader}, is a participant whose reason for trading is
+unrelated to private information about fair value. They trade because
+they need cash, because a pension fund is rebalancing on a calendar
+schedule, because a mutual fund is meeting redemptions, because
+someone pressed the wrong button, or because an automated strategy's
+signal was pure statistical nonsense.
+\end{definition}
+
+The terminology is historical and slightly unfair: a pension fund
+rebalancing a multi-billion-dollar portfolio is not literally
+\emph{noisy}, just orthogonal to information about the next price
+move. What matters is that the noise trader's decision is
+\emph{uncorrelated with the product's true value}: on average they
+buy as often before a down-move as before an up-move. To the market
+maker, the noise trader is the perfect counterparty --- every fill is
+a fair bet and the spread collected is profit.
+
+Real markets always contain a mix of informed and noise flow, and
+every microstructure model in this book is built around that mix. The
+market maker's willingness to quote a tight spread depends on the
+\emph{noise fraction} being high; when informed flow dominates,
+spreads widen or market makers withdraw. \Cref{ch:spreads_roll} makes
+this quantitative.
+
+\paragraph{Identification heuristic.} Uncorrelated with subsequent
+price moves; roughly 50\% of trades face up-moves and 50\% face
+down-moves. Often larger order sizes and longer holding horizons than
+information-driven flow. In Prosperity, the scripted ``retail'' bots
+that simply hit the top of the book at random intervals are pure
+noise traders.
+
+\subsection{High-frequency traders (HFTs)}
+\label{subsec:hft}
+
+\begin{definition}[High-frequency trader]
+\index{high-frequency trader (HFT)|textbf}\index{HFT|textbf}
+A \emph{high-frequency trader (HFT)} is a participant whose strategy
+operates at microsecond to sub-millisecond latencies, rewriting quotes
+hundreds or thousands of times per second in response to every incoming
+message on the book. HFTs are technologically, not fundamentally,
+defined: the category includes market-making HFTs, arbitrage HFTs, and
+short-horizon signal-driven HFTs.
+\end{definition}
+
+HFTs sit on top of the taxonomy rather than inside it: most are a
+hybrid of market-making and arbitrage roles, operating at a latency
+regime only hardware-colocated strategies can reach. Their defining
+feature is intense concern with \textbf{queue position}: in a
+price--time priority market (\cref{ch:lob}) the first order at a price
+level fills first, and moving from tenth- to first-in-queue can double
+a strategy's fill rate. HFTs pay to co-locate servers in the same data
+centre as the matching engine, measured in metres of fibre, so their
+messages arrive ahead of competitors'.
+
+The economic contribution of HFTs is contested. The defensive case:
+HFT market making has driven spreads on liquid products to historic
+lows, benefiting every other participant. The critical case: HFTs
+impose an adverse-selection tax on slower participants by racing in
+front of institutional flow. \Cref{ch:order_flow} develops the
+order-flow imbalance framework underlying most short-horizon HFT
+signals.
+
+\paragraph{Identification heuristic.} Enormous message rates (cancels
+per second), near-zero average holding time, aggressive quote
+competition at the top of the book, sensitivity to microsecond-level
+latency events. In exchange-level data they show up as the firms
+submitting 95\%+ of all cancellations.
+
+\subsection{Institutional asset managers}
+\label{subsec:inst}
+
+\begin{definition}[Institutional asset manager]
+\index{institutional asset manager|textbf}
+An \emph{institutional asset manager} is a firm that trades on behalf
+of long-horizon capital: pension funds, mutual funds, sovereign wealth
+funds, university endowments, insurance companies, and the like. Their
+positions are measured in hundreds of millions to hundreds of billions
+of dollars, their holding periods run from months to decades, and
+their trading is driven by portfolio construction mandates rather than
+by microstructure signals.
+\end{definition}
+
+Institutional flow is the natural counterparty of the HFT market
+makers above: slow, size-constrained orders meet fast, two-sided
+quotes. The institutional manager consumes liquidity (takes); the
+HFT provides it (makes), with the maker--taker fee schedule
+(\cref{ch:lob}) aligning the incentives.
+
+An institutional manager buying 10 million shares cannot send one
+market order for 10 million: it would eat the entire visible book and
+move price by percent. Instead they slice the parent order over hours
+or days using execution algorithms such as VWAP, TWAP, and
+participation-of-volume targets. \Cref{ch:almgren_chriss} derives the
+optimal schedule under a linear impact model. For now: institutional
+trading is \emph{size-constrained and execution-sensitive} --- P\&L
+is dominated by the price received on each slice, not by the raw
+direction of the trade.
+
+To the market maker, institutional flow is \emph{partially informed}:
+the rebalance decision is uncorrelated with short-horizon moves
+(looks like noise), but the signed persistence of a parent sliced
+over hours reveals its direction (looks like information). This is
+why institutional orders leak impact even when executed carefully ---
+persistent one-sided flow is itself informative.
+
+\paragraph{Identification heuristic.} Persistent one-sided flow over
+hours with roughly constant slice size; use of VWAP/TWAP child orders
+that match the day's volume profile; the parent order ends when the
+target quantity is reached rather than when a price target is hit.
+
+\subsection{Retail traders}
+\label{subsec:retail}
+
+\begin{definition}[Retail trader]
+\index{retail trader|textbf}
+A \emph{retail trader} is an individual trading their own personal
+account through a broker. Order sizes are small (typically tens to
+thousands of dollars per trade), the trader is usually less informed
+than professional participants, and their flow reaches the exchange
+only after the broker has first had an opportunity to internalise it
+or to sell it to a wholesaler.
+\end{definition}
+
+Retail motivations are varied and typically non-professional:
+long-horizon saving for retirement, speculation on a view picked up
+from news or social media, hobbyist day-trading, or hedging a
+concentrated stock grant from an employer. What unites the category
+is that trading is not the participant's job and the capital at risk
+is personal.
+
+The retail trader never reaches the exchange directly. Their order
+travels first to their broker, who in most modern markets either
+executes against the broker's own inventory (\emph{internalisation})
+or sells the order to a wholesale market maker for a small fee under
+\emph{payment for order flow (PFOF)}. The wholesaler then matches it
+internally or routes to the exchange. By the time a retail order
+hits the public book, it has been inspected by at least one
+professional.
+
+Wholesale market makers pay for retail flow because it is, on average,
+heavily noise-dominated. A retail trader is more likely selling to
+pay a bill than because they have private information about earnings.
+Paying for retail flow therefore buys the best counterparty in the
+market --- the noise trader of \cref{subsec:noise}. Retail flow is
+not uniformly uninformed: retail-level insider trading, meme-stock
+coordination, and reactions to public news all inject short bursts of
+information into the channel.
+
+\paragraph{Identification heuristic.} Small average order size,
+heavy concentration in a handful of popular tickers, bursts of
+correlated buying or selling around news events, and, in venues where
+it is observable, the characteristic latency signature of a broker's
+customer router rather than a direct exchange feed.
+
+\section{Informed vs uninformed: the single most important distinction}
+\label{sec:informed_vs_uninformed}
+
+The seven categories collapse onto a single axis that dominates all
+others: is the counterparty \emph{informed} or \emph{uninformed}? A
+market maker trades with noise all day and flees informed flow; an
+execution algorithm disguises its parent order as noise; an HFT
+arbitrageur wants to act on information first. Every microstructure
+result in \cref{ch:spreads_roll,ch:kyle_gm} is ultimately a statement
+about how this distinction shapes prices.
+
+\begin{definition}[Informed and uninformed flow]
+\index{informed flow|textbf}\index{uninformed flow|textbf}
+Let $V$ denote the unobserved fair value of a product a short time
+after the current instant. An order is \emph{informed} if the
+participant submitting it has information that changes their
+conditional expectation of $V$ relative to the public information set.
+An order is \emph{uninformed} (equivalently \emph{noise} or
+\emph{liquidity}) if its submission is conditionally independent of
+$V$ given public information: the participant is trading for reasons
+orthogonal to the product's short-horizon value.
+\end{definition}
+
+The market maker \emph{cannot see this label}. From the message
+stream, an informed buy and a noise buy are bit-for-bit identical:
+side, quantity, timestamp, maybe an anonymised account identifier.
+The only way to infer the label is to observe what the price does
+\emph{after} the trade. Over many trades the market maker can build a
+statistical model of each counterparty's informativeness; on a single
+trade, they are flying blind.
+
+This blindness is asymmetric against the market maker. Fills against
+noise traders are fair coin flips around the mid, and the spread
+turns them into profit. Fills against informed traders are
+systematically adverse: the informed buyer only hits the ask when
+fair value strictly exceeds the ask, leaving the market maker's
+post-trade inventory underwater. This is \textbf{adverse
+selection}.
+
+\subsection{A toy adverse-selection calculation}
+\label{subsec:toy_adverse}
+
+Consider the simplest model. A product has two possible fair values,
+$V = 100$ and $V = 110$, equally likely a priori. Fraction $\alpha =
+0.3$ of arriving traders are \emph{informed}: they know $V$ and buy
+when $V = 110$, sell when $V = 100$. The other $1 - \alpha = 0.7$ are
+\emph{noise}: they buy or sell with probability $\tfrac{1}{2}$ each,
+independent of $V$. The market maker posts a single price at the mid,
+$\midp = 105$, and trades with whoever arrives.
+
+Suppose a buy order arrives and fills at $105$. What does the market
+maker expect to lose?
+
+\paragraph{Step 1: $P(\text{buy} \mid V)$.}
+\[
+  P(\text{buy} \mid V = 110) \;=\; \underbrace{\alpha \cdot 1}_{\text{informed, buys}}
+    \;+\; \underbrace{(1 - \alpha) \cdot \tfrac{1}{2}}_{\text{noise, random}}
+    \;=\; 0.3 + 0.7 \cdot 0.5 \;=\; 0.65.
+\]
+\[
+  P(\text{buy} \mid V = 100) \;=\; \underbrace{\alpha \cdot 0}_{\text{informed, sells}}
+    \;+\; \underbrace{(1 - \alpha) \cdot \tfrac{1}{2}}_{\text{noise, random}}
+    \;=\; 0 + 0.35 \;=\; 0.35.
+\]
+
+\paragraph{Step 2: $P(\text{buy})$.}
+\begin{align*}
+  P(\text{buy}) &\;=\; P(V = 110)\,P(\text{buy} \mid V = 110)
+                     + P(V = 100)\,P(\text{buy} \mid V = 100) \\
+                &\;=\; 0.5 \cdot 0.65 + 0.5 \cdot 0.35
+                 \;=\; 0.50.
+\end{align*}
+
+\paragraph{Step 3: posterior over $V$ given a buy, by Bayes.}
+\[
+  P(V = 110 \mid \text{buy})
+    \;=\; \frac{P(V = 110)\,P(\text{buy} \mid V = 110)}{P(\text{buy})}
+    \;=\; \frac{0.5 \cdot 0.65}{0.50}
+    \;=\; 0.65.
+\]
+\[
+  P(V = 100 \mid \text{buy}) \;=\; 1 - 0.65 \;=\; 0.35.
+\]
+
+\paragraph{Step 4: expected fair value given a buy.}
+\[
+  \E[V \mid \text{buy}]
+    \;=\; 0.65 \cdot 110 + 0.35 \cdot 100
+    \;=\; 71.5 + 35 \;=\; 106.5.
+\]
+
+\paragraph{Step 5: market maker's expected P\&L on this fill.}
+The market maker sold at $\midp = 105$ and now holds $-1$ unit of a
+product whose conditional fair value is $106.5$. The expected loss
+per unit is
+\[
+  \underbrace{105}_{\text{price received}}
+    \;-\; \underbrace{106.5}_{\E[V \mid \text{buy}]}
+    \;=\; -1.5.
+\]
+The market maker loses $1.5$ on average on every buy that hits their
+ask, because the buy is informationally tilted toward the high-value
+state. By symmetry, every sell that hits their bid loses $1.5$ as
+well: sells come preferentially from informed traders who know $V =
+100$, so the market maker buys at $105$ a product worth $103.5$,
+giving P\&L $= -1.5$ per unit.
+
+The market maker cannot stay at the mid. Allowing a genuine spread
+--- ask strictly above $105$, bid strictly below --- shrinks losses,
+and at a wide enough spread turns them positive. ``How wide must the
+spread be to offset adverse selection?'' is the Glosten--Milgrom
+problem, derived in full in \cref{ch:kyle_gm}. The toy calculation
+here shows that \emph{a nonzero spread is forced by the mere
+existence of informed flow}, even without order-processing costs or
+inventory risk. The other two spread drivers are added in
+\cref{ch:spreads_roll}.
+
+\begin{keyfactbox}[The market maker's fundamental problem]
+The market maker sees only anonymous order flow and cannot tell
+informed from noise. Informed flow is systematically adverse (buyers
+buy only when fair value exceeds the ask, sellers sell only when fair
+value is below the bid), so fills against it lose money in
+expectation. The whole point of quoting a spread rather than a single
+price is to charge noise flow enough to cover losses to informed
+flow. This tension is \textbf{adverse selection}, the first-order
+phenomenon every microstructure model quantifies.
+\end{keyfactbox}
+
+\begin{intuitionbox}
+You would never play poker against someone who can see your hand. A
+market maker plays a worse game: against a table of strangers, some
+of whom see the hand and some of whom do not, and the market maker is
+not told which. Their only tool is to charge enough per hand to break
+even averaged over the whole table. That charge is the spread.
+\end{intuitionbox}
+
+\begin{pitfallbox}[``Small spread = cheap trading cost'' is wrong for makers]
+Novices assume a tight spread means cheap trading. True for a
+\emph{taker} (\cref{ch:lob}): tight spread means small crossing
+distance. False for a \emph{maker}: tight spread means small reward
+per fill while adverse-selection losses continue unchanged. On a
+product with heavy informed flow, a tight spread is a warning, not an
+invitation. \Cref{ch:market_making} shows how a market maker skews
+quotes \emph{inside} or \emph{outside} the top of book depending on
+their view of adverse selection.
+\end{pitfallbox}
+
+\section{Maker/taker economics in full}
+\label{sec:maker_taker_econ}
+
+\Cref{ch:lob} introduced the maker--taker fee schedule mechanically:
+the exchange charges the taker a small fee, pays the maker a small
+rebate, and keeps the difference. This chapter can now explain
+\emph{why}, and why the asymmetry is necessary.
+
+The maker of every trade is someone whose limit order was resting when
+the trade happened. That order has been exposed to \textbf{adverse
+selection} for every microsecond it sat: any informed trader arriving
+during that window would have picked off the stale quote. The longer a
+quote rests, the more likely the next fill is adverse. Posting is
+costly, and someone must compensate the posters or they will stop
+posting.
+
+The taker, in the same trade, crossed the book. They paid the spread
+--- the gap between fill price and mid --- and received the one thing
+the market maker cannot promise: \textbf{immediacy}. The taker traded
+right now, at the quoted price, without risk of the opportunity
+disappearing. This is valuable to any participant with a
+short-shelf-life trade: an arbitrageur whose loop closes in
+milliseconds, an execution algorithm needing to complete by the close,
+a retail trader reacting to a news event. Takers pay for immediacy
+because without it their strategy does not exist.
+
+\begin{keyfactbox}[The economic symmetry of the maker/taker fee]
+The maker bears adverse-selection risk, inventory risk, and the
+opportunity cost of capital in resting orders. In return they get (a)
+the spread and (b) an exchange rebate. The taker gets immediacy. In
+return they pay (a) the spread and (b) an exchange fee. The exchange
+clips the difference to fund matching, compliance, and margin.
+Without the rebate, no posted liquidity; without the fee, no
+exchange.
+\end{keyfactbox}
+
+A market charging neither side would still function in principle ---
+participants would trade for the spread alone --- but the exchange
+would have no revenue, and without a rebate the incentive to post
+rather than wait-and-take disappears. Rebates are typically a few
+tenths of a basis point, but at the scale of rebate-harvesting market
+making (\cref{ch:market_making}) they are the entire business model.
+
+Not every venue uses the same schedule. A \textbf{maker--maker model}
+rebates both sides and funds the exchange from subscription and data
+fees. Some derivatives exchanges use \textbf{pro-rata allocation}
+instead of price--time priority, devaluing queue position and
+shifting market-making economics. Dark pools charge neither side and
+exist as venues for institutional block crosses that avoid signalling.
+\Cref{ch:market_making} treats the full range.
+
+\section{Dealer markets vs exchange markets}
+\label{sec:dealer_vs_exchange}
+
+So far this book has described an \textbf{order-driven market}: a
+central limit order book with anonymous participants, price--time
+priority, and a matching engine that pairs crossing orders. This is
+the dominant structure for listed equities, listed futures, major
+cryptocurrencies, and all of Prosperity. It is not the only
+architecture, and several of the world's largest asset classes do
+\emph{not} trade this way.
+
+\begin{definition}[Order-driven market]
+\index{order-driven market|textbf}
+An \emph{order-driven market} is one in which all participants submit
+limit and market orders to a single shared limit order book, trades
+are matched by an anonymous matching engine under fixed priority
+rules, and every participant faces the same book. Prices emerge from
+the interaction of orders; no single participant is privileged.
+Examples: equities on NASDAQ and NYSE, futures on CME, cryptocurrencies
+on Binance, and Prosperity.
+\end{definition}
+
+\begin{definition}[Quote-driven or dealer market]
+\index{dealer market|textbf}\index{quote-driven market|textbf}
+A \emph{quote-driven market} (also called a \emph{dealer market}) is
+one in which a participant wishing to trade does not send an order to
+a central book but instead sends a \emph{request for quote (RFQ)} to
+one or more dealers, typically large banks. Each dealer responds with
+a bid and an ask at which they are willing to trade; the client picks
+the best one and trades against that dealer's inventory. The dealer
+takes the position onto their own book and is responsible for
+hedging it. There is no anonymous matching; the dealer is a
+\emph{counterparty}, not a neutral intermediary. Examples: most over-
+the-counter (OTC) bond markets, interest rate swaps, FX spot for
+institutional size, OTC derivatives.
+\end{definition}
+
+The difference is fundamental enough that this book's intuitions
+transfer only partially. In an order-driven market the sell-side bank
+is just another participant; in a quote-driven market the bank is the
+\emph{only} participant on one side, with entirely different
+incentives. A dealer pricing an interest rate swap is not a neutral
+matching engine: they price against their own inventory, their fair
+value, their hedging costs, and their assessment of how informed the
+client is. A macro hedge fund gets quoted wider; a corporate treasurer
+rolling a hedge gets quoted tighter.
+
+The microstructure models of \cref{ch:spreads_roll,ch:kyle_gm} were
+developed for order-driven markets, but the core intuition ---
+adverse-selection pressure on the liquidity provider --- carries over.
+A dealer faces the same problem as a market maker with a different
+interface: they see the client's identity (helps: classify the flow)
+but commit to a price before the client commits to trade (hurts: the
+client shops around). \Cref{ch:strats_role} returns to the day-to-day
+life of a Strat on the quote-driven side.
+
+\begin{gsbox}
+On a Goldman rates desk, a pension fund calls asking a price on a
+\$500m 10-year interest rate swap. There is no central book for swaps
+in that size. You --- the Strat --- receive the RFQ; your system
+computes a fair mid from the current swap curve; you add a spread
+reflecting your inventory (already long duration? charge more), your
+view of the client's informedness (routine corporate hedge or macro
+fund taking a directional view?), and your hedging cost in the linear
+futures market where you will offset delta within minutes. The client
+picks your price or someone else's; if yours, the position lands on
+your book and you immediately sell Eurodollar futures to neutralise
+first-order rate exposure. \Cref{ch:strats_role} teaches how every
+piece of this workflow is implemented.
+\end{gsbox}
+
+The boundary is not watertight. Some equity venues run both: a
+central book by day and an RFQ facility for block trades. Some crypto
+products trade on central books and via OTC dealers. Some order-driven
+exchanges host dealer-style market makers (``lead market makers'' in
+ETFs, designated market makers on NYSE, specialists in older designs).
+What does not change is the economic pressure: the liquidity provider
+--- central-book market maker or sell-side dealer --- is paid to
+absorb risk from flow they cannot fully classify. The game is the
+adverse-selection game of \cref{ch:kyle_gm}.
+
+\section{The Olivia story: an informed trader in the wild}
+\label{sec:olivia}
+
+The informed/uninformed distinction can feel abstract. Prosperity~3
+provided a vivid real example showing the informed-trader category is
+a recognisable pattern in actual order flow --- and exploiting it
+paid.
+
+\begin{prosperitybox}
+In the 2025 IMC Prosperity~3 competition, participants traded against
+scripted bots whose trades were \emph{anonymous} for the first four
+rounds: you saw trade size, price, and direction but not which bot
+acted. In Round~5 IMC made historical \textbf{trader IDs} public,
+lifting the anonymity curtain and letting teams tag every past trade
+with its submitting bot.
+
+One bot, \textbf{Olivia}, had followed a strikingly simple rule
+throughout: on Squid Ink, buy $15$ lots at the daily low, sell $15$
+lots at the daily high. In the vocabulary of
+\cref{sec:informed_vs_uninformed} she was an archetypal informed
+trader, acting on private information (the day's price extrema) no
+one else could see until after the fact.
+
+The Frankfurt Hedgehogs \citep{frankfurtHedgehogs2025imcP3}, who
+finished 2nd overall, spotted this during the first four rounds
+without knowing the bot's name: a particular anonymous counterparty
+consistently bought at what turned out to be the daily minimum and
+sold at the daily maximum, a pattern their running-extremum detector
+could latch onto. The optimal strategy on Squid Ink became ``mimic the
+informed trader'': buy when Olivia buys, sell when Olivia sells. This
+single signal generated roughly $8{,}000$ SeaShells on Squid Ink in
+Round~1. In Round~2 they used Olivia's inferred Croissants position
+(a picnic-basket constituent) to tilt basket-spread thresholds ---
+the cross-product extension of \cref{ch:basket_etf_arb}.
+
+When Round~5 revealed trader IDs, the Hedgehogs already had a working
+detector; the reveal merely let them swap heuristic matching for a
+literal trader-ID check, eliminating false positives. Several other
+top-ten teams converged on the same strategy.
+
+The story maps onto this chapter's theory. Olivia was informed in the
+strict sense: a private signal, acted on. Any team running pure
+market-making on Squid Ink was unwittingly the market maker of
+\cref{sec:informed_vs_uninformed}, paying for adversely-selected flow.
+Teams that identified and copied Olivia were on the informed side, and
+P\&L flowed accordingly. Lesson for Prosperity~4 (and for any real
+exchange with mixed counterparties): the informed/uninformed
+distinction is not abstraction. It is the difference between making
+and losing money, visible in the order flow if you know where to
+look.
+\end{prosperitybox}
+
+\section{Key facts to memorise}
+\label{sec:ch2_key_facts}
+
+\begin{itemize}
+  \item The seven participant categories --- \textbf{market makers},
+  \textbf{arbitrageurs}, \textbf{informed traders}, \textbf{noise
+  (liquidity) traders}, \textbf{HFTs}, \textbf{institutional asset
+  managers}, \textbf{retail traders} --- are distinguished by
+  motivation, not by the orders they send.
+
+  \item The most consequential split is \textbf{informed vs
+  uninformed}: flow correlated with subsequent price moves vs flow
+  orthogonal to them. Every result in
+  \cref{ch:spreads_roll,ch:kyle_gm} rests on this distinction.
+
+  \item \textbf{Adverse selection}: a market maker's fills against
+  informed counterparties systematically lose money because the
+  informed trader crosses only when fair value is favourable. In the
+  toy model of \cref{subsec:toy_adverse} ($\alpha = 0.3$, $V \in
+  \{100, 110\}$, mid $105$), expected loss per fill is $\$1.5$ per
+  unit, forcing a nonzero spread.
+
+  \item The \textbf{maker--taker fee schedule} is economic symmetry:
+  makers get a rebate for bearing adverse selection and inventory
+  risk; takers pay a fee for immediacy. Without the rebate, no one
+  posts; without the fee, the exchange has no revenue.
+
+  \item \textbf{Order-driven} (CLOB, anonymous, price--time priority)
+  and \textbf{quote-driven / dealer} (RFQ, dealer holds inventory)
+  markets are architecturally distinct. Equities, futures, crypto,
+  Prosperity sit in the first; bonds, swaps, institutional FX spot,
+  OTC derivatives sit in the second. The adverse-selection game is
+  the same.
+
+  \item \textbf{Queue position} matters under price--time priority;
+  this is the economic reason HFTs co-locate.
+
+  \item \textbf{Institutional flow} is partially informed: slices are
+  uncorrelated with the next tick, but parent-order persistence leaks
+  direction. \Cref{ch:almgren_chriss} covers large-order execution.
+
+  \item \textbf{Retail flow is valuable because it is uninformed}:
+  wholesalers pay brokers for PFOF access, because a noisy counterparty
+  is the best counterparty.
+
+  \item The \textbf{Olivia story} is empirical ground truth for the
+  informed-trader category --- detectable from order flow alone, and
+  top-ten teams copied her for direct P\&L. The informed/uninformed
+  distinction is a pattern in real data, not an abstraction.
+\end{itemize}

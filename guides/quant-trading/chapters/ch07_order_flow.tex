@@ -1,0 +1,822 @@
+\chapter{Order Flow Dynamics: Imbalance, Queue, Latency}
+\label{ch:order_flow}
+\chaptermark{Order flow dynamics}
+
+You have a snapshot of the limit order book and a few seconds of
+trade history. In thirty seconds' time, will the mid-price have
+moved up or down? No crystal ball, no news feed --- just what has
+been happening in the book for the last few hundred milliseconds.
+Can you do better than a coin flip?
+
+Yes, and by a surprising margin. The single most informative
+number is the \textbf{order-flow imbalance} (OFI): the net
+aggressive buying pressure over a short window. Over sub-minute
+horizons, OFI explains a larger share of the variation in
+mid-price changes than any other easily-computed signal --- larger
+than lagged returns, larger than volume alone, and larger than the
+raw bid--ask depth \citeBouchaud. Read the book, compute OFI, and
+act on it faster than the next trader: this is close to the only
+honest edge at the microsecond scale.
+
+This chapter builds three related pieces of structure around that
+claim. First, OFI itself: definition, empirical regularity, and
+mechanism. Second, \textbf{queue position} --- where in the line
+of resting orders you sit --- and why being near the front is
+worth measurably more than being near the back. Third, two
+machinery observations: arrivals \emph{cluster in time} (the
+Hawkes observation) rather than being independent, and
+\emph{latency is a second-derivative game} --- being fast is only
+useful up to the point where nobody faster can pick you off.
+
+Hawkes processes and latency are treated qualitatively; a full
+quantitative treatment of either would fill its own chapter. The
+Avellaneda--Stoikov market-making model of
+\cref{ch:market_making} is built around an assumed arrival
+intensity $\arrate$ that comes straight out of this chapter.
+
+\begin{backgroundbox}[Prerequisites]
+From earlier in the book:
+\begin{itemize}
+  \item \Cref{ch:lob}: the limit order book as two sorted sides,
+  the specific four-level toy LOB with best bid
+  $\bidp = 102.54$ (quantity $131$) and best ask
+  $\askp = 103.23$ (quantity $48$), mid $\midp = 102.885$,
+  spread $\spreads = 0.69$. Price--time priority for the matching
+  engine, i.e.\ first-in-first-out within a given price level. The
+  ``walking the book'' calculation for a market order that
+  consumes multiple levels.
+  \item \Cref{ch:price_value}: the \textbf{microprice}
+  $\mprice = (Q_a \bidp + Q_b \askp)/(Q_a + Q_b)$, introduced
+  there with a promise that the underlying reason is
+  order-flow imbalance and that the present chapter would
+  develop it. This is where that promise is cashed in.
+  \item \Cref{ch:kyle_gm}: adverse selection and the idea that
+  incoming order flow carries information. Kyle's linear
+  equilibrium in particular gave a price response
+  $\Delta \midp = \lamk \, y$ where $y$ is the aggregate order
+  flow. OFI is the empirical version of that $y$.
+\end{itemize}
+From outside the book:
+\begin{itemize}
+  \item Elementary probability: Poisson processes (arrival
+  intensity $\lambda$, exponential inter-arrival times, the
+  memoryless property), expectations, independence.
+  \item Enough calculus to read an integral with a kernel in it.
+  No Itô, no measure theory.
+\end{itemize}
+\end{backgroundbox}
+
+\section{Order flow imbalance (OFI)}
+\label{sec:ofi}
+
+\subsection{Intuition before the definition}
+
+Watch the top-of-book quotes. Each aggressive buyer (a market
+buy or a marketable limit buy crossing the best ask) removes
+quantity from the ask; each aggressive seller removes quantity
+from the bid. Passive traders post inside the existing quotes
+(tightening the spread, adding depth); resting orders cancel
+(removing depth).
+
+If over the last few hundred milliseconds the ask is being eaten
+faster than the bid --- six market buys for every sell, lots of
+cancels on the bid and none on the ask --- buyers are the urgent
+side: willing to pay the half-tick for immediacy. An urgent side
+is almost always an \emph{informed} side
+(\cref{ch:kyle_gm}-sense), because informed traders cannot
+afford to wait. Urgent buying tends to mean the next few ticks
+of discovery move up. OFI quantifies how urgent one side is
+relative to the other.
+
+\begin{definition}[Order-flow imbalance]
+\index{order-flow imbalance (OFI)|textbf}\index{OFI|textbf}
+\label{def:ofi}
+Let $[t, t+\Delta t]$ be a short time window. For each event on
+the top of the LOB during that window, assign a signed quantity
+$e_k$ as follows:
+\begin{itemize}
+  \item a new limit buy at the best bid, or an increase in
+  best-bid depth: $e_k = +q_k$;
+  \item an aggressive sell, or a cancel at the best bid, or a
+  decrease in best-bid depth: $e_k = -q_k$;
+  \item a new limit sell at the best ask, or an increase in
+  best-ask depth: $e_k = -q_k$;
+  \item an aggressive buy, or a cancel at the best ask, or a
+  decrease in best-ask depth: $e_k = +q_k$.
+\end{itemize}
+The \textbf{order-flow imbalance} over the window is
+\begin{equation}
+  \label{eq:ofi_def}
+  \mathrm{OFI}(t, t+\Delta t) \;\defeq\;
+  \sum_{k \,:\, t_k \in (t, t+\Delta t]} e_k
+  \;=\;
+  \underbrace{\Delta Q_b}_{\substack{\text{net increase}\\\text{of best-bid depth}}}
+  \;-\;
+  \underbrace{\Delta Q_a}_{\substack{\text{net increase}\\\text{of best-ask depth}}}.
+\end{equation}
+A positive OFI means buy-side pressure; a negative OFI means
+sell-side pressure.
+\end{definition}
+
+Check the sign convention in \cref{eq:ofi_def}. A buyer hitting
+the ask \emph{removes} quantity, so $\Delta Q_a < 0$ and
+$-\Delta Q_a$ contributes positively to OFI. A buyer posting a
+new limit at the bid \emph{adds} quantity, so $\Delta Q_b > 0$
+contributes positively too. Both are buy-pressure events; both
+push OFI up. OFI is the net ``demand minus supply'' that hit the
+top of the book over the window.
+
+Two standard subtleties \citeBouchaud{}:
+\begin{enumerate}
+  \item \emph{OFI is computed at the top of the book, not
+  aggregated over all levels.} Deeper levels change less often
+  and carry less information. The top-of-book version predicts
+  short-horizon returns.
+  \item \emph{OFI counts quantity, not messages.} Ten aggressive
+  buys of size $1$ and one aggressive buy of size $10$ contribute
+  the same $+10$ to OFI. The econometric justification: the
+  price-impact kernel is linear in quantity at the single-trade
+  scale, not in message count.
+\end{enumerate}
+
+\subsection{Worked toy example on the four-level LOB}
+\label{sec:ofi_toy}
+
+We use the toy LOB from \cref{ch:lob}, reproduced here to anchor
+the numbers:
+\begin{center}
+\begin{tabular}{cc|cc}
+\toprule
+\multicolumn{2}{c|}{\textbf{Bid side}} & \multicolumn{2}{c}{\textbf{Ask side}} \\
+Qty & Price & Price & Qty \\
+\midrule
+$131$ & $102.54$ & $103.23$ & $48$ \\
+$32$  & $101.87$ & $103.98$ & $84$ \\
+$293$ & $101.48$ & $104.17$ & $38$ \\
+$65$  & $101.10$ & $104.75$ & $127$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+So $\bidp = 102.54$, $\askp = 103.23$, $\midp = 102.885$, and the
+top-of-book quantities are $Q_b = 131$ and $Q_a = 48$.
+
+Consider a window of ten consecutive timesteps during which the
+following events arrive at the top of the book:
+\begin{itemize}
+  \item $3$ aggressive market buys of size $10$ each (each
+  removes $10$ from the best ask);
+  \item $1$ aggressive market sell of size $5$ (removes $5$ from
+  the best bid);
+  \item no new limit orders or cancels at the top of book during
+  the window.
+\end{itemize}
+Apply \cref{def:ofi} event-by-event. Each buy consumes $10$ from
+the ask, so $\Delta Q_a = -10$ on that event, contributing
+$-\Delta Q_a = +10$ to OFI. The three buys together contribute
+$+30$. The single sell consumes $5$ from the bid, so
+$\Delta Q_b = -5$ on that event, contributing $+\Delta Q_b = -5$
+to OFI. Summing:
+\begin{equation}
+  \mathrm{OFI}
+  \;=\;
+  \underbrace{(+10) + (+10) + (+10)}_{\text{three buys}}
+  \;+\;
+  \underbrace{(-5)}_{\text{one sell}}
+  \;=\;
+  +25.
+\end{equation}
+The value $25$ is an urgency meter for the window: sign says
+buyer-dominated, magnitude says $25$ more units of aggressive
+buy pressure than sell pressure.
+
+What does OFI predict about the mid? The empirical fact
+\citeBouchaud{}, replicated on equities, futures, and FX, is that
+the change in the mid over the \emph{next} window of similar
+length is approximately linear in OFI:
+\begin{equation}
+  \label{eq:ofi_regression}
+  \Delta \midp \;\approx\; \beta \cdot \mathrm{OFI} + \varepsilon,
+\end{equation}
+with $\beta > 0$, and $R^2$ on sub-minute bars typically
+several percent --- small-sounding but an enormous
+signal-to-noise ratio for short-horizon forecasting. A slope
+$\beta \approx 0.01$ ticks per unit of OFI is typical on a
+mid-cap equity; for the toy example, that gives an expected
+next-window mid move of $\beta \cdot 25 = 0.25$ ticks --- a
+quarter-tick drift in the direction of the buying pressure. A
+strategy trading on this signal is \emph{not} predicting the
+direction of this window's flow; it uses this window's flow to
+predict the next window's mid.
+
+\Cref{tab:ofi_bins} shows a synthetic bin table in the style of
+Cont, Kukanov, and Stoikov's OFI paper and matching the shape
+reported in \citeBouchaud: slope approximately one-hundredth of a
+tick per unit of OFI, monotonic and linear across a wide range
+of OFI values.
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{rr}
+    \toprule
+    OFI bin & $\E[\Delta \midp \mid \text{OFI}]$ (ticks) \\
+    \midrule
+    $-40$ & $-0.38$ \\
+    $-25$ & $-0.27$ \\
+    $-10$ & $-0.08$ \\
+    $\phantom{-}0$   & $-0.02$ \\
+    $+5$  & $+0.07$ \\
+    $+15$ & $+0.13$ \\
+    $+30$ & $+0.32$ \\
+    $+45$ & $+0.43$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Synthetic OFI-to-next-mid-move table, in the shape
+  predicted by the linear model \cref{eq:ofi_regression} with
+  slope $\beta \approx 0.0098$ and near-zero intercept. Real
+  equity-futures data produces curves that look like this
+  \citeBouchaud.}
+  \label{tab:ofi_bins}
+\end{table}
+
+\begin{keyfactbox}[OFI predicts short-horizon mid-price returns]
+Over sub-minute windows, the mid-price change is approximately
+linear in the preceding-window order-flow imbalance:
+\[
+  \Delta \midp(t + \Delta t)
+  \;\approx\; \beta \cdot \mathrm{OFI}(t - \Delta t, t),
+  \qquad \beta > 0.
+\]
+This is the most robust short-horizon signal in empirical
+microstructure. It holds across assets, venues, and decades, and
+is the workhorse feature of every HFT alpha model. The slope
+$\beta$ is calibrated per product; the sign is always positive.
+\end{keyfactbox}
+
+\begin{intuitionbox}
+Why does OFI work? Traders with private information cannot
+afford to wait. If you know the fair value has risen, the cheapest
+way to exploit that knowledge is to post a passive bid and wait
+for the next aggressive seller; the expensive way is to cross
+the spread and pay the half-spread for immediacy. Choosing the
+expensive way reveals that the information decays faster than
+the time a passive order would need to fill. The \emph{willingness
+to pay} the spread is itself evidence. OFI aggregates that
+willingness. \Cref{ch:kyle_gm} framed informed order flow as the
+channel by which information reaches prices; OFI is the
+model-free statistic that measures how much of the channel was
+used.
+\end{intuitionbox}
+
+\subsection{OFI is the microprice, reorganised}
+\label{sec:microprice_ofi}
+
+\Cref{ch:price_value} defined the microprice as the
+cross-weighted combination of the two top quotes,
+\[
+  \mprice
+  \;=\;
+  \frac{Q_a \bidp + Q_b \askp}{Q_a + Q_b},
+\]
+and claimed $\mprice$ is a better short-horizon predictor of the
+next mid than $\midp$, promising an explanation here. The OFI
+story is the explanation.
+
+Define the \emph{queue imbalance ratio}
+\[
+  \rho \;\defeq\; \frac{Q_b}{Q_a + Q_b} \;\in\; (0, 1).
+\]
+This is the fraction of the total top-of-book quantity sitting on
+the bid side. A little algebra gives an alternative form for
+the microprice:
+\begin{align}
+  \mprice
+  &= \frac{Q_a \bidp + Q_b \askp}{Q_a + Q_b} \\
+  &= \frac{Q_a + Q_b}{Q_a + Q_b} \cdot \midp
+     + \Bigl(\frac{Q_b}{Q_a+Q_b} - \frac{1}{2}\Bigr)(\askp - \bidp) \\
+  &= \midp + \Bigl(\rho - \tfrac{1}{2}\Bigr) \spreads.
+  \label{eq:micro_ofi}
+\end{align}
+(Readers should verify \cref{eq:micro_ofi} by substituting
+$\rho = Q_b/(Q_a+Q_b)$ into the right-hand side; a single line of
+algebra recovers the original definition. For the toy LOB we
+have $Q_a = 48$, $Q_b = 131$, $\rho = 131/179 \approx 0.7318$,
+and the formula gives
+$\midp + (0.7318 - 0.5)(0.69) = 102.885 + 0.1599 = 103.0449$,
+which matches the explicit $103.0450$ computed in
+\cref{ch:price_value}.)
+
+The microprice equals the mid plus a correction proportional to
+the \emph{static depth imbalance}: if $\rho > 1/2$, the bid has
+more resting depth than the ask, which under
+\cref{ch:kyle_gm}-style reasoning should pressure the ask and
+lift the mid. The correction pushes the microprice \emph{towards}
+the ask, anticipating the lift.
+
+Static depth imbalance is the \emph{level} of which OFI is the
+\emph{first difference}. Between two snapshots, the change in
+top-of-book quantities is exactly
+$\Delta Q_b - \Delta Q_a = \mathrm{OFI}$ by \cref{def:ofi}.
+
+\emph{Microprice and OFI are the same object on two different
+time scales.} The microprice is the instantaneous
+depth-imbalance-corrected mid; OFI is the change in signed
+top-of-book depth over a short window. Both are positive when
+buyers dominate and both predict the same sign of the next mid
+move. A market maker quoting around $\mprice$ is implicitly using
+the same signal as an alpha trader predicting returns from OFI;
+the two differ only in how they convert the signal into action.
+
+\section{Queue position and the value of priority}
+\label{sec:queue}
+
+\Cref{ch:lob} established that the matching engine runs
+price--time priority within a level: among resting orders at the
+same price, the first-in is filled first. That rule is why queue
+position --- where in the FIFO line your order sits --- is a
+dimension of the book you can extract edge from.
+
+\subsection{Front of the queue is not the same as back of the queue}
+
+Consider two market makers, Alice and Bob, each posting a passive
+limit bid at $\bidp$, same quantity, same product, same instant
+they decide to quote. Alice posted five milliseconds earlier.
+With $131$ units of resting depth before they arrived, Alice is
+at queue position $132$ (the $132$nd unit an aggressive seller
+would hit); Bob is at position $132 + $ (Alice's size).
+
+The next aggressive sell of size $135$ fills the first $131$
+existing units, then all of Alice's order, then a small piece of
+Bob's. Alice collects the full half-spread; Bob gets a slice.
+Over the next minute, both want their full order filled: what
+are the respective probabilities?
+
+The empirical shape is stark. On the big equity futures ---
+Moallemi--Yuan and Huang--Polak on CME products ---
+\emph{front-of-queue} (first $10\%$ of level depth) minute-horizon
+fill probabilities run $50$--$70\%$, while \emph{back-of-queue}
+(last $10\%$) sit at $5$--$15\%$ \citeBouchaud. The ratio is
+typically four to seven. Queue position matters more than price
+level --- since the two orders are, by construction, at the same
+price.
+
+\subsection{Pricing the queue position}
+
+Put a dollar number on this. Fix a tick size $\Delta p$ and
+assume a filled quote captures, on average, half a tick of value
+relative to the true fair at fill. (A market maker quoting
+$\bidp$ who gets filled buys below $\midp$; captured value is
+$\tfrac{1}{2}\spreads$, half a tick for a single-tick spread.
+This is the Roll-model half-spread of \cref{ch:spreads_roll}.)
+
+Let $p_{\mathrm{front}}$ be the probability that a
+front-of-queue order fills over the next minute, and
+$p_{\mathrm{back}}$ the same for a back-of-queue order. The
+expected value of holding the quote for that minute is
+\[
+  \mathrm{EV}
+  \;=\;
+  p_{\mathrm{fill}} \cdot \tfrac{1}{2} \Delta p,
+\]
+ignoring inventory and adverse-selection risk (both of which
+\cref{ch:market_making} will restore). Plug in representative
+numbers $p_{\mathrm{front}} = 0.60$ and
+$p_{\mathrm{back}} = 0.10$:
+\begin{align}
+  \mathrm{EV}_{\mathrm{front}}
+  &\;=\; 0.60 \cdot \tfrac{1}{2} \;=\; 0.30\ \text{ticks}, \\
+  \mathrm{EV}_{\mathrm{back}}
+  &\;=\; 0.10 \cdot \tfrac{1}{2} \;=\; 0.05\ \text{ticks}.
+\end{align}
+The ratio $0.30 / 0.05 = 6$: front-of-queue is worth six times
+back-of-queue on the same instrument at the same price. Being in
+front is a first-order consideration.
+
+\begin{keyfactbox}[Queue position is worth a factor of six]
+Under representative fill probabilities, a quote at the front of
+the queue is worth roughly $6\times$ a quote at the back --- on
+the same product, at the same price level, at the same time. The
+only thing separating the two numbers is when each order arrived.
+\end{keyfactbox}
+
+\begin{intuitionbox}
+Time in the queue is free optionality. Your position was set
+when you posted; from then on, every new same-price order is
+queued behind you, and every aggressive hit works through the
+queue in arrival order. An earlier order has been ``converting
+aggressive flow into fills'' for longer and has, on expectation,
+more of the minute left to spend at the front. A queue position
+is a credit you earn by posting early and consume by getting
+filled.
+\end{intuitionbox}
+
+\subsection{Consequences for strategy design}
+
+Four consequences follow from the factor-of-six result, all
+formalised later in the Avellaneda--Stoikov context
+(\cref{ch:market_making}).
+
+\begin{enumerate}
+  \item \emph{Cancelling a resting order is expensive even when
+  the order was wrong.} Cancel-and-repost loses all accrued
+  queue credit. A one-tick re-quote is not worth doing unless
+  the expected benefit exceeds the lost queue value.
+  \item \emph{Posting deeper than best is often better than
+  posting at best.} Deeper levels have shorter queues; a post at
+  the second-best price might start near the front of its short
+  queue, whereas a post at the best price might end up buried.
+  The calculation is ``price $\times$ fill probability'', not
+  price alone.
+  \item \emph{Queue estimates must be tracked per-venue,
+  per-time-of-day, per-product.} The front-of-queue advantage is
+  $6\times$ on one product, $2\times$ on another, $15\times$ on a
+  third. Calibrate each from historical fill data.
+  \item \emph{The reservation price of a market-making strategy
+  should depend on queue position.} A front-of-queue quote needs
+  a smaller spread to break even than a back-of-queue one,
+  because $\E[\text{value per minute}]$ is higher.
+  \Cref{ch:market_making} folds this into the Avellaneda--Stoikov
+  optimal-spread formula as an effective arrival-intensity
+  correction.
+\end{enumerate}
+
+The Frankfurt Hedgehogs' Prosperity 3 RAINFOREST\_RESIN quoter
+is an explicit example of this logic being applied by hand:
+the bot did not cancel on small price noise because, as
+their writeup notes, ``the queue was worth more than the
+tick'' \citep{frankfurtHedgehogs2025imcP3}. A Prosperity
+algorithm can estimate its own queue position directly from
+the \texttt{TradingState.order\_depths} object each tick and
+from its own position delta, then estimate fill probability as
+$1 - e^{-\lambda t_{\text{remain}}}$ under a thin-Poisson
+approximation to the aggressive-sell arrival rate. Cancelling
+only when the adverse-selection cost of holding exceeds the
+lost queue value is the one-line summary of the strategy.
+
+\section{Hawkes processes: clustered arrivals}
+\label{sec:hawkes}
+
+So far we have treated order flow as a stream of events with a
+well-defined rate, without specifying how the rate varies in
+time. \textbf{Poisson} arrivals with constant intensity $\lambda$
+get two things right (inter-arrival times
+$\operatorname{Exp}(\lambda)$; independent counts on disjoint
+intervals) and one thing catastrophically wrong: real order flow
+is \emph{clustered}. A market order tends to be followed by
+another on the same side within a few hundred milliseconds, far
+more often than Poisson allows. Quiet periods follow quiet
+periods; bursty periods follow bursty periods.
+
+Measurements on equity order flow show a sharp excess of short
+inter-arrival gaps relative to the Poisson null, and a
+conditional intensity given a recent arrival five to ten times
+the long-run average for several seconds \citeBouchaud. A
+Poisson-based market-making model is unprepared for bursts:
+quotes too wide in quiet periods (over-estimated adverse
+selection from the constant mean) and too tight in bursts (local
+rate far above long-run mean). Both directions lose money.
+
+\subsection{The Hawkes model in one line}
+
+The standard fix, used somewhere in every HFT stack, is the
+\textbf{Hawkes process}, introduced by Alan Hawkes in 1971
+\citep{hawkes1971spectra}. A Hawkes process is a point process
+whose intensity at time $t$ depends on past arrivals:
+\begin{equation}
+  \label{eq:hawkes}
+  \lambda(t) \;=\; \mu \;+\; \sum_{t_i < t} \phi(t - t_i),
+\end{equation}
+where $\mu \ge 0$ is baseline intensity and
+$\phi : [0,\infty) \to [0, \infty)$ is a non-negative decay
+kernel, typically exponential
+$\phi(\tau) = \alpha e^{-\beta \tau}$ with $\alpha, \beta > 0$.
+Each past event $t_i$ adds a time-decaying ``kick'' to the
+intensity: an arrival makes the next arrival more likely for a
+short window, then the memory decays.
+
+Two facts to carry forward:
+\begin{itemize}
+  \item \emph{Stationarity.} With
+  $\phi(\tau) = \alpha e^{-\beta \tau}$, the \emph{branching
+  ratio} $\alpha/\beta$ must be strictly less than one for
+  stationarity. A branching ratio near one is near-critical
+  self-excitation (arrivals driven almost entirely by other
+  arrivals rather than by $\mu$), characteristic of modern
+  liquid equity markets \citeBouchaud.
+  \item \emph{Effect on strategy.} Any model using a single
+  average arrival rate (Avellaneda--Stoikov, Glosten--Milgrom,
+  Roll) is making a Poisson approximation. It is harmless for
+  coarse reasoning; wrong for burst handling. Practical
+  strategies use either a short-window rolling average intensity
+  (cheap, most of the benefit) or a Hawkes estimator (more
+  complex, slightly better burst response).
+\end{itemize}
+
+Clustering matters in two places the book will treat
+elsewhere: market making and mean reversion.
+
+In market making, a burst of same-side aggressive flow signals
+that you are about to be \emph{picked off} on the opposite side:
+more flow on the same side is coming, and your resting quote
+looks stale. A good maker widens, skews, or cancels the at-risk
+side. All three depend on recognising the burst quickly; a
+rolling Hawkes-style intensity estimate is the standard trigger.
+\Cref{ch:market_making} shows how the Avellaneda--Stoikov
+arrival-intensity $\arrate$ is in practice an estimator of this
+instantaneous rate, even though the original \citeAS{}
+derivation assumed constant rate.
+
+In mean-reversion and stat arb, clustering matters for the
+opposite reason: Roll (\cref{ch:spreads_roll}) assumed iid
+trade-direction signs, and most pairs-trading P\&L analysis
+assumes iid residual shocks. Clustered direction violates iid:
+a naive variance estimator under-reports residual variance
+because shocks bunch rather than average out. Failing to
+correct is a standard cause of ``backtested Sharpe $3$, live
+$0.8$'' surprises. \Cref{ch:mean_reversion_ou} flags this in the
+Ornstein--Uhlenbeck context.
+
+\begin{historybox}[title={Hawkes, seismology, and the migration to finance}]
+Hawkes introduced the self-exciting point process in 1971
+\citep{hawkes1971spectra} for \emph{aftershocks}: an earthquake
+raises the probability of another in the same region for hours
+or days. The exponentially-decaying kernel in \cref{eq:hawkes}
+captured the empirical decay: each earthquake is a ``parent''
+generating a Poisson number of ``aftershock children'', each
+child can generate its own aftershocks, and stationarity requires
+the expected children per parent (branching ratio
+$\alpha/\beta$) below one. The order-flow analogy was noticed in
+the mid-2000s: trade arrivals look like aftershocks on a
+seismograph. Bacry, Delattre, Hoffmann, and Muzy were among the
+first to calibrate Hawkes processes to HF financial data, and by
+the late 2010s a Hawkes kernel somewhere in the stack was
+standard on sell-side HFT desks. Quant trading has always
+imported tools from other data-rich sciences --- signal
+processing, ML, fluid dynamics, and here, seismology.
+\end{historybox}
+
+\section{Latency economics}
+\label{sec:latency}
+
+Everything so far --- OFI, queue position, intensity estimation
+--- has a clock attached. OFI is computed over hundreds of
+milliseconds; queue position changes on the timescale of
+individual orders; Hawkes kicks decay over seconds. If your
+trading loop runs slower than those clocks, you are reading
+stale state.
+
+\subsection{What latency is, and what it isn't}
+
+\begin{definition}[Latency]
+\index{latency|textbf}
+\label{def:latency}
+The \textbf{latency} of a trading system is the wall-clock time
+between a triggering event on the exchange and the trader's
+response being acted on at the matching engine. It decomposes
+into (i) \emph{market-data latency} (event to decision module),
+(ii) \emph{decision latency} (strategy code computing an action),
+(iii) \emph{order-entry latency} (action reaching and being
+sequenced by the matching engine).
+\end{definition}
+
+The three numbers are measured separately because each has its
+own cost structure. Market-data latency is dominated by network
+propagation and matching-engine publish pipelines; decision
+latency is a software problem; order-entry latency is again
+network and, on exchanges that allow it, FPGA. On modern US
+equity exchanges each component is in microseconds; Prosperity
+intentionally removes latency competition by simulating
+discrete ticks.
+
+Every signal in this chapter is \emph{time-stamped} and valid
+only for a short window. If OFI over the past $200$\,ms predicts
+the next $200$\,ms, a strategy taking $300$\,ms to compute and
+send an order arrives too late. If a fill-priority quote must
+be posted within a few milliseconds of the level becoming
+attractive, a $10$\,ms round-trip loses all the queue value
+\cref{sec:queue} just priced at $6\times$.
+
+\subsection{Cost-benefit of speed}
+
+Latency-reduction costs are lumpy. In descending order on a real
+desk:
+
+\begin{itemize}
+  \item \textbf{Colocation.} Rent rack space in the exchange's
+  data centre so market data and order entry traverse a short
+  local network instead of the open Internet. A rack at a major
+  US exchange costs tens of thousands per month; saving is the
+  end-to-end latency to your alternative site: $10$--$50$\,ms on
+  US-east-coast-to-east-coast, $50$--$200$\,ms intercontinental.
+  \item \textbf{FPGA order entry.} Replacing a software path
+  (microseconds of kernel/NIC overhead) with hardware (hundreds
+  of nanoseconds) saves $1$--$5\,\mu$s per round trip. Cost:
+  specialised hardware and FPGA engineers. Only shops fighting
+  for explicit speed rank do this.
+  \item \textbf{Optical fibre routes.} The Chicago--New-Jersey
+  fibre project (Spread Networks, 2010) shaved $\sim 3$\,ms off
+  the round trip between CME and NASDAQ versus incumbent telecom
+  routes, used by a few HFT firms before microwave and laser
+  relays surpassed it. Construction ran into the hundreds of
+  millions for that $3$\,ms saving.
+\end{itemize}
+
+Benefits decompose along three axes: (i) better queue position
+(you post first), (ii) fewer stale-quote fills (you cancel
+before pickoff), (iii) ability to act on faster-decaying signals
+(OFI on shorter windows has larger slope). ``How fast do I need
+to be?'' has no universal answer; it depends on who else is in
+the product.
+
+\begin{pitfallbox}[Latency is a second-derivative game]
+The common mistake is treating latency as an arms race to be
+the absolute fastest. What matters is whether you are slow
+enough to be \emph{picked off} by the faster traders in the
+same product. If the fastest HFT has a $10\,\mu$s round trip
+and you have $25\,\mu$s, the $15\,\mu$s gap lets them consume
+your stale quote before you update. You lose on every signal
+flip. At $10\,\mu$s vs $12\,\mu$s, the gap is two microseconds
+and the HFT usually cannot exploit it before you react.
+
+The damage function is nonlinear in the latency gap: last to
+middle of the pack is worth more than middle to first. A
+$10\,\mu$s improvement can save a strategy; a $1$\,ms
+improvement rarely matters outside explicit latency-arb.
+The question is not ``am I the fastest?'' but ``am I fast
+enough that nobody can systematically pick me off?''. On
+Prosperity, which fixes tick granularity and processes all bots
+simultaneously, the question does not arise; on real venues it
+is the difference between a profitable and unprofitable
+market-making book.
+\end{pitfallbox}
+
+\Cref{ch:market_making} closes the loop: Avellaneda--Stoikov
+treats arrival intensity $\arrate$ as a parameter tuned by the
+trader's own latency. A slower trader assumes a lower effective
+arrival rate (slow quotes get fewer fills) and quotes wider to
+break even. Latency is one of the inputs to market-making theory,
+not a separate topic.
+
+\section{Putting it together: an OFI-driven trading loop}
+\label{sec:together}
+
+A single picture connects the four sections before the summary:
+
+\begin{enumerate}
+  \item \textbf{Maintain the book and the top-of-book
+  quantities.} Every tick, record the current $\bidp$, $\askp$,
+  $Q_b$, $Q_a$, and microprice
+  $\mprice = \midp + (\rho - \tfrac{1}{2})\spreads$.
+  \item \textbf{Compute OFI over a rolling window.} For the last
+  $\Delta t$ of order-book events, accumulate the signed
+  contributions of \cref{def:ofi}. This is a single running
+  sum; it is trivial in code.
+  \item \textbf{Estimate the instantaneous arrival rate.} Over
+  the same window, count aggressive events. A simple
+  exponentially-weighted moving average of the count is an
+  adequate proxy for the Hawkes intensity for most practical
+  purposes.
+  \item \textbf{Derive a short-horizon fair value.} The
+  preferred estimator is the microprice, optionally shifted by
+  $\beta \cdot \mathrm{OFI}$ for a few seconds of look-ahead.
+  This is the ``fair value'' that later chapters will refer to
+  when they write ``quote around fair value'' in a
+  market-making algorithm.
+  \item \textbf{Act subject to queue constraints.} Before
+  cancelling a resting order, check its queue position;
+  back-of-queue orders have low fill value and can be moved
+  cheaply, front-of-queue orders hold edge and should only be
+  moved when the signal change is larger than the cost of
+  losing queue credit.
+  \item \textbf{Bound every step by latency.} Each of the above
+  reads a time-stamped piece of state. If the wall-clock time
+  between observation and action exceeds the timescale over
+  which the signal is valid, the output is actively
+  misleading; better to not act at all than to act on stale
+  OFI. The latency budget is as much a part of the algorithm as
+  the signal itself.
+\end{enumerate}
+
+The shape: a high-frequency inner loop feeding a strategy-level
+outer loop. The outer loop is the market-maker or stat-arb
+trader (\cref{ch:market_making} onwards); the inner loop is
+shared infrastructure across every HFT strategy in the book.
+Two strategies with identical outer loops can have radically
+different P\&L because one has a better inner loop. That is what
+``trading infrastructure'' means in practice.
+
+\begin{prosperitybox}
+An OFI-based alpha is easy to prototype on Prosperity's KELP
+product (Prosperity 3's trending fish price). Each
+\texttt{TradingState} tick exposes \texttt{order\_depths};
+differencing consecutive ticks gives $\Delta Q_b$ and
+$\Delta Q_a$, and the Trader can accumulate OFI over the last
+five ticks. Synthetic tests on Prosperity-style KELP data with
+moderate autocorrelation in aggressive-side flow show the sign
+of rolling OFI agrees with the next-tick mid change around
+$70\%$ of the time --- well above the $50\%$ coin flip. Because
+KELP is \emph{trending} (unlike mean-reverting
+RAINFOREST\_RESIN), the natural strategy is \emph{directional
+following}: take the side indicated by positive OFI, exit on OFI
+sign flip or position limit. This is exactly the structure the
+Frankfurt Hedgehogs used on KELP in their Prosperity 3 run, and
+it produced the bulk of their KELP P\&L.
+\end{prosperitybox}
+
+\begin{gsbox}
+On a sell-side Goldman equities HFT desk, OFI is the dominant
+short-horizon alpha signal and one of the first features every
+new strat builds from tick data. Two production uses:
+
+\begin{itemize}
+  \item \textbf{Systematic internaliser (SI) routing.} When
+  Goldman receives a client equity order above a size threshold,
+  the SI engine chooses between filling from Goldman's book
+  (``internalise'') or routing to an exchange. The decision
+  depends on whether the short-horizon expected move ---
+  estimated from OFI and related signals --- is larger than the
+  internalisation fee. If OFI says the market is about to rally,
+  the engine prefers to fill from inventory at the current mid
+  rather than pay up on the open market.
+  \item \textbf{Execution algos.} In-house VWAP, TWAP, and
+  implementation-shortfall algorithms consult real-time OFI when
+  scheduling the next child order. In high-positive-OFI windows,
+  a buy child is held back (price drifting against the client;
+  wait); in negative-OFI windows, accelerated (price coming to
+  you). ``Improve the OFI estimator'' is a common junior-strat
+  project.
+\end{itemize}
+
+Hasbrouck \citeHasbrouck{} gives the econometric framing: the
+signed trade series (or OFI) is treated as a covariance-stationary
+process whose impulse response on the mid is the quantity of
+interest; the research question is robust estimation of that
+impulse response. This framing --- and VAR-style decompositions of
+price and trade series --- is a standard interview topic for
+equities-desk strat placements.
+\end{gsbox}
+
+\section{Key facts to memorise}
+\label{sec:ch7_summary}
+
+\begin{itemize}
+  \item \textbf{Order-flow imbalance} is the net signed
+  top-of-book depth change over a short window:
+  $\mathrm{OFI} = \Delta Q_b - \Delta Q_a$, positive for buy
+  pressure and negative for sell pressure. It is the workhorse
+  short-horizon return predictor.
+  \item \textbf{OFI--return regression.} Over sub-minute
+  windows, $\Delta \midp \approx \beta \cdot \mathrm{OFI}$ with
+  positive slope $\beta$. Typical $R^2$ is a few percent, which
+  is enormous by short-horizon alpha standards.
+  \item \textbf{Microprice $\equiv$ OFI.} The microprice
+  equals $\midp + (\rho - 1/2)\spreads$ where
+  $\rho = Q_b/(Q_a+Q_b)$. Its change over a short window is
+  $\mathrm{OFI}$. The two signals are the same object at
+  different time scales.
+  \item \textbf{Queue position carries a factor-of-six value
+  premium.} Front-of-queue expected fill value is about
+  $0.30$ ticks per minute versus $0.05$ at the back under
+  representative fill probabilities ($60\%$ vs $10\%$); the
+  ratio is six, on the same instrument at the same price.
+  \item \textbf{Cancelling destroys queue credit.} Cancel-and-repost
+  only makes sense if expected gain exceeds lost queue value.
+  Hence ``stay in the queue'' is the universal passive-MM maxim.
+  \item \textbf{Arrivals are clustered, not Poisson.} Hawkes
+  (1971) self-exciting processes,
+  $\lambda(t) = \mu + \sum_{t_i < t} \phi(t - t_i)$, are the
+  standard model. The branching ratio $\alpha/\beta < 1$ is the
+  stationarity condition; modern liquid equity markets sit
+  close to criticality.
+  \item \textbf{Latency is nonlinear in its effect.} Being
+  $10\,\mu$s slower than the fastest HFT on a venue can
+  destroy a market-making strategy via pickoff; being
+  $1$\,ms slower is usually survivable outside of explicit
+  latency-arb plays. The question is never ``am I the
+  fastest?''; it is ``am I fast enough to avoid being picked
+  off?''
+  \item \textbf{Every model using a single arrival rate is making
+  a Poisson approximation.} That includes Glosten--Milgrom, Roll,
+  and Avellaneda--Stoikov. Acceptable for coarse reasoning; in
+  production, replace with a rolling intensity estimate.
+  \item \textbf{The inner trading loop.} Maintain the book,
+  compute OFI, estimate an intensity, form a microprice-based
+  fair value, respect queue constraints, and bound every step
+  by latency. This inner loop is common infrastructure across
+  the market-making and alpha strategies in the rest of the
+  book.
+\end{itemize}
+
+\bigskip
+
+This chapter closes Part II. \Cref{ch:spreads_roll,ch:kyle_gm,ch:market_impact}
+gave \emph{cross-sectional} results --- why spreads exist, how
+information reaches prices, how impact scales with size; this
+chapter added the \emph{time-series} layer: how flow looks on a
+clock, what short-horizon signal it carries, what constraints the
+clock imposes. Part III turns to strategies that use them,
+starting with market making in \cref{ch:market_making}, where
+Avellaneda--Stoikov stitches together the spread economics of
+\cref{ch:spreads_roll}, the inventory risk of \cref{ch:kyle_gm},
+the impact model of \cref{ch:market_impact}, and the OFI / queue
+/ latency infrastructure of this chapter
+into a single optimisation.
