@@ -61,18 +61,61 @@ You do not need all of them for every project; the tree is a menu, not a checkli
 \label{fig:feature-taxonomy}
 \end{figure}
 
+Figure~\ref{fig:feature-pipeline} shows how raw market data flows through the feature engineering pipeline into the model.
+Every feature must pass through the temporal alignment gate: it can only use data available at or before time $t$ to predict the target at time $t+1$.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  pipeblock/.style={draw, rounded corners, minimum height=1.2cm, minimum width=2.8cm, align=center, font=\small},
+  arrow/.style={-{Stealth[length=2.5mm]}, thick},
+  node distance=0.6cm
+]
+% Row 1: data sources
+\node[pipeblock, fill=defblue!10] (raw) {Raw Data\\{\footnotesize ticks, OHLCV,}\\{\footnotesize options, news}};
+\node[pipeblock, fill=keyorange!10, right=of raw] (compute) {Compute\\Features\\{\footnotesize RV, RQ, IV,}\\{\footnotesize OBI, sentiment}};
+\node[pipeblock, fill=warnred!10, right=of compute] (align) {Temporal\\Alignment\\{\footnotesize no lookahead}\\{\footnotesize bias gate}};
+\node[pipeblock, fill=intgreen!10, right=of align] (transform) {Transform\\{\footnotesize log, frac-diff,}\\{\footnotesize standardize}};
+\node[pipeblock, fill=examteal!10, right=of transform] (model) {Model\\Input\\$\bX \in \R^{T \times p}$};
+
+% Arrows
+\draw[arrow] (raw) -- (compute);
+\draw[arrow] (compute) -- (align);
+\draw[arrow] (align) -- (transform);
+\draw[arrow] (transform) -- (model);
+
+% Annotations
+\node[below=0.4cm of align, font=\scriptsize\itshape, align=center, warnred] {Features at time $t$\\use only data $\leq t$};
+\end{tikzpicture}
+\caption{Feature engineering pipeline. Raw market data is processed into features, passed through a temporal alignment gate to prevent lookahead bias, transformed for stationarity, and assembled into the model input matrix $\bX$.}
+\label{fig:feature-pipeline}
+\end{figure}
+
 % ──────────────────────────────────────────────────────────────
 \section{Lagged RV Transforms}\label{sec:feat-lagged-rv}
 % ──────────────────────────────────────────────────────────────
 
 The single most predictive feature for tomorrow's realized volatility is yesterday's realized volatility.
-The HAR model (Chapter~\ref{ch:har}) already exploits this by using three horizons:
+The HAR model (Chapter~\ref{ch:har}) already exploits this by using three horizons that smooth RV over different lookback windows:
 
 \begin{align}
 \RV_t^{(d)} &= \RV_t, \label{eq:rv-d}\\
 \RV_t^{(w)} &= \frac{1}{5}\sum_{i=0}^{4} \RV_{t-i}, \label{eq:rv-w}\\
 \RV_t^{(m)} &= \frac{1}{22}\sum_{i=0}^{21} \RV_{t-i}. \label{eq:rv-m}
 \end{align}
+\begin{itemize}[nosep]
+  \item $\RV_t^{(d)}$: daily RV, the single most recent observation.
+  \item $\RV_t^{(w)}$: weekly RV, the average of the past 5 trading days.
+  \item $\RV_t^{(m)}$: monthly RV, the average of the past 22 trading days.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+These three features capture volatility at different ``speeds.'' Daily RV tells you what happened today. Weekly RV smooths out day-to-day noise to reveal the recent trend. Monthly RV captures the slow-moving baseline level. By including all three, you give the model a short-term, medium-term, and long-term view of volatility, which is why HAR works so well despite being a simple linear model.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+These three features are the columns your HAR baseline consumes. Every ML model you build should include $\log \RV_t^{(d)}$, $\log \RV_t^{(w)}$, and $\log \RV_t^{(m)}$ as core inputs. The goal of fancier feature engineering is to add value on top of these, not to replace them. If an ML model cannot beat HAR using only these three features, the extra complexity is not justified.
+\end{projectconnection}
 
 These three variables alone explain roughly 40--60\% of the variation in next-day log-RV for equity indices.
 For ML models, you should include all three, but also consider the following transforms.
@@ -128,6 +171,14 @@ Under standard diffusion assumptions, $\operatorname{RQ}_t \xrightarrow{p} \int_
   \item The factor $n/3$ provides the correct asymptotic scaling.
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+Realized quarticity measures how ``wild'' the intraday price path was. By raising each return to the fourth power, extreme moves dominate the sum. A day with one large intraday swing followed by calm will have high RQ even if overall RV is moderate. In short, RQ tells you how much you should trust today's RV number: high RQ means the RV estimate is noisy and unreliable.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include $\sqrt{\operatorname{RQ}_t}$ as a standalone feature column. It serves double duty: (1) tree models can learn to split on it, effectively down-weighting noisy RV days the way HARQ does analytically, and (2) it provides a data-quality signal that no other feature captures. On days where RQ is elevated, your forecast should lean more on the stable weekly and monthly averages.
+\end{projectconnection}
+
 \textbf{Why RQ matters for feature engineering.}
 The asymptotic variance of $\RV_t$ is proportional to $\operatorname{RQ}_t$.
 When RQ is high, today's RV number is unreliable.
@@ -142,6 +193,10 @@ The product $\RV_t^{(d)} \cdot \sqrt{\operatorname{RQ}_t}$ is itself a feature.
 When $\operatorname{RQ}_t$ is large, the interaction term pulls the effective weight on daily RV toward zero, letting the more stable weekly and monthly averages dominate the forecast.
 For ML models, include both $\RV_t^{(d)}$ and $\sqrt{\operatorname{RQ}_t}$ as separate columns; the tree or network can learn the interaction without you specifying it.
 \end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+The HARQ interaction feature is the single most important extension beyond baseline HAR for your project. \citet{BollerslevPattonQuaedvlieg2016HARQ} show it improves QLIKE by 5--15\% across equity indices. For your ML pipeline, you do not need to hard-code the interaction: include $\RV_t^{(d)}$, $\RV_t^{(w)}$, $\RV_t^{(m)}$, and $\sqrt{\operatorname{RQ}_t}$ as four separate columns and let gradient-boosted trees or neural networks discover the interaction automatically.
+\end{projectconnection}
 
 \begin{workedexample}{Computing RQ}
 With $n = 78$ five-minute returns and $\sum r_{t,i}^4 = 5.2 \times 10^{-12}$:
@@ -164,11 +219,25 @@ Negative returns drive future volatility up more than positive returns of the sa
 Several features capture this asymmetry directly from high-frequency data.
 
 \textbf{Realized semivariances.}
-Split intraday returns by sign:
+To separate the contribution of upward and downward price moves to total volatility, we split intraday returns by sign:
 \begin{align}
 \RV_t^+ &= \sum_{i=1}^{n} r_{t,i}^2 \,\mathbf{1}(r_{t,i} > 0), \label{eq:rs-plus}\\
 \RV_t^- &= \sum_{i=1}^{n} r_{t,i}^2 \,\mathbf{1}(r_{t,i} < 0). \label{eq:rs-minus}
 \end{align}
+\begin{itemize}[nosep]
+  \item $\RV_t^+$: realized semivariance from positive returns (``good volatility'').
+  \item $\RV_t^-$: realized semivariance from negative returns (``bad volatility'').
+  \item $\mathbf{1}(\cdot)$: indicator function selecting returns of the specified sign.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Total RV treats a 2\% up-move and a 2\% down-move identically. Semivariances break this symmetry. $\RV^-$ isolates the volatility coming from declines, which is the part that matters most for risk management and future vol prediction. $\RV^+$ captures the ``calm'' upside moves. Keeping them separate lets a model learn that a day dominated by selling pressure has different forecasting implications than a day dominated by buying.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include $\RV_t^-$ and $\RV_t^+$ (and their weekly/monthly averages) as separate feature columns. The SHAR baseline already uses them, so your ML model needs them to at least match SHAR performance. Empirically, $\RV_t^-$ carries roughly twice the predictive weight of $\RV_t^+$, so if you must prune features, keep $\RV_t^-$ and drop $\RV_t^+$ before dropping other features.
+\end{projectconnection}
+
 By construction, $\RV_t = \RV_t^+ + \RV_t^-$ (ignoring zero returns).
 The SHAR model in Chapter~\ref{ch:har} uses $\RV_t^+$ and $\RV_t^-$ as separate regressors, allowing different persistence for up-moves and down-moves.
 
@@ -185,7 +254,19 @@ J_t^+ = \sum_{i} r_{t,i}^2 \,\mathbf{1}(r_{t,i} > 0,\; |r_{t,i}| > \theta_t), \q
 J_t^- = \sum_{i} r_{t,i}^2 \,\mathbf{1}(r_{t,i} < 0,\; |r_{t,i}| > \theta_t),
 \end{equation}
 where $\theta_t$ is an intraday jump threshold (e.g., from Lee-Mykland, Chapter~\ref{ch:jumps}).
-Negative jumps are substantially more predictive of future volatility than positive jumps.
+\begin{itemize}[nosep]
+  \item $J_t^+$: squared returns from large positive moves exceeding the jump threshold.
+  \item $J_t^-$: squared returns from large negative moves exceeding the jump threshold.
+  \item $\theta_t$: intraday threshold distinguishing jumps from continuous price variation.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Signed jumps isolate the extreme tail events and ask: did the big intraday moves come from sudden rallies or sudden crashes? A day dominated by negative jumps (a flash crash, a surprise rate hike) behaves very differently from a day dominated by positive jumps (a short squeeze, a surprise earnings beat). Splitting jumps by sign gives the model a finer-grained view of tail risk than total jump variation alone.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Add $J_t^-$ as a feature column. Negative jumps are substantially more predictive of future volatility than positive jumps. In HAR-CJ extensions, including $J_t^-$ separately improves QLIKE by 1--3\%. For your ML model, this asymmetric jump signal complements the semivariance features and is especially valuable during turbulent periods when jump activity clusters.
+\end{projectconnection}
 
 \textbf{Realized semicovariances.}
 \citet{BollerslevLiPattonQuaedvlieg2020} extend semivariances to the multivariate case, computing covariances conditional on the sign of the market return.
@@ -197,16 +278,33 @@ The mechanism is mechanical, not behavioral: a short gamma position that loses m
 Features that isolate this downside channel capture a structural driver, not a statistical accident.
 \end{intuition}
 
+\begin{projectconnection}[Why This Matters]
+The asymmetry between positive and negative moves is one of the strongest and most robust findings in the volatility literature. For your project, always compute signed versions of your features: $\RV_t^-$ vs.\ $\RV_t^+$, $J_t^-$ vs.\ $J_t^+$, and (if using multivariate features) downside semicovariances. This costs you nothing in terms of data requirements but gives tree models a clean split variable to identify leverage-effect regimes.
+\end{projectconnection}
+
 % ──────────────────────────────────────────────────────────────
 \section{Higher Moments}\label{sec:feat-moments}
 % ──────────────────────────────────────────────────────────────
 
-Realized skewness and kurtosis can be computed from intraday returns in the obvious way:
+Realized skewness and kurtosis measure the shape of the intraday return distribution. They are computed from higher powers of intraday returns:
 
 \begin{align}
 \operatorname{RSkew}_t &= \frac{\frac{1}{n}\sum_{i=1}^{n} r_{t,i}^3}{\left(\frac{1}{n}\sum_{i=1}^{n} r_{t,i}^2\right)^{3/2}}, \label{eq:rskew}\\[6pt]
 \operatorname{RKurt}_t &= \frac{\frac{1}{n}\sum_{i=1}^{n} r_{t,i}^4}{\left(\frac{1}{n}\sum_{i=1}^{n} r_{t,i}^2\right)^{2}}. \label{eq:rkurt}
 \end{align}
+\begin{itemize}[nosep]
+  \item $\operatorname{RSkew}_t$: realized skewness, measuring asymmetry of intraday returns (negative = more large down-moves).
+  \item $\operatorname{RKurt}_t$: realized kurtosis, measuring tail heaviness (higher = more extreme moves relative to typical).
+  \item Both are normalized by powers of RV so they are scale-free.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Realized skewness tells you whether today's intraday price action was lopsided: a very negative value means the big moves were predominantly downward. Realized kurtosis tells you whether the price path had fat tails: a high value means there were extreme intraday swings relative to the typical move size. Together they describe the ``shape'' of intraday price behavior beyond just its level (RV) and sign (semivariances).
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include realized skewness and kurtosis in your initial feature set, but expect them to rank low in importance. Their main value is as regime-conditioning variables: when realized skewness is very negative, the model may learn that volatility persistence changes. Tree models can use them as split variables to identify stress regimes even if their linear predictive power is weak.
+\end{projectconnection}
 
 \begin{warning}[Modest Predictive Power]
 Realized skewness and kurtosis are noisy estimators and have shown only modest incremental forecasting power for next-day RV in most studies.
@@ -226,19 +324,42 @@ Wider spreads predict higher near-term volatility.
 Use the time-weighted average spread across the observation window.
 
 \textbf{Order book imbalance (OBI).}
+The balance of resting orders on each side of the book reveals directional pressure. OBI formalizes this:
 \begin{equation}\label{eq:obi}
 \text{OBI}_t = \frac{V_t^{\text{bid}} - V_t^{\text{ask}}}{V_t^{\text{bid}} + V_t^{\text{ask}}},
 \end{equation}
-where $V^{\text{bid}}$ and $V^{\text{ask}}$ are the total visible volume at the best bid and ask.
-OBI ranges from $-1$ (all volume on the ask side, selling pressure) to $+1$ (all on the bid, buying pressure).
-Extreme OBI in either direction predicts short-term price moves and, through the signed-volatility channel, future volatility.
+\begin{itemize}[nosep]
+  \item $V_t^{\text{bid}}$: total visible volume resting at the best bid price.
+  \item $V_t^{\text{ask}}$: total visible volume resting at the best ask price.
+  \item OBI ranges from $-1$ (all volume on the ask side) to $+1$ (all on the bid side).
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+OBI measures who is more eager to trade. When there is much more volume resting on the bid side than the ask, buyers are providing liquidity and the price is likely to tick up (or at least not fall). When ask-side volume dominates, sellers are in control. Extreme imbalance in either direction signals one-sided pressure that tends to resolve through a price move, and price moves create volatility.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+If you are working with tick-level data (e.g., Optiver-style competitions or LOB snapshots), OBI is one of the strongest short-horizon features. Compute time-weighted OBI over your observation window and include it as a feature column. The absolute value $|\text{OBI}_t|$ is often more useful than signed OBI for volatility forecasting, since extreme imbalance in either direction predicts elevated vol.
+\end{projectconnection}
 
 \textbf{Weighted average price (WAP) log returns.}
-The WAP blends bid and ask prices weighted by the opposite side's volume:
+The WAP blends bid and ask prices, weighting each side by the opposite side's depth to reflect where the ``true'' price likely sits:
 \begin{equation}\label{eq:wap}
 \text{WAP}_t = \frac{p_t^{\text{bid}} \cdot V_t^{\text{ask}} + p_t^{\text{ask}} \cdot V_t^{\text{bid}}}{V_t^{\text{bid}} + V_t^{\text{ask}}}.
 \end{equation}
-Log returns computed from WAP rather than mid-price can be less noisy because they account for the current shape of the book.
+\begin{itemize}[nosep]
+  \item $p_t^{\text{bid}}, p_t^{\text{ask}}$: best bid and ask prices.
+  \item $V_t^{\text{bid}}, V_t^{\text{ask}}$: volume at the best bid and ask.
+  \item The cross-weighting pulls WAP toward the side with less volume (where the next fill is more likely).
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+The simple midprice treats both sides of the book equally, but if there are 10,000 shares on the bid and only 100 on the ask, the next trade is far more likely to happen at the ask. WAP accounts for this asymmetry by weighting each price by the opposite side's volume, pulling the estimated fair value toward the thinner side of the book. Returns computed from WAP are less contaminated by bid-ask bounce.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+When computing RV from LOB data, use WAP-based log returns rather than midprice returns as your raw input. This reduces microstructure noise at the source, before any noise-robust estimator is applied, giving you a cleaner RV target and cleaner lagged-RV features. Top Optiver competition solutions all used WAP returns for exactly this reason.
+\end{projectconnection}
 
 \begin{figure}[ht]
 \centering
@@ -286,11 +407,22 @@ Log returns computed from WAP rather than mid-price can be less noisy because th
 \end{figure}
 
 \textbf{Price acceleration.}
-Compute the log return of the log return:
+Beyond first-order returns, the second difference of log-prices captures changes in momentum within the observation window:
 \begin{equation}\label{eq:price-accel}
 a_{t,i} = \Delta \log(\text{WAP}_{t,i}) - \Delta \log(\text{WAP}_{t,i-1}).
 \end{equation}
-This second-difference feature captures momentum shifts within the observation window and was heavily used in top Optiver competition solutions.
+\begin{itemize}[nosep]
+  \item $\Delta \log(\text{WAP}_{t,i})$: the log return between consecutive WAP observations at times $i-1$ and $i$.
+  \item $a_{t,i}$: the change in the log return, analogous to acceleration in physics.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+If the price was falling and then starts falling faster, that is negative acceleration. If the price was falling and then slows down, that is positive acceleration (deceleration). Aggregating the magnitude of these acceleration values over a window captures how ``jerky'' the price path is. A smooth trending market has low acceleration; a choppy market with rapid reversals has high acceleration. This jerkiness is a leading indicator of near-term volatility.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+For tick-level or LOB-based projects, include the standard deviation or sum of squared accelerations over the observation window as a feature column. This was one of the highest-importance features in top Optiver competition solutions. It captures information orthogonal to RV (which uses only first differences), providing the model with a signal about momentum instability that raw RV misses.
+\end{projectconnection}
 
 \textbf{Volume profiles.}
 Aggregate volume into time buckets (e.g., 2-minute bins within a 10-minute window).
@@ -310,12 +442,23 @@ Always recalibrate when switching asset classes.
 \subsection{Microprice and Volume Features}\label{sec:feat-microprice}
 
 The simple midprice $(P_{\text{bid}} + P_{\text{ask}})/2$ assigns equal weight to both sides of the book regardless of depth.
-The \textbf{microprice} \citep{CarteaJaimungalPenalva2015} corrects for order-book imbalance:
+The \textbf{microprice} \citep{CarteaJaimungalPenalva2015} corrects for order-book imbalance by shifting the estimated fair value toward the thinner side of the book:
 \begin{equation}\label{eq:microprice}
   S^*_t = \frac{V_t^{\text{ask}} \cdot P_t^{\text{bid}} + V_t^{\text{bid}} \cdot P_t^{\text{ask}}}{V_t^{\text{bid}} + V_t^{\text{ask}}}.
 \end{equation}
-When bid volume dominates (buyers are eager), the microprice shifts toward the ask (fair value is higher).
-Computing returns from microprice rather than midprice reduces bid-ask-bounce noise in your RV estimate without needing a formal noise-robust estimator.
+\begin{itemize}[nosep]
+  \item $P_t^{\text{bid}}, P_t^{\text{ask}}$: best bid and ask prices.
+  \item $V_t^{\text{bid}}, V_t^{\text{ask}}$: total visible volume at the best bid and ask.
+  \item When bid volume dominates, the microprice shifts toward the ask (fair value is higher).
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+The microprice is essentially the same idea as WAP. Both weight the bid price by ask volume and vice versa. The key insight is that the side of the book with more resting volume is ``cheaper'' to trade against, so the true fair value sits closer to the other side. The microprice is a better estimate of where the next trade will actually occur than the simple midprice.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+For microstructure-level projects, the deviation $|S^* - S_{\text{mid}}|$ between microprice and midprice is itself a useful feature: it measures how asymmetric the book is. Large deviations indicate one-sided pressure that often precedes short-term volatility. Use microprice returns rather than midprice returns as the basis for computing short-horizon RV targets.
+\end{projectconnection}
 
 \textbf{Volume features.}
 Daily trading volume is highly correlated with daily volatility.
@@ -333,6 +476,10 @@ The intuition: volume spikes reflect new information arriving (earnings whispers
 Include at least one volume feature in any feature set.
 \end{keyidea}
 
+\begin{projectconnection}[Why This Matters]
+Add $\log(\text{volume}/\text{MA}_{20}\text{volume})$ as a feature column. It is easy to compute, available for any traded asset, and provides incremental predictive power beyond lagged RV. For microstructure-level projects, also include volume acceleration and the microprice-midprice deviation. These volume-based features are most valuable in the 1--2 day forecasting horizon where information arrival is actively resolving into price moves.
+\end{projectconnection}
+
 % ──────────────────────────────────────────────────────────────
 \section{Options-Implied Features}\label{sec:feat-options}
 % ──────────────────────────────────────────────────────────────
@@ -346,26 +493,58 @@ For forecasting 1-month RV, use the 30-day ATM IV.
 For daily RV, short-dated (weekly) options are more informative.
 
 \textbf{Skew (25-delta risk reversal).}
+The risk reversal measures the difference in implied volatility between out-of-the-money calls and puts at matched delta:
 \begin{equation}\label{eq:rr}
 \text{RR}_{25} = \IVol_{25\Delta\text{call}} - \IVol_{25\Delta\text{put}}.
 \end{equation}
-When the put is expensive relative to the call ($\text{RR}_{25} < 0$ for equities), the market is pricing crash risk.
-Steeper negative skew predicts higher future volatility, especially in the tails.
+\begin{itemize}[nosep]
+  \item $\IVol_{25\Delta\text{call}}$: implied volatility of the 25-delta call (out-of-the-money upside).
+  \item $\IVol_{25\Delta\text{put}}$: implied volatility of the 25-delta put (out-of-the-money downside).
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+The risk reversal tells you which side of the distribution the options market is more worried about. For equities, puts are almost always more expensive than calls (negative RR), reflecting the market's willingness to pay a premium for downside protection. When the skew becomes more negative than usual, the market is pricing in elevated crash risk. This forward-looking fear signal often precedes actual volatility increases.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include $\text{RR}_{25}$ as a feature column whenever options data is available. It captures tail-risk expectations that are invisible in price-based features. For your project, the level of skew and its recent change (5-day difference) are both informative: a sudden steepening of the skew predicts near-term vol spikes even when ATM IV has not yet moved.
+\end{projectconnection}
 
 \textbf{Term structure slope.}
+The slope of the IV term structure reveals whether the market expects volatility to increase or decrease over time:
 \begin{equation}\label{eq:ts-slope}
 \text{TS}_t = \IVol_t^{(3\text{m})} - \IVol_t^{(1\text{m})}.
 \end{equation}
-Normally this is positive (contango); when it inverts (backwardation), the market expects near-term turbulence to subside.
-An inverted IV term structure is a signal that a volatility spike is already priced in.
+\begin{itemize}[nosep]
+  \item $\IVol_t^{(3\text{m})}$: 3-month at-the-money implied volatility.
+  \item $\IVol_t^{(1\text{m})}$: 1-month at-the-money implied volatility.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Normally, longer-dated options cost more in vol terms because there is more time for uncertainty to accumulate (contango, $\text{TS} > 0$). When the term structure inverts ($\text{TS} < 0$), it means near-term IV exceeds longer-term IV, signaling that the market sees a current crisis that it expects to resolve. An inverted term structure is analogous to an inverted yield curve: it reflects stress in the near term that the market believes is temporary.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The term structure slope is a powerful regime indicator. Include it as a feature column and also consider its interaction with lagged RV. When TS is negative (backwardation), the market has already priced in a vol spike, so your model should dampen its vol-up forecasts. When TS is positive and rising, the market expects calm to continue. This feature is most useful at the 1-week to 1-month forecasting horizon where options have their largest informational advantage over realized measures.
+\end{projectconnection}
 
 \textbf{VRP proxy.}
-From Chapter~\ref{ch:vrp}:
+The variance risk premium measures the gap between what the options market expects and what actually materializes. From Chapter~\ref{ch:vrp}:
 \begin{equation}\label{eq:vrp-feat}
 \VRP_t = \frac{\text{VIX}_t^2}{10{,}000} - \E_t[\RV_{t+30}],
 \end{equation}
-where $\E_t[\RV_{t+30}]$ can be replaced by a trailing 30-day RV as a simple proxy.
-A large positive VRP indicates that the market is charging a high premium for variance protection, which tends to normalize, pulling future IV down.
+\begin{itemize}[nosep]
+  \item $\text{VIX}_t^2 / 10{,}000$: implied variance from VIX, annualized and scaled to match RV units.
+  \item $\E_t[\RV_{t+30}]$: expected realized variance over the next 30 days, approximated by trailing 30-day RV.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+VRP is the ``insurance premium'' the market charges for bearing volatility risk. When VRP is high, implied vol far exceeds realized vol, meaning options are expensive relative to what actually happens. This premium tends to mean-revert: when it is abnormally high, future implied vol is likely to fall (or realized vol is likely to rise) to close the gap. VRP captures information that neither lagged RV nor current IV alone provides.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+VRP is one of the strongest features for medium-horizon (1-week to 1-month) vol forecasting. Include it as a feature column using the simple proxy $\text{VIX}_t^2/10{,}000 - \RV_t^{(m)}$. Be careful about temporal alignment: the ``expected'' component must use only backward-looking data. Using a forward-looking RV estimate in the VRP proxy introduces lookahead bias. For Project 5 (VRP ML trader), this feature becomes the primary signal rather than just an input.
+\end{projectconnection}
 
 \textbf{VIX and VVIX.}
 The VIX itself is a feature for equity volatility.
@@ -378,6 +557,10 @@ Options-implied features are the only family that reflects the market's consensu
 When both are available, combining them almost always improves forecasts.
 The gains are largest at horizons beyond one week, where the informational advantage of options over recent realized quantities is greatest.
 \end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+For your project, the options-implied feature family (ATM IV, RR$_{25}$, TS slope, VRP, VVIX) provides the largest marginal improvement over HAR-family baselines. If you have access to options data, these features should be your first extension beyond the core lagged-RV set. At the 1-day horizon, the gain is modest (1--3\% QLIKE). At the 1-week and 1-month horizons, the gain can reach 5--10\% because options encode forward-looking information that lagged RV cannot.
+\end{projectconnection}
 
 % ──────────────────────────────────────────────────────────────
 \section{Cross-Asset Features}\label{sec:feat-cross}
@@ -408,6 +591,14 @@ S^H = \frac{\sum_{i \neq j} \theta_{ij}^H}{\sum_{i,j} \theta_{ij}^H} \times 100.
 \end{itemize}
 \end{definition}
 
+\begin{intuition}[In Plain English]
+The spillover index answers a simple question: what fraction of each asset's volatility is coming from other assets rather than from its own dynamics? When the index is high, markets are tightly coupled and a shock anywhere propagates everywhere. When the index is low, each asset's volatility is driven mainly by its own news. The index rises during crises (2008, COVID) and falls during calm, asset-specific regimes.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+For Project 3 (Multivariate RC with GNNs), the spillover index is a natural global feature. For single-asset forecasting, include the rolling spillover index and its 5-day change as feature columns. Rising connectedness warns that your single-asset model may face larger forecast errors because external shocks are more likely to contaminate your target asset's volatility. This signal helps a tree model adjust its forecasts during contagion regimes.
+\end{projectconnection}
+
 In practice, you compute the spillover index on a rolling window (200 trading days is typical) and include its level and change as features.
 Rising connectedness forecasts higher broad-market volatility.
 
@@ -425,11 +616,24 @@ Standard differencing ($\Delta^1$) removes long memory but also destroys the ver
 Fractional differencing provides a middle ground.
 
 \textbf{Fractional differencing.}
-Following \citet{LopezdePrado2018AFML} (Chapter 5), define the fractional difference operator:
+Standard first-differencing ($d=1$) achieves stationarity but destroys the long memory that makes volatility predictable. Fractional differencing lets you dial the differencing order to a non-integer value, preserving some memory while achieving stationarity. Following \citet{LopezdePrado2018AFML} (Chapter 5), define the fractional difference operator:
 \begin{equation}\label{eq:frac-diff}
 (1 - L)^d \, x_t = \sum_{k=0}^{\infty} \binom{d}{k} (-1)^k \, x_{t-k},
 \end{equation}
-where $L$ is the lag operator and $d \in (0,1)$ is the differencing order.
+\begin{itemize}[nosep]
+  \item $L$: the lag operator ($Lx_t = x_{t-1}$).
+  \item $d \in (0,1)$: the fractional differencing order (a continuous knob between ``no differencing'' and ``full differencing'').
+  \item $\binom{d}{k}$: generalized binomial coefficients that produce exponentially decaying weights on past values.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Fractional differencing is a weighted average of the current value and all past values, where the weights decay slowly for small $d$ and quickly for large $d$. At $d=0$, you keep the raw series (full memory, possibly non-stationary). At $d=1$, you get the standard first difference (stationary but memoryless). The trick is to find the smallest $d$ that makes the series stationary, because that value preserves the maximum amount of predictive long-range dependence while satisfying the stationarity assumptions that many ML models require.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Apply fractional differencing to $\log \RV_t$ with $d \approx 0.35$--$0.45$ and include the result as a feature column. This is especially important for linear models and neural networks that assume stationary inputs. Tree models are less sensitive to non-stationarity, but fractionally differenced log-RV can still help by making the signal cleaner. Use the grid-search approach described below to find the optimal $d$ for your specific dataset.
+\end{projectconnection}
+
 The binomial coefficients $\binom{d}{k}$ for non-integer $d$ are:
 \[
 \binom{d}{k} = \frac{d(d-1)(d-2)\cdots(d-k+1)}{k!}.
@@ -541,7 +745,19 @@ Extract it as:
 \begin{equation}\label{eq:event-implied-vol}
   \sigma_{\text{event}} = \sqrt{\frac{T_2\,\sigma_2^2 - T_1\,\sigma_1^2}{T_2 - T_1}}
 \end{equation}
-for expiries $T_1 < t_{\text{event}} < T_2$ bracketing the event.
+\begin{itemize}[nosep]
+  \item $T_1, T_2$: expiry times of two options that bracket the event ($T_1 < t_{\text{event}} < T_2$).
+  \item $\sigma_1, \sigma_2$: ATM implied volatilities for those expiries.
+  \item $\sigma_{\text{event}}$: the implied vol attributable to the event alone.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+This formula ``subtracts out'' the normal day-to-day volatility to isolate the extra uncertainty the market assigns to the event itself. The idea is that total implied variance over a period equals the sum of variances from individual days (roughly, under independence). By comparing two options that differ only in whether they include the event day, you can back out how much additional variance the event contributes.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Event-implied vol is a much richer feature than a binary event dummy. It tells your model not just that an FOMC meeting is happening, but how uncertain the market is about the outcome. Include $\sigma_{\text{event}}$ as a feature column on event days (and zero on non-event days). This feature requires options data but adds significant value for event-day forecasting, where binary dummies alone are too crude.
+\end{projectconnection}
 
 \textbf{Historical event-day RV ratios.}
 Compute the ratio $\text{RV}(\text{event day}) / \text{RV}(\text{surrounding days})$ historically for each event type.
@@ -551,6 +767,46 @@ Use these ratios as multiplicative adjustments to your baseline forecast on even
 \textbf{Days-to-next-event features.}
 Rather than a binary ``is today an event,'' encode continuous distance: $\text{days\_to\_FOMC}$, $\text{days\_since\_FOMC}$, $\text{days\_to\_earnings}$.
 This lets the model learn the anticipation buildup and post-event decay.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  font=\footnotesize,
+  dayblock/.style={draw, minimum width=1.8cm, minimum height=0.7cm, align=center},
+  arrow/.style={-{Stealth[length=2.5mm]}, thick},
+]
+% Timeline
+\draw[thick, ->] (0,0) -- (14,0) node[right]{\small Time};
+
+% Day markers
+\foreach \x/\lab in {1/t{-}2, 3.5/t{-}1, 6/t, 8.5/t{+}1, 11/t{+}2} {
+  \draw[thick] (\x, -0.15) -- (\x, 0.15);
+  \node[below] at (\x, -0.2) {$\lab$};
+}
+
+% Event marker
+\node[above, warnred, font=\footnotesize\bfseries] at (6, 0.2) {FOMC};
+\draw[warnred, thick] (6, 0) -- (6, 0.6);
+
+% Feature computation window (OK)
+\draw[intgreen, very thick, decorate, decoration={brace, amplitude=5pt, mirror}]
+  (0.5, -0.9) -- (3.5, -0.9) node[midway, below=6pt, intgreen, align=center] {Features known\\at $t{-}1$ \checkmark};
+
+% Forecast target
+\draw[defblue, very thick, decorate, decoration={brace, amplitude=5pt}]
+  (6, 0.8) -- (8.5, 0.8) node[midway, above=6pt, defblue, align=center] {Forecast target:\\$\RV_{t+1}$};
+
+% Lookahead violation
+\draw[warnred, very thick, decorate, decoration={brace, amplitude=5pt, mirror}]
+  (5, -0.9) -- (8.5, -0.9) node[midway, below=6pt, warnred, align=center] {Using data from $t$ or $t{+}1$\\in features = lookahead bias \texttimes};
+
+% Dashed line showing information boundary
+\draw[dashed, thick, keyorange] (3.5, -1.6) -- (3.5, 1.6);
+\node[keyorange, font=\scriptsize\bfseries, right] at (3.7, 1.4) {Information boundary};
+\end{tikzpicture}
+\caption{Temporal alignment for feature engineering. Features used to predict $\RV_{t+1}$ must be computed from data available at or before time $t{-}1$ (the close of trading on the day before the forecast is made). Using same-day or future data introduces lookahead bias. The orange dashed line marks the information boundary.}
+\label{fig:temporal-alignment}
+\end{figure}
 
 \begin{warning}[Look-Ahead Risk with Events]
 Earnings dates are announced approximately 2--4 weeks before the event.
@@ -603,14 +859,76 @@ MDA is model-agnostic and properly accounts for nonlinear interactions.
 For tree-based models, sum the impurity reduction (e.g., variance reduction for regression trees) across all splits that use a given feature.
 MDI is fast but biased: it favors high-cardinality features and features correlated with other important variables.
 
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[font=\small]
+% Horizontal bar chart of feature importance
+\def\barheight{0.35}
+\def\gap{0.55}
+
+% Feature names and importance values (illustrative)
+\foreach \i/\name/\val/\col in {
+  0/{$\log \RV_t^{(d)}$}/4.2/defblue,
+  1/{$\log \RV_t^{(w)}$}/3.5/defblue,
+  2/{$\sqrt{\operatorname{RQ}_t}$}/2.8/keyorange,
+  3/{$\log \RV_t^{(m)}$}/2.4/defblue,
+  4/{$\RV_t^-$}/2.1/intgreen,
+  5/{ATM IV}/1.7/examteal,
+  6/{VRP}/1.4/examteal,
+  7/{$\RV_t^+$}/1.0/intgreen,
+  8/{RR$_{25}$}/0.8/examteal,
+  9/{Volume ratio}/0.5/prereqpurple
+} {
+  \pgfmathsetmacro{\y}{-\i*\gap}
+  % Bar
+  \fill[\col!40] (0, \y-\barheight) rectangle (\val, \y+\barheight);
+  \draw[\col!80] (0, \y-\barheight) rectangle (\val, \y+\barheight);
+  % Label
+  \node[left, font=\footnotesize] at (-0.1, \y) {\name};
+  % Value
+  \node[right, font=\scriptsize] at (\val+0.1, \y) {\val};
+}
+
+% Axis
+\draw[thick, ->] (0, 0.5) -- (0, -5.2);
+\draw[thick, ->] (0, 0.5) -- (5, 0.5);
+\node[above, font=\footnotesize] at (2.5, 0.6) {Mean $|\phi_j|$ (SHAP importance)};
+
+% Legend
+\fill[defblue!40] (5.5, -0.2) rectangle (6.0, 0.2);
+\node[right, font=\scriptsize] at (6.1, 0) {Lagged RV};
+\fill[keyorange!40] (5.5, -0.8) rectangle (6.0, -0.4);
+\node[right, font=\scriptsize] at (6.1, -0.6) {Noise (RQ)};
+\fill[intgreen!40] (5.5, -1.4) rectangle (6.0, -1.0);
+\node[right, font=\scriptsize] at (6.1, -1.2) {Signed};
+\fill[examteal!40] (5.5, -2.0) rectangle (6.0, -1.6);
+\node[right, font=\scriptsize] at (6.1, -1.8) {Options};
+\fill[prereqpurple!40] (5.5, -2.6) rectangle (6.0, -2.2);
+\node[right, font=\scriptsize] at (6.1, -2.4) {Other};
+\end{tikzpicture}
+\caption{Illustrative SHAP feature importance ranking for a gradient-boosted tree model forecasting next-day log-RV. Lagged RV features (blue) dominate, but noise-awareness ($\sqrt{\operatorname{RQ}}$, orange) and asymmetry ($\RV^-$, green) provide substantial incremental value. Options-implied features (teal) add forward-looking information. Exact values are dataset-dependent; the ranking pattern is robust.}
+\label{fig:feature-importance}
+\end{figure}
+
 \textbf{SHAP (SHapley Additive exPlanations).}
 $\SHAP$ values decompose each prediction into additive contributions from each feature, grounded in cooperative game theory.
-For a single prediction $\hat{y}_i$:
+For a single prediction $\hat{y}_i$, SHAP decomposes it as:
 \begin{equation}\label{eq:shap}
 \hat{y}_i = \phi_0 + \sum_{j=1}^{p} \phi_j^{(i)},
 \end{equation}
-where $\phi_0$ is the base value (mean prediction) and $\phi_j^{(i)}$ is feature $j$'s contribution to prediction $i$.
-Averaging $|\phi_j^{(i)}|$ across the test set gives a global importance ranking.
+\begin{itemize}[nosep]
+  \item $\phi_0$: the base value (mean prediction across the training set).
+  \item $\phi_j^{(i)}$: feature $j$'s contribution to prediction $i$ (can be positive or negative).
+  \item The sum of all SHAP values plus the base value exactly equals the model's prediction.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+SHAP answers the question: ``For this particular prediction, how much did each feature push the forecast up or down relative to the average?'' It borrows from game theory the idea of fairly splitting credit among players in a cooperative game. Each feature is a ``player,'' the prediction is the ``payout,'' and SHAP computes each feature's fair share by considering all possible orderings in which features could be added to the model.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Use SHAP values to explain your model's predictions in your internship presentation. A SHAP summary plot showing that $\log \RV_t^{(d)}$ and $\sqrt{\operatorname{RQ}_t}$ are the top two features validates that your ML model has learned economically sensible patterns. SHAP also helps debug: if a calendar dummy ranks in the top 3, something is likely wrong (possible lookahead bias or data leakage). Always compute SHAP across multiple purged CV folds to assess stability.
+\end{projectconnection}
 
 \begin{warning}[SHAP instability for correlated features]
 When two features are highly correlated (e.g., $\RV_t^{(d)}$ and $\log \RV_t^{(d)}$), SHAP values become unstable: small perturbations in the training data can swap their importance rankings.
@@ -637,6 +955,14 @@ where:
 \end{itemize}
 \end{definition}
 
+\begin{intuition}[In Plain English]
+ALE plots answer the question: ``As this feature increases, does the model's prediction go up, down, or stay flat?'' Unlike partial dependence plots, which can be misleading when features are correlated (they evaluate the model at feature combinations that never occur in practice), ALE plots only compute effects within the observed data range. The result is a curve showing the marginal effect of one feature on the prediction, holding everything else at its actual (not hypothetical) value.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Use ALE plots to sanity-check your trained model. The ALE plot for $\log \RV_t^{(d)}$ should show a roughly increasing, concave relationship: higher lagged RV predicts higher future RV, but with diminishing effect at extreme levels (mean reversion). If the ALE plot shows a non-monotonic or economically implausible pattern, your model may be overfitting noise. Include ALE plots for the top 3--5 features in your internship report as evidence that the model has learned meaningful structure.
+\end{projectconnection}
+
 ALE plots tell you the \emph{shape} of the relationship: is the effect of lagged RV on predicted volatility linear, concave, or threshold-like?
 This is valuable for sanity-checking whether the model has learned economically sensible patterns.
 
@@ -651,6 +977,10 @@ Before reporting which features matter, run this checklist:
 \end{enumerate}
 Unstable rankings are a warning sign, not a failure: they tell you the signal is shared across correlated features, which is useful information for feature selection and portfolio construction.
 \end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+Follow this exact protocol for your internship project. Run MDA across your 5 purged CV folds and report the stability of the top-10 feature rankings. If $\log \RV_t^{(d)}$ and $\sqrt{\operatorname{RQ}_t}$ consistently rank in the top 5, you have confirmation that your ML model has learned the HARQ insight from data. Present the stability table and ALE plots in your final report; they are more convincing evidence of model quality than a single QLIKE number.
+\end{projectconnection}
 
 % ══════════════════════════════════════════════════════════════
 \section{Summary}\label{sec:feat-summary}
