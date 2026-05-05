@@ -169,7 +169,9 @@ This is the core mechanism: jumps are isolated events, so a product of consecuti
 \end{intuition}
 
 \begin{definition}[Bipower Variation]
-Given $n$ intraday log returns $r_{t,1}, r_{t,2}, \ldots, r_{t,n}$ within day $t$, the bipower variation is:
+We need an estimator that converges to integrated variance even when jumps are present.
+The idea: instead of squaring each return (which amplifies jumps), multiply consecutive absolute returns so that an isolated jump is dampened by its normal-sized neighbor.
+
 \begin{equation}
   \BPV_t = \frac{\pi}{2}\sum_{i=2}^{n}|r_{t,i}|\,|r_{t,i-1}|
   \label{eq:bpv}
@@ -182,6 +184,11 @@ Given $n$ intraday log returns $r_{t,1}, r_{t,2}, \ldots, r_{t,n}$ within day $t
   \item $\frac{\pi}{2} \approx 1.5708$: a scaling constant that corrects for the fact that $\E[|Z|] = \sqrt{2/\pi}$ when $Z \sim \N(0,1)$
 \end{itemize}
 \end{definition}
+
+\begin{projectconnection}[Why This Matters]
+$\BPV_t$ is the workhorse estimator you will use to construct the continuous variation component $C_t$ for HAR-J and HAR-CJ models (Chapter~\ref{ch:har}).
+Without it, your forecasting model receives $\RV_t$ contaminated by unpredictable jumps, which dilutes the persistent signal that drives forecast accuracy.
+\end{projectconnection}
 
 \subsection{Why the $\pi/2$ Scaling Factor}
 
@@ -398,7 +405,10 @@ The test statistic measures how many standard deviations the difference is from 
 \citet{BNS2006} proposed the following test.
 
 \begin{definition}[BNS Jump Test Statistic]
-The Barndorff-Nielsen and Shephard jump test statistic is:
+We know $\RV_t - \BPV_t$ estimates the jump component, but on any given day this difference is noisy.
+We need a way to ask: ``Is this difference large enough to be statistically significant, or is it just estimation noise?''
+The BNS test standardizes the difference by its sampling variability.
+
 \begin{equation}
   Z_{\text{BNS},t} = \frac{\RV_t - \BPV_t}{\sqrt{\vartheta\,\max\!\left(\frac{1}{n}\,\operatorname{RQ}_t,\; 10^{-10}\right)}}
   \label{eq:bns-test}
@@ -412,7 +422,20 @@ The Barndorff-Nielsen and Shephard jump test statistic is:
   \item $\max(\cdot,\;10^{-10})$: a numerical safeguard to prevent division by zero
   \item Under the null hypothesis of no jumps, $Z_{\text{BNS},t} \xrightarrow{d} \N(0,1)$ as $n \to \infty$
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+This is a signal-to-noise ratio.
+The numerator measures how much jump variation you think occurred (the gap between $\RV$ and $\BPV$).
+The denominator measures how noisy that estimate is (derived from realized quarticity, which captures the variability of the variability).
+If the ratio exceeds a standard normal critical value, the jump is real, not a statistical artifact.
+\end{intuition}
 \end{definition}
+
+\begin{projectconnection}[Why This Matters]
+The BNS test gives you a daily binary jump indicator: did a statistically significant jump occur on day $t$?
+In your HAR-J model, this indicator determines whether you include the jump component $J_t^2 = \max(\RV_t - \BPV_t, 0)$ as a separate regressor.
+Days without significant jumps get $J_t^2 = 0$, keeping the jump feature clean and preventing estimation noise from leaking in.
+\end{projectconnection}
 
 \begin{keyidea}[How to Use the BNS Test]
 Compare $Z_{\text{BNS},t}$ to standard normal critical values.
@@ -493,7 +516,9 @@ Then standardize the return by this local volatility.
 If the standardized return exceeds a threshold derived from extreme-value theory, flag it as a jump.
 
 \begin{definition}[Lee-Mykland Test Statistic]
-For each intraday return $r_{t,i}$, the Lee-Mykland test statistic is:
+To pinpoint exactly which returns within the day are jumps, we standardize each return by a local estimate of diffusion volatility.
+If a return is far too large to have come from the local diffusion process, it must be a jump.
+
 \begin{equation}
   \mathcal{L}_{t,i} = \frac{|r_{t,i}|}{\hat{\sigma}_{t,i}}
   \label{eq:lm-stat}
@@ -509,7 +534,21 @@ A return is classified as a jump if the statistic exceeds a critical value from 
   \label{eq:lm-rejection}
 \end{equation}
 where $\beta_\alpha$ is the $(1-\alpha)$ quantile of the standard Gumbel distribution.
+
+\begin{intuition}[In Plain English]
+The Lee-Mykland statistic asks: ``How many local standard deviations is this return?''
+A normal diffusion return might be 1 or 2 local standard deviations.
+A jump will be 5, 10, or more.
+The Gumbel critical value accounts for the fact that with many returns per day, even under pure diffusion you expect a few moderately large ones by chance.
+Only returns that exceed this multiple-testing-adjusted threshold are flagged as jumps.
+\end{intuition}
 \end{definition}
+
+\begin{projectconnection}[Why This Matters]
+Lee-Mykland gives you jump \emph{times and sizes}, not just a daily indicator.
+This is the basis for signed jump features: you can separately measure ``bad jumps'' (large negative returns) and ``good jumps'' (large positive returns) within the day.
+Signed jump variation feeds directly into the SHAR model and the asymmetric jump features in Chapter~\ref{ch:features}, where negative jumps predict higher future volatility than positive jumps of the same magnitude.
+\end{projectconnection}
 
 \begin{keyresult}[\citet{LeeMykland2008}: Intraday Jump Detection]
 The Lee-Mykland test provides both jump detection and jump timing at intraday frequency.
@@ -616,7 +655,9 @@ The test detects this shift.
 \end{intuition}
 
 \begin{definition}[Power Variation]
-The realized power variation of order $p > 0$ is:
+Instead of always squaring returns, we can raise absolute returns to any power $p$.
+This single parameter $p$ controls whether the estimator ``listens to'' jumps or ignores them.
+
 \begin{equation}
   V_t^{(p)} = \sum_{i=1}^{n} |r_{t,i}|^p
   \label{eq:power-var}
@@ -626,7 +667,20 @@ The realized power variation of order $p > 0$ is:
   \item $p = 1$: sum of absolute returns
   \item The key property: for $p < 2$, the power variation is dominated by diffusion (jumps contribute negligibly). For $p = 2$, jumps contribute fully. For $p > 2$, jumps dominate.
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+Think of the power $p$ as a volume knob for jump sensitivity.
+Small returns (diffusion) and large returns (jumps) are both present in the data.
+When $p$ is low (say $p = 1$), raising everything to $p$ compresses the big returns more than the small ones, so jumps fade into the background.
+When $p$ is high (say $p = 4$), the large returns get amplified disproportionately, so jumps scream.
+At $p = 2$ (standard $\RV$), you get an honest count of both.
+\end{intuition}
 \end{definition}
+
+\begin{projectconnection}[Why This Matters]
+The A\"it-Sahalia-Jacod test uses power variation to detect jumps at higher sampling frequencies where microstructure noise corrupts BPV-based methods.
+If your data source provides tick-level or 1-minute data and you want to push to higher frequency for better estimation, this framework gives you a noise-robust alternative to the BNS test for deciding which days contain jumps.
+\end{projectconnection}
 
 The \citet{AitSahaliaJacod2009} test statistic compares $V_t^{(p)}$ computed at two sampling frequencies, $\Delta$ and $k\Delta$ (e.g., 5-minute and 15-minute).
 Under the null of no jumps, the ratio converges to a constant $k^{p/2-1}$.
@@ -662,7 +716,8 @@ This is conceptually simpler than bipower variation and naturally extends to the
 \end{keyidea}
 
 \begin{definition}[Threshold Realized Variance]
-The threshold (or truncated) realized variance is:
+Instead of dampening jumps implicitly (as BPV does), we can remove them explicitly: classify each return as ``jump'' or ``not jump'' based on a size cutoff, then sum squared returns only for the non-jump returns.
+
 \begin{equation}
   \operatorname{TRV}_t = \sum_{i=1}^{n} r_{t,i}^2 \cdot \mathbf{1}\!\left\{|r_{t,i}| \leq \vartheta_i\right\}
   \label{eq:trv}
@@ -673,7 +728,21 @@ The threshold (or truncated) realized variance is:
   \item $\mathbf{1}\{\cdot\}$: indicator function (equals 1 if the condition is true, 0 otherwise)
   \item $\vartheta_i$: threshold for return $i$, typically set as $\vartheta_i = c\,\hat{\sigma}_i\,\Delta^{\varpi}$, where $c$ is a constant (e.g., $c = 3$), $\hat{\sigma}_i$ is a local volatility estimate, and $\varpi \in (0, 1/2)$ controls how the threshold scales with sampling frequency
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+Threshold realized variance is a filter.
+It looks at each 5-minute return and asks: ``Is this return small enough to be normal diffusion, or is it suspiciously large?''
+Returns below the cutoff are kept and squared as usual (they estimate continuous variation).
+Returns above the cutoff are discarded (they are presumed jumps).
+The result is a ``cleaned'' version of $\RV_t$ with jump contamination removed.
+\end{intuition}
 \end{definition}
+
+\begin{projectconnection}[Why This Matters]
+The threshold approach is the basis of the HAR-CJ model \citep{CorsiPirinoReno2010}, one of the strongest baselines for your vol forecasting project.
+HAR-CJ enters $C_t = \operatorname{TRV}_t$ and $J_t = \RV_t - \operatorname{TRV}_t$ as separate features, letting the model learn that continuous variation is persistent (high coefficient) while jump variation is transient (low coefficient).
+If your ML model cannot beat HAR-CJ, the decomposition itself is doing most of the heavy lifting.
+\end{projectconnection}
 
 \citet{Mancini2009} established the theoretical foundation for threshold estimators.
 \citet{CorsiPirinoReno2010} combined the threshold approach with the HAR forecasting model to produce the HAR-CJ decomposition.
@@ -709,6 +778,47 @@ This difference has a direct implication for forecasting models.
 If you feed raw $\RV_t$ into a model, you are mixing a highly persistent signal (continuous variation) with transient noise (jump variation).
 The model has to learn a single set of persistence parameters that compromises between the two.
 Separating them lets the model learn different dynamics for each component.
+
+\subsection{Diagram: The Decomposition Pipeline}
+
+Figure~\ref{fig:decomposition-pipeline} summarizes the full decomposition pipeline from raw intraday returns to the separated components that feed into forecasting models.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=0.8cm and 1.2cm,
+  every node/.style={font=\small},
+  box/.style={draw, rounded corners, minimum height=1cm, minimum width=2.8cm, align=center, thick},
+]
+% Top: raw RV
+\node[box, fill=defblue!12, minimum width=4cm] (rv) {$\RV_t = \sum r_{t,i}^2$\\[2pt]\scriptsize Total quadratic variation};
+
+% Split
+\node[box, fill=intgreen!12, below left=1.2cm and 0.8cm of rv, minimum width=4cm] (cv) {$C_t$ (Continuous)\\[2pt]\scriptsize $\BPV_t$ or $\operatorname{TRV}_t$};
+\node[box, fill=warnred!12, below right=1.2cm and 0.8cm of rv, minimum width=4cm] (jv) {$J_t^2$ (Jump)\\[2pt]\scriptsize $\RV_t - C_t$};
+
+% Properties
+\node[box, fill=intgreen!6, below=0.8cm of cv, minimum width=4cm] (cprop) {\scriptsize High persistence\\[1pt]\scriptsize Autocorrelation $\approx 0.6$--$0.7$\\[1pt]\scriptsize \textbf{Predictable}};
+\node[box, fill=warnred!6, below=0.8cm of jv, minimum width=4cm] (jprop) {\scriptsize Low persistence\\[1pt]\scriptsize Autocorrelation $\approx 0.0$--$0.1$\\[1pt]\scriptsize \textbf{Nearly unpredictable}};
+
+% Forecasting model
+\node[box, fill=keyorange!12, below=1.2cm of rv, minimum width=4cm, yshift=-4.5cm] (har) {HAR-J / HAR-CJ Model\\[2pt]\scriptsize Separate coefficients for $C_t$ and $J_t^2$};
+
+% Arrows
+\draw[-{Stealth}, thick, intgreen!70!black] (rv.south) -- ++(0,-0.3) -| (cv.north) node[midway, above, font=\scriptsize, yshift=2pt] {BPV or threshold};
+\draw[-{Stealth}, thick, warnred!70!black] (rv.south) -- ++(0,-0.3) -| (jv.north) node[midway, above, font=\scriptsize, yshift=2pt] {residual};
+\draw[-{Stealth}, thick] (cv) -- (cprop);
+\draw[-{Stealth}, thick] (jv) -- (jprop);
+\draw[-{Stealth}, thick, intgreen!70!black] (cprop.south) -- ++(0,-0.3) -| (har.north west) node[pos=0.25, left, font=\scriptsize] {large $\beta$};
+\draw[-{Stealth}, thick, warnred!70!black] (jprop.south) -- ++(0,-0.3) -| (har.north east) node[pos=0.25, right, font=\scriptsize] {small $\beta$};
+\end{tikzpicture}
+\caption{The decomposition pipeline.
+$\RV_t$ is split into a continuous component $C_t$ (estimated via BPV or threshold truncation) and a jump component $J_t^2$ (the residual).
+The continuous component is highly persistent and drives forecasting accuracy.
+The jump component is nearly unpredictable but still included to prevent it from contaminating the continuous signal.
+In the HAR-J and HAR-CJ models, each component receives its own coefficient, letting the model exploit the different persistence.}
+\label{fig:decomposition-pipeline}
+\end{figure}
 
 \begin{keyidea}[Forecasting with Separated Components]
 In the HAR-J and HAR-CJ models (Chapter~\ref{ch:har}), the continuous component enters with high persistence coefficients (it is highly predictable), while the jump component enters with a small, often statistically insignificant coefficient (it is nearly unpredictable).
