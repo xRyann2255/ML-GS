@@ -39,6 +39,17 @@ where $\delta$ is chosen so the half-life matches approximately 20 to 60 trading
 This is what most funds actually use for position sizing: not GARCH, not HAR, just exponential smoothing.
 Its popularity stems from simplicity, low latency, and the fact that it requires exactly one parameter.
 
+\begin{intuition}[In Plain English]
+Tomorrow's variance estimate is a weighted blend of today's squared return (the ``news'') and today's variance estimate (the ``memory'').
+A high $\delta$ means slow adaptation: the estimate barely moves day-to-day.
+A low $\delta$ means the estimate jumps quickly with every new return, reacting fast but also picking up noise.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+EWMA is the baseline your vol-targeting backtest must beat.
+If your HAR or ML forecast cannot outperform this one-parameter smoother in a position-sizing test, the model adds no economic value regardless of its QLIKE score.
+\end{projectconnection}
+
 % ──────────────────────────────────────────────────
 \subsection{The Volatility-Targeting Formula}
 \label{subsec:vol-target-formula}
@@ -59,6 +70,12 @@ The result is a return stream with approximately constant realized volatility eq
 The mechanism: by reducing exposure before drawdowns, vol-targeting truncates the left tail.
 A better vol forecast means you cut exposure earlier and more precisely.
 \end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This formula is the direct economic-value test for your internship project (Project Direction 1: HARQ-X + ML residual).
+Every QLIKE improvement in your forecast translates into a tighter $\hat\sigma_t$, which means more precise position sizing and higher Sharpe.
+The vol-targeting backtest is your primary deliverable for demonstrating that statistical accuracy creates real P\&L.
+\end{projectconnection}
 
 % ──────────────────────────────────────────────────
 \subsection{Worked Example: Vol-Targeting the S\&P 500}
@@ -172,6 +189,11 @@ The estimate is approximate but directionally informative:
 \end{itemize}
 Adding $\text{sign}(\text{GEX})$ or GEX-quintile as a feature to HAR-X is a novel extension not yet thoroughly explored in the academic literature \citep{Bennett2014}.
 \end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+GEX provides a feature that captures a fundamentally different mechanism from any return-based or RV-based predictor.
+Including it in your HAR-X specification (Project Direction 1 or 2) demonstrates market microstructure awareness and gives your model an edge that purely statistical approaches miss.
+\end{projectconnection}
 
 \subsection{Structured Products and the Short-Gamma Overhang}
 
