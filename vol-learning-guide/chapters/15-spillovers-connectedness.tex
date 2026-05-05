@@ -37,6 +37,22 @@ $\by_t = (\RV_{1,t}, \ldots, \RV_{N,t})'$ and fit a VAR($p$):
   \qquad \bm{u}_t \sim (0, \bm{\Sigma}),
 \end{equation}
 
+\begin{intuition}[In Plain English]
+Today's vector of realized volatilities across all assets is a linear combination of
+the past $p$ days' volatility vectors, plus a surprise term.  Each coefficient matrix
+$\bm{A}_\ell$ captures how yesterday's (or day-before's) vol in \emph{every} asset
+feeds into today's vol for \emph{every} asset.  This is the multivariate extension
+of the HAR idea: past vol predicts future vol, but now cross-asset effects are
+explicitly modeled.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The VAR on RVs is the backbone of the Diebold-Yilmaz framework.  For your project,
+the off-diagonal entries of $\bm{A}_\ell$ are cross-asset predictive features: they
+tell you how much of asset $j$'s vol is predictable from asset $k$'s recent vol.
+This directly extends the univariate HAR baseline with cross-asset lags.
+\end{projectconnection}
+
 where:
 \begin{itemize}[nosep]
   \item $\by_t \in \R^N$: vector of realized volatilities on day $t$,
@@ -51,6 +67,21 @@ VAR:
 \begin{equation}\label{eq:var-ma}
   \by_t = \bm{\mu} + \sum_{h=0}^{\infty} \bm{\Phi}_h \, \bm{u}_{t-h},
 \end{equation}
+
+\begin{intuition}[In Plain English]
+This rewrites the system so that today's volatility is expressed as a sum of all past
+shocks, weighted by how much each shock persists over time.  The matrix $\bm{\Phi}_h$
+is the ``memory kernel'': entry $(j,k)$ tells you how much a surprise in asset $k$'s
+vol $h$ days ago still echoes in asset $j$'s vol today.  It is the multivariate
+impulse-response function.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The MA representation is what lets you decompose forecast errors into contributions
+from each asset.  For GNN-based vol forecasting (Project Direction 3), the impulse-response
+matrices $\bm{\Phi}_h$ define the effective ``edge weights'' of the spillover graph
+at each horizon.
+\end{projectconnection}
 
 where the $N \times N$ matrices $\bm{\Phi}_h$ are the impulse-response coefficients
 at horizon $h$.  Entry $(\bm{\Phi}_h)_{jk}$ tells you how a unit shock to asset $k$
@@ -85,12 +116,43 @@ where:
 \end{itemize}
 \end{definition}
 
+\begin{intuition}[In Plain English]
+This formula answers a simple question: of all the uncertainty in asset $j$'s
+volatility forecast $H$ days ahead, what fraction was caused by a shock to asset $k$?
+The numerator isolates the contribution of shock $k$ (scaled by its own variance),
+and the denominator is the total forecast uncertainty for asset $j$.  When $j = k$,
+you get the ``own'' contribution; when $j \neq k$, you get the spillover from $k$
+to $j$.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The GFEVD is the core building block for spillover features.  Each off-diagonal
+entry $\theta_{jk}^{(H)}$ is a direct measure of cross-asset vol predictability:
+it tells you how much of asset $j$'s vol surprise came from asset $k$.  These
+entries become edges in the spillover graph that a GNN can learn over.
+\end{projectconnection}
+
 Because GFEVD rows do not sum to one in general, normalize each row:
 \begin{equation}\label{eq:gfevd-norm}
   \widetilde{\theta}_{jk}^{(H)}
   = \frac{\theta_{jk}^{(H)}}{\sum_{k=1}^{N} \theta_{jk}^{(H)}},
   \qquad \text{so that } \sum_{k=1}^{N} \widetilde{\theta}_{jk}^{(H)} = 1.
 \end{equation}
+
+\begin{intuition}[In Plain English]
+The raw GFEVD fractions for a given asset do not necessarily add up to 100\% because
+the generalized approach allows shocks to be correlated.  This normalization simply
+rescales each row so that the contributions from all assets (including itself) sum to
+one.  After normalization, you can read each entry as a percentage: ``$X$\% of asset
+$j$'s vol forecast error is attributable to shocks from asset $k$.''
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Normalized entries are directly interpretable as edge weights in the spillover
+network.  For your feature matrix, these percentages can be used as-is: the
+``directional FROM'' feature for each asset is just the sum of its off-diagonal
+row entries.
+\end{projectconnection}
 
 \subsection{Spillover Measures}
 
@@ -129,6 +191,16 @@ others:
 A positive net spillover means asset $j$ is a \emph{net transmitter} of volatility;
 negative means \emph{net receiver}.
 \end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+These four measures are the feature engineering payoff of the DY framework.  Total
+spillover $S^{(H)}_t$ is a regime indicator (high = crisis = different vol dynamics).
+Directional FROM measures how ``vulnerable'' an asset is to imported vol.  Net
+spillover identifies transmitters vs.\ receivers.  All three become columns in your
+feature matrix.  For Project Direction 3 (GNNs), the pairwise entries form the
+adjacency matrix of the volatility graph, and time-varying versions define dynamic
+graph structure.
+\end{projectconnection}
 
 The framework evolved across three papers:
 \citet{DieboldYilmaz2009} introduced the total index using a Cholesky decomposition,
@@ -246,6 +318,53 @@ Interpretation: about 38\% of the total forecast-error variance in this system c
 from cross-asset shocks rather than own shocks.  Equity is the dominant transmitter.
 \end{workedexample}
 
+% ── TikZ: Decomposition of total connectedness ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    block/.style={rectangle, draw, thick, rounded corners, minimum width=3cm,
+                  minimum height=1cm, font=\small, align=center},
+    topblock/.style={block, fill=defblue!15},
+    midblock/.style={block, fill=orange!12},
+    botblock/.style={block, fill=green!10},
+    connector/.style={-{Stealth[length=2.5mm]}, thick},
+  ]
+
+  % Top level: Total
+  \node[topblock, minimum width=5cm] (total) at (0, 3)
+    {Total Spillover $S^{(H)}$\\{\scriptsize System-wide connectedness}};
+
+  % Mid level: Directional
+  \node[midblock] (from) at (-3.5, 1)
+    {FROM $S_{j \leftarrow \bullet}$\\{\scriptsize Vol received}};
+  \node[midblock] (to) at (3.5, 1)
+    {TO $S_{j \rightarrow \bullet}$\\{\scriptsize Vol transmitted}};
+
+  % Bottom level: Net
+  \node[botblock, minimum width=4cm] (net) at (0, -1)
+    {Net $= $ TO $-$ FROM\\{\scriptsize Transmitter ($+$) or Receiver ($-$)}};
+
+  % Arrows
+  \draw[connector] (total.south west) ++(0.3,0) -- (from.north);
+  \draw[connector] (total.south east) ++(-0.3,0) -- (to.north);
+  \draw[connector] (from.south east) ++(0.2,0) -- (net.north west) ++(0.3,0);
+  \draw[connector] (to.south west) ++(-0.2,0) -- (net.north east) ++(-0.3,0);
+
+  % Annotations
+  \node[font=\scriptsize, gray, anchor=west] at (1.8, 2.1)
+    {$= \frac{1}{N}\sum_{j \neq k} \widetilde{\theta}_{jk}$};
+  \node[font=\scriptsize, gray, anchor=east] at (-1.0, 0.0)
+    {sum off-diag row};
+  \node[font=\scriptsize, gray, anchor=west] at (1.0, 0.0)
+    {sum off-diag col};
+
+\end{tikzpicture}
+\caption{Decomposition of the Diebold-Yilmaz spillover measures.  The total index
+summarizes system-wide connectedness.  Directional FROM and TO break it down per
+asset, and the net spillover identifies transmitters vs.\ receivers.}
+\label{fig:spillover-decomposition}
+\end{figure}
+
 
 % ──────────────────────────────────────────────────────────────
 \section{Time-Varying Spillovers}\label{sec:tv-spillovers}
@@ -340,6 +459,24 @@ The TVP-VAR model allows coefficients to drift:
   \qquad
   \operatorname{vec}(\bm{A}_t) = \operatorname{vec}(\bm{A}_{t-1}) + \bm{\eta}_t,
 \end{equation}
+
+\begin{intuition}[In Plain English]
+This is the same VAR as before, but now the coefficient matrices $\bm{A}_{\ell,t}$
+are allowed to change every day.  The second equation says that today's coefficients
+equal yesterday's plus a small random drift $\bm{\eta}_t$.  The Kalman filter
+estimates the evolving coefficients without needing a rolling window, so the spillover
+index updates smoothly each day rather than jumping when observations enter or leave
+a fixed window.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+TVP-VAR connectedness responds faster to regime changes than rolling-window estimates,
+making it a better real-time feature for your ML model.  When the connectedness index
+spikes, your model knows that vol dynamics have shifted to ``crisis mode'' with higher
+persistence and stronger cross-asset effects.  This is a natural conditioning variable
+for the HAR baseline: interact HAR lags with a high-connectedness indicator to let the
+model adapt its decay structure in real time.
+\end{projectconnection}
 
 where:
 \begin{itemize}[nosep]
@@ -516,6 +653,15 @@ This does not diminish the usefulness of spillover indices as diagnostic tools,
 but it changes how you interpret them: high spillover may reflect common-factor
 exposure rather than sequential transmission from one asset to the next.
 \end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Universality has a direct architectural implication for your project.  If vol dynamics
+are truly shared across assets, you can train a single model on pooled data (all
+assets stacked) rather than fitting $N$ separate models.  This dramatically increases
+your effective sample size and reduces overfitting.  Even for a univariate HAR-based
+forecast, pooling across assets with shared features (same lags, same jump indicators)
+can improve out-of-sample QLIKE.
+\end{projectconnection}
 
 
 % ──────────────────────────────────────────────────────────────
