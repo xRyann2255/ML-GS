@@ -1,0 +1,1076 @@
+\chapter{The Arbitrage Zoo}
+\label{ch:arbitrage_zoo}
+\chaptermark{The arbitrage zoo}
+
+This chapter tours the zoo of textbook arbitrages: the strategies
+a quant looks for first when evaluating a new market. Each
+follows the template \emph{observable}, \emph{trade},
+\emph{P\&L}, \emph{why it usually doesn't exist}, \emph{when it
+does}. The goal is to fix that template so firmly that, given any
+market data dump, the right diagnostic question fires
+automatically: when you see this shape in a market, set up this
+trade.
+
+Seven arbitrages are presented in the same fixed format, two to
+three pages each. Once the template is internalised, encountering
+an unfamiliar instrument --- a new commodity future, a token on
+an exotic crypto venue, a thinly-traded ETF --- becomes a matter
+of ticking through the seven types to see which, if any, is open.
+An eighth section closes the chapter by stating that statistical
+arbitrage (\cref{ch:mean_reversion_ou},
+\cref{ch:pairs_cointegration}) is \emph{not} a member of the zoo:
+it shares the name but not the no-risk guarantee, and conflating
+the two has wiped out more firms than the other six combined.
+
+\begin{backgroundbox}[Prerequisites]
+From earlier:
+\begin{itemize}
+  \item \Cref{ch:lob}: the limit order book, the bid--ask
+  spread, and \emph{walking the book}. Several arbitrages here
+  are nothing more than walking two books simultaneously, one as
+  buyer and one as seller.
+  \item \Cref{ch:basket_etf_arb}: the ETF creation / redemption
+  mechanism and authorised participants. The ETF c/r entry
+  refers back rather than re-deriving.
+  \item Forward: \cref{ch:options_payoffs} for European call/put
+  payoffs. The put-call parity entry uses only the payoff
+  diagrams; readers unfamiliar with $\Call$, $\Put$, $\Spx$,
+  $\Kstrike$ should skim that section's opener first.
+  \item Discounting: a riskless cashflow $X$ at time $T$ is
+  worth $X e^{-\rrf T}$ today, with $\rrf$ the risk-free rate.
+  No stochastic calculus is used; every payoff is deterministic
+  by construction.
+\end{itemize}
+No prior finance vocabulary is assumed beyond \cref{ch:lob}
+through \cref{ch:momentum}.
+\end{backgroundbox}
+
+\section{The arbitrage template}
+\label{sec:ch13_template}
+
+We fix the template first. The seven case studies that follow
+are instances of the same five-step pattern.
+
+\begin{definition}[Arbitrage]
+\index{arbitrage|textbf}
+\label{def:arbitrage}
+An \emph{arbitrage} is a trading strategy that, executed at
+market prices, has zero or negative initial cost, non-negative
+payoff in every state of the world, and strictly positive payoff
+in at least one state. Equivalently: a portfolio that costs
+nothing (or pays you to hold it) and cannot lose money. The
+Type~I / Type~II split in the technical literature does not
+matter operationally here.
+\end{definition}
+
+``In every state of the world'' does all the work. A strategy
+that wins on \emph{average} but can lose is not an arbitrage; it
+is at best a positive-EV bet, requiring the sizing and risk
+apparatus of \cref{ch:kelly_risk}. A true arbitrage is a free
+lunch, and the central fact of mature markets is that free
+lunches are rare and short-lived. This chapter is about
+recognising the few that exist.
+
+Every arbitrage in the zoo follows the same five-step pattern.
+
+\begin{keyfactbox}[The arbitrage template]
+\label{kf:arb_template}
+For any candidate arbitrage, answer the following five questions
+in order. If any answer is unsatisfactory, the arbitrage is not
+open and you move on.
+\begin{enumerate}
+  \item \textbf{Observable}: What do you see in market data that
+  tells you the arbitrage is open? This is the trigger condition
+  --- a numerical inequality between observable prices.
+  \item \textbf{Trade}: What is the explicit set of orders that
+  captures the discrepancy? Specify each leg, on which venue,
+  in which direction, in what size.
+  \item \textbf{P\&L}: What is the \emph{deterministic} profit
+  in the ideal case --- frictionless, fully filled, instant
+  execution? This is a number, not a distribution.
+  \item \textbf{Why it usually doesn't exist}: Which forces in a
+  normal, healthy market keep the inequality from opening?
+  Knowing this is what tells you when the arb is real and when
+  it is a data artefact or a stale quote.
+  \item \textbf{When it does}: What specific conditions
+  temporarily disable those forces and let the arbitrage open?
+  This is the catalogue entry --- the situations in which to
+  watch.
+\end{enumerate}
+\end{keyfactbox}
+
+\begin{intuitionbox}
+The template does two jobs. Steps~1--3 are the trade: see the
+gap, do the orders, count the money. Steps~4--5 are the
+\emph{theory}: an arbitrage is interesting only insofar as it is
+rare, because anything common is already arbed out by someone
+faster. Winning relative-value desks know the closures and
+openings of each arbitrage so intimately that they are
+positioned for the open before it is visible to everyone else.
+\end{intuitionbox}
+
+In steady state every arbitrage here is closed, because if it
+were not, someone would close it. The interesting question is
+not ``how do I capture this arb?'' (mechanical once you know it
+is open) but ``what would have to break for this arb to open,
+and how would I know?'' Each entry answers both.
+
+\section{Triangular FX arbitrage}
+\label{sec:ch13_triangular}
+
+Currency pairs are quoted bilaterally --- EUR/USD, USD/JPY,
+EUR/JPY --- and the three prices are linked by a consistency
+requirement: in a frictionless market, walking the triangle EUR
+$\to$ USD $\to$ JPY $\to$ EUR returns exactly one EUR. A round
+trip above one is an arbitrage; below one, the reverse direction
+is.
+
+\textbf{Observable.} Three FX rates whose product around a
+triangle differs from one. Concretely, denote the price of one
+unit of currency~$X$ in units of currency~$Y$ by $E_{X/Y}$. The
+arbitrage indicator is
+\begin{equation}
+  \Delta \;\defeq\; E_{\text{EUR}/\text{USD}} \cdot
+  E_{\text{USD}/\text{JPY}} \cdot E_{\text{JPY}/\text{EUR}}
+  \;-\; 1.
+  \label{eq:triangular_indicator}
+\end{equation}
+If $\Delta > 0$, the EUR $\to$ USD $\to$ JPY $\to$ EUR direction
+is profitable; if $\Delta < 0$, the reverse direction is. If
+$\Delta = 0$ the triangle is consistent and no arbitrage exists.
+
+\textbf{Trade.} Starting with one EUR:
+\begin{enumerate}
+  \item Sell EUR for USD at rate $E_{\text{EUR}/\text{USD}}$,
+  receiving $E_{\text{EUR}/\text{USD}}$ USD.
+  \item Sell USD for JPY at rate $E_{\text{USD}/\text{JPY}}$,
+  receiving $E_{\text{EUR}/\text{USD}} \cdot
+  E_{\text{USD}/\text{JPY}}$ JPY.
+  \item Sell JPY for EUR at rate $E_{\text{JPY}/\text{EUR}}$,
+  receiving the round-trip total
+  $E_{\text{EUR}/\text{USD}} \cdot E_{\text{USD}/\text{JPY}}
+  \cdot E_{\text{JPY}/\text{EUR}}$ EUR.
+\end{enumerate}
+The three trades must execute as simultaneously as the matching
+engines permit, because rates move while legs are pending. Real
+desks send all three orders in a single market message or use
+guaranteed-fill order types.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  cur/.style={circle, draw, minimum size=1.6cm, text centered,
+    font=\small\bfseries, fill=yellow!20},
+  arr/.style={-Stealth, thick, blue!65},
+]
+\node[cur] (eur) at (90:3.2cm)  {EUR};
+\node[cur] (usd) at (210:3.2cm) {USD};
+\node[cur] (jpy) at (330:3.2cm) {JPY};
+\draw[arr] (eur) -- node[left=5pt, font=\small]{$E_{\mathrm{EUR/USD}}$} (usd);
+\draw[arr] (usd) -- node[below=5pt, font=\small]{$E_{\mathrm{USD/JPY}}$} (jpy);
+\draw[arr] (jpy) -- node[right=5pt, font=\small]{$E_{\mathrm{JPY/EUR}}$} (eur);
+\node[draw, rounded corners=3pt, fill=red!8, font=\footnotesize, align=center,
+  inner sep=6pt] at (0,0)
+  {Arbitrage when\\[2pt]
+   $E_{\mathrm{EUR/USD}}$\\[-2pt]$\times\;E_{\mathrm{USD/JPY}}$\\[-2pt]$\times\;E_{\mathrm{JPY/EUR}}\neq 1$};
+\end{tikzpicture}
+\caption{Triangular FX arbitrage. Starting with one EUR, convert to USD at
+$E_{\mathrm{EUR/USD}}$, then to JPY at $E_{\mathrm{USD/JPY}}$, then back to
+EUR at $E_{\mathrm{JPY/EUR}}$. If the product of the three rates exceeds one,
+a riskless profit exists. Competitive markets enforce the no-arbitrage
+constraint that the product equals one. In practice the window is
+milliseconds wide and requires co-located systems to exploit.}
+\label{fig:triangular_arb}
+\end{figure}
+
+\textbf{P\&L.} Per unit of starting EUR, $\text{profit} =
+\Delta$. Locked the moment all three legs fill; no holding
+period, no subsequent price exposure.
+
+\paragraph{Worked numerical example.} Suppose at some instant
+the three rates are
+\begin{align*}
+  E_{\text{EUR}/\text{USD}} &= 1.08, \\
+  E_{\text{USD}/\text{JPY}} &= 148, \\
+  E_{\text{JPY}/\text{EUR}} &= 0.0063.
+\end{align*}
+Then the round-trip is
+\begin{equation*}
+  \underbrace{1.08}_{\text{EUR}\to\text{USD}}
+  \;\times\;
+  \underbrace{148}_{\text{USD}\to\text{JPY}}
+  \;\times\;
+  \underbrace{0.0063}_{\text{JPY}\to\text{EUR}}
+  \;=\; 1.006992,
+\end{equation*}
+so $\Delta \approx 0.006992$, about $0.70\%$ per round trip ---
+seven thousand EUR on one million, before fees and the cost of
+executing fast enough that no leg moves between trades.
+
+The JPY/EUR quote of $0.0063$ implies an EUR/JPY of $\approx
+158.73$. The no-arb inverse of the first two rates is
+$1/(1.08 \cdot 148) \approx 0.006257$; the quoted $0.0063$
+exceeds that by exactly what the round trip captures. In
+general: fix any two rates and solve for the third; any
+deviation is the locked-in profit.
+
+\textbf{Why it usually doesn't exist.} The major-pair FX market
+is the most heavily arbitraged in the world. EBS, Reuters, and
+bank-internal ECNs run continuous triangular consistency
+monitors, and any basis-point opening closes in microseconds.
+\citeBouchaud{} report that on liquid majors the indicator lives
+almost entirely within the constituent bid--ask spreads ---
+apparent gaps are not capturable after crossing the spread on
+each leg.
+
+\textbf{When it does.} Three families. (i) \emph{Fragmented
+liquidity}: a small ECN quoting all three pairs with fewer
+participants drifts off consensus, and a desk plugged into both
+the ECN and consensus venues captures the gap. (ii)
+\emph{News-driven dislocations}: news hitting EUR/USD a
+millisecond before EUR/JPY leaves the triangle inconsistent for
+the propagation delay; the FX latency arms race is a race to
+close that gap. (iii) \emph{Exotic pairs}: EUR $\to$ TRY $\to$
+RUB $\to$ EUR is much less competed; the indicator opens further
+and stays open longer in thinner pairs.
+
+\begin{prosperitybox}
+Round~$1$'s manual challenge in Prosperity~$3$ was a literal
+triangular FX exercise: a $4 \times 4$ conversion matrix between
+\texttt{Snowballs}, \texttt{Pizza}, \texttt{Silicon Nuggets},
+\texttt{SeaShells}, with the task of finding a sequence of at
+most five trades maximising final \texttt{SeaShells}. The
+Frankfurt Hedgehogs enumerated all sequences and found the
+optimum \texttt{SeaShells} $\to$ \texttt{Snowballs} $\to$
+\texttt{Silicon Nuggets} $\to$ \texttt{Pizza} $\to$
+\texttt{Snowballs} $\to$ \texttt{SeaShells}, yielding $\approx
+8.9\%$ per round trip \citep{frankfurtHedgehogs2025imcP3}. This
+is the brute-force version of triangular arbitrage: enumerate
+cycles in the currency graph, take the one whose product of edge
+weights most exceeds one. In the wild the market enumerates
+continuously and closes cycles within microseconds; in
+Prosperity the matrix was static for the round, making the
+``arbitrage'' a one-shot optimisation. The pedagogical point
+survives: this is triangular FX arbitrage in miniature.
+\end{prosperitybox}
+
+\section{Locational arbitrage}
+\label{sec:ch13_locational}
+
+Same trade, but across a pair of \emph{venues} for the same
+asset rather than around a currency triangle.
+
+\textbf{Observable.} Identical contract, identical settlement,
+identical quality, different prices on two exchanges. Classical
+example: BTC at \$$50{,}000$ on exchange~A and \$$50{,}050$ on
+exchange~B. Equity examples include dual-listed stocks on
+NYSE/Toronto or E-mini contracts on CME vs alternative venues.
+The observable is $\text{ask}_{A} < \text{bid}_{B}$ (crossable
+in the lift-A, hit-B direction).
+
+\textbf{Trade.} Buy on the cheaper venue, sell on the dearer, in
+equal size. If the asset is fungible and venues share custody
+(or the trader holds inventory at both), the position closes
+immediately at the gross spread. If the asset must be
+\emph{moved} between venues --- as for crypto, where transfer
+takes minutes to hours and incurs network fees --- it is not
+strictly an arbitrage during transit: price can move and the
+trader wears the risk.
+
+\textbf{P\&L.} Per unit, gross $= \text{bid}_{B} -
+\text{ask}_{A}$. Net subtracts (i) exchange fees on both venues,
+(ii) transfer cost, (iii) borrow cost if shorting one side,
+(iv) slippage beyond top of book. In the BTC example gross is
+\$$50$ per coin; net is typically a small fraction of gross.
+
+\textbf{Why it usually doesn't exist.} Automated cross-venue
+bots continuously monitor every pair of liquid venues and close
+any gap beyond net costs in subsecond time. On BTC/USD between
+Coinbase and Binance the gap exceeds joint fees for less than a
+fraction of a percent of trading time, and closes within
+seconds when it does. The closing \emph{is} the arb; its
+existence maintains convergence.
+
+\textbf{When it does.} Three families:
+\begin{itemize}
+  \item \textbf{Regulatory fragmentation.} Pre-$2018$ Japan vs
+  US crypto: capital controls made moving BTC expensive or
+  illegal, and BTC traded at a $5$--$10\%$ premium on Japanese
+  venues for sustained periods. The Coinbase / bitFlyer spread
+  was a multi-month feature, because the closing trade was
+  blocked by regulation.
+  \item \textbf{Latency asymmetry.} CME E-mini S\&P and
+  less-liquid alternative venues briefly dislocate during fast
+  moves: a market-maker quoting both from one feed updates one
+  before the other. Co-located firms capture the gap in a few
+  hundred microseconds.
+  \item \textbf{Transient liquidity imbalance.} A large
+  aggressive order drives the local bid--ask off consensus; the
+  asymmetry persists for seconds before cross-venue MMs
+  re-equalise. A bot positioned on both venues lifts the cheap
+  side and hits the dear side during the window.
+\end{itemize}
+
+\begin{prosperitybox}
+Round~$4$ of Prosperity~$3$ introduced
+\texttt{MAGNIFICENT\_MACARONS}, tradeable on the local order
+book and via a fixed-fee external ``conversion'' channel
+exposing an external bid/ask adjusted for import/export and
+transport fees \citep{frankfurtHedgehogs2025imcP3}. Whenever
+local bid exceeded external ask (after fees), or local ask fell
+below external bid, a profitable conversion was available ---
+textbook locational arbitrage with the local book as one venue
+and the external channel as the other. The Frankfurt Hedgehogs
+report that over $10{,}000$ timesteps with a $10$-unit per-tick
+conversion cap, the trade could theoretically yield up to
+$300{,}000$ SeaShells per round, with realistic captures of
+$130{,}000$--$160{,}000$. Their implementation placed limit
+sells on the local book at $\lfloor\text{externalBid} +
+0.5\rfloor$ each tick --- the maximum price that still attracted
+local taker bots --- and converted resulting inventory through
+the external channel. Locational arbitrage can be a stable,
+high-throughput source of profit when the closing mechanism is
+rate-limited.
+\end{prosperitybox}
+
+\section{Cash-and-carry arbitrage}
+\label{sec:ch13_cash_carry}
+
+Cash-and-carry links spot and futures on the same asset. Its
+no-arbitrage relation $F = S e^{(r-y)(T-t)}$ is one of the
+half-dozen most fundamental formulas in derivative pricing.
+
+\subsection{The cost-of-carry relation, derived from no-arbitrage}
+\label{sec:ch13_cost_of_carry_derivation}
+
+Consider a non-dividend-paying asset with spot $\Spx$, risk-free
+rate $\rrf$ (borrow = lend), and a futures contract with
+delivery $T$ and price $F$. We derive $F$ by exhibiting a
+replicating portfolio.
+
+\emph{Portfolio~A}: at $t=0$, borrow $\Spx$ in cash, buy one
+unit at spot, and enter a short futures with delivery price $F$.
+Setup is cashless (borrowed cash pays for the asset; the short
+futures requires no upfront premium beyond margin, treated as
+zero-cost). At time $T$:
+\begin{itemize}
+  \item Deliver into the short futures for $F$ cash.
+  \item Repay the loan, grown to $\Spx e^{\rrf T}$ under
+  continuous compounding.
+\end{itemize}
+The terminal cashflow $F - \Spx e^{\rrf T}$ is deterministic
+(both legs locked at $t=0$), so no-arbitrage forces it to zero:
+\begin{equation}
+  F \;=\; \Spx \, e^{\rrf T},
+  \label{eq:cost_of_carry_no_div}
+\end{equation}
+which is the no-dividend, no-storage-cost version of the
+cost-of-carry formula.
+
+If $F > \Spx e^{\rrf T}$, Portfolio~A delivers positive cashflow
+at zero cost: borrow cash, buy spot, short futures, deliver,
+pocket the difference (\emph{cash-and-carry arbitrage}). If
+$F < \Spx e^{\rrf T}$, the reverse trade --- short spot, lend
+cash, long futures, take delivery --- is the arbitrage
+(\emph{reverse cash-and-carry}).
+
+\paragraph{Adding a yield.} If the asset pays a continuous yield
+at rate $y$ (dividend yield for equities, coupons for bonds,
+convenience yield for commodities useful to hold), Portfolio~A's
+holding leg receives extra $\Spx(e^{yT}-1)$. Re-running the
+argument:
+\begin{equation}
+  F \;=\; \Spx \, e^{(\rrf - y) T},
+  \label{eq:cost_of_carry}
+\end{equation}
+which is the general cost-of-carry forward formula.
+
+\begin{keyfactbox}[Cost-of-carry forward formula]
+\label{kf:cost_of_carry}
+For an asset with spot price $\Spx$, risk-free rate $\rrf$, and
+continuous yield $y$ (dividend yield for equities, convenience
+yield net of storage for commodities), the no-arbitrage
+forward / futures price for delivery at time $T$ is
+\begin{equation}
+  F \;=\; \Spx \, e^{(\rrf - y) T}.
+\end{equation}
+A \emph{cash-and-carry arbitrage} exists when the market
+forward $F_{\text{market}}$ differs from this fair value:
+\begin{itemize}
+  \item $F_{\text{market}} > \Spx e^{(\rrf-y)T}$: long spot,
+  short futures, finance at $\rrf$, deliver at $T$. Locks in
+  $F_{\text{market}} - \Spx e^{(\rrf-y)T}$ per unit.
+  \item $F_{\text{market}} < \Spx e^{(\rrf-y)T}$: short spot,
+  long futures, lend at $\rrf$, take delivery at $T$. Locks in
+  $\Spx e^{(\rrf-y)T} - F_{\text{market}}$ per unit.
+\end{itemize}
+\end{keyfactbox}
+
+\subsection{Worked numerical example}
+\label{sec:ch13_carry_example}
+
+Consider an equity index with spot $\Spx = 100$, risk-free rate
+$\rrf = 5\%$, dividend yield $y = 1\%$, and a futures contract
+expiring in $T = 0.5$ years. The fair forward is
+\begin{equation*}
+  F \;=\; 100 \cdot e^{(0.05 - 0.01) \cdot 0.5}
+  \;=\; 100 \cdot e^{0.02}
+  \;=\; 100 \cdot 1.02020134\ldots
+  \;\approx\; 102.02.
+\end{equation*}
+Suppose the market quotes the futures at $F_{\text{market}} =
+103$. Then the cash-and-carry arbitrage is open at
+\begin{equation*}
+  103 - 102.02 \;\approx\; 0.98 \text{ per unit}.
+\end{equation*}
+At $t=0$: borrow $100$ at $5\%$, buy one index unit, sell one
+futures at $103$. At $T=0.5$: receive dividends
+$100(e^{0.005}-1) \approx 0.5013$ (continuous compounding),
+deliver for $103$, repay loan $100 \cdot e^{0.025} \approx
+102.5316$. Net at $T$:
+\begin{equation*}
+  \underbrace{103}_{\text{delivery}}
+  \;+\;
+  \underbrace{0.5013}_{\text{dividend}}
+  \;-\;
+  \underbrace{102.5316}_{\text{loan repayment}}
+  \;=\;
+  0.9697 \text{ per unit},
+\end{equation*}
+matching the $\sim 0.98$ headline up to compounding rounding.
+The arb locks the moment loan, spot, and futures legs are in
+place.
+
+\textbf{Why it usually doesn't exist.} Index-futures-vs-spot
+bases are watched continuously by every relative-value desk.
+$\rrf$ is well-known, $y$ is forecast from public dividend
+schedules, and $F_{\text{market}} - \Spx e^{(\rrf - y)T}$
+typically lives below joint round-trip cost. The basis is the
+cleanest and most heavily competed trade in equities.
+
+\textbf{When it does.} Cash-and-carry opens when one formula
+input moves faster than the market can price it in:
+\begin{itemize}
+  \item \textbf{Dividend-date dislocations.} On a large ex-div
+  morning the cash market drops by the dividend; if futures
+  lags, the basis opens by a comparable amount.
+  \item \textbf{Forced unwinds.} A margin-called leveraged fund
+  dumps spot; spot drops below fair value while futures stays
+  anchored, opening a reverse cash-and-carry.
+  \item \textbf{Commodity storage constraints.} For storage-
+  constrained commodities (April~$2020$ WTI), the convenience
+  yield $y$ turns large and negative, and the futures curve
+  contangoes beyond rates-implied fair value. The arbitrageur
+  cannot find a tank to store physical oil --- the ``free''
+  part of the free lunch is not free.
+  \item \textbf{Funding-rate spikes.} If $\rrf$ jumps
+  (year-end repo squeezes), $\Spx e^{\rrf T}$ jumps with it; if
+  the futures curve does not follow, the basis opens.
+\end{itemize}
+
+Hull \citeHull{} (Ch~$5$) is the standard reference.
+
+\section{Put-call parity arbitrage}
+\label{sec:ch13_put_call_parity}
+
+Put-call parity is the no-arbitrage relation between a European
+call, a European put, and the underlying. It is the only formula
+here that requires knowing what calls and puts are; we state the
+payoffs and derive parity directly. Full treatment:
+\cref{ch:options_payoffs}.
+
+\subsection{Setup}
+\label{sec:ch13_parity_setup}
+
+A \emph{European call} with strike $\Kstrike$ and maturity
+$\Tmat$ on underlying $\Spx$ pays $\max(\Spx_T - \Kstrike, 0)$
+at $\Tmat$; its price today is $\Call$. A \emph{European put}
+with the same strike and maturity pays $\max(\Kstrike - \Spx_T,
+0)$ and has price $\Put$. The risk-free rate is $\rrf$. We
+assume no dividends between today and $\Tmat$; the dividend
+correction is in the pitfall box below.
+
+\subsection{Derivation from no-arbitrage}
+\label{sec:ch13_parity_derivation}
+
+Consider the portfolio: long one call, short one put, lend
+$\Kstrike e^{-\rrf \Tmat}$ (equivalently, a zero-coupon bond
+paying $\Kstrike$ at $\Tmat$). Cost today:
+\begin{equation*}
+  V_0 \;=\; \Call - \Put + \Kstrike e^{-\rrf \Tmat}.
+\end{equation*}
+At $\Tmat$ the portfolio value depends on $\Spx_T$:
+
+\textbf{Case~1: $\Spx_T > \Kstrike$.} Call pays $\Spx_T -
+\Kstrike$; short put expires worthless; bond pays $\Kstrike$.
+Total:
+\begin{equation*}
+  V_T \;=\; (\Spx_T - \Kstrike) + 0 + \Kstrike \;=\; \Spx_T.
+\end{equation*}
+
+\textbf{Case~2: $\Spx_T \leq \Kstrike$.} Call expires worthless;
+short put owes $\Kstrike - \Spx_T$; bond pays $\Kstrike$. Total:
+\begin{equation*}
+  V_T \;=\; 0 - (\Kstrike - \Spx_T) + \Kstrike \;=\; \Spx_T.
+\end{equation*}
+
+Both cases give $V_T = \Spx_T$, so the portfolio replicates one
+share and its cost today must equal the spot price:
+\begin{equation*}
+  \Call - \Put + \Kstrike e^{-\rrf \Tmat} \;=\; \Spx.
+\end{equation*}
+Rearranging gives the famous put-call parity identity.
+
+\begin{keyfactbox}[Put-call parity]
+\label{kf:put_call_parity}
+For European call $\Call$ and put $\Put$ with the same strike
+$\Kstrike$ and maturity $\Tmat$, on a non-dividend-paying
+underlying $\Spx$ at risk-free rate $\rrf$,
+\begin{equation}
+  \Call - \Put \;=\; \Spx - \Kstrike e^{-\rrf \Tmat}.
+  \label{eq:put_call_parity}
+\end{equation}
+The identity holds at every instant before maturity by
+no-arbitrage alone, with no dynamic model, no distributional
+assumption --- only the absence of free lunches.
+\end{keyfactbox}
+
+\begin{intuitionbox}
+Picture the payoffs. Long call: zero below $\Kstrike$, slopes
+up at $45^\circ$ above. Short put: zero above $\Kstrike$,
+slopes down at $45^\circ$ below. Stacked, they form a single
+$45^\circ$ line --- a synthetic long forward struck at
+$\Kstrike$. A forward to buy at $\Kstrike$ is worth $\Spx -
+\Kstrike e^{-\rrf \Tmat}$ by cost-of-carry, hence $\Call - \Put
+= \Spx - \Kstrike e^{-\rrf \Tmat}$. Parity and cost-of-carry are
+two views of the same no-arbitrage skeleton.
+\end{intuitionbox}
+
+\subsection{The arbitrage trade}
+\label{sec:ch13_parity_trade}
+
+\textbf{Observable.} A market in which $\Call$, $\Put$, $\Spx$
+violate \eqref{eq:put_call_parity}. Two cases:
+\begin{itemize}
+  \item $\Call - \Put > \Spx - \Kstrike e^{-\rrf \Tmat}$: the
+  call--put combination is overvalued relative to the
+  synthetic-forward right-hand side.
+  \item $\Call - \Put < \Spx - \Kstrike e^{-\rrf \Tmat}$: the
+  call--put combination is undervalued.
+\end{itemize}
+
+\textbf{Trade.} Overvalued case (the other is symmetric): sell
+call, buy put, buy underlying, borrow $\Kstrike e^{-\rrf
+\Tmat}$. Cash inflow at $t=0$ is
+\begin{equation*}
+  +\Call - \Put - \Spx + \Kstrike e^{-\rrf \Tmat}
+  \;=\; (\Call - \Put) - (\Spx - \Kstrike e^{-\rrf \Tmat}),
+\end{equation*}
+the parity violation, positive by hypothesis. At maturity the
+four legs cancel by the two-state argument, so the violation is
+pocketed and nothing is owed later.
+
+\textbf{P\&L.} The parity violation, locked at $t=0$.
+
+\textbf{Why it usually doesn't exist.} Listed options market
+makers enforce parity continuously: their quoting algorithms
+compute, per (strike, maturity) pair, the call implied by the
+put (or vice versa) via parity, and refuse to let quotes drift
+more than a tick from consistency. A visible parity gap on a
+liquid name is usually a stale quote.
+
+\textbf{When it does.} Parity opens when the underlying leg
+becomes non-trivial:
+\begin{itemize}
+  \item \textbf{Hard-to-borrow underlyings.} For heavily-shorted
+  small-caps or squeezed meme stocks, the short-underlying leg
+  carries real borrow cost, modelled as a positive $y$ in the
+  cost-of-carry relation. Assuming $y=0$ produces fake
+  violations that are not capturable.
+  \item \textbf{Discrete dividends.} A dividend between $t$ and
+  $\Tmat$ goes to the underlying holder but not to the synthetic
+  combination; the formula subtracts $PV$(div). See the pitfall
+  box.
+  \item \textbf{Corporate actions.} Mergers, spin-offs, special
+  dividends, splits disrupt the options chain while the exchange
+  recalculates specs; parity can drift during the adjustment.
+  \item \textbf{Early-exercise on American options.} Parity
+  holds strictly only for European options; American options
+  give a pair of inequalities, one of the six no-arb relations
+  in \citep{damodaranOptionsArbitrage}.
+\end{itemize}
+
+\subsection{Worked numerical example}
+\label{sec:ch13_parity_example}
+
+Take $\Spx = 100$, $\Kstrike = 100$, $\rrf = 5\%$, $\Tmat = 1$
+year, and a non-dividend-paying underlying. The right-hand side
+of parity is
+\begin{equation*}
+  \Spx - \Kstrike e^{-\rrf \Tmat}
+  \;=\; 100 - 100 \cdot e^{-0.05}
+  \;=\; 100 \cdot (1 - e^{-0.05})
+  \;=\; 100 \cdot 0.04877\ldots
+  \;\approx\; 4.877.
+\end{equation*}
+So put-call parity says $\Call - \Put \approx 4.877$.
+
+Suppose the market quotes $\Call = 8$, $\Put = 2$. Then $\Call -
+\Put = 6$ exceeds the parity-implied $4.877$ by $6 - 4.877
+\approx 1.123$ per pair, which the arbitrageur locks by selling
+the call, buying the put, buying the stock at $100$, and
+borrowing $100 e^{-0.05} \approx 95.123$. Net inflow $t=0$ is
+$1.123$; at maturity the four legs cancel.
+
+\begin{pitfallbox}[Parity breaks with discrete dividends]
+\label{pf:parity_dividends}
+$\Call - \Put = \Spx - \Kstrike e^{-\rrf \Tmat}$ assumes no
+dividends. Real equities pay discrete dividends to whoever
+holds the share \emph{on the ex-dividend date}, not to the
+holder of the synthetic call--put combination. Corrected
+parity:
+\begin{equation*}
+  \Call - \Put \;=\; \Spx - PV(\text{div}) - \Kstrike e^{-\rrf \Tmat},
+\end{equation*}
+where $PV$(div) is the present value of dividends scheduled
+between $t$ and $\Tmat$. Forgetting this term is a common
+scanner failure: every quarter, dividend-paying stocks report a
+dividend-sized ``violation'' that is entirely fake. Always strip
+the dividend stream. The same correction applies to
+\eqref{eq:cost_of_carry} for equity indices with non-zero $y$
+--- index versions use a continuous-yield approximation,
+single-name equities need the discrete version.
+\end{pitfallbox}
+
+The Damodaran catalogue \citep{damodaranOptionsArbitrage}
+develops six no-arb relations on options --- intrinsic-value
+bounds, strike and maturity monotonicity, and parity --- each
+derived by the same pattern: two-state payoff at expiry, show
+portfolio payoff non-negative in both states, conclude cost
+today non-positive. Hull \citeHull{} (Ch~$5$) is the standard
+textbook treatment.
+
+\section{Index arbitrage}
+\label{sec:ch13_index}
+
+Index arbitrage is cost-of-carry on an index futures contract,
+where the underlying is a basket (for the S\&P~$500$, five
+hundred stocks in declared proportions). The fair forward comes
+from \eqref{eq:cost_of_carry} with $\Spx$ the weighted
+constituent sum and $y$ the weighted-average dividend yield.
+
+\textbf{Observable.} Index futures away from
+\begin{equation*}
+  F^*_{\text{index}} \;=\; \Spx_{\text{SPX}} \cdot e^{(\rrf - y)(T - t)},
+\end{equation*}
+with $\Spx_{\text{SPX}}$ the $500$-stock synthetic at wall-mid
+prices, $\rrf$ the overnight rate (fed funds or SOFR), $y$ the
+index dividend yield.
+
+\textbf{Trade.} If $F_{\text{market}} > F^*_{\text{index}}$:
+short futures, buy all $500$ constituents in index proportions.
+If $F_{\text{market}} < F^*_{\text{index}}$: reverse. Hold to
+expiry; deliver (or cover). Dedicated ``program trading'' or
+``index arb'' desks exist to run this --- the largest single
+trade by volume in equities.
+
+\textbf{P\&L.} Per index unit, $F_{\text{market}} -
+F^*_{\text{index}}$, times contract notional and size.
+
+\textbf{Why it usually doesn't exist.} Index arb is the most
+heavily competed trade in the world. The basis typically lives
+inside the joint bid--ask of the futures and the cheapest
+tracking portfolio. Convergence is so tight that the basis is
+sometimes read as a real-time benchmark for $\rrf$: given
+observable $F_{\text{market}}$ and $\Spx_{\text{SPX}}$,
+\eqref{eq:cost_of_carry} is inverted for the market's funding
+cost.
+
+\textbf{When it does.} Index arb opens at moments of
+constituent-level chaos:
+\begin{itemize}
+  \item \textbf{Index-rebalance events.} When S\&P changes
+  membership on a known date, index funds must track the new
+  composition; the basis can dislocate during the recompute
+  window.
+  \item \textbf{Quadruple witching.} Once a quarter, futures,
+  options, and underlyings expire together, triggering massive
+  program-trading flow and occasional dislocations beyond joint
+  transaction cost.
+  \item \textbf{Fast-market stress.} During extreme vol
+  (March~$2020$ COVID, August~$2024$ Yen unwind), the $500$-stock
+  basket does not track futures in lock-step; the basis can blow
+  out by percentage points for tens of minutes.
+\end{itemize}
+
+\paragraph{Connection to basket arbitrage.} Mathematically
+identical to \cref{ch:basket_etf_arb}: both compare a synthetic
+weighted-constituent value to a single wrapper quote (futures or
+ETF). The structural difference is the closing mechanism ---
+creation/redemption for ETFs, physical delivery at maturity for
+futures.
+
+\section{Calendar arbitrage}
+\label{sec:ch13_calendar}
+
+Calendar arbitrage exploits inconsistent pricing between two
+contracts on the same underlying with different expiries. The
+common venue is options, where the implied-vol term structure
+occasionally inverts by more than the calendar no-arb bound
+permits.
+
+\textbf{Observable.} Two options on the same underlying, same
+strike, maturities $T_1 < T_2$. The no-arb bound says the
+longer-dated option is at least as valuable (it retains option
+value after the shorter expires): for European calls,
+$\Call(T_2) \geq \Call(T_1)$. A violation is the observable ---
+equivalently, a term-structure inversion where short-dated vol
+exceeds long-dated vol by more than the bound permits. Hull
+\citeHull{} (Ch~$17$) covers calendar spreads.
+
+\textbf{Trade.} Buy the cheap (long-dated), sell the expensive
+(short-dated), hold to short-dated expiry. The short expires;
+the trader is left holding the long, worth at least what the
+short was, plus the captured violation.
+
+\textbf{P\&L.} The violation net of joint transaction cost. This
+is a true Type~I arbitrage only if the long is held to its own
+expiry and residual value works out; in practice desks unwind
+earlier and treat it as a relative-value position.
+
+\textbf{Why it usually doesn't exist.} Options market makers
+smooth the vol surface by construction: quoting algorithms
+enforce monotonicity and convexity in strike and maturity, and
+errors correct within seconds. The calendar bound is one of the
+six monotonicity conditions in
+\citep{damodaranOptionsArbitrage}.
+
+\textbf{When it does.} Around scheduled events between the two
+maturities --- earnings, central bank meetings, FDA decisions
+--- where short-dated implied vol spikes for event risk while
+long-dated does not move much (the event is a small fraction of
+its remaining variance). Biotech FDA decisions are the classic
+case: short-dated implied vol can grow by an order of magnitude
+in the days before announcement.
+
+A second source is liquidity: for thin long-dated markets
+(exotic commodity options, deep-OTM LEAPS), the long quote goes
+stale relative to the short, inverting the term structure as a
+quoting artefact. The detection logic is the same though the
+capture looks more like market making.
+
+\section{ETF creation/redemption arbitrage}
+\label{sec:ch13_etf_cr}
+
+The mechanism is in \cref{ch:basket_etf_arb}; this section
+places the trade in the zoo and draws the line between it and
+the basket-spread stat-arb of the same chapter.
+
+\textbf{Observable.} ETF price diverges from synthetic basket
+value by more than the creation/redemption fee plus joint
+transaction cost. With ETF mid $P_{\text{ETF}}$ and synthetic
+NAV $P_{\text{NAV}}$:
+\begin{equation*}
+  |P_{\text{ETF}} - P_{\text{NAV}}|
+  \;>\;
+  \text{creation fee} + \text{transaction costs}.
+\end{equation*}
+
+\textbf{Trade.} If $P_{\text{ETF}} > P_{\text{NAV}}$: the AP
+shorts the ETF, buys the basket, uses the basket to
+\emph{create} new ETF shares with the issuer, delivers against
+the short. If $P_{\text{ETF}} < P_{\text{NAV}}$: the AP buys
+the ETF, redeems with the issuer for the basket, sells the
+basket.
+
+\textbf{P\&L.} $|P_{\text{ETF}} - P_{\text{NAV}}|$ minus
+creation fee minus joint transaction cost, locked per creation
+unit ($\sim 50{,}000$ shares).
+
+\textbf{Why it usually doesn't exist.} APs run automated
+basis-monitoring on every liquid ETF and are contractually
+incentivised to keep the basis tight. On SPY, IVV, VOO the
+basis rarely exceeds a fraction of a basis point intraday, and
+openings close in seconds.
+
+\textbf{When it does.} Three families:
+\begin{itemize}
+  \item \textbf{Creation fee changes.} A fee increase widens the
+  no-arb band; a trader who knows the new schedule before the
+  basis adjusts captures the transition.
+  \item \textbf{Settlement lag.} For ETFs with international
+  constituents (EM ETFs spanning $20$ time zones), constituent
+  prices are stale when home markets are closed; the basis is a
+  noisy stale-vs-current mix. Sophisticated APs use fair-value
+  models; traders who model time zones better than consensus
+  find real openings.
+  \item \textbf{AP outages.} When an AP is unavailable (trading
+  system down, credit line frozen), the closing mechanism is
+  gone. The basis can blow out by percent until another AP picks
+  up. The ``flash crash'' episodes are the dramatic cases: ETF
+  prices collapse relative to NAV when AP-side and exchange-side
+  liquidity vanish together.
+\end{itemize}
+
+The Prosperity~$3$ \texttt{PICNIC\_BASKET} trade in
+\cref{ch:basket_etf_arb} is \emph{not} an instance: the
+simulator has no creation/redemption mechanism; basket-to-NAV
+convergence is a property of the data-generating process, not a
+closed loop, so the trade has no zero-risk completion. The next
+section is about that distinction.
+
+\section{Statistical arbitrage --- not a true arbitrage}
+\label{sec:ch13_stat_arb}
+
+The seven preceding sections cover \emph{true arbitrage}:
+deterministic, non-negative-in-every-state by construction, with
+a no-arb argument that pins fair value down.
+
+The strategies of \cref{ch:mean_reversion_ou},
+\cref{ch:pairs_cointegration}, and \cref{ch:basket_etf_arb}
+(outside the literal ETF c/r mechanism above) are different in
+kind. They share the word ``arbitrage'' for historical/marketing
+reasons but are not arbitrages in the sense of
+\cref{def:arbitrage}. A statistical arbitrage:
+\begin{itemize}
+  \item Has positive \emph{expected} payoff under an assumed
+  data-generating process.
+  \item Has non-zero variance of realised payoff.
+  \item Can lose in any individual trade and over any finite
+  window.
+  \item Requires an assumption about the persistence of a
+  statistical relationship, with no contractual no-arb
+  guarantee enforcing it.
+\end{itemize}
+
+The OU $z$-score rule of \cref{ch:mean_reversion_ou} is
+positive-EV under the assumption that the spread follows OU
+with the calibrated parameters; if parameters change, the rule
+can be wrong for arbitrarily long and the position can lose
+arbitrarily much before convergence. The cointegration tests of
+\cref{ch:pairs_cointegration} are statistical inferences that
+can be correct in expectation and wrong on the realised path.
+The \texttt{PICNIC\_BASKET1} spread trade works in Prosperity
+because the quoting bots are programmed to mean-revert toward
+synthetic value --- a property of the simulation, not the
+universe; a different parameterisation breaks it.
+
+Sizing follows from the distinction. A true arb is sized to
+maximum capacity, because there is no downside; the only
+constraint is broker-deployable principal. A stat arb must be
+sized via \cref{ch:kelly_risk}: by the ratio of expected return
+to variance, with full Kelly as an upper bound and some
+fraction thereof in practice. Sizing a stat arb as a true arb
+is unbounded risk in disguise.
+
+\begin{pitfallbox}[Statistical arbitrage is not arbitrage]
+\label{pf:stat_arb_is_not}
+``Arbitrage'' in ``statistical arbitrage'' is a marketing
+label from the late $1980$s/early $1990$s, not the technical
+term of \cref{def:arbitrage}. A stat arb has positive expected
+return, not deterministic, and it can and does lose. LTCM
+($1998$, \citep{lowenstein2000ltcm}), the $2007$ quant quake
+that vaporised equity-market-neutral funds in three days, and a
+long list of smaller blow-ups reduce to one error: a stat-arb
+book sized as if it could not lose, then realising
+cross-position-correlated losses far beyond the in-sample
+variance estimate.
+
+Two rules:
+\begin{enumerate}
+  \item Never call a bet an ``arbitrage'' or an arbitrage a
+  ``trade''. Vocabulary discipline is the first defence against
+  the sizing error.
+  \item Size stat arbs by Kelly (\cref{ch:kelly_risk}), never by
+  ``fully deploy capital''. The bound is the risk model's worst
+  plausible drawdown, not the capital balance.
+\end{enumerate}
+Apply the five-step template of \cref{kf:arb_template} and ask
+at step~(3): \emph{is the P\&L deterministic?} For pairs
+trading, non-creatable basket spreads, and OU mean reversion
+the answer is no, and the trade moves out of the zoo and into
+the strategy bestiary.
+\end{pitfallbox}
+
+\begin{gsbox}
+Every large bank runs a desk mandated to monitor and trade the
+seven arbitrages here --- \emph{relative value}, \emph{program
+trading}, or simply \emph{the arb desk}. On a Goldman Sachs
+floor in $2025$, a junior strat's morning begins with a
+\emph{zoo sweep}: a scripted walk-through of every arbitrage
+against intraday prices, with any opening flagged in a Slack
+channel the senior traders read over first coffee. On most
+mornings every entry returns ``closed by less than round-trip
+cost'' and nothing happens. On the rare morning one entry
+opens --- a parity violation on a hard-to-borrow name, a basis
+dislocation around quadruple witching, an index rebalance, an
+FDA decision --- the trader descends for an hour and the desk
+makes a meaningful share of its monthly P\&L. The
+patience-and-automation culture flows from this rhythm: daily
+expected return is flat, but conditional expected return given
+an opening is huge, so the trader set up to capture openings
+the moment they appear is the one who eats. The strats
+building zoo-sweep monitors are accordingly some of the
+quietly important people on the floor: their dashboards are
+the institutional memory of when, how, and why each arbitrage
+has historically opened.
+\end{gsbox}
+
+\begin{historybox}
+Systematic study of no-arb relations dates to the early
+$1970$s. Black--Scholes ($1973$ JPE) with Merton's companion
+\citep{merton1973rational} derived \eqref{eq:put_call_parity}
+as a corollary of the replicating-portfolio argument behind the
+Black--Scholes equation. \citet{stoll1969relationship} is the
+canonical pre-1973 citation for the US-equity parity
+inequality, but the modern hierarchical view --- parity as the
+simplest of a ladder topped by the Black--Scholes PDE --- comes
+from the $1973$ papers.
+
+Institutional arbitrage on a trading floor is older. Gustave
+Levy ran Goldman Sachs' arb desk from the late $1940$s and was
+Senior Partner by $1969$, making his name on \emph{merger
+arbitrage}: buying a target at a discount to the deal price,
+hedged by shorting the acquirer. Merger arb is not in the zoo
+--- deals break, and the spread compensates deal-break risk ---
+but Goldman's modern arb desk traces to Levy's $1950$s practice.
+
+The cautionary half is LTCM, founded $1994$ and bankrupt
+$1998$ \citep{lowenstein2000ltcm}. Founded by Meriwether with
+Merton and Scholes themselves, LTCM ran statistical arbitrages
+dressed as textbook arbs --- on-the-run/off-the-run Treasury
+spreads, swap spreads, sovereign convergence --- all
+positive-EV with small normal-regime variance, all
+simultaneously losing during the August--September~$1998$
+Russian-default flight to quality. A Fed-organised \$$3.6$B
+private-sector recapitalisation averted broader collapse. The
+lesson: a strategy whose name contains ``arbitrage'' is not, by
+that fact alone, an arbitrage.
+\end{historybox}
+
+\section{The arb-diagnostic flowchart}
+\label{sec:ch13_flowchart}
+
+The chapter ends where it began: with a diagnostic. Given an
+observable condition, which arbitrage fits? The table lists the
+seven zoo entries with their triggers, trade structures, and
+section references. Keep it in arm's reach when encountering an
+unfamiliar product and walk down row by row.
+
+\renewcommand{\arraystretch}{1.3}
+\begin{center}
+\begin{tabular}{p{0.34\linewidth} p{0.34\linewidth} p{0.20\linewidth}}
+\toprule
+\textbf{If you observe\ldots} & \textbf{\ldots set up} & \textbf{See} \\
+\midrule
+Three FX rates whose product around a triangle differs from
+one. &
+Triangular arbitrage: cycle through the three pairs in the
+profitable direction. &
+\cref{sec:ch13_triangular} \\
+\midrule
+The same asset quoted at materially different prices on two
+venues, after fees. &
+Locational arbitrage: buy on the cheap venue, sell on the
+dear venue. &
+\cref{sec:ch13_locational} \\
+\midrule
+A futures price away from $\Spx e^{(\rrf - y)(T-t)}$, after
+financing and yield. &
+Cash-and-carry arbitrage: long spot, short futures (or the
+reverse), deliver at maturity. &
+\cref{sec:ch13_cash_carry} \\
+\midrule
+$\Call - \Put$ on a European pair away from $\Spx - \Kstrike
+e^{-\rrf \Tmat}$ (after dividends and borrow). &
+Put-call parity arbitrage: trade the four legs to lock in the
+violation. &
+\cref{sec:ch13_put_call_parity} \\
+\midrule
+Index futures away from the synthetic basket value (after
+dividends and rates). &
+Index arbitrage: trade the futures against all constituents
+in index proportions. &
+\cref{sec:ch13_index} \\
+\midrule
+A short-dated and long-dated option on the same underlying
+with relative pricing violating monotonicity. &
+Calendar arbitrage: buy the cheap maturity, sell the
+expensive, hold to short-leg expiry. &
+\cref{sec:ch13_calendar} \\
+\midrule
+ETF wrapper trading away from synthetic NAV by more than the
+creation fee. &
+ETF creation / redemption arbitrage: create or redeem with
+the issuer to capture the basis. &
+\cref{sec:ch13_etf_cr} \\
+\midrule
+A spread between historically-correlated assets that has
+drifted from its long-run mean, with no contractual mechanism
+to force convergence. &
+\emph{Statistical arbitrage} (NOT a true arb): a positive-EV
+bet to be sized via Kelly. &
+\cref{sec:ch13_stat_arb}, \cref{ch:kelly_risk} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+One row per zoo entry, plus the closing row explicitly
+excluding stat arb. A reader with this table internalised can
+walk into any market, look at available instruments, and
+within minutes have an opinion on which arbitrages are worth
+monitoring and which are inapplicable. That is the
+chapter's operational deliverable.
+
+\section{Key facts to memorise}
+\label{sec:ch13_keyfacts}
+
+\begin{itemize}
+  \item \textbf{Definition.} An arbitrage is a strategy with
+  zero or negative initial cost, non-negative payoff in every
+  state of the world, and strictly positive payoff in some
+  state. Equivalently, a free lunch.
+  \item \textbf{The five-step template.} Observable, trade,
+  P\&L, why it usually does not exist, when it does. Every
+  entry in the zoo follows this template.
+  \item \textbf{Triangular FX.} Three currency pairs whose
+  product around a triangle differs from one; trade the cycle.
+  Profit per unit is the gap; example $1.08 \cdot 148 \cdot
+  0.0063 - 1 \approx 0.70\%$.
+  \item \textbf{Locational arbitrage.} Same asset, two venues,
+  different prices after fees; buy cheap, sell dear. Opens on
+  regulatory fragmentation, latency asymmetry, transient
+  imbalance.
+  \item \textbf{Cost of carry.} The no-arbitrage forward price
+  is $F = \Spx e^{(\rrf - y) T}$. The cash-and-carry arbitrage
+  closes any deviation from this; the example with $\Spx =
+  100$, $\rrf = 5\%$, $y = 1\%$, $T = 0.5$ gives fair forward
+  $\approx 102.02$.
+  \item \textbf{Put-call parity.} For European options on a
+  non-dividend underlying, $\Call - \Put = \Spx - \Kstrike
+  e^{-\rrf \Tmat}$. With $\Spx = \Kstrike = 100$, $\rrf = 5\%$,
+  $\Tmat = 1$, parity gives $\Call - \Put \approx 4.877$. Add
+  $-PV(\text{div})$ if the underlying pays dividends.
+  \item \textbf{Index arbitrage.} Cost-of-carry applied to a
+  basket: index futures vs the synthetic value of the
+  $500$-stock basket. Most heavily competed trade in equities;
+  opens on rebalances, witching days, fast markets.
+  \item \textbf{Calendar arbitrage.} Two maturities of the
+  same option, monotonicity violated; buy the cheap one, sell
+  the expensive one. Opens around scheduled events between
+  the two maturities.
+  \item \textbf{ETF creation / redemption arbitrage.} ETF
+  wrapper price away from synthetic NAV by more than the
+  creation fee; create or redeem to close. Distinct from the
+  Prosperity \texttt{PICNIC\_BASKET} stat arb of
+  \cref{ch:basket_etf_arb}, which has no creation mechanism.
+  \item \textbf{Statistical arbitrage is not arbitrage.}
+  Positive expected value, non-zero variance, can and does
+  lose. Size via Kelly (\cref{ch:kelly_risk}), not by capital
+  deployment.
+  \item \textbf{The desk rhythm.} Expected open arbitrages per
+  day is small; the relative-value desk detects openings
+  automatically the moment they appear. The
+  patience-and-automation culture follows from the
+  conditional-vs-unconditional expected-return asymmetry.
+\end{itemize}

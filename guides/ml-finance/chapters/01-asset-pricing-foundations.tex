@@ -1,0 +1,523 @@
+\chapter{Asset Pricing Foundations}
+\label{ch:asset-pricing}
+
+\begin{projectconnection}
+This chapter provides the theoretical foundation for why risk signals should predict returns. Understanding the SDF framework is essential for framing your project thesis (Phase~0 pitch) and interpreting results (Phase~5 presentation). Every feature you engineer in Phase~2 is, at its core, a proxy for a component of the pricing kernel. When your sponsor asks ``why should VaR dynamics predict returns?''\ the answer lives here.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{The Stochastic Discount Factor}
+\label{sec:sdf}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Conditional Expectation]
+If $X$ and $Y$ are random variables, the conditional expectation $\E[X \mid Y]$ is itself a random variable---it gives the ``best prediction'' of $X$ given knowledge of $Y$. The law of iterated expectations says $\E[\E[X \mid Y]] = \E[X]$. You will use this constantly in asset pricing: today's price reflects the conditional expectation of tomorrow's discounted payoff.
+\end{prereq}
+
+\begin{prereq}[Law of One Price]
+Two portfolios with identical future payoffs in every state of the world must have the same price today. If they did not, you could buy the cheap one, sell the expensive one, and pocket the difference risklessly. This principle is weaker than no-arbitrage (it does not rule out ``free lottery tickets''), but it is enough to guarantee the existence of a linear pricing rule.
+\end{prereq}
+
+\begin{prereq}[Gross vs.\ Net Returns]
+Finance uses two return conventions. A \textbf{net return} $r_i$ is the percentage gain: if you invest \$100 and end with \$108, $r_i = 0.08$ (8\%). A \textbf{gross return} $R_i = 1 + r_i = 1.08$ is the wealth multiplier: \$100 becomes $100 \times 1.08 = \$108$. The SDF equation uses gross returns because the algebra is cleaner. When you see $\E[\SDF \cdot R_i] = 1$, remember $R_i$ includes the principal repayment.
+\end{prereq}
+
+The central object in modern asset pricing is the \textbf{stochastic discount factor} (SDF), also called the pricing kernel or state-price density. It is a single random variable that prices every asset in the economy.
+
+\begin{definition}[Stochastic Discount Factor]
+A random variable $\SDF_{t+1}$ is a stochastic discount factor if, for every asset $i$ with gross return $R_{i,t+1}$,
+\begin{equation}
+\E_t[\SDF_{t+1} \, R_{i,t+1}] = 1
+\label{eq:sdf-basic}
+\end{equation}
+where $\E_t[\cdot]$ denotes the expectation conditional on information available at time $t$.
+\begin{itemize}[nosep]
+  \item $\SDF_{t+1}$ --- the SDF, a random variable realized at $t+1$. High in ``bad'' states, low in ``good'' states.
+  \item $R_{i,t+1}$ --- gross return on asset $i$ (i.e., $1 + r_i$ where $r_i$ is the net return).
+  \item $\E_t[\cdot]$ --- expectation conditional on all information known at time $t$.
+\end{itemize}
+\end{definition}
+
+Equivalently, if the asset has a random payoff $x_{t+1}$ and a price $p_t$ today:
+\begin{equation}
+p_t = \E_t[\SDF_{t+1} \, x_{t+1}]
+\label{eq:sdf-payoff}
+\end{equation}
+Price equals expected discounted payoff. Every model in finance---CAPM, Fama-French, option pricing, term structure models---is a different claim about what $\SDF$ looks like (Cochrane, 2005, Ch.~1).
+
+\begin{intuition}[The SDF as ``State Dislike'']
+The SDF is a single number that tells you how much the market ``dislikes'' each state of the world. States where you are already losing money---recessions, financial crises, liquidity dry-ups---get high SDF values. Assets that pay off precisely in those painful states are valuable (they provide insurance), so their prices get bid up and their expected returns are low. Assets that only pay off in good times are cheap and must offer high expected returns to attract buyers. The SDF is the exchange rate between dollars today and dollars tomorrow, where the rate depends on which ``tomorrow'' you are in.
+\end{intuition}
+
+\subsection{The Fundamental Theorem of Asset Pricing}
+
+The deep connection between no-arbitrage and the SDF is:
+
+\begin{keyidea}[Fundamental Theorem of Asset Pricing]
+The following are equivalent (Harrison and Kreps, 1979; Harrison and Pliska, 1981):
+\begin{enumerate}[nosep]
+  \item There are no arbitrage opportunities (no way to get something for nothing).
+  \item There exists a strictly positive SDF: $\SDF > 0$ such that $\E[\SDF \, R_i] = 1$ for all traded assets $i$.
+\end{enumerate}
+Strictly positive means $\SDF > 0$ in every state---it never assigns zero value to any possible outcome.
+\end{keyidea}
+
+This theorem is the bedrock of quantitative finance. It says: if markets make any sense at all (no free money), then there \emph{must} exist a positive random variable that prices everything. The entire research program of asset pricing is figuring out what drives $\SDF$.
+
+\begin{prereq}[No-Arbitrage]
+An \textbf{arbitrage} is a trading strategy that (i) costs nothing to enter, (ii) has no possibility of losing money, and (iii) has a positive probability of making money. Example: gold trades at \$2{,}000 in New York and \$2{,}010 in London. Buy in New York, sell in London, pocket \$10 risk-free. No-arbitrage means these opportunities do not persist---they get traded away instantly. This is the weakest assumption in finance: even if investors are irrational, as long as \emph{someone} is willing to pick up free money, arbitrage opportunities vanish.
+\end{prereq}
+
+Note that the fundamental theorem does \emph{not} say $\SDF$ is unique. In incomplete markets (where not every payoff can be replicated by traded assets), many different SDFs are consistent with no-arbitrage. Each corresponds to a different way of pricing payoffs that are not currently traded. The CAPM, Fama-French, and intermediary models (Chapter~\ref{ch:intermediary}) each propose a specific $\SDF$; they disagree on which one is ``correct.''
+
+\subsection{The Risk-Free Rate and the SDF}
+
+If a risk-free asset exists with certain gross return $R_f$, then since $R_f$ is non-random:
+\begin{equation}
+\E_t[\SDF_{t+1}] \cdot R_f = 1 \quad \Longrightarrow \quad R_f = \frac{1}{\E_t[\SDF_{t+1}]}
+\label{eq:rf-sdf}
+\end{equation}
+The risk-free rate is the inverse of the expected SDF. When the expected SDF is high (the market expects bad times ahead and ``discounts the future heavily''), the risk-free rate is low.
+
+% ──────────────────────────────────────────────────────────────
+\section{Risk Premia}
+\label{sec:risk-premia}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Covariance Decomposition]
+For any two random variables $X$ and $Y$: $\E[XY] = \E[X]\E[Y] + \text{Cov}(X,Y)$. This identity is the algebraic engine behind most of asset pricing. When you see $\E[\SDF \cdot R] = 1$, splitting it into mean and covariance components gives you the risk premium formula.
+\end{prereq}
+
+Why do different assets earn different expected returns? Apply the covariance decomposition to equation~\eqref{eq:sdf-basic}:
+\begin{align}
+1 &= \E_t[\SDF_{t+1} \, R_{i,t+1}] \notag \\
+  &= \E_t[\SDF_{t+1}] \, \E_t[R_{i,t+1}] + \text{Cov}_t(\SDF_{t+1}, R_{i,t+1})
+\label{eq:cov-decomp}
+\end{align}
+Substituting $\E_t[\SDF_{t+1}] = 1/R_f$ from equation~\eqref{eq:rf-sdf} and rearranging:
+
+\begin{definition}[Risk Premium Formula]
+\begin{equation}
+\E_t[R_{i,t+1}] - R_f = -R_f \, \text{Cov}_t(\SDF_{t+1}, R_{i,t+1})
+\label{eq:risk-premium}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\E_t[R_{i,t+1}] - R_f$ --- the \textbf{risk premium} (expected excess return) on asset $i$.
+  \item $R_f$ --- the gross risk-free rate (a positive constant).
+  \item $\text{Cov}_t(\SDF_{t+1}, R_{i,t+1})$ --- covariance between the SDF and the asset's return.
+  \item The minus sign: assets with \emph{negative} covariance with $\SDF$ (they pay off when the SDF is low, i.e., in good times) earn \emph{positive} risk premia.
+\end{itemize}
+\end{definition}
+
+This single equation explains all of asset pricing. An asset earns a risk premium if and only if its return covaries negatively with the SDF. No covariance, no premium---regardless of how volatile the asset is.
+
+\begin{keyidea}[Risk vs.\ Volatility]
+Volatility alone does not earn you a risk premium. Only \emph{systematic} risk---covariance with the pricing kernel---is compensated. A coin flip that doubles or halves your money is extremely volatile but has zero SDF covariance (coin flips are unrelated to aggregate economic conditions), so it earns zero premium. This is why idiosyncratic risk is not priced in equilibrium.
+\end{keyidea}
+
+\begin{intuition}[Insurance Analogy]
+Think of risk premia like insurance premiums. Homeowner's insurance costs money (negative expected return for the buyer) because it pays off precisely when you need it most---when your house burns down. The insurance company earns a positive expected return by bearing that risk. In asset pricing, Treasury bonds are like insurance: they pay off in recessions (when the SDF is high), so their expected returns are low. Equities are like being the insurance company: they lose value in recessions, so investors demand a premium to hold them. The market risk premium (${\sim}6$--$8\%$/year historically) is the ``premium'' investors earn for bearing aggregate economic risk.
+\end{intuition}
+
+\begin{workedexample}{Two Assets in Two States}
+Consider a simple economy with two equally likely states: \textbf{Boom} and \textbf{Recession}.
+
+\medskip
+\begin{tabular}{lccc}
+\toprule
+ & Probability & SDF ($\SDF$) & \\
+\midrule
+Boom      & 0.5 & 0.8 & \\
+Recession & 0.5 & 1.2 & \\
+\bottomrule
+\end{tabular}
+
+\medskip
+The SDF is higher in recessions (the market dislikes recessions). The risk-free rate is:
+\[
+R_f = \frac{1}{\E[\SDF]} = \frac{1}{0.5 \times 0.8 + 0.5 \times 1.2} = \frac{1}{1.0} = 1.0 \quad (\text{i.e., } r_f = 0\%)
+\]
+
+\textbf{Asset A} (``procyclical''): pays $R_A = 1.3$ in Boom, $R_A = 0.7$ in Recession.
+\[
+\E[R_A] = 0.5(1.3) + 0.5(0.7) = 1.0
+\]
+\[
+\text{Cov}(\SDF, R_A) = \E[\SDF \cdot R_A] - \E[\SDF]\E[R_A] = [0.5(0.8)(1.3) + 0.5(1.2)(0.7)] - (1.0)(1.0) = 0.94 - 1.0 = -0.06
+\]
+Risk premium $= -R_f \cdot \text{Cov}(\SDF, R_A) = -(1.0)(-0.06) = +0.06$, i.e., $+6\%$.
+
+But wait---$\E[R_A] = 1.0$ and $R_f = 1.0$, so the premium is 0\%, not 6\%. That is because Asset~A is mispriced at our assumed returns. To be consistent with the SDF, Asset~A's price must adjust so that $p_A = \E[\SDF \cdot x_A] = 0.94$, giving an expected return of $\E[x_A]/p_A = 1.0/0.94 = 1.064$, or a 6.4\% expected return.
+
+\textbf{Asset B} (``countercyclical''): pays $R_B = 0.7$ in Boom, $R_B = 1.3$ in Recession.
+\[
+\text{Cov}(\SDF, R_B) = [0.5(0.8)(0.7) + 0.5(1.2)(1.3)] - (1.0)(1.0) = 1.06 - 1.0 = +0.06
+\]
+Risk premium $= -(1.0)(+0.06) = -0.06$, i.e., $-6\%$.
+
+Asset~B pays off in recessions when the SDF is high---it provides insurance. Investors bid up its price, driving its expected return \emph{below} the risk-free rate. Asset~A does the opposite: it fails you in recessions, so you demand compensation.
+
+\textbf{Takeaway:} Same volatility (30\% spread between states), opposite risk premia. Covariance with $\SDF$, not variance, determines expected returns.
+\end{workedexample}
+
+% ──────────────────────────────────────────────────────────────
+\section{Factor Models}
+\label{sec:factor-models}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Linear Regression and OLS]
+A factor model is just a multivariate linear regression. If you regress asset returns $R_i$ on factors $f_1, \ldots, f_K$:
+\[
+R_{i,t} - R_f = \alpha_i + \beta_{i,1} f_{1,t} + \cdots + \beta_{i,K} f_{K,t} + \varepsilon_{i,t}
+\]
+The $\beta$'s are OLS coefficients measuring the asset's sensitivity (``loading'') on each factor. The $R^2$ tells you what fraction of return variation the factors explain. The intercept $\alpha_i$ is the return left unexplained---the ``alpha.''
+\end{prereq}
+
+The SDF framework is powerful but abstract. In practice, we need to specify \emph{what drives $\SDF$}. Factor models do this by saying: the SDF is a linear function of a small number of observable factors.
+
+\begin{definition}[Linear Factor Model]
+A linear factor model assumes the SDF is:
+\begin{equation}
+\SDF_{t+1} = a - \mathbf{b}^\top \mathbf{f}_{t+1}
+\label{eq:linear-sdf}
+\end{equation}
+where $\mathbf{f}_{t+1}$ is a $K \times 1$ vector of factor returns and $a$, $\mathbf{b}$ are constants.
+\begin{itemize}[nosep]
+  \item $a$ --- a constant ensuring $\E[\SDF] = 1/R_f$.
+  \item $\mathbf{b}$ --- vector of factor ``prices of risk.'' Larger $b_k$ means factor $k$ matters more for pricing.
+  \item $\mathbf{f}_{t+1}$ --- realized factor returns (e.g., market return, size factor, value factor).
+\end{itemize}
+\end{definition}
+
+Substituting equation~\eqref{eq:linear-sdf} into the risk premium formula \eqref{eq:risk-premium} and using the covariance decomposition:
+\begin{equation}
+\E[R_i] - R_f = \sum_{k=1}^{K} \beta_{i,k} \, \lambda_k
+\label{eq:beta-pricing}
+\end{equation}
+where $\beta_{i,k} = \text{Cov}(R_i, f_k) / \text{Var}(f_k)$ is asset $i$'s loading on factor $k$, and $\lambda_k$ is the risk premium for factor $k$ (the expected excess return on a portfolio with unit beta on factor $k$ and zero on all others). This is the \textbf{beta pricing equation}---the operational heart of factor models. Every specific model is a claim about which factors belong in $\mathbf{f}$.
+
+\begin{intuition}[Factors as ``Bad Times'' Indicators]
+Why should loading on a factor earn you a premium? Because factors represent states of the world that investors dislike. The market factor is obvious: it drops in recessions. The size factor captures the idea that small firms are particularly vulnerable in downturns (they have less access to credit, thinner margins). The value factor captures the idea that cheap, distressed firms are risky precisely because they are already in trouble and could get worse. Each factor is, in SDF language, a component of $\SDF$---a dimension of ``bad times.''
+\end{intuition}
+
+\subsection{CAPM: The One-Factor Benchmark}
+
+The \textbf{Capital Asset Pricing Model} (Sharpe, 1964; Lintner, 1965) is the simplest factor model. It says the market portfolio is the only factor:
+
+\begin{equation}
+\E[R_i] - R_f = \beta_i \, (\E[R_m] - R_f)
+\label{eq:capm}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\beta_i = \text{Cov}(R_i, R_m) / \text{Var}(R_m)$ --- asset $i$'s sensitivity to the market.
+  \item $\E[R_m] - R_f$ --- the \textbf{market risk premium} (historically ${\approx}6$--$8\%$ per year for U.S.\ equities).
+  \item The equation says: your expected excess return is proportional to your market beta.
+\end{itemize}
+
+In SDF language, the CAPM says $\SDF_{t+1} = a - b \, R_{m,t+1}$: the pricing kernel depends \emph{only} on the market return. This is equivalent to assuming all investors hold mean-variance efficient portfolios and have homogeneous expectations. Under these assumptions, the market portfolio is mean-variance efficient, and market beta is the only source of priced risk.
+
+The CAPM is elegant but empirically incomplete. Early tests by Black, Jensen, and Scholes (1972) found a positive relation between beta and average return, but the relationship is ``too flat'': low-beta stocks earn more than the CAPM predicts, and high-beta stocks earn less. Fama and French (1992) went further, showing that beta has essentially no explanatory power for the cross-section of returns once you control for firm size. Fama and French (2004) summarized decades of evidence with the blunt assessment that ``the failure of the CAPM in empirical tests implies that most applications of the model are invalid.''
+
+Despite these failures, the CAPM remains your default benchmark. When your sponsor asks ``does this signal have alpha?'' they mean alpha relative to the market at minimum. You will always include market beta as a control.
+
+\subsection{Fama-French Three-Factor Model}
+
+Fama and French (1993) proposed three factors:
+
+\begin{equation}
+\E[R_i] - R_f = \beta_i^{\text{MKT}}(\E[R_m] - R_f) + \beta_i^{\text{SMB}} \, \E[\text{SMB}] + \beta_i^{\text{HML}} \, \E[\text{HML}]
+\label{eq:ff3}
+\end{equation}
+\begin{itemize}[nosep]
+  \item \textbf{MKT} --- excess return on the market portfolio (same as CAPM).
+  \item \textbf{SMB} (Small Minus Big) --- return on small-cap stocks minus large-cap stocks. Captures the \textbf{size premium}: small firms earn higher average returns.
+  \item \textbf{HML} (High Minus Low) --- return on high book-to-market stocks minus low book-to-market stocks. Captures the \textbf{value premium}: cheap (``value'') firms earn higher average returns than expensive (``growth'') firms.
+\end{itemize}
+
+\begin{keyresult}[Fama and French (1993)]
+The three-factor model explains over 90\% of diversified portfolio return variation, compared with roughly 70\% for the CAPM alone. In their 1963--1991 U.S.\ sample, the average monthly SMB premium was approximately 0.27\% (${}\approx 3.2\%$ annualized) and the average monthly HML premium was approximately 0.40\% (${}\approx 4.8\%$ annualized). After controlling for size and book-to-market, market beta has no residual explanatory power for the cross-section of expected returns.
+\end{keyresult}
+
+\begin{warning}[Why Does This Model ``Work''?]
+Fama and French (1993) is a statistical fact, not an explanation. It tells you that size and value loadings predict returns, but it does not tell you \emph{why}. Fama and French argue these are risk factors (small/value firms are riskier in recessions). Others argue they reflect mispricing (investors systematically undervalue cheap, boring firms). For your project, this debate matters less than the practical point: any ``alpha'' you claim must survive as alpha \emph{after} controlling for known factors. If your signal just loads on HML, you have not found anything new.
+\end{warning}
+
+\subsection{Arbitrage Pricing Theory (APT)}
+
+Ross (1976) took a different approach. Instead of deriving factors from an equilibrium model, the \textbf{Arbitrage Pricing Theory} starts from two assumptions:
+
+\begin{enumerate}[nosep]
+  \item Returns are generated by a linear factor model:
+  \begin{equation}
+  R_{i,t} = a_i + \beta_{i,1} f_{1,t} + \beta_{i,2} f_{2,t} + \cdots + \beta_{i,K} f_{K,t} + \varepsilon_{i,t}
+  \label{eq:apt-return}
+  \end{equation}
+  \item No-arbitrage: you cannot construct a zero-cost, zero-risk portfolio with a positive expected return.
+\end{enumerate}
+
+From these, Ross proved:
+\begin{equation}
+\E[R_i] - R_f \approx \beta_{i,1} \lambda_1 + \beta_{i,2} \lambda_2 + \cdots + \beta_{i,K} \lambda_K
+\label{eq:apt-pricing}
+\end{equation}
+where $\lambda_k$ is the \textbf{risk premium} for factor $k$---the expected return per unit of exposure to that factor.
+
+\begin{itemize}[nosep]
+  \item $\beta_{i,k}$ --- asset $i$'s loading (sensitivity) on factor $k$. Estimated via time-series regression.
+  \item $\lambda_k$ --- the price of risk for factor $k$. Estimated cross-sectionally.
+  \item $\varepsilon_{i,t}$ --- idiosyncratic return, diversifiable and unpriced.
+  \item The $\approx$ sign: the APT pricing relation holds exactly only as the number of assets grows to infinity. For finite portfolios, there is an approximation error.
+\end{itemize}
+
+\begin{keyidea}[APT vs.\ CAPM: What Changed]
+The CAPM tells you \emph{which} factor matters (the market) but requires strong assumptions (mean-variance investors, a single period, etc.). The APT tells you that \emph{some} factors are priced but does not tell you which ones---that is an empirical question. The APT is more general but less specific. In practice, applied researchers (and your project) take the APT perspective: propose factors motivated by theory, test whether their $\lambda$'s are significantly different from zero.
+\end{keyidea}
+
+\subsection{Comparison of Factor Models}
+
+\begin{center}
+\begin{tabular}{p{3cm} p{3.5cm} p{3.5cm} p{3.5cm}}
+\toprule
+ & \textbf{CAPM} & \textbf{Fama-French 3} & \textbf{APT} \\
+\midrule
+\textbf{Factors} & Market only & Market, SMB, HML & Unspecified (empirical) \\
+\textbf{Derivation} & Equilibrium (mean-variance optimization) & Empirical observation & No-arbitrage \\
+\textbf{Assumptions} & Homogeneous expectations, single period, all assets tradable & Factors capture risk (debated) & Factor structure in returns, no-arbitrage \\
+\textbf{Testable?} & Yes (but market portfolio unobservable---Roll's critique) & Yes (time-series and cross-sectional regressions) & Weakly (does not specify factors) \\
+\textbf{$R^2$ for portfolios} & ${\sim}70\%$ & ${\sim}90\%$+ & Depends on factor choice \\
+\textbf{Practical use} & Benchmark; cost of equity & Performance attribution; alpha testing & Theoretical justification for multi-factor models \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ──────────────────────────────────────────────────────────────
+\section{Alpha, Beta, and Information Ratio}
+\label{sec:alpha-beta-ir}
+% ──────────────────────────────────────────────────────────────
+
+These three concepts are the vocabulary of quantitative investing. You will use them every day on the desk.
+
+\begin{definition}[Beta]
+The \textbf{beta} of asset $i$ with respect to factor $k$ is:
+\begin{equation}
+\beta_{i,k} = \frac{\text{Cov}(R_i, f_k)}{\text{Var}(f_k)}
+\label{eq:beta}
+\end{equation}
+It is the OLS slope coefficient from regressing $R_i$ on $f_k$. Beta measures sensitivity: if $\beta_{i,\text{MKT}} = 1.2$, then when the market rises 1\%, asset $i$ rises 1.2\% on average (and vice versa for declines).
+\end{definition}
+
+\begin{definition}[Alpha]
+The \textbf{alpha} of asset $i$ (or a portfolio/strategy) relative to a set of factors $\mathbf{f}$ is the intercept in the regression:
+\begin{equation}
+R_{i,t} - R_f = \alpha_i + \bbeta_i^\top \mathbf{f}_t + \varepsilon_{i,t}
+\label{eq:alpha}
+\end{equation}
+Alpha is the average return that is \emph{not} explained by the asset's factor exposures. Positive alpha means the asset earns more than its risk (as measured by the factor model) justifies.
+\end{definition}
+
+\begin{warning}[Alpha Is Always Relative]
+Alpha is always relative to a factor model. A strategy might show $\alpha = 3\%$ per year relative to CAPM (one factor), but $\alpha = 0\%$ relative to Fama-French (three factors)---because the strategy was simply loading on SMB and HML. When you present results in Phase~5, always specify the benchmark. Your sponsor will ask: ``Is this alpha relative to what?'' If you cannot answer precisely, your result is uninterpretable. In Chapter~\ref{ch:backtesting}, you will build this into your reporting pipeline.
+\end{warning}
+
+\begin{definition}[Information Ratio]
+The \textbf{information ratio} (IR) of a strategy is:
+\begin{equation}
+\text{IR} = \frac{\alpha}{\sigma(\varepsilon)}
+\label{eq:ir}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\alpha$ --- the strategy's alpha (annualized excess return over the benchmark).
+  \item $\sigma(\varepsilon)$ --- the \textbf{tracking error}, the standard deviation of the strategy's residual returns (i.e., the volatility of the component not explained by factors).
+\end{itemize}
+The IR measures how much excess return you earn per unit of active risk. It is the active manager's analogue of the Sharpe ratio.
+\end{definition}
+
+How large is a ``good'' IR? Top-quartile active managers achieve annualized information ratios of roughly 0.5 (Grinold and Kahn, 2000). An IR of 1.0 is exceptional and rare. Your project signals, which are research-stage and pre-transaction-cost, might show higher in-sample IRs, but always apply the Deflated Sharpe Ratio (Chapter~\ref{ch:validation}) to check whether that is real.
+
+\begin{keyidea}[The Fundamental Law of Active Management]
+Grinold (1989) showed:
+\begin{equation}
+\text{IR} \approx \IC \times \sqrt{BR}
+\label{eq:fundamental-law}
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\IC$ --- \textbf{information coefficient}, the correlation between your signal's forecast and the realized return. Even small ICs (0.02--0.05) are valuable.
+  \item $BR$ --- \textbf{breadth}, the number of independent bets per year.
+\end{itemize}
+A mediocre signal ($\IC = 0.03$) applied to 500 independent bets per year gives $\text{IR} \approx 0.03 \times \sqrt{500} \approx 0.67$---a respectable result. This is why cross-asset strategies (more assets $=$ more bets) are attractive, and why your project targets multiple asset classes.
+\end{keyidea}
+
+\begin{workedexample}{Computing Alpha and IR}
+Suppose you run a strategy that earns 8\% per year with a volatility of 12\%. The risk-free rate is 4\%. You regress your strategy returns on the Fama-French three factors and estimate:
+\[
+R_{\text{strat},t} - R_f = \underbrace{0.02}_{\alpha} + 0.6 \cdot \text{MKT}_t + 0.3 \cdot \text{SMB}_t - 0.1 \cdot \text{HML}_t + \varepsilon_t
+\]
+\begin{itemize}[nosep]
+  \item Your alpha is $\alpha = 2\%$ per year. The remaining 2\% of your 4\% excess return ($8\% - 4\%$) is explained by your market, size, and value exposures.
+  \item If $\sigma(\varepsilon) = 5\%$ per year, then $\text{IR} = 2\%/5\% = 0.40$.
+  \item Interpretation: your strategy generates 0.40 units of excess return per unit of active risk---roughly median for active managers. If your sponsor expected top-quartile performance, you would need IR $\geq 0.5$.
+\end{itemize}
+\end{workedexample}
+
+\subsection{Sharpe Ratio}
+
+\begin{prereq}[Annualizing Returns and Volatility]
+If you observe monthly returns, annualize the mean by multiplying by 12: $\mu_{\text{ann}} = 12 \, \mu_{\text{monthly}}$. Annualize volatility by multiplying by $\sqrt{12}$: $\sigma_{\text{ann}} = \sqrt{12} \, \sigma_{\text{monthly}}$. The square-root rule assumes returns are independently distributed across months. If they are autocorrelated, the annualized volatility will be higher (positive autocorrelation) or lower (mean reversion) than the square-root rule suggests.
+\end{prereq}
+
+A closely related measure is the \textbf{Sharpe ratio}:
+\begin{equation}
+\SR = \frac{\E[R_p] - R_f}{\sigma(R_p)}
+\label{eq:sharpe}
+\end{equation}
+The Sharpe ratio uses total excess return and total volatility, while the IR uses alpha (factor-adjusted excess return) and tracking error. If you have no factor exposures ($\bbeta = 0$), the two are identical. In practice, you will report both. The Sharpe ratio tells you how good the strategy is in isolation; the IR tells you how much value it adds beyond existing exposures.
+
+% ──────────────────────────────────────────────────────────────
+\section{Cross-Sectional vs.\ Time-Series Tests}
+\label{sec:cs-vs-ts}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[Panel Data]
+A \textbf{panel} (or longitudinal dataset) has observations indexed by both entity $i$ and time $t$. In finance, you might have monthly returns for 500 stocks over 20 years: 500 entities $\times$ 240 months = 120{,}000 observations. Cross-sectional analysis looks across entities at a point in time. Time-series analysis looks at one entity across time. Panel methods combine both dimensions; see Chapter~\ref{ch:panel}.
+\end{prereq}
+
+Asset pricing tests come in two flavors, and understanding the distinction matters for your project.
+
+\subsection{Time-Series Tests}
+
+A time-series test asks: does a factor explain the \emph{time variation} in an asset's returns? You run:
+\begin{equation}
+R_{i,t} - R_f = \alpha_i + \beta_i f_t + \varepsilon_{i,t}
+\label{eq:ts-test}
+\end{equation}
+for each asset $i$ separately. The test is whether $\alpha_i = 0$: if the factor model is correct, the intercept should be zero (all expected return is explained by factor exposure). A joint test across all assets (e.g., the GRS test of Gibbons, Ross, and Shanken, 1989) checks whether all alphas are simultaneously zero.
+
+\begin{workedexample}{Time-Series Alpha Test}
+You regress monthly excess returns of a high-yield bond portfolio on the three Fama-French factors over 120 months and estimate $\hat{\alpha} = 0.15\%$ per month with a standard error of $0.08\%$. The $t$-statistic is $0.15/0.08 = 1.875$. At the 5\% significance level ($t_{\text{crit}} \approx 1.98$ for 116 degrees of freedom), you cannot reject $\alpha = 0$. Conclusion: the portfolio's average return is fully explained by its market, size, and value exposures. There is no evidence of ``skill'' or mispricing beyond these factors.
+\end{workedexample}
+
+\subsection{Cross-Sectional Tests}
+
+A cross-sectional test asks: do assets with higher betas earn higher average returns? The standard procedure is the \textbf{Fama-MacBeth regression} (Fama and MacBeth, 1973):
+
+\begin{keyidea}[Fama-MacBeth Two-Pass Regression]
+\textbf{Pass 1 (time-series):} For each asset $i$, regress its full return history on factors to estimate $\hat{\beta}_i$:
+\[
+R_{i,t} - R_f = \alpha_i + \hat{\beta}_i f_t + \varepsilon_{i,t}, \quad t = 1, \ldots, T
+\]
+
+\textbf{Pass 2 (cross-sectional):} For each month $t$, regress all assets' returns on their estimated betas:
+\[
+R_{i,t} - R_f = \gamma_{0,t} + \gamma_{1,t} \hat{\beta}_i + \eta_{i,t}, \quad i = 1, \ldots, N
+\]
+
+\textbf{Inference:} Average the monthly $\gamma_{1,t}$ estimates across time:
+\[
+\hat{\lambda} = \frac{1}{T} \sum_{t=1}^{T} \gamma_{1,t}
+\]
+and compute a $t$-statistic using the time-series standard error of $\{\gamma_{1,t}\}$. If $\hat{\lambda}$ is significantly positive, the factor carries a positive risk premium.
+
+\textbf{Why average across months?} Because each monthly cross-sectional regression gives a noisy estimate of $\lambda$. By averaging across $T$ months, you reduce noise by $1/\sqrt{T}$. The time-series variation in $\gamma_{1,t}$ naturally accounts for the fact that some months the factor works well and other months it does not. This is a key advantage of Fama-MacBeth over a single pooled regression.
+
+\textbf{Limitation:} Fama-MacBeth standard errors correct for cross-sectional correlation (returns of different stocks in the same month are correlated) but do \emph{not} correct for time-series autocorrelation. If the risk premium is persistent, standard errors may be understated. Newey-West or Shanken (1992) corrections are standard fixes.
+\end{keyidea}
+
+\begin{warning}[Errors-in-Variables in Two-Pass Regressions]
+The second-pass regression uses \emph{estimated} betas from the first pass, not true betas. Since $\hat{\beta}_i$ contains estimation error, the second-pass coefficients are biased (attenuation bias---the $\lambda$ estimates are pushed toward zero). This is why Fama and MacBeth (1973) and most subsequent work form \emph{portfolios} sorted on characteristics (e.g., 25 size-value portfolios) rather than using individual stocks: portfolio betas are estimated more precisely because idiosyncratic noise averages out.
+\end{warning}
+
+\subsection{Which Test Does Your Project Use?}
+
+Your project is primarily a \textbf{time-series prediction} problem: you observe risk-system features today and predict returns/volatility tomorrow. This is closer to time-series tests. However, because you work across asset classes (equities, rates, FX, credit), you also have a cross-sectional dimension: do assets with higher VaR utilization today earn different returns tomorrow? Chapter~\ref{ch:panel} covers how to combine both dimensions using panel regression and the fixed-effects estimators you will need.
+
+\begin{projectconnection}[Time-Series Prediction and the SDF]
+Your Phase~2 features (VaR dynamics, factor concentration, scenario P\&L) are, in SDF language, proxies for the state variables that drive $\SDF$. Intermediary asset pricing theory (Chapter~\ref{ch:intermediary}) argues that dealer balance-sheet constraints \emph{are} the relevant state variables. When you test whether VaR utilization predicts returns, you are testing whether dealer risk capacity is a priced state variable---i.e., whether it belongs in equation~\eqref{eq:linear-sdf}. Frame it this way in your pitch and your sponsor will immediately see the intellectual foundation.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{Connecting SDF Theory to Your Features}
+\label{sec:sdf-features}
+% ──────────────────────────────────────────────────────────────
+
+Let us make the link between abstract theory and your concrete project explicit. The SDF framework says expected returns are determined by covariance with the pricing kernel. Your project hypothesis is:
+
+\begin{quote}
+\emph{SecDB risk-system outputs (VaR, Greeks, scenario P\&L) are observable proxies for the state variables driving $\SDF$, and therefore predict returns cross-sectionally and over time.}
+\end{quote}
+
+How does each feature family map to this framework?
+
+\begin{center}
+\begin{tabular}{p{3.5cm} p{4.5cm} p{5cm}}
+\toprule
+\textbf{Feature Family} & \textbf{SDF Interpretation} & \textbf{Theory Source} \\
+\midrule
+VaR utilization & Proxy for dealer risk capacity; when VaR usage is high, dealer SDF is high (risk-averse state) & He and Krishnamurthy (2013), Adrian and Shin (2010) \\
+Factor concentration & Measures crowding; high Herfindahl $\Rightarrow$ concentrated risk $\Rightarrow$ fragile SDF & Coval and Stafford (2007) \\
+Scenario P\&L & Directly measures tail exposures---the states where SDF is highest & Cochrane (2005), Ch.~1 \\
+Cross-asset flow & Captures risk reallocation; component VaR shifts signal changing SDF loadings & He, Kelly, and Manela (2017) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This mapping is what transforms your project from ``I ran some ML on risk data'' into ``I tested whether dealer balance-sheet state variables are priced,'' which is a much stronger pitch. Chapter~\ref{ch:intermediary} develops the intermediary asset pricing theory in detail.
+
+\begin{keyidea}[From Theory to Features: The Pipeline]
+The logic chain connecting this chapter to your code is:
+\begin{enumerate}[nosep]
+  \item SDF theory says expected returns are driven by covariance with a pricing kernel.
+  \item Intermediary theory (Chapter~\ref{ch:intermediary}) says dealer constraints are a major component of that kernel.
+  \item SecDB risk outputs are daily, high-frequency measurements of those constraints.
+  \item You engineer features from SecDB data (Chapter~\ref{ch:features}) that proxy for the state variables in the intermediary SDF.
+  \item You test whether those features predict returns/volatility using proper validation (Chapter~\ref{ch:validation}).
+  \item If they do, you have evidence that dealer risk capacity is a priced state variable---a publishable, defensible result.
+\end{enumerate}
+Every step after this chapter builds on this foundation.
+\end{keyidea}
+
+% ──────────────────────────────────────────────────────────────
+\section{Summary}
+\label{sec:ch1-summary}
+% ──────────────────────────────────────────────────────────────
+
+\begin{enumerate}[nosep]
+  \item The \textbf{stochastic discount factor} $\SDF$ is a single random variable that prices all assets: $\E[\SDF \cdot R_i] = 1$.
+  \item No-arbitrage is equivalent to the existence of a strictly positive SDF (the Fundamental Theorem).
+  \item The \textbf{risk premium} on any asset equals $-R_f \, \text{Cov}(\SDF, R_i)$: only covariance with the pricing kernel is compensated.
+  \item Volatility alone does not earn a risk premium. Idiosyncratic risk is not priced.
+  \item \textbf{Factor models} parametrize $\SDF$ as linear in observable factors. The CAPM uses one factor (market); Fama-French uses three (market, size, value); the APT leaves factors unspecified.
+  \item Fama-French (1993) three factors explain $>90\%$ of diversified portfolio return variation, vs.\ ${\sim}70\%$ for CAPM.
+  \item \textbf{Alpha} is the return unexplained by a factor model---always specify the benchmark.
+  \item \textbf{Beta} measures sensitivity to a factor; it is an OLS regression coefficient.
+  \item The \textbf{information ratio} $= \alpha / \sigma(\varepsilon)$ measures risk-adjusted active return. Top-quartile managers achieve IR $\approx 0.5$.
+  \item The \textbf{Fundamental Law}: $\text{IR} \approx \IC \times \sqrt{BR}$. Small edge $\times$ many bets $=$ good performance.
+  \item \textbf{Time-series tests} check if alpha is zero for a given factor model. \textbf{Cross-sectional tests} (Fama-MacBeth) check if betas explain return differences across assets.
+  \item Your project is primarily time-series prediction but with cross-asset panel structure.
+  \item The \textbf{Fama-MacBeth regression} is the standard tool for cross-sectional tests: estimate betas in time series, then regress returns on betas cross-sectionally each period.
+  \item Every feature you build is, in SDF language, a candidate state variable for the pricing kernel. Frame your pitch accordingly.
+\end{enumerate}
+
+% ──────────────────────────────────────────────────────────────
+\section*{Key Results Reference}
+\label{sec:ch1-key-results}
+% ──────────────────────────────────────────────────────────────
+
+\begin{center}
+\begin{tabular}{p{4cm} p{4cm} p{5.5cm}}
+\toprule
+\textbf{Paper} & \textbf{Key Claim} & \textbf{Headline Result} \\
+\midrule
+Sharpe (1964) & Expected return is linear in market beta & CAPM: $\E[R_i] - R_f = \beta_i (\E[R_m] - R_f)$ \\
+\addlinespace
+Black, Jensen, Scholes (1972) & CAPM relationship is ``too flat'' & Low-beta stocks earn more than predicted; high-beta stocks earn less \\
+\addlinespace
+Ross (1976) & No-arbitrage implies linear factor pricing & APT: $\E[R_i] - R_f \approx \sum_k \beta_{i,k} \lambda_k$ \\
+\addlinespace
+Fama \& French (1993) & Size and value factors explain cross-section & 3-factor $R^2 > 90\%$ vs.\ CAPM $R^2 \approx 70\%$; SMB $\approx 3.2\%$/yr, HML $\approx 4.8\%$/yr \\
+\addlinespace
+Harrison \& Kreps (1979) & No-arbitrage $\Leftrightarrow$ positive SDF exists & Fundamental Theorem of Asset Pricing \\
+\addlinespace
+Grinold (1989) & IR decomposes into skill $\times$ breadth & $\text{IR} \approx \IC \times \sqrt{BR}$ \\
+\bottomrule
+\end{tabular}
+\end{center}

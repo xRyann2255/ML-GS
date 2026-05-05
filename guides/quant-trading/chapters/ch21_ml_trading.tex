@@ -1,0 +1,994 @@
+\chapter{Machine Learning for Trading}
+\label{ch:ml_trading}
+\chaptermark{ML for trading}
+
+Most ML-for-trading projects lose money because they treat the
+problem as ``forecast tomorrow's return with a neural net'' ---
+predicting a near-random-walk target with a high-variance estimator,
+then being surprised when out-of-sample performance is indistinguishable
+from noise. The real opportunities are narrower: feature engineering on
+order-book data, regime detection, trade-level \emph{meta-labeling}, and
+execution. This chapter draws the bulk of its content from Lop\'ez de
+Prado's \textit{Advances in Financial Machine Learning} (AFML) --- a book
+less about ``how to build trading ML models'' than ``here is every way
+people get it wrong.''
+
+\Cref{ch:backtesting} spent thirty pages on validation discipline, and
+every sentence of this chapter assumes you know why naive $k$-fold
+cross-validation on financial time series is a bug and what CPCV does
+about it. The techniques here produce nonsense if fed into a broken
+validation pipeline.
+
+\begin{backgroundbox}[Prerequisites]
+From earlier in the book:
+\begin{itemize}
+  \item \Cref{ch:mean_reversion_ou}: Ornstein--Uhlenbeck mean
+  reversion. The ``OU $z$-score entry'' primary signal is the
+  running example for meta-labeling in
+  \cref{sec:ml_metalabel}.
+  \item \Cref{ch:pairs_cointegration}: pairs-trading mechanics,
+  used as the worked example for the meta-labeling lift
+  calculation.
+  \item \Cref{ch:backtesting}: Combinatorial Purged
+  Cross-Validation (CPCV), walk-forward, and the general
+  pitfalls of look-ahead and data snooping. This chapter
+  refers to CPCV as the correct inner validation loop for every
+  ML procedure it introduces.
+  \item \Cref{ch:kelly_risk}: Sharpe, drawdown, and the mental
+  model of ``scoring after sizing''. Needed for the
+  meta-labeling lift numbers in \cref{sec:ml_metalabel}.
+\end{itemize}
+From outside the book:
+\begin{itemize}
+  \item Elementary supervised learning: linear/logistic
+  regression, decision trees, random forests, basic
+  classification metrics (precision, recall, ROC-AUC), and the
+  idea of cross-validation for hyperparameter selection.
+  \item The concept that \emph{financial time series are not
+  stationary}: distributions drift, regimes change, and the
+  i.i.d.\ assumption powering textbook ML is always false for
+  markets. This chapter is about what to do given that fact.
+\end{itemize}
+\end{backgroundbox}
+
+% =====================================================================
+\section{Where ML helps}
+\label{sec:ml_where_helps}
+
+ML does not help with ``what will the price of product $X$ be
+tomorrow.'' It helps with four narrower questions, and in each case
+the reason it helps is not the cleverness of the model but the
+structure of the prediction target. We take them in order of
+practical impact.
+
+\subsection{Feature engineering on order-book data}
+\label{subsec:ml_feature_eng}
+
+The most productive use of ML in trading is not prediction; it is
+\emph{compression}. A Level-2 order book at millisecond frequency is
+a firehose of numbers: ten levels per side, quantity and price at
+each, plus every trade print. A rules-based strategy can use at most
+a handful of features before it becomes unmaintainable. ML reduces
+hundreds of raw order-book columns into a small number of short-horizon
+predictive features.
+
+Feeding the raw order-book columns directly into a classifier is a
+non-starter: raw prices drift (non-stationary), quantity columns
+change variance with the regime (heteroscedastic), and both swamp any
+learner with scale artefacts rather than signal. Good features are
+\emph{stationary transforms} --- log-returns, rolling $z$-scores,
+normalised imbalances --- whose distribution is comparable across
+time and across instruments.
+
+Examples of such derived features, all covered in
+\cref{ch:order_flow}:
+
+\begin{itemize}
+  \item \textbf{Order Flow Imbalance (OFI)}: signed running total
+  of aggressive buy minus aggressive sell volume over a
+  lookback window. Empirically one of the strongest
+  short-horizon return predictors.
+  \item \textbf{Top-of-book imbalance}:
+  $(q^{\mathrm{bid}}_1 - q^{\mathrm{ask}}_1) / (q^{\mathrm{bid}}_1 + q^{\mathrm{ask}}_1)$
+  at the inside quote. A cheap real-time drift proxy.
+  \item \textbf{Realised volatility at multiple horizons}:
+  $\volat_{1\mathrm{m}}, \volat_{5\mathrm{m}},
+  \volat_{30\mathrm{m}}$ from intraday returns. Used as direct
+  features and to normalise other features across regimes.
+  \item \textbf{Trade direction entropy}: Shannon entropy of
+  signed trades over a rolling window. Low entropy = one-sided
+  flow; high = balanced flow.
+  \item \textbf{Queue-position-weighted imbalance}: imbalance
+  that discounts orders at the back of a price-time priority
+  queue, which are less likely to fill soon.
+\end{itemize}
+
+The ML part is boring on purpose. A gradient-boosted tree or linear
+model predicts the one-step-ahead return from these features under
+CPCV. The value added is not the model --- a linear regression
+usually does fine --- it is the \emph{choice of features}. A skilled
+researcher spends 80\% of their time on feature construction and
+20\% on the model. Academic papers on ``deep learning for financial
+prediction'' invert that ratio and are rarely reproducible.
+
+\subsection{Regime detection}
+\label{subsec:ml_regime}
+
+The second win is regime detection: given a history of market
+observables (volatility, spread, volume, correlation structure),
+infer how many distinct regimes the market has been in and which it
+is in now. The canonical tool is the \textbf{Hidden Markov Model}
+(HMM), which assumes the market cycles between a small number of
+latent states (``quiet mean-reverting,'' ``high-vol trending,''
+``crisis'') with observable features drawn from a state-dependent
+distribution. \Cref{ch:which_strategy_when} promotes regime detection
+from ``nice to have'' to the backbone of the ``which strategy when''
+framework.
+
+Regime detection is a good ML use case because the target is not a
+scalar future return but a discrete label that can be validated
+qualitatively (``yes, March 2020 was a crisis regime''). The
+prediction problem is more stable than return prediction: volatility
+is far more auto-correlated than the return itself, so an HMM
+fitted on year $t$ still works on year $t+1$ provided the training
+regimes also appear at test time.
+
+\subsection{Trade-level meta-labeling}
+\label{subsec:ml_metalabel_intro}
+
+The third, and in Lop\'ez de Prado's framing the highest-value
+ML use in trading, is \textbf{meta-labeling}: given a primary
+strategy that emits trade signals, train a binary classifier to
+decide \emph{which signals to actually take}. The primary strategy
+supplies direction (long/short, entry/exit); the meta-labeler
+supplies the filter. We treat this as its own section
+(\cref{sec:ml_metalabel}) because its leverage relative to
+implementation cost is unmatched.
+
+\subsection{Execution}
+\label{subsec:ml_execution}
+
+The fourth win is execution: reinforcement learning (RL) for
+optimal order placement and routing. Given a parent order, an RL
+agent learns a slicing and child-order policy that minimises
+implementation shortfall relative to the arrival price. The
+Almgren--Chriss solution from \cref{ch:almgren_chriss} is the
+analytical baseline; RL relaxes the linear-impact assumption and
+learns a policy respecting the empirically measured cost curve and
+current order-book state. Execution is the area where RL papers
+translate into genuine production lift, because the reward signal
+is high-frequency, unambiguous, and approximately stationary over
+short horizons.
+
+We do not cover execution ML here (not on the Prosperity critical
+path); interested readers should start with
+\citet{cartea2015algorithmic} chapters 6--8 and the RL literature
+that relaxes Almgren--Chriss's linear-impact simplification.
+
+% =====================================================================
+\section{Where ML fails}
+\label{sec:ml_where_fails}
+
+Having established the four regions where ML earns its keep, we
+enumerate the larger regions where it does not. These are
+categorical failure modes where more compute and a bigger model
+actively make things worse.
+
+\subsection{Naked return prediction}
+\label{subsec:ml_naked_return}
+
+The archetypal failed project is ``predict $r_{t+1}$ from
+$(r_t, r_{t-1}, \ldots, r_{t-L})$ using a neural network.'' Two
+reasons this fails, and they compound.
+
+First, the signal-to-noise ratio is catastrophically low. A
+one-day equity return has annualised volatility around $20\%$, so
+a single daily return has standard deviation about $1.26\%$. A
+real alpha signal generating Sharpe $1$ per year contributes a
+daily drift of $\approx 0.08\%$: noise is $16\times$ the signal
+on any single observation. Neural networks with millions of
+parameters are wonderful at memorising the noise.
+
+Second, one-period equity returns are a near-random-walk target
+by construction: if they were not, a trivial linear predictor
+would exist and be arbitraged away. The weak form of the
+Efficient Market Hypothesis says precisely that an ML model
+trained on lagged returns should find nothing; the fact that it
+does find something in-sample is a diagnostic of overfitting.
+
+The diagnosis is nearly always the same: stunning in-sample
+$R^2$, a decent CV $R^2$ under the wrong CV scheme, and a
+zero-or-negative $R^2$ on a genuinely held-out period. ``The
+wrong CV scheme'' is almost always naive $k$-fold, and fixing it
+kills the result.
+
+\begin{pitfallbox}[Don't use $k$-fold CV on time series]
+This is the most common ML-for-trading bug, responsible for a
+huge fraction of irreproducible papers. The failure mode:
+
+\begin{enumerate}
+  \item You build triple-barrier labels
+  (\cref{sec:ml_triple_barrier}) with a $5$-day horizon: the
+  label at time $t$ depends on prices between $t$ and $t+5$.
+  \item You apply scikit-learn's \texttt{KFold} with $k = 5$,
+  which shuffles observations and splits them
+  contiguously (or worse, randomly).
+  \item A training observation at time $t' = t + 3$ has a label
+  whose window overlaps with the test observation at time
+  $t$. Information about \emph{the test label} has leaked
+  into the training set via the training labels.
+  \item The classifier reports a miraculous out-of-sample
+  accuracy, e.g.\ $75\%$ on a 55\%-baseline problem.
+  \item In live trading the accuracy collapses to the true
+  55\% and the strategy loses money.
+\end{enumerate}
+
+Fix: CPCV (\cref{ch:backtesting}) --- purge training observations
+whose label window intersects a test observation, plus an embargo
+on each side of the test fold. Any non-CPCV-compliant ML-trading
+evaluation is, until proven otherwise, a leakage artefact.
+\end{pitfallbox}
+
+\subsection{Hyperparameter abuse}
+\label{subsec:ml_hyper_abuse}
+
+The second failure mode is hyperparameter abuse: tuning twenty
+hyperparameters on the same data used for evaluation --- the
+data-snooping bias of \cref{ch:backtesting} in ML clothing. If you
+run $N = 1000$ parameter combinations and report the best CV
+Sharpe, the expected-max-of-$N$-iid-normals approximation
+$\E[\max_{i \le N} Z_i] \approx \sqrt{2 \ln N}$ gives a spurious
+Sharpe of $\sqrt{2 \ln 1000} \approx 3.72$ standard errors above
+the true mean \emph{even if every strategy is pure noise}. The
+defence is nested CPCV: outer CPCV for evaluation, a separate
+inner CPCV inside each outer training fold for tuning.
+
+Most applied papers skip the outer loop and report the best
+inner-CV score as ``out-of-sample performance.'' This is silently
+but devastatingly wrong.
+
+\subsection{Non-stationarity}
+\label{subsec:ml_nonstationary}
+
+The third failure mode is baked into the data. Return
+distributions drift: mean, variance, correlation structure, tail
+behaviour, and the \emph{predictability structure} of features
+all change as regimes change. A model with Sharpe $2$ on
+$2015$--$2018$ may not survive $2020$ because the regime it
+learned no longer exists. This is structural, not a bias to
+correct.
+
+Defences: (i)~retrain frequently on a rolling window, (ii)~pool
+across instruments for statistical power, (iii)~condition on a
+regime label from a separate detector (\cref{subsec:ml_regime}).
+None fully solve the problem; they make degradation more gradual.
+Expecting a fit-once-and-forget model to work for years is the
+common unforced error.
+
+\subsection{The general taxonomy}
+\label{subsec:ml_general_taxonomy}
+
+\begin{keyfactbox}[Where ML for trading lives and dies]
+Four regions where ML helps:
+\begin{enumerate}
+  \item Feature engineering on order-book data
+  (\cref{ch:order_flow}).
+  \item Regime detection via HMMs and state-space models
+  (\cref{ch:which_strategy_when}).
+  \item Trade-level meta-labeling of a rule-based primary
+  strategy (\cref{sec:ml_metalabel}).
+  \item Execution: RL for order slicing and routing
+  (\cref{ch:almgren_chriss} as baseline).
+\end{enumerate}
+Four regions where ML fails:
+\begin{enumerate}
+  \item Naked return prediction from lagged returns.
+  \item $k$-fold CV on time series (fixed by CPCV).
+  \item Hyperparameter abuse (fixed by nested CPCV).
+  \item Non-stationarity (mitigated, never eliminated, by
+  rolling retraining and regime conditioning).
+\end{enumerate}
+\end{keyfactbox}
+
+% =====================================================================
+\section{Triple-barrier labeling}
+\label{sec:ml_triple_barrier}
+
+Before training any classifier we need labels. The textbook
+approach --- ``$+1$ if the next-step return is positive, $-1$
+otherwise'' --- is wrong for trading. First, it assumes every
+trade is held for exactly one step. Second, it ignores risk: a
+$0.01\%$ return is labelled identically to a $5\%$ return. The
+\textbf{triple-barrier method} of \citeAFML{} Ch.~3 fixes both.
+
+\subsection{The method}
+\label{subsec:ml_tb_method}
+
+At each observation time $t$, suppose the current price is
+$p_t$ and the estimated short-horizon volatility is $\hat\volat_t$
+(e.g.\ an exponentially weighted standard deviation of daily
+returns). We open a hypothetical trade at $p_t$ and set three
+barriers:
+
+\begin{itemize}
+  \item \textbf{Top barrier} (profit target):
+  $p^{\mathrm{top}}_t = p_t (1 + \pi_u \hat\volat_t)$, for some
+  profit-target multiplier $\pi_u > 0$.
+  \item \textbf{Bottom barrier} (stop-loss):
+  $p^{\mathrm{bot}}_t = p_t (1 - \pi_d \hat\volat_t)$, for some
+  stop-loss multiplier $\pi_d > 0$.
+  \item \textbf{Vertical barrier} (max holding): we give up on
+  the trade after $H$ time steps and record the realised return
+  regardless.
+\end{itemize}
+
+The label $y_t$ is then the first barrier the price path hits:
+
+\[
+y_t = \begin{cases}
++1 & \text{if } p^{\mathrm{top}}_t \text{ is hit first,} \\
+-1 & \text{if } p^{\mathrm{bot}}_t \text{ is hit first,} \\
+\phantom{+}0 & \text{if neither is hit within } H \text{ steps.}
+\end{cases}
+\]
+
+This three-class label corresponds to a real trading outcome:
+``a long at this observation, held with a $\pi_u \hat\volat_t$
+target and $\pi_d \hat\volat_t$ stop, would have been a winner,
+loser, or timeout.'' The volatility rescaling is crucial: a $2\%$
+move counts differently in calm vs.\ crisis markets. Fixed-percent
+barriers (``top at $+3\%$'') are trivially satisfied in high-vol
+regimes and never triggered in low-vol regimes, making them
+useless classification targets.
+
+\subsection{Worked example on BTC-like daily data}
+\label{subsec:ml_tb_worked}
+
+We run the triple-barrier method on a synthetic BTC-like daily
+series with ten labeled starting observations ($i = 0, \ldots, 9$),
+constant volatility $\hat\volat = 2.0\%$, $\pi_u = \pi_d = 2.0$,
+horizon $H = 5$ days. The full price path has sixteen entries (the
+extra six are lookahead for the final starting observations):
+
+\[
+\begin{aligned}
+p &= (100.00,\ 101.00,\ 102.50,\ 104.20,\ 103.80,\ 103.10,\\
+&\phantom{= (}\ 102.50,\ \phantom{0}98.00,\ \phantom{0}97.50,\ \phantom{0}99.00,\ 100.20,\\
+&\phantom{= (}\ 100.50,\ \phantom{0}99.80,\ 100.10,\ 100.30,\ 100.40).
+\end{aligned}
+\]
+
+For each starting index $i = 0, 1, \ldots, 9$ we compute the top
+barrier $p_i \cdot 1.04$, the bottom barrier $p_i \cdot 0.96$,
+and walk forward up to $5$ days looking for the first barrier
+hit. The resulting label table is:
+
+\begin{center}
+\begin{tabular}{c|rrr|l|c}
+\toprule
+$i$ & $p_i$ & top & bot & first hit & $y_i$ \\
+\midrule
+$0$ & $100.00$ & $104.00$ & $96.00$ & top at $j=3$, $p=104.20$ & $+1$ \\
+$1$ & $101.00$ & $105.04$ & $96.96$ & timeout (no barrier) & $\phantom{+}0$ \\
+$2$ & $102.50$ & $106.60$ & $98.40$ & bot at $j=5$, $p=98.00$ & $-1$ \\
+$3$ & $104.20$ & $108.37$ & $100.03$ & bot at $j=4$, $p=98.00$ & $-1$ \\
+$4$ & $103.80$ & $107.95$ & $99.65$ & bot at $j=3$, $p=98.00$ & $-1$ \\
+$5$ & $103.10$ & $107.22$ & $98.98$ & bot at $j=2$, $p=98.00$ & $-1$ \\
+$6$ & $102.50$ & $106.60$ & $98.40$ & bot at $j=1$, $p=98.00$ & $-1$ \\
+$7$ & $\phantom{0}98.00$ & $101.92$ & $94.08$ & timeout (no barrier) & $\phantom{+}0$ \\
+$8$ & $\phantom{0}97.50$ & $101.40$ & $93.60$ & timeout (no barrier) & $\phantom{+}0$ \\
+$9$ & $\phantom{0}99.00$ & $102.96$ & $95.04$ & timeout (no barrier) & $\phantom{+}0$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The label distribution is one $+1$, five $-1$, four zero, matching
+the intuitive reading: an early rally, a sharp drop triggering a
+cascade of stop hits, then a late recovery where barriers are never
+reached within the $5$-day window. A classifier trained on features
+at each index $i$ gets a realistic, trading-aligned label, not a
+raw one-day-forward return sign.
+
+\begin{keyfactbox}[Triple-barrier method]
+For each observation $t$, define a profit-target top barrier, a
+stop-loss bottom barrier (both scaled by current volatility
+$\hat\volat_t$), and a max-holding vertical barrier. Label the
+observation with the first barrier hit: $+1$, $-1$, or $0$. The
+labels match real trading outcomes and automatically adapt to
+time-varying volatility. Standard reference:
+\citeAFML{} Ch.~3.
+\end{keyfactbox}
+
+\begin{pitfallbox}[Don't forget to purge when using triple-barrier
+labels]
+Triple-barrier labels have a horizon $H$: the label at time $t$
+depends on prices up to $t + H$ --- the exact situation that
+breaks $k$-fold CV (\cref{subsec:ml_naked_return}). Every
+triple-barrier classifier evaluation must use CPCV with purging
+of at least $H$ observations plus an embargo. Otherwise the
+reported accuracy is leakage.
+\end{pitfallbox}
+
+% =====================================================================
+\section{Fractional differentiation}
+\label{sec:ml_fracdiff}
+
+The second core AFML preprocessing trick is \textbf{fractional
+differentiation}. It solves a dilemma anyone training on price
+series has hit.
+
+\subsection{The dilemma}
+\label{subsec:ml_fracdiff_dilemma}
+
+Most price series are non-stationary --- drifting mean, time-varying
+variance. Stationarity is the assumption powering every classical
+ML method: if the target distribution changes, a model fitted on
+the past does not generalise. The classical fix is first differences
+(log returns) $r_t = \ln p_t - \ln p_{t-1}$, which are approximately
+stationary. But differencing destroys level information: returns at
+$p = 100$ and $p = 10{,}000$ are indistinguishable, even though a
+trader would act very differently. Return-based features have no
+memory of where the price sits in its historical range --- exactly
+what a mean-reversion or range-bound strategy needs.
+
+Fractional differentiation threads the needle: stationarity with
+maximum ``memory'' preserved.
+
+\subsection{The construction}
+\label{subsec:ml_fracdiff_construction}
+
+For a real parameter $d$, the fractional differentiation operator
+is defined by the binomial expansion of $(1 - B)^d$ where $B$ is
+the lag operator ($B x_t = x_{t-1}$):
+
+\[
+(1 - B)^d = \sum_{k=0}^{\infty} \binom{d}{k} (-1)^k B^k
+  = \sum_{k=0}^{\infty} w_k B^k.
+\]
+
+The weights $w_k$ obey the recursion
+
+\[
+w_0 = 1, \qquad
+w_k = -\,w_{k-1} \cdot \frac{d - k + 1}{k}, \quad k \ge 1.
+\]
+
+For integer $d$ this collapses to the classical differencing
+operator: at $d = 1$, $w_0 = 1$, $w_1 = -1$, and all higher
+weights are zero, recovering $x_t - x_{t-1}$. For fractional
+$d \in (0, 1)$, the weights decay like a power law rather than
+cutting off abruptly, and the operator applied to the series is
+a long-memory weighted sum over the entire history of the
+process:
+
+\[
+\tilde x_t = \sum_{k=0}^{\infty} w_k \cdot x_{t-k}.
+\]
+
+Lop\'ez de Prado's recipe: start at $d = 1$, decrease slowly; at
+each value run an Augmented Dickey--Fuller (ADF) test on $\tilde
+x_t$; the smallest $d$ for which ADF rejects non-stationarity at
+5\% is optimal --- just stationary enough, maximum memory. For
+most equity indices this lands in $[0.3, 0.5]$, well below the
+classical $d = 1$.
+
+\subsection{Sanity-check of the weights}
+\label{subsec:ml_fracdiff_numbers}
+
+To see the long-memory behaviour concretely, here are the first
+eleven weights for $d = 0.4$ (the midpoint of the typical equity
+range), rounded to five decimals:
+
+\[
+w_{0..10} = (1,\ -0.4,\ -0.12,\ -0.064,\ -0.0416,\ -0.02995,
+\]\[
+\ -0.02296,\ -0.01837,\ -0.01516,\ -0.0128,\ -0.01101).
+\]
+
+Sum of absolute values: $\approx 1.74$. Weights decay geometrically
+but slowly; the tail is long. $d = 0.3$ decays more slowly (more
+memory), $d = 0.5$ faster (more stationarity). All three sit
+between the extremes of ``no differencing'' ($d = 0$, max memory,
+non-stationary) and ``first difference'' ($d = 1$, zero memory,
+stationary).
+
+The infinite sum is truncated: weights below $\tau \sim 10^{-5}$
+are dropped, giving a finite-window implementation that loses only
+a warm-up period equal to the truncation window.
+
+\begin{keyfactbox}[Fractional differentiation]
+For $d \in (0, 1)$, the fractionally differenced series
+$\tilde x_t = \sum_{k=0}^{\infty} w_k x_{t-k}$ with
+$w_0 = 1$, $w_k = -w_{k-1}(d - k + 1)/k$ achieves stationarity
+with minimum loss of memory. The optimal $d$ is the smallest
+value for which the series passes an ADF test; for most equity
+return data it falls in $[0.3, 0.5]$. Standard reference:
+\citeAFML{} Ch.~5.
+\end{keyfactbox}
+
+% =====================================================================
+\section{Information-driven bars}
+\label{sec:ml_bars}
+
+A hidden assumption of every textbook time-series ML tutorial is
+uniform time sampling: one-minute, one-day, or one-hour bars. This
+is the wrong scheme for trading data. Information does not arrive
+uniformly: most of the day is quiet, then a news release dumps
+five minutes' information into five seconds. Uniform-time sampling
+means irregular sampling on the news clock --- over-sampling quiet
+periods, under-sampling active ones.
+
+\citeAFML{} Ch.~2 proposes activity-adaptive sampling. Four
+standard families, in order of sophistication:
+
+\subsection{Tick bars}
+\label{subsec:ml_ticks}
+
+A \textbf{tick bar} closes every $N$ trades. Each bar represents
+the same transaction count regardless of elapsed time. Quiet
+periods produce fewer bars, news spikes many. The resulting series
+has far more stable intraday return distributions than time bars
+--- exactly what classical ML assumptions want.
+
+\subsection{Volume bars}
+\label{subsec:ml_volume}
+
+A \textbf{volume bar} closes every $V$ shares (or contracts).
+Trades of $100$ and $900$ shares trigger a close at $V = 1000$;
+a single $2000$-share trade triggers two closes in succession.
+Volume bars respect that large trades carry more information than
+small ones --- tick bars ignore this.
+
+\subsection{Dollar bars}
+\label{subsec:ml_dollar}
+
+A \textbf{dollar bar} closes every $D$ dollars of notional. If
+the price doubles, half as many shares represent the same
+dollar amount, so the bar boundary adapts. For equities that
+appreciate or depreciate substantially, dollar bars give the
+most stable return statistics across time --- more so than
+volume bars (which drift with share-price inflation) or tick
+bars.
+
+\subsection{Information-driven bars}
+\label{subsec:ml_info_bars}
+
+\textbf{Information-driven bars} go further: a bar closes when a
+cumulative information statistic exceeds a threshold. Simplest
+example --- the signed-volume imbalance bar: accumulate
+$\sum (\text{sign}(r_t) \cdot v_t)$ until $|\cdot| > \theta$. The
+bar closes when flow becomes directionally significant. Balanced
+chop produces few bars; a large directional order produces many
+in rapid succession. Switching from time to dollar (or
+information-driven) bars is often the biggest leverage change in
+a feature-engineering pipeline: the same classifier on the same
+features improves because the time axis is now aligned with the
+clock on which information actually arrives.
+
+\begin{keyfactbox}[Bar taxonomy]
+\begin{itemize}
+  \item \textbf{Time bars}: fixed wall-clock interval. Worst
+  for ML; the default in every naive tutorial.
+  \item \textbf{Tick bars}: fixed number of trades. Better;
+  equalises transaction count.
+  \item \textbf{Volume bars}: fixed shares/contracts. Better
+  still; weights by trade size.
+  \item \textbf{Dollar bars}: fixed notional. Best plain
+  alternative; robust to price drift over time.
+  \item \textbf{Information-driven bars}: variable, adapts to
+  cumulative signed flow or other entropy proxy. Sampling
+  density tracks information arrival.
+\end{itemize}
+Any ML-for-trading pipeline that still uses one-minute bars
+after reading \citeAFML{} Ch.~2 is leaving a free lunch on the
+table.
+\end{keyfactbox}
+
+% =====================================================================
+\section{Meta-labeling: the single best ML-for-trading idea}
+\label{sec:ml_metalabel}
+
+If you take one idea from this chapter, take this one.
+Meta-labeling is cleanly positive-expected-value for any
+researcher with a working rule-based primary strategy. The
+construction is embarrassingly simple, which is partly why the
+field was slow to notice it.
+
+\subsection{Setup}
+\label{subsec:ml_meta_setup}
+
+Suppose you have a \textbf{primary strategy} emitting trade
+signals --- e.g., the OU mean-reversion rule from
+\cref{ch:mean_reversion_ou}, long on $z < -2$, short on $z > +2$.
+Suppose its empirical hit rate is $55\%$, annualised Sharpe $1.0$,
+drawdowns occasionally reaching $20\%$: decent but not great,
+painful in specific regimes.
+
+The meta-labeling question: \emph{can we learn to skip the bad
+triggers?} Instead of predicting returns, we predict whether a
+primary signal, given current market state, is a winner or loser.
+We act on signals the classifier flags ``probably winner'' and
+skip the rest.
+
+\subsection{The mechanics}
+\label{subsec:ml_meta_mechanics}
+
+The meta-labeling pipeline has four steps.
+
+\begin{enumerate}
+  \item \textbf{Run the primary strategy on historical data}
+  and log every trigger: timestamp, direction (long/short),
+  and eventual outcome (``winner: closed in profit before
+  stop'' or ``loser: closed in loss''). This gives a binary
+  label $m_t \in \{0, 1\}$ for every primary trigger.
+  \item \textbf{Build features for each trigger} from the
+  current market state: regime (low-vol / high-vol /
+  crisis), recent volatility, top-of-book imbalance, time
+  of day, spread, and so on. These are the same kind of
+  features as in \cref{subsec:ml_feature_eng}.
+  \item \textbf{Train a binary classifier}
+  $\hat m(\mathbf{x})$ (logistic regression, random forest,
+  gradient boosting --- the choice of model matters less
+  than the features) to predict $m_t$ from the features
+  $\mathbf{x}_t$, \emph{under CPCV}.
+  \item \textbf{Deploy}: at each new primary trigger, compute
+  $\hat m(\mathbf{x}_t)$; if the predicted probability is
+  above a threshold $\tau$ (say $0.55$), take the trade;
+  otherwise pass.
+\end{enumerate}
+
+The classifier does not predict returns. It only improves on the
+$55\%$ base rate by preferentially skipping losers. This is a
+far easier problem: clean binary target, reasonable class
+balance, features natively predictive of trade quality
+(volatility regime, liquidity, time of day), and --- critically
+--- the learner is not asked to generate alpha. It is asked to
+\emph{gate} alpha that already exists.
+
+\subsection{Worked lift calculation}
+\label{subsec:ml_meta_lift}
+
+Consider a stylised pairs-trading strategy
+(\cref{ch:pairs_cointegration}) generating $N = 1000$ primary
+triggers over a historical window. Each winner contributes $+1R$,
+each loser $-1R$ ($R$ = per-trade risk unit):
+
+\[
+\text{Baseline P\&L} = (0.55 \cdot 1000) \cdot (+1R)
+  + (0.45 \cdot 1000) \cdot (-1R) = 100R.
+\]
+
+Train a meta-labeler that flags $40\%$ of trades ($400$ triggers)
+as skip. Assume it is informative but not perfect: of the $400$
+skipped, $240$ were losers, $160$ were winners (vs.\ a
+uniform-skip baseline of $220$ losers, $180$ winners --- a modest
+edge). We keep $600$ trades, of which
+
+\[
+\text{kept winners} = 550 - 160 = 390, \qquad
+\text{kept losers} = 450 - 240 = 210.
+\]
+
+The kept hit rate is $390 / 600 = 65\%$, a $10$-pp lift from
+$55\%$. Kept P\&L:
+
+\[
+(390)(+1R) + (210)(-1R) = 180R,
+\]
+
+\emph{an $80\%$ lift in absolute P\&L}, on $40\%$ fewer trades.
+Assuming per-trade variance is unchanged and the
+$\sqrt{N}$ denominator rescales with trade count, the stylised
+Sharpe jumps from $100 / \sqrt{1000} \approx 3.16$ to
+$180 / \sqrt{600} \approx 7.35$ --- a factor of $\sim 2.3\times$.
+These numbers are illustrative, but they show why meta-labeling
+is the highest-leverage idea here: a modest classifier merely
+correlated with trade quality translates into dramatic
+bottom-line improvement, because all it does is filter.
+
+\subsection{Why meta-labeling works (and return prediction doesn't)}
+\label{subsec:ml_meta_why}
+
+Meta-labeling works where naked return prediction fails because
+it attacks a fundamentally easier problem. Return prediction asks:
+``across all market states, which will have positive next-step
+returns?'' --- terrible signal-to-noise, near-random-walk target.
+Meta-labeling asks: ``given that the primary just fired, which
+firings are the good ones?'' --- a conditioning trick. The
+primary has already isolated high-information moments; the
+classifier only has to rank them. The target is binary and stable
+(``did this entry hit target before stop?''), the feature set is
+tight, class balance is sane, and the learner has no ambition to
+beat the market from scratch --- only to improve a working
+baseline.
+
+\begin{keyfactbox}[Meta-labeling]
+Given a rule-based primary strategy with a modest positive
+edge, a binary classifier trained on trade-quality features
+can systematically skip the worst triggers and keep the best,
+turning a mediocre strategy into a good one without touching
+the primary logic. This is the single highest-leverage idea
+in ML for trading. Standard reference: \citeAFML{} Ch.~3.
+\end{keyfactbox}
+
+\begin{intuitionbox}
+Meta-labeling inverts the usual framing. Instead of ``predict
+returns, then construct a strategy,'' it says ``construct a
+strategy, then learn to filter its triggers.'' The strategy
+generates alpha; the classifier chooses battles. It works
+because the primary strategy has collapsed the
+infinite-dimensional ``when is the market predictable'' down to
+a finite set of concrete trade opportunities, each with a
+binary supervisable outcome. That is a far better shaped ML
+problem.
+\end{intuitionbox}
+
+\begin{pitfallbox}[Don't meta-label until the primary strategy is
+profitable]
+Meta-labeling can only filter; it cannot turn a losing primary
+into a winner. If the primary has a $45\%$ hit rate, the best
+meta-labeling can do is skip every trade --- breakeven via not
+trading. The literature sometimes sells it as magic, but the
+magic is conditional on the primary having an edge. Validate the
+primary with CPCV (\cref{ch:backtesting}) first; only then build
+a meta-labeler.
+\end{pitfallbox}
+
+% =====================================================================
+\section{The hardest problem is not prediction, it is validation}
+\label{sec:ml_validation_is_hard}
+
+Standard ML research orders things so: prediction is hard (train a
+model with low training error), validation is the easy final step
+(held-out set, report accuracy). For trading, that ordering is
+inverted. The hard part is \emph{validation} --- under which
+measurement procedure can you trust that reported performance
+survives contact with real money? Fitting the model is a footnote.
+
+Why? A trading ML model has three adversaries a normal one does
+not: (i)~the target is weakly predictable, so the honest OOS
+signal is drowned by any validation bug; (ii)~the data is
+non-stationary, so one held-out period is an unreliable estimate;
+(iii)~a broken model loses money, unrecoverable by ``a second
+experiment with cleaner methodology.''
+
+Consequence: the majority of time goes to the validation pipeline,
+not the model. Every technique in \cref{ch:backtesting} ---
+walk-forward, CPCV with purging and embargo, deflated Sharpe,
+nested CV, plateau-not-peak selection --- is required by default.
+Every technique here --- triple-barrier labels, fractional
+differentiation, information-driven bars, meta-labeling --- sets
+up the problem so validation has a fighting chance.
+
+\begin{keyfactbox}[The validation-first doctrine]
+In ML for trading the ranking of effort is:
+\begin{enumerate}
+  \item Validation pipeline (CPCV, purging, embargo,
+  nested CV, deflated Sharpe).
+  \item Feature engineering (order-book microstructure,
+  volatility normalisation, information-driven bars).
+  \item Label construction (triple-barrier, meta-labeling
+  targets).
+  \item The model itself (and this step is nearly always
+  ``a gradient-boosted tree with sensible defaults'').
+\end{enumerate}
+The academic ranking is the reverse. If you are spending most
+of your time on step~4, you are working on the wrong problem.
+\end{keyfactbox}
+
+% =====================================================================
+\section{Prosperity: ML plays a narrow role}
+\label{sec:ml_prosperity}
+
+\begin{prosperitybox}
+In IMC Prosperity, the top teams' edge is almost never ML. Profit
+comes from classical tools: market making
+(\cref{ch:market_making}), mean reversion and pairs trading
+(\cref{ch:mean_reversion_ou,ch:pairs_cointegration}), basket/ETF
+arbitrage (\cref{ch:basket_etf_arb}), and options
+(\cref{ch:black_scholes,ch:greeks_hedging}). Neural networks on
+tick features do not appear in winning writeups. The reason is
+specific: Prosperity data is short (a few hundred thousand
+observations per round at most), products are synthetic with
+stationary microstructure, and classical-strategy edge is always
+large enough to statistically dominate an ML model fitted on a
+few thousand ticks.
+
+One area where ML-flavoured technique does appear:
+\textbf{detecting informed traders from per-trade data}. The
+Frankfurt Hedgehogs' second-place Prosperity~3 writeup (source of
+\cref{sec:olivia}'s Olivia story) trained a pattern-detector on
+per-trader behaviour to identify anonymous bots filling at daily
+extremes. In this chapter's framing: a classification problem.
+Given history labeled by anonymous trader ID, predict ``is this
+trader informed?'' Features are classical --- fill-price distance
+from the day's running min/max, fill size, time since last trade.
+The binary label derives from the observation that one bot always
+fills at the daily extreme. The classifier is used as a
+\emph{meta-labeler} on the team's own trades: ``don't compete
+with informed flow, align with it.''
+
+This is precisely the meta-labeling idea of
+\cref{sec:ml_metalabel}. The primary is a rule-based pairs trade
+on an ETF basket; the meta-labeler biases entry thresholds by the
+inferred informed-bot direction. The reported lift materially
+improved placement, and the classical part still worked when the
+informed bot did not trade --- ML was pure upside, not a
+replacement.
+
+General lesson: do not reach for ML until classical tools are
+exhausted. When you do, reach for a one-sentence classification
+problem --- ``is this trader informed,'' ``is this regime
+high-volatility,'' ``is this spread about to revert'' --- not
+``predict the next tick.'' Prosperity punishes overfitting fast,
+and the surviving techniques are the boring ones: few features,
+linear or tree-based models, CPCV.
+\end{prosperitybox}
+
+% =====================================================================
+\section{Goldman Sachs: which desks actually use ML}
+\label{sec:ml_gs}
+
+\begin{gsbox}
+At Goldman Sachs, as at any large sell-side bank, ML lives on
+specific desks and problems --- it is not the bank-wide religion
+outsiders sometimes imagine. The distribution maps cleanly onto
+the ``where ML helps'' list in \cref{sec:ml_where_helps}:
+
+\begin{itemize}
+  \item \textbf{Systematic Equities (quantitative
+  long/short)}: the cleanest home for meta-labeling.
+  Quant research generates primary alphas from
+  fundamental or technical signals; the systematic
+  trading team trains classifiers on trade-level
+  features to filter the worst entries. Alphas are
+  transparent and attributable; ML is a conditional
+  filter on top.
+  \item \textbf{Central Risk Book}: the team
+  warehousing inventory across flow desks uses HMMs and
+  related regime-detection models to time hedging bands
+  (high-vol regime, widen; quiet regime, tighten). ML
+  here is a regime classifier, not a return predictor.
+  \item \textbf{Execution / Algorithmic Trading}: uses
+  RL for child-order placement atop an Almgren--Chriss
+  baseline (\cref{ch:almgren_chriss}), plus supervised
+  learning for short-horizon fill-probability prediction
+  in smart-order routers. The highest-compute ML use
+  case in the firm.
+  \item \textbf{Data Science / Strats}: builds
+  feature-engineering pipelines on alternative and
+  microstructure data (credit-card transactions,
+  satellite imagery, news sentiment, order-book
+  reconstructions), sold as \emph{inputs} to the
+  systematic desks. Output is ``a feature matrix,'' not
+  ``a model.''
+\end{itemize}
+
+Three points worth underlining. First, \textbf{ML is almost
+never used for directional signal generation}. The directional
+signal --- long or short --- comes from quantitative research
+(QR), using classical statistical and economic models with
+defensible attributions. ML enters as filter, regime switch, or
+execution optimiser, never to generate the thesis. A Strat
+pitching an RNN return predictor as a trading signal is gently
+but firmly redirected to an HMM or linear factor model. Second,
+\textbf{validation discipline is taken very seriously}: every
+production ML model has a CPCV evaluation, a monthly-recut
+out-of-sample window, and a documented retirement criterion
+(e.g., ``pull if rolling 6-month OOS Sharpe $< 0.5$''). Models
+do not live forever. Third, \textbf{the feature matrix is the
+crown jewel}: the most durable source of desk edge is a
+well-engineered feature pipeline that can be recombined as
+regimes change. Fancy model on a bad matrix loses to a simple
+model on a good one, every time.
+\end{gsbox}
+
+% =====================================================================
+\section{A short reference implementation}
+\label{sec:ml_reference_impl}
+
+One short Python snippet for the triple-barrier method is this
+chapter's core algorithmic contribution; everything else is about
+what to feed in and how to validate what comes out. The
+implementation below takes a price array, per-observation
+volatility, profit/stop multipliers, and max holding period, and
+returns the triple-barrier label per observation.
+
+\begin{lstlisting}[language=Python, caption={Triple-barrier
+labeling, producing the label table of
+\cref{subsec:ml_tb_worked}.}]
+import numpy as np
+
+def triple_barrier_labels(prices, sigma, pt_mult=2.0, sl_mult=2.0, max_hold=5):
+    """Return +1 (top), -1 (stop), 0 (timeout) for each observation."""
+    n = len(prices)
+    labels = np.zeros(n)
+    for i in range(n - max_hold):
+        top = prices[i] * (1 + pt_mult * sigma[i])
+        bot = prices[i] * (1 - sl_mult * sigma[i])
+        for j in range(1, max_hold + 1):
+            if prices[i + j] >= top:
+                labels[i] = +1; break
+            if prices[i + j] <= bot:
+                labels[i] = -1; break
+    return labels
+\end{lstlisting}
+
+Run this on the ten-observation BTC-like series of
+\cref{subsec:ml_tb_worked} with constant \texttt{sigma[i] = 0.02}
+and you recover the label vector
+$(+1, 0, -1, -1, -1, -1, -1, 0, 0, 0)$ --- exactly the worked
+example. An implementation reproducing this vector has the
+barrier logic right; one that does not has a sign error, an
+off-by-one, or a confused volatility-scaling direction. Production versions (e.g.,
+\texttt{mlfinlab.labeling.get\_events} in the \texttt{mlfinlab}
+package accompanying \citeAFML{}) add volatility estimation,
+asymmetric horizons, and event metadata, but the core logic is
+the ten lines above.
+
+% =====================================================================
+\section{Key facts to memorise}
+\label{sec:ml_key_facts}
+
+\begin{itemize}
+  \item \textbf{ML for trading is narrow.} It helps with
+  feature engineering on order-book data, regime
+  detection, trade-level meta-labeling, and execution. It
+  does not help with naked return prediction from lagged
+  returns, no matter how deep the network.
+  \item \textbf{Naive $k$-fold CV on time series is a bug.}
+  Triple-barrier labels with horizon $H$ leak between
+  folds unless you purge training observations whose
+  label windows intersect test observations (plus an
+  embargo). Use CPCV from \cref{ch:backtesting}.
+  Everything else in this chapter assumes this fix is
+  already applied.
+  \item \textbf{Triple-barrier labels} define profit,
+  stop, and timeout barriers for each observation and
+  label it by the first barrier hit. Volatility scaling
+  is mandatory; fixed percentage barriers are useless.
+  Standard reference: \citeAFML{} Ch.~3.
+  \item \textbf{Fractional differentiation} threads the
+  needle between ``stationary but memoryless'' returns
+  and ``non-stationary but level-preserving'' prices.
+  Weights: $w_0 = 1$,
+  $w_k = -w_{k-1}(d - k + 1)/k$. Typical optimal $d$
+  for equity series is in $[0.3, 0.5]$, chosen as the
+  smallest $d$ at which an ADF test rejects
+  non-stationarity.
+  \item \textbf{Information-driven bars} (tick, volume,
+  dollar, imbalance) sample time more densely when
+  something is happening. Switching from time bars to
+  dollar bars is often the single biggest leverage
+  change in a feature pipeline.
+  \item \textbf{Meta-labeling is the single
+  highest-leverage idea.} Train a binary classifier on
+  top of a working rule-based primary strategy to filter
+  out low-quality triggers. Turns a mediocre strategy
+  into a good one without touching the primary logic.
+  \item \textbf{Meta-labeling only filters.} It cannot
+  turn a losing primary strategy into a winner. Validate
+  the primary with CPCV first.
+  \item \textbf{The validation pipeline is the hard
+  part.} In ML for trading the ranking of effort is
+  (1)~validation, (2)~features, (3)~labels, (4)~model.
+  The academic ranking is the reverse.
+  \item \textbf{Non-stationarity never goes away.}
+  Rolling retraining, regime conditioning, and deflated
+  Sharpe all soften it; none eliminate it. Any model
+  expected to live for years is the wrong model.
+  \item \textbf{ML at Goldman Sachs} lives on systematic
+  equities (meta-labeling), central risk
+  (regime detection), execution (RL for child orders),
+  and Strats data science (feature pipelines). It does
+  \emph{not} live in the directional signal: that comes
+  from QR using classical models.
+  \item \textbf{ML in Prosperity is rarely the edge.}
+  Classical tools dominate; the one place ML appears is
+  in \emph{informed-trader detection} (Olivia-style),
+  which is a meta-labeling application in disguise.
+  \item \textbf{The single sentence.} \emph{``The hardest
+  problem in ML for trading is not prediction, it is
+  validation.''} Everything in this chapter is in
+  service of that sentence.
+\end{itemize}

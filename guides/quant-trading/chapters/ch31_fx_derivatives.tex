@@ -1,0 +1,1007 @@
+\chapter{FX Derivatives}
+\label{ch:fx_derivatives}
+\chaptermark{FX derivatives}
+
+Foreign-exchange (FX) is the largest financial market in the world:
+the BIS 2022 Triennial Survey put average daily turnover at \$7.5
+trillion, an order of magnitude above global equities.  It also
+carries the densest jargon --- ``pips'', ``forward points'',
+``25-delta risk-reversal'', ``TARF'', ``CNH vs CNY'' --- most with
+no analogue elsewhere.  This chapter translates the jargon, derives
+\emph{covered interest parity}, states the FX Black--Scholes
+(\emph{Garman--Kohlhagen}), and tours the vanilla-through-exotic
+option zoo: barriers, digitals, TARFs, and the ATMF/RR/BF quoting
+convention from which the entire smile is reconstructed.
+
+\begin{backgroundbox}[Prerequisites]
+From earlier in the book:
+\begin{itemize}
+  \item \Cref{ch:arbitrage_zoo}: the no-arbitrage principle, triangular
+    FX arbitrage, and the idea that cross-rates must agree in a
+    cycle.
+  \item \Cref{ch:options_payoffs}: European call/put payoffs,
+    put--call parity, and the notion of a strike $\Kstrike$.
+  \item \Cref{ch:black_scholes}: the Black--Scholes formula under
+    geometric Brownian motion, the $\CDFN$/$\pdfN$ notation, and
+    risk-neutral pricing.
+  \item \Cref{ch:fixed_income_foundations}: continuous discounting,
+    zero-coupon curves, $e^{-\rrf T}$ as the discount factor.
+\end{itemize}
+If any of these feel hazy, re-read the relevant chapter first.
+\end{backgroundbox}
+
+
+%% ================================================================
+\section{FX jargon decoder}
+\label{sec:fx_jargon}
+%% ================================================================
+
+FX desk conversation is unreadable without the shorthand.  The
+table collects the terms used in the rest of the chapter; each is
+formally defined where first needed.
+
+\begin{keyfactbox}[FX jargon at a glance]
+\label{fact:fx_jargon}
+\begin{tabular}{@{}p{0.22\textwidth} p{0.72\textwidth}@{}}
+\toprule
+\textbf{Term} & \textbf{Meaning} \\
+\midrule
+\emph{Currency pair} & A pair written $\mathrm{BASE}/\mathrm{QUOTE}$,
+  e.g.\ $\mathrm{EUR}/\mathrm{USD}$.  The quoted number is the number
+  of units of the \emph{quote} currency required to buy one unit of
+  the \emph{base} currency. \\
+\emph{Spot} $S_t$ & Current exchange rate; deliverable on the
+  \emph{spot date}, conventionally $T+2$ business days. \\
+\emph{Forward} $F(T)$ & Rate agreed now for an exchange settling at
+  future date $T$.  No money changes hands today. \\
+\emph{Forward points} & The difference $F(T) - S_t$, quoted in
+  \emph{pips}. \\
+\emph{Pip} & ``Percentage in point''; the smallest conventional
+  price increment.  For most pairs this is $10^{-4}$; for JPY pairs it
+  is $10^{-2}$. \\
+\emph{Direct quote} & Quote with the domestic currency as the quote
+  (right-hand) currency.  From a US perspective, $\mathrm{EUR}/\mathrm{USD}$
+  is direct; $\mathrm{USD}/\mathrm{JPY}$ is indirect. \\
+\emph{Cross rate} & Rate for a pair neither leg of which is the USD,
+  e.g.\ $\mathrm{EUR}/\mathrm{JPY}$, usually inferred from the two
+  USD legs. \\
+\emph{Domestic / foreign} & In option pricing, the \emph{domestic}
+  currency is the one you are measuring P\&L in (the quote currency);
+  the \emph{foreign} currency is the underlying asset (the base
+  currency).  Rates $r_d, r_f$ follow this convention. \\
+\emph{NDF} & Non-deliverable forward: cash-settles in USD against a
+  fixing, used where the local currency is not freely convertible
+  (e.g.\ $\mathrm{KRW}, \mathrm{TWD}, \mathrm{CNY}$). \\
+\emph{CNH vs CNY} & Offshore (Hong Kong) vs onshore (mainland)
+  renminbi.  The two are separate markets and their rates can
+  diverge persistently. \\
+\bottomrule
+\end{tabular}
+\end{keyfactbox}
+
+\begin{pitfallbox}[$\mathrm{EUR}/\mathrm{USD}$ is not the same as $\mathrm{USD}/\mathrm{EUR}$]
+$\mathrm{EUR}/\mathrm{USD} = 1.08$ means
+``\textbf{1} EUR buys \textbf{1.08} USD.''  Inverting, one USD buys
+$1/1.08 \approx 0.9259$ EUR.  Newcomers flip the convention and
+wonder why their hedge is backwards.  The rule:
+\emph{the left-hand currency is the one unit; the right-hand is
+how many you pay.}  ``A call on $\mathrm{EUR}/\mathrm{USD}$'' is a
+call on EUR --- buying EUR, selling USD --- struck in USD per EUR.
+\end{pitfallbox}
+
+The slot convention is fixed by market practice, not mathematics.
+EUR is always the base against USD, JPY is always the quote, GBP is
+always the base, and so on.  Get the convention wrong on a ticket
+and you have written the opposite trade.
+
+\subsection{Fixings and settlement mechanics}
+\label{subsec:fx_fixings}
+
+Many FX contracts --- NDFs, option barriers, TARF schedules,
+hedged-equity baskets --- reference an \emph{FX fixing}: a
+publicly-observed rate set at a fixed time by polling or matching
+on a specified venue.  The main fixings:
+\begin{itemize}
+  \item \textbf{WM/Reuters 4pm London}: benchmark for equity-index
+    currency hedging; set from trades and executable quotes in a
+    five-minute window around 4pm London, published by Refinitiv.
+  \item \textbf{ECB reference rates}: daily concertation fix at
+    14:15 CET, for European statistics and accounting.
+  \item \textbf{Central-bank NDF fixes}: e.g.\ the PBOC USD/CNY
+    onshore midpoint (09:15 Beijing), reference for many CNY NDFs.
+\end{itemize}
+Confusing which fixing a contract references has cost traders real
+money: a barrier that knocks out ``on any touch'' does so
+continuously on spot, but a TARF leg ``settling against the fixing''
+cares only about the one reference value on the fixing date.
+
+\textbf{Non-deliverable forwards (NDFs).}
+An NDF is a forward with no physical exchange at settlement; one
+party pays the other USD (or EUR) cash equal to (forward rate --
+fixing) $\times$ notional.  NDFs exist because many EM currencies
+(CNY, KRW, INR, TWD, BRL, \ldots) have capital controls preventing
+free offshore ownership of the local currency; the NDF gives
+exposure without holding the local leg.  The NDF market is the
+primary venue for non-resident renminbi, rupee, and won exposure,
+with over \$250bn daily turnover in 2022.
+
+
+%% ================================================================
+\section{Spot and forwards}
+\label{sec:fx_spot_forward}
+%% ================================================================
+
+\subsection{Spot}
+
+The \textbf{spot rate} $S_t$ is the price at time $t$ for immediate
+exchange of the two currencies.  ``Immediate'' is convention: for
+most pairs the \emph{spot date} is $T+2$ business days.  USD/CAD is
+$T+1$; intraday fixings use whatever the fixing definition says.
+
+The $T+2$ convention is historical: pre-electronic settlement
+required physical payment instructions through two central-bank
+RTGS systems in two time zones.  CLS eliminates the operational
+need, but $T+2$ remains the anchor --- zero curves, forward-point
+quotes, and option-expiry calendars all hang off it.  A ``tom/next''
+trade is a one-day forward relative to spot, not a two-day one.
+
+\subsection{Forwards}
+
+A \textbf{forward contract} struck at $t$ exchanges currencies at
+fixed rate $F(t,T)$ on date $T$.  No money changes hands at
+inception; at $T$ one side delivers foreign and receives domestic at
+$F$.  The commercial motivation is hedging: a European exporter
+invoiced USD 10M for delivery in three months faces uncertain EUR
+proceeds, and locking a forward today converts that uncertain
+future USD receipt into a known EUR amount.
+
+What rate makes this fair today?  No-arbitrage pins it down exactly
+as with equity forwards (\cref{ch:options_payoffs}), with one twist:
+holding the foreign currency earns the \emph{foreign interest rate}
+$r_f$, not a dividend yield.
+
+\subsection{Covered interest parity}
+\label{subsec:cip}
+
+\begin{keyfactbox}[Covered interest parity (CIP)]
+\label{fact:cip}
+Let $S_t$ be the spot $\mathrm{BASE}/\mathrm{QUOTE}$ rate (units of
+quote per unit of base).  Let $r_d$ be the continuously compounded
+domestic (quote-currency) interest rate and $r_f$ the foreign
+(base-currency) rate, both for the tenor $T$.  Then the fair forward
+rate is
+\begin{equation}
+  F(t,T) \;=\; S_t \, e^{(r_d - r_f)(T - t)}.
+  \label{eq:cip}
+\end{equation}
+If market quotes deviate from this relation, a textbook arbitrage
+exists.
+\end{keyfactbox}
+
+\textbf{Derivation.}  Consider two self-financing strategies,
+starting from one unit of foreign at time $t$ and ending in domestic
+at $T$.
+
+\textit{Strategy A (invest foreign, convert forward):} deposit the
+foreign unit at rate $r_f$, growing to $e^{r_f (T-t)}$; sell this
+forward at $F(t,T)$; receive $F(t,T)\,e^{r_f(T-t)}$ domestic at $T$.
+
+\textit{Strategy B (convert spot, invest domestic):} sell the
+foreign unit at spot for $S_t$ domestic; deposit at $r_d$, growing
+to $S_t \, e^{r_d(T-t)}$ at $T$.
+
+Both start from one foreign unit with deterministic terminal
+cashflow.  By the law of one price they must agree:
+\begin{equation}
+  F(t,T) \, e^{r_f(T-t)} \;=\; S_t \, e^{r_d(T-t)},
+\end{equation}
+rearranging to \cref{eq:cip}.  If $F$ exceeded this level, borrow
+domestic, run Strategy B, sell forward, and collect
+$Fe^{r_f(T-t)} - S_t e^{r_d(T-t)} > 0$ risklessly; the converse
+flips.  \citeHull, Ch.\ 5 (general assets) and Ch.\ 17 (currencies).
+
+\begin{intuitionbox}
+$F > S$ iff the domestic rate exceeds the foreign rate.  If USD
+earns 5\% vs EUR's 4\%, everyone wants USD; the forward market
+compensates by pricing future USD \emph{lower} in EUR terms so the
+two investments break even.  Mnemonic: \emph{the high-yielding
+currency trades at a forward discount.}
+\end{intuitionbox}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[>=Stealth,
+  box/.style={draw, rounded corners, fill=gray!8,
+              minimum width=3.2cm, minimum height=1.1cm,
+              align=center, font=\footnotesize}]
+  \node[box] (A) at (0,   2.5) {1 unit foreign\\at time $t$};
+  \node[box] (B) at (7.5, 2.5) {$e^{r_f(T-t)}$ foreign\\at time $T$};
+  \node[box] (C) at (0,   0)   {$S_t$ domestic\\at time $t$};
+  \node[box] (D) at (7.5, 0)   {$S_t\,e^{r_d(T-t)}$\\domestic at $T$};
+
+  % Strategy A: invest foreign, sell forward
+  \draw[->, thick, blue] (A) -- node[above, font=\footnotesize]{invest at $r_f$} (B);
+  \draw[->, thick, blue] (B) -- node[right, align=center, font=\footnotesize]
+    {sell forward\\at $F(t,T)$} (D);
+
+  % Strategy B: sell spot, invest domestic
+  \draw[->, thick, red] (A) -- node[left, font=\footnotesize]{sell spot at $S_t$} (C);
+  \draw[->, thick, red] (C) -- node[below, font=\footnotesize]{invest at $r_d$} (D);
+
+  % Strategy labels
+  \node[blue, font=\footnotesize\bfseries] at (3.75, 3.15) {Strategy A};
+  \node[red,  font=\footnotesize\bfseries] at (3.75,-0.65) {Strategy B};
+
+  % No-arb result
+  \node[font=\footnotesize, align=center] at (3.75, 1.25)
+    {No-arb: equal terminal values\\
+     $\Rightarrow F(t,T) = S_t\,e^{(r_d - r_f)(T-t)}$};
+\end{tikzpicture}
+\caption{Covered interest parity (CIP). Both strategies start from 1 unit of foreign
+currency at $t$ and end in domestic at $T$. Strategy A (blue): deposit foreign at $r_f$,
+sell proceeds forward at $F$. Strategy B (red): sell spot at $S_t$, invest domestic at
+$r_d$. No-arbitrage forces the two terminal values to agree, pinning the forward rate.}
+\label{fig:cip_strategies}
+\end{figure}
+
+\subsection{Worked example: 1-year EUR/USD forward}
+\label{subsec:cip_example}
+
+Suppose EUR/USD spot $S_0 = 1.0800$, the continuously compounded USD
+rate is $r_d = 5\%$, and the continuously compounded EUR rate is
+$r_f = 4\%$, both for 1-year tenor.  Then
+\begin{equation}
+  F(0, 1) \;=\; 1.08 \cdot e^{(0.05 - 0.04) \cdot 1}
+            \;=\; 1.08 \cdot e^{0.01}
+            \;\approx\; 1.0909.
+\end{equation}
+The forward points are $F - S = 0.010854 = 108.54$ pips, quoted as
+``EUR/USD 1-year fwd at $+108.5$ points.''  Verified to six decimal
+places in Python (\cref{lst:gk_pricer}).
+
+\begin{pitfallbox}[Quote convention flip reverses the sign]
+With $\mathrm{EUR}/\mathrm{USD}$ and USD domestic, higher USD rate
+gives a forward \emph{premium} ($F > S$).  Quoted as
+$\mathrm{USD}/\mathrm{EUR}$ instead, the domestic role swaps:
+$r_d = 4\%, r_f = 5\%$, so $F/S = e^{-0.01}$ --- a forward
+\emph{discount}.  Same economics, opposite sign on the points.
+\end{pitfallbox}
+
+
+%% ================================================================
+\section{Cross-currency basis swaps}
+\label{sec:xccy_basis}
+%% ================================================================
+
+A \textbf{cross-currency basis swap} (XCCY swap) exchanges floating
+interest in two currencies over months to decades.  At inception,
+the parties exchange principals $N$ and $S_0 N$ at spot $S_0$ (one
+pays $N$ USD, receives $S_0 N$ EUR).  At each coupon $t_i$, one pays
+floating USD (SOFR) on $N$ and receives floating EUR (EURIBOR plus
+spread) on $S_0 N$, spread on the EUR leg.  At maturity, principals
+are re-exchanged at the \emph{initial} rate $S_0$, not the
+prevailing one.
+
+The ``basis'' $b$ is the spread on the non-USD leg that zeros
+inception PV.  Under naive CIP this would be zero; since 2008 it has
+been persistently non-zero, typically 10--50~bp against USD for
+majors and wider in stress.  In plain English: $b$ is the extra
+interest a counterparty demands, on top of their own domestic
+floating rate, to lend you their currency and take USD in exchange
+--- compensation for the scarcity of dollar funding when non-US
+banks want USD more than US banks want foreign currency.
+
+\begin{keyfactbox}[Post-2008 CIP deviations]
+\label{fact:cip_deviations}
+The observed cross-currency basis $b$ violates pure CIP:
+\emph{borrowing USD synthetically via FX swaps is more expensive
+than borrowing USD directly.}  The drivers are
+\begin{itemize}
+  \item \textbf{Balance-sheet costs} under Basel III --- arbitraging
+    the basis consumes scarce leverage capacity.
+  \item \textbf{USD funding premium} --- non-US banks structurally
+    short of USD bid for it, especially at quarter- and year-ends.
+  \item \textbf{Credit/counterparty risk} in the FX-swap market.
+\end{itemize}
+See \citet{borio2016covered} for the canonical post-crisis account.
+For option-pricing purposes, the practical consequence is that the
+forward rate used in \cref{fact:cip} must be replaced with the
+\emph{market} forward (which bakes in the basis), not the
+textbook CIP-implied forward.
+\end{keyfactbox}
+
+The basis is a term structure quoted at 3M, 6M, 1Y, 2Y, \ldots, 30Y.
+Long-tenor FX-forward desks price off the basis curve plus the two
+single-currency curves, not textbook CIP.  XCCY basis swaps hedge
+and express views on the spread.
+
+\subsection{Implied basis from a forward}
+\label{subsec:implied_basis}
+
+Given market forward $F^{\mathrm{mkt}}$ and two zero curves, the
+\emph{implied} basis is
+\begin{equation}
+  b_{\mathrm{implied}}(T) \;=\;
+  \frac{1}{T}\ln\frac{F^{\mathrm{mkt}}}{S_0}
+  \;-\; (r_d - r_f),
+  \label{eq:implied_basis}
+\end{equation}
+the deviation of the observed forward from the textbook CIP level
+$S_0 e^{(r_d-r_f)T}$.  Positive = premium over CIP; negative =
+discount.  EUR/USD 3-month basis has blown out to 50--80~bp at
+stressed quarter-ends.
+
+\subsection{Why this matters for pricing}
+
+The Garman--Kohlhagen formula of \cref{sec:fx_vanillas} assumes CIP
+and uses $r_d - r_f$ as the risk-neutral drift.  Desks pricing
+against market forwards replace this with
+$\tfrac{1}{T}\ln(F^{\mathrm{mkt}}/S_0) = r_d - r_f +
+b_{\mathrm{implied}}$.  Equivalently, price off the market forward
+curve directly (the \emph{forward-flat} convention).
+
+
+%% ================================================================
+\section{FX vanillas and quanto}
+\label{sec:fx_vanillas}
+%% ================================================================
+
+\subsection{Garman--Kohlhagen}
+
+The FX analogue of Black--Scholes is \textbf{Garman--Kohlhagen}
+\citep{garman1983foreign}: treat the foreign currency like a
+dividend-paying stock with continuous yield $r_f$ in place of $q$.
+
+\begin{keyfactbox}[Garman--Kohlhagen formula]
+\label{fact:garman_kohlhagen}
+Under the risk-neutral model
+$d\Spx_t = (r_d - r_f)\,\Spx_t\,dt + \volat\,\Spx_t\,dW_t$,
+a European call on the FX rate $\Spx$ (paying
+$\max(\Spx_T - \Kstrike, 0)$ in domestic currency) is worth
+\begin{equation}
+  \Call \;=\; \Spx_0 \, e^{-r_f T} \CDFN(d_1)
+              \;-\; \Kstrike \, e^{-r_d T} \CDFN(d_2),
+  \label{eq:gk_call}
+\end{equation}
+with
+\begin{equation}
+  d_1 \;=\; \frac{\ln(\Spx_0/\Kstrike) + (r_d - r_f + \tfrac12 \volat^2)T}
+                 {\volat \sqrt{T}},
+  \qquad
+  d_2 \;=\; d_1 - \volat\sqrt{T}.
+  \label{eq:gk_d1d2}
+\end{equation}
+The corresponding put price is
+$\Put = \Kstrike e^{-r_d T}\CDFN(-d_2) - \Spx_0 e^{-r_f T}\CDFN(-d_1)$.
+\end{keyfactbox}
+
+Differences from equity Black--Scholes (\cref{ch:black_scholes}) are
+cosmetic: drift under $\Qm$ is $r_d - r_f$; spot discounted by
+$e^{-r_f T}$.  The derivation is identical with
+$q \mapsto r_f$ throughout.  \citeHull, Ch.\ 17.
+
+\subsection{Put--call parity in FX form}
+
+Subtracting put from call gives FX put--call parity
+\begin{equation}
+  \Call - \Put \;=\; \Spx_0 e^{-r_f T} - \Kstrike e^{-r_d T},
+  \label{eq:fx_putcall}
+\end{equation}
+the PV of a forward buying foreign at $\Kstrike$.  Using CIP
+(\cref{fact:cip}), the RHS equals $e^{-r_d T}(F - \Kstrike)$.  Long
+call + short put at the same strike = long forward, as in equities.
+
+\subsection{Worked example: 3-month EUR/USD ATM call}
+\label{subsec:gk_example}
+
+Using the same market data as in \cref{subsec:cip_example} but with
+$T = 0.25$ years, $\volat = 9\%$ (a typical EUR/USD at-the-money
+implied vol), and strike $\Kstrike = 1.08$ (ATM spot):
+\begin{align}
+  d_1 &= \frac{\ln(1) + (0.05 - 0.04 + \tfrac12 \cdot 0.09^2) \cdot 0.25}
+               {0.09 \sqrt{0.25}}
+        \;=\; 0.0781, \\
+  d_2 &= 0.0781 - 0.09\sqrt{0.25} \;=\; 0.0331, \\
+  \Call &= 1.08\,e^{-0.04\cdot 0.25}\CDFN(0.0781)
+           - 1.08\,e^{-0.05\cdot 0.25}\CDFN(0.0331) \notag \\
+        &\approx 0.02054 \text{ USD per EUR notional}.
+\end{align}
+On a EUR 10M notional, the premium is USD 205{,}346.
+The corresponding put is worth USD 178{,}648; their difference
+USD 26{,}698 matches $\Spx e^{-r_f T} - \Kstrike e^{-r_d T}$ times
+EUR 10M, as parity requires.  All five numbers above are
+verified in Python below to six decimal places.
+
+\begin{lstlisting}[caption={Garman--Kohlhagen vanilla pricer for FX options.},label={lst:gk_pricer}]
+import numpy as np
+from scipy.stats import norm
+
+def garman_kohlhagen(S, K, T, r_d, r_f, sigma, option="call"):
+    """Price a European FX option (domestic-currency premium per
+    unit of foreign notional).  S, K in domestic-per-foreign units."""
+    d1 = (np.log(S / K) + (r_d - r_f + 0.5 * sigma**2) * T) \
+         / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    if option == "call":
+        return S * np.exp(-r_f * T) * norm.cdf(d1) \
+             - K * np.exp(-r_d * T) * norm.cdf(d2)
+    return K * np.exp(-r_d * T) * norm.cdf(-d2) \
+         - S * np.exp(-r_f * T) * norm.cdf(-d1)
+
+# 3M EUR/USD ATM, spot 1.08, vol 9%, USD 5%, EUR 4%
+C = garman_kohlhagen(1.08, 1.08, 0.25, 0.05, 0.04, 0.09, "call")
+P = garman_kohlhagen(1.08, 1.08, 0.25, 0.05, 0.04, 0.09, "put")
+print(f"Call = {C:.6f}, Put = {P:.6f}, C-P = {C-P:.6f}")
+# Check put-call parity: C - P == S*exp(-r_f*T) - K*exp(-r_d*T)
+parity = 1.08*np.exp(-0.04*0.25) - 1.08*np.exp(-0.05*0.25)
+assert abs((C - P) - parity) < 1e-10
+\end{lstlisting}
+
+\subsection{Quanto options}
+
+A \textbf{quanto} (``quantity-adjusting'') option pays in a currency
+different from the underlying's natural one.  Canonical example: a
+Japanese investor holds a call on SPX paying
+$\max(\Spx_T^{\mathrm{SPX}} - \Kstrike, 0)$ \emph{in JPY}, with a
+contractually fixed FX rate (say 1 index unit = 1 JPY).
+
+Quantos introduce correlation between index $\Spx^{\mathrm{SPX}}$
+and rate $X^{\mathrm{USDJPY}}$.  Under the JPY risk-neutral measure,
+the SPX drift is
+\begin{equation}
+  \mu^{\mathrm{SPX, quanto}} \;=\;
+  r_{\mathrm{JPY}} - q^{\mathrm{SPX}}
+  \;-\; \rho \, \volat_{\mathrm{SPX}} \, \volat_{\mathrm{USDJPY}},
+  \label{eq:quanto_drift}
+\end{equation}
+with $\rho$ the correlation of SPX and USD/JPY log-returns.  The
+adjustment is the $-\rho\volat\volat$ term: positive co-movement
+reduces the quanto drift, because a JPY investor gets ``free'' FX
+appreciation when SPX rises and pays for it via a lower forward.
+With the adjusted drift the rest is ordinary Black--Scholes.
+\citeHull, Ch.\ 30.
+
+\subsubsection{Worked example: quanto vs naive SPX call}
+
+Take $\volat_{\mathrm{SPX}} = 20\%,
+\volat_{\mathrm{USDJPY}} = 10\%, \rho = -0.30$ (USD weakens when
+SPX rallies).  The SPX-drift adjustment is
+\begin{equation}
+  -\rho\,\volat_{\mathrm{SPX}}\,\volat_{\mathrm{USDJPY}}
+  \;=\;
+  -(-0.30)(0.20)(0.10) \;=\; +0.60\%,
+\end{equation}
+raising the quanto drift by 60 bp/year.  The JPY investor pays
+\emph{more} than for the unhedged exposure because she gets the
+FX-hedged return without paying for the hedge.  Flip $\rho > 0$ and
+the quanto trades at a discount.
+
+\begin{pitfallbox}[Quantos are not the same as FX-hedged notes]
+An \emph{FX-hedged} investment converts the SPX return at the
+terminal FX rate and strips FX exposure via a rolling forward hedge.
+A \emph{quanto} uses a contractually fixed FX rate --- no spot-FX
+sensitivity at expiry.  The P\&L differs, and the quanto carries
+correlation risk ($\rho$) that the hedged note does not.
+\end{pitfallbox}
+
+
+%% ================================================================
+\section{Barriers, digitals, and TARFs}
+\label{sec:fx_exotics}
+%% ================================================================
+
+Vanilla FX options trade in vast quantities, but exotic-desk
+complexity lives in structured products used to fine-tune corporate
+and asset-manager hedges.  Three families follow.
+
+\subsection{Barrier options}
+
+A \textbf{barrier option} is a vanilla that comes into existence
+(\emph{knock-in}) or is extinguished (\emph{knock-out}) when spot
+touches barrier $B$ during the option's life.  \{up, down\} $\times$
+\{in, out\} $\times$ \{call, put\} gives eight standard types, all
+with closed-form GK prices
+\citep[see][Ch.\ 26 and 19]{hull8ed}.  The key \emph{in-out parity}:
+\begin{equation}
+  \text{knock-in} + \text{knock-out} \;=\; \text{vanilla},
+  \label{eq:in_out_parity}
+\end{equation}
+since the barrier either fires (knock-in lives, knock-out dies) or
+does not, and the portfolio pays the vanilla payoff either way.
+
+Barriers are popular because they are strictly cheaper than the
+matching vanilla: a hedger who ``knows'' EUR/USD won't rally above
+1.20 in six months buys a 1.10-strike knock-out with barrier 1.20.
+If spot touches 1.20, the hedge disappears exactly when most needed
+--- the standard barrier failure mode.
+
+For the case of an \emph{up-and-out call} with strike $\Kstrike <
+B$ under Garman--Kohlhagen dynamics, the closed form is
+\citep[][Ch.\ 26]{hull8ed}
+\begin{equation}
+  \Call_{\mathrm{UO}} \;=\;
+  \Call_{\mathrm{vanilla}}
+  \;-\; \Call_{\mathrm{UI}},
+  \label{eq:uo_decomp}
+\end{equation}
+where $\Call_{\mathrm{UI}}$ is a sum of four Gaussian CDF terms
+involving the reflected strike $B^2/\Spx_0$ and exponent
+$\mu = (r_d - r_f)/\volat^2 - \tfrac12$.  Ugly but mechanical to
+code.  Key properties:
+\begin{itemize}
+  \item UO vanishes when spot hits $B$;
+  \item vega changes sign near $B$ (long far from $B$, short close
+    --- more vol raises the knockout probability);
+  \item gamma spikes large and negative near $B$, making delta
+    hedging unstable in the final 1--2\% approach.
+\end{itemize}
+The last point --- barrier \emph{pin risk} --- is why traders run
+separate ``stopping-time'' hedges (small digital offsets for the
+gamma spike) rather than smooth delta hedging alone.
+
+\subsubsection{Barrier vs vanilla: a concrete comparison}
+
+Using the data of \cref{subsec:gk_example}
+(spot 1.08, $r_d = 5\%, r_f = 4\%, \volat = 9\%, T = 0.25$), compare
+three $\Kstrike = 1.09$ calls:
+\begin{itemize}
+  \item \textbf{Vanilla}: $\approx 1.59\%$ of EUR notional.
+  \item \textbf{Up-and-out, $B = 1.12$}: $\approx 0.11\%$ (MC).  An
+    order of magnitude cheaper: the barrier is tight enough that
+    most paying paths knock out first.
+  \item \textbf{Up-and-out, $B = 1.15$}: $\approx 0.61\%$ ---
+    under half the vanilla, but retains most of the 1.09--1.15
+    terminal probability.
+\end{itemize}
+(Prices verified via MC at $2\times 10^5$ paths, 100 steps.)
+The discount is largest exactly when the cheap hedge is most
+wanted --- the same perverse trade-off as TARFs.  The barrier's
+expected payoff conditional on the hedge being needed
+(spot $\geq 1.09$ at expiry) is strictly lower than the vanilla's;
+the shortfall is the structure's true cost.
+
+\subsection{Digital (binary) options}
+
+A \textbf{digital call} pays $Q$ if $\Spx_T > \Kstrike$, zero
+otherwise.  Under GK, the domestic-cash digital call is
+\begin{equation}
+  D^{\mathrm{call}}_{\mathrm{cash}} \;=\;
+  Q \, e^{-r_d T} \, \CDFN(d_2),
+  \label{eq:digital_call}
+\end{equation}
+with $d_2$ as in \cref{eq:gk_d1d2}.  The digital put is
+$Q e^{-r_d T} \CDFN(-d_2)$; they sum to $Q e^{-r_d T}$, the digital
+put--call parity.
+
+\begin{intuitionbox}
+A digital is the derivative of a vanilla with respect to strike:
+$\partial C / \partial \Kstrike = -e^{-r_d T}\CDFN(d_2)$, so a tiny
+long-call-short-call-at-$\Kstrike + \epsilon$ spread, rescaled by
+$1/\epsilon$, replicates a digital.  This is why a digital's
+\emph{vega profile} has a sharp spike at the strike: the replicating
+call spread becomes infinitely narrow.  Traders describe digitals as
+``event insurance'' --- they pay a fixed amount contingent on a
+spot-at-expiry event.
+\end{intuitionbox}
+
+``One-touch'' and ``no-touch'' variants pay $Q$ if spot ever / never
+crosses the barrier before expiry --- cheap conditional bets on
+range-bound or trending regimes.  Closed forms follow from the
+reflection principle \citep[][Ch.\ 19]{hull8ed}.
+
+\subsubsection{One-touch pricing sketch}
+
+For a one-touch that pays $Q$ in domestic currency at expiry $T$
+if spot ever hits barrier $B$, the BS price under drift
+$\mu = r_d - r_f$ is
+\begin{equation}
+  \mathrm{OT} \;=\; Q\,e^{-r_d T}\!
+    \left[ \left(\tfrac{B}{\Spx_0}\right)^{2\mu/\volat^2}\!
+      \CDFN(z_+)
+    + \CDFN(z_-) \right],
+  \label{eq:one_touch}
+\end{equation}
+with
+$z_\pm = (\pm \ln(\Spx_0/B) - \mu T + \tfrac12\volat^2 T)/(\volat\sqrt{T})$
+(sign conventions vary; \citet{clark2011foreign} lists all four
+variants).  One-touches are pure \emph{stopping-time} products:
+price depends on the first-passage distribution of GBM, not the
+terminal alone.  Skew and kurtosis drive large BS corrections, so
+desks mark them via Vanna--Volga or smile-consistent MC.
+
+\subsection{Target redemption forwards (TARFs)}
+
+A \textbf{target redemption forward} is a structured series of
+monthly or weekly forwards: on each fixing, the client buys base
+currency at a favourable strike if spot is in range.  The structure
+\emph{terminates early} once cumulative client gains reach a
+contractual \emph{target}; if spot moves against the client, they
+keep paying at the unfavourable strike, often on \emph{doubled}
+notional, through the remaining schedule.
+
+This asymmetry is the point: clients accept tail risk in exchange
+for a better favourable-side strike.  Dealers price TARFs by MC over
+the full strike schedule with the early-termination trigger; no
+closed form.
+
+Concretely, a 12-month EUR/USD TARF might specify: twelve monthly
+fixings, strike $\Kstrike = 1.09$, notional EUR 1M per fixing,
+target cumulative client P\&L = EUR 100k, leverage 2x on the loss
+leg.  On each fixing date the cashflow to the client is
+\begin{equation}
+  \mathrm{CF}_i \;=\;
+  \begin{cases}
+    (\Kstrike - \mathrm{Fix}_i) \cdot N
+      & \text{if } \mathrm{Fix}_i \leq \Kstrike \ \text{(client gain)}, \\
+    (\Kstrike - \mathrm{Fix}_i) \cdot 2N
+      & \text{if } \mathrm{Fix}_i > \Kstrike \ \text{(client loss, 2x)},
+  \end{cases}
+\end{equation}
+with $N = $ EUR 1M.  Termination is at the first fixing $i^*$ with
+$\sum_{j \leq i^*} \max(\mathrm{CF}_j, 0) \geq $ target.  The MC
+pricer draws 12 fixing paths, applies the termination rule,
+discounts, and averages.  Greeks come from bump-and-reprice at
+roughly $12\times$ vanilla cost.
+
+\begin{pitfallbox}[TARFs are leveraged the wrong way]
+TARFs cap client upside (the target) while leveraging downside
+tenor-unlimited --- the wrong profile for a hedger, the right one
+for a short-vol speculator.  Treasurers were sold TARFs as ``cheap
+hedges'' in 2014--2015; the August 2015 RMB devaluation locked
+Asian corporates into daily-doubling CNH purchases above market,
+booking multi-hundred-million USD losses.  The product is now
+regulatory-flagged in most jurisdictions.  \emph{If a structure
+advertises ``free'' hedging, find the short-vol double-notional
+leg before signing.}
+\end{pitfallbox}
+
+\begin{historybox}[title={The 2015 CNH TARF blow-up}]
+July 2015: 1Y CNH near 6.20 per USD with a mild appreciation
+trend.  Asian treasurers had TARFs selling CNH at 6.15 (0.8\% better
+than spot), with doubled notional if CNH depreciated.  On 11 August
+the PBOC devalued the onshore fix by 1.9\%; CNH fell to 6.40 over
+weeks.  Corporates sold double-notional at 6.15 into spot near 6.40
+--- roughly 4\%/month MTM loss on twice notional, compounding.
+Aggregate Asian corporate losses exceeded \$10bn --- the textbook
+asymmetric-payoff mis-selling case.
+\end{historybox}
+
+
+%% ================================================================
+\section{Delta conventions: ATMF, 25\texorpdfstring{$\Delta$}{-delta} RR, 25\texorpdfstring{$\Delta$}{-delta} BF}
+\label{sec:fx_delta_conventions}
+%% ================================================================
+
+FX options are quoted by \emph{delta}, not strike or moneyness.  A
+broker quote for EUR/USD 1-month looks like
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+1M ATMF & 8.50\% & (at-the-money-forward vol) \\
+1M 25\,RR & $-0.40\%$ & (25-delta risk reversal) \\
+1M 25\,BF & $+0.18\%$ & (25-delta butterfly) \\
+\bottomrule
+\end{tabular}
+\end{center}
+From these three numbers the entire 1-month smile is reconstructed.
+
+\subsection{Delta and ATMF}
+
+\textbf{Delta} is $\Delta = \partial V / \partial S$.  ``25-delta
+call'' is the strike with $\Delta = 0.25$; ``25-delta put'' has
+$\Delta = -0.25$.  \citet{clark2011foreign} gives the full taxonomy
+of conventions:
+\begin{itemize}
+  \item \textbf{Spot delta, premium-excluded (SD-PE)}: plain
+    $\partial V / \partial S$.  Default for USD-premium pairs
+    (EUR/USD, GBP/USD).
+  \item \textbf{Spot delta, premium-included (SD-PI)}: adjusted
+    for foreign-currency premium payment.  Standard for USD/JPY etc.
+  \item \textbf{Forward delta (FD-PE, FD-PI)}: $\partial V/\partial
+    F$; standard for long-dated options ($T > 1$ year).
+\end{itemize}
+One option, four numerical deltas; desks exchanging a ``25-delta
+call'' without fixing the convention can be pricing different
+strikes.
+
+The \textbf{at-the-money forward} (ATMF) strike is
+$\Kstrike_{\mathrm{ATMF}} = F(0,T) = S_0 e^{(r_d - r_f)T}$, the
+delta-neutral straddle strike under most conventions.  ATMF vol is
+the single most-quoted number.  ``ATM-spot'' ($\Kstrike = S_0$)
+differs from ATMF whenever $r_d \neq r_f$; FX defaults to ATMF.
+
+\subsection{Risk reversal and butterfly}
+
+\begin{keyfactbox}[FX vol quoting via ATMF/RR/BF]
+\label{fact:fx_rr_bf}
+For a fixed delta $\delta$ (typically $25\%$ or $10\%$), define
+\begin{align}
+  \mathrm{RR}_\delta
+    &\;=\; \volat(\delta\text{-call}) - \volat(\delta\text{-put}),
+    \label{eq:rr_def} \\
+  \mathrm{BF}_\delta
+    &\;=\; \tfrac12\!\left[\volat(\delta\text{-call})
+                            + \volat(\delta\text{-put})\right]
+           - \volat_{\mathrm{ATMF}}.
+    \label{eq:bf_def}
+\end{align}
+$\mathrm{RR}_\delta$ measures the \emph{skew} (asymmetry of the
+smile); $\mathrm{BF}_\delta$ measures the \emph{smile convexity}
+(curvature).  Given $(\volat_{\mathrm{ATMF}}, \mathrm{RR}_\delta,
+\mathrm{BF}_\delta)$, the wing vols are recovered by
+\begin{equation}
+  \volat(\delta\text{-call}) \;=\;
+    \volat_{\mathrm{ATMF}} + \mathrm{BF}_\delta + \tfrac12\mathrm{RR}_\delta,
+  \qquad
+  \volat(\delta\text{-put}) \;=\;
+    \volat_{\mathrm{ATMF}} + \mathrm{BF}_\delta - \tfrac12\mathrm{RR}_\delta.
+  \label{eq:wing_vols}
+\end{equation}
+\end{keyfactbox}
+
+Three numbers (ATMF, 25\,RR, 25\,BF) pin three vol points: the ATMF
+and 25-delta call/put vols.  Adding 10\,RR and 10\,BF gives five
+points for interpolation.
+
+\subsection{Example: EUR/USD 1-month}
+
+With $\volat_{\mathrm{ATMF}} = 8.50\%, \mathrm{RR}_{25} = -0.40\%,
+\mathrm{BF}_{25} = 0.18\%$:
+\begin{align}
+  \volat(25\Delta\text{-call}) &= 8.50 + 0.18 + \tfrac12(-0.40)
+                                = 8.48\%, \\
+  \volat(25\Delta\text{-put})  &= 8.50 + 0.18 - \tfrac12(-0.40)
+                                = 8.88\%.
+\end{align}
+Negative 25\,RR means the put is more expensive than the call in
+vol --- the market prices EUR downside (USD strength) as more
+volatile than EUR upside.  Typical EUR/USD skew; opposite in USD/JPY
+where JPY-strength tails command more vol.
+
+\begin{intuitionbox}
+ATMF = height, RR = tilt, BF = curvature above the straight line
+through the wings --- the minimum three-parameter smile.  Traders
+express directional vol views via $\Delta$RR (``buying 1M EUR/USD
+risk-reversal'' = betting EUR-downside vol widens further over
+EUR-upside) and convexity views via $\Delta$BF.
+\end{intuitionbox}
+
+\subsection{Smile reconstruction: five-point interpolation}
+\label{subsec:smile_reconstruction}
+
+For a more refined smile, desks quote a five-point system
+$(\volat_{\mathrm{ATMF}}, \mathrm{RR}_{10}, \mathrm{BF}_{10},
+\mathrm{RR}_{25}, \mathrm{BF}_{25})$.  A typical 3-month EUR/USD
+quote block might read
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+ATMF & $9.00\%$ \\
+25$\Delta$ RR & $-0.50\%$ \\
+25$\Delta$ BF & $0.20\%$ \\
+10$\Delta$ RR & $-1.10\%$ \\
+10$\Delta$ BF & $0.75\%$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+from which the five wing vols are
+\begin{align}
+  \volat(25\Delta\text{-call}) &= 9.00 + 0.20 - 0.25 = 8.95\%, \\
+  \volat(25\Delta\text{-put})  &= 9.00 + 0.20 + 0.25 = 9.45\%, \\
+  \volat(10\Delta\text{-call}) &= 9.00 + 0.75 - 0.55 = 9.20\%, \\
+  \volat(10\Delta\text{-put})  &= 9.00 + 0.75 + 0.55 = 10.30\%.
+\end{align}
+These five points are interpolated into a $\volat(\Kstrike)$ curve.
+Standard techniques: Vanna--Volga \citep{castagna2007consistent},
+SABR \citep{hagan2002managing}, and monotone-convex splines for
+no-arbitrage.  They agree on interpolation but diverge on
+extrapolation beyond 10-delta; FX smiles are thus often quoted to
+5-delta when deep-OTM options trade.
+
+\begin{pitfallbox}[RR sign conventions disagree across regions]
+London desks quote RR as call minus put; some NY desks quote put
+minus call, flipping every historical series.  Check the sign on a
+broker sheet against implied call/put vols before taking a view.
+Sanity check: EUR/USD 25\,RR is almost always \emph{negative} on
+London convention; a positive number without an inversion means
+the sign is flipped.
+\end{pitfallbox}
+
+
+%% ================================================================
+\section{FX market structure: CLS and dealer tiering}
+\label{sec:fx_market_structure}
+%% ================================================================
+
+FX trades in an over-the-counter market split into three tiers.
+
+\textbf{Tier 1} --- interbank: the G10 banks (JPM, Citi, DB, UBS,
+Goldman, HSBC, BofA, BNP Paribas, and a few others) making two-way
+prices in size to each other and to top clients.  Quotes trade on
+EBS and Refinitiv FX Matching; inside spread on EUR/USD is sub-pip
+for \$5M clips.
+
+\textbf{Tier 2} --- single-/multi-dealer platforms: each bank's
+e-FX portal (Barx, NeoBank, Autobahn, \ldots) and ECNs (FXall, 360T,
+Hotspot, Currenex).  Asset managers, hedge funds, and corporates
+trade RFQ or streaming, at spreads scaling with size, urgency, and
+toxicity.
+
+\textbf{Tier 3} --- retail: CFD brokers, spreads 5--20$\times$
+interbank and often 2\% per trip on exotics.
+
+\textbf{Settlement.}  Most FX cashflows settle through CLS
+(Continuous Linked Settlement), launched 2002, settling 18
+currencies PvP in a daily five-hour window.  CLS eliminated
+``Herstatt risk'' --- your day-side payment going out before the
+counterparty fails its other-side leg (a live risk before 2002;
+Bankhaus Herstatt's 1974 \$620M failure is the namesake).  ITM
+options settle via spot, so non-CLS pairs carry meaningfully higher
+operational and credit risk.
+
+\begin{historybox}[title={Herstatt and the birth of CLS}]
+26 June 1974: German regulators closed Bankhaus Herstatt at 15:30
+CET.  US banks had paid DEM earlier that morning for DEM/USD trades,
+expecting USD via CHIPS later.  Herstatt's USD leg never paid,
+leaving roughly \$620M of chain losses.  The episode drove the
+three-decade project culminating in CLS.  Non-CLS pairs remain
+the ones with highest implied vol and largest overnight risk
+charges.
+\end{historybox}
+
+%% ================================================================
+\section{Vanna--Volga adjustments}
+\label{sec:vanna_volga}
+%% ================================================================
+
+The \textbf{Vanna--Volga} method \citep{castagna2007consistent} is
+the standard FX technique for pricing exotics off the three
+ATMF/25RR/25BF inputs.  It is a first-order smile correction: start
+with the BS/GK price at ATMF vol and add terms making the three
+vanilla hedges (ATMF straddle, 25$\Delta$ RR, 25$\Delta$ BF) match
+market exactly.
+
+Vanna and volga are the mixed and pure second derivatives in
+$\volat$ and $\Spx$:
+\begin{equation}
+  \mathrm{vanna} \;=\;
+    \frac{\partial^2 V}{\partial \Spx\, \partial \volat},
+  \qquad
+  \mathrm{volga} \;=\;
+    \frac{\partial^2 V}{\partial \volat^2}.
+\end{equation}
+A risk-reversal is mostly vanna (long delta--vol correlation); a
+butterfly is mostly volga (long vol-of-vol).  The VV price is the
+BS/GK price plus a linear combination of vanna, volga, and vega with
+coefficients pinned by matching the three hedging vanillas:
+\begin{equation}
+  V_{\mathrm{VV}} \;=\;
+  V_{\mathrm{BS}} + w_{\mathrm{ATMF}}\,\mathrm{vega}
+                   + w_{\mathrm{BF}}\,\mathrm{volga}
+                   + w_{\mathrm{RR}}\,\mathrm{vanna}.
+\end{equation}
+The weights $w_\cdot$ solve a closed-form 3$\times$3 linear system
+requiring that three reference vanillas (ATMF straddle, 25$\Delta$
+call, 25$\Delta$ put) reproduce their market premia.
+
+\begin{keyfactbox}[Vanna--Volga in one line]
+\label{fact:vanna_volga}
+Correct the Black--Scholes price of an exotic by adding the vanna
+and volga dollar-risk, weighted by the market-price surplus over
+BS of a 25$\Delta$ risk-reversal and butterfly respectively, plus
+a vega correction for the ATMF skew of the exotic's own vol.
+Three vanilla hedges, three corrections, exact match on those
+three, first-order smile consistency everywhere else.
+\end{keyfactbox}
+
+VV is not rigorous (not a no-arbitrage price under any model) but
+reproduces desk quotes for single-barrier options to within a basis
+point in normal markets.  Multi-barrier and path-dependent exotics
+use smile-consistent MC or PDE instead.
+
+
+%% ================================================================
+\section{Desk and competition context}
+\label{sec:fx_context}
+%% ================================================================
+
+\subsection{Choosing the right FX hedge}
+
+For a hedger with a specific view and exposure, the right FX
+product follows from three questions: horizon, desired payoff shape,
+tolerance for basis risk.  Short decision guide:
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.35\textwidth} p{0.60\textwidth}@{}}
+\toprule
+\textbf{Hedger's situation} & \textbf{Standard product} \\
+\midrule
+Certain receivable / payable, single date &
+  Forward (if deliverable); NDF (if not) \\
+Budget-rate floor, willing to cap upside &
+  Collar (long put + short call at matching deltas) \\
+Protection against extreme move only &
+  Out-of-the-money put / call \\
+``Cheap'' hedge, strong directional view &
+  Knock-out option (accept tail risk on hedge disappearing) \\
+Known range view (spot stays in $[a,b]$) &
+  No-touch option (pays if range holds) \\
+Series of monthly cashflows &
+  Participating forward / accumulator / (beware) TARF \\
+Equity-index exposure in different currency &
+  Quanto option or FX-hedged share class \\
+\bottomrule
+\end{tabular}
+\end{center}
+All price off the same GK engine plus the smile of
+\cref{sec:fx_delta_conventions}; only the payoff function changes.
+
+
+\begin{prosperitybox}[title={Prosperity Round 1 manual: triangular FX}]
+Round 1's manual gives a small cluster of rates between fictional
+currencies and asks for a trade sequence ending with more shells
+than you started with --- triangular FX arb
+(\cref{ch:arbitrage_zoo}) in disguise.  A cycle
+$\mathrm{A} \to \mathrm{B} \to \mathrm{C} \to \mathrm{A}$ is
+profitable iff the product of rates exceeds 1 net of fees.  The
+Frankfurt Hedgehogs (\cref{ch:top_team_lessons}) brute-forced
+4-legged paths.  Real-world FX arb scales this to the full
+cross-rate graph with transaction costs, latency, and basis.
+\end{prosperitybox}
+
+\begin{gsbox}[title={The FX options desk}]
+On a sell-side FX options desk, the Strat owns three systems.
+First, a \emph{vol surface builder} ingesting ATMF/RR/BF broker
+quotes across tenors and delta slices --- usually a SABR or VV fit
+\citep{castagna2007consistent}.  Second, a \emph{pricer} for
+vanillas (GK) and barriers/digitals/touches (closed-form with
+skew corrections).  Third, a \emph{MC exotics pricer} for TARFs,
+accumulators, and path-dependent structures, wired into the firm's
+risk system for aggregate Greeks and overnight VaR.  Interviews
+routinely ask you to derive CIP, state GK, explain ATMF/RR/BF, and
+sketch a knock-out pricer.
+\end{gsbox}
+
+
+%% ================================================================
+\section{Key facts to memorise}
+\label{sec:fx_summary}
+%% ================================================================
+
+\begin{itemize}
+  \item \textbf{FX is the largest financial market}: \$7.5T per
+    day (BIS 2022), larger than all equity markets combined.
+  \item A pair $\mathrm{BASE}/\mathrm{QUOTE}$ is quoted in units of
+    quote per unit of base.  EUR/USD = 1.08 means one EUR buys
+    1.08 USD.
+  \item A \textbf{pip} is $10^{-4}$ for most pairs, $10^{-2}$ for
+    JPY pairs.  \textbf{Forward points} = $F - S$ in pips.
+  \item \textbf{Covered interest parity}:
+    $F = S\,e^{(r_d - r_f)T}$.  The high-yielding currency trades
+    at a forward \emph{discount} (the low-yielder at a premium).
+  \item Post-2008 CIP deviates by 10--50~bp persistently.  The
+    wedge is the \emph{cross-currency basis}, traded via XCCY
+    basis swaps.
+  \item \textbf{Garman--Kohlhagen}: the FX Black--Scholes.  Treats
+    foreign currency as a continuous-yield asset with yield $r_f$.
+  \item \textbf{Put--call parity} in FX:
+    $\Call - \Put = S e^{-r_f T} - \Kstrike e^{-r_d T}$.
+  \item \textbf{Quanto adjustment}: subtract
+    $\rho \volat_{\mathrm{asset}} \volat_{\mathrm{FX}}$ from the
+    drift when the payoff is in a currency other than the
+    underlying's natural one.
+  \item \textbf{Barrier options}: knock-in + knock-out = vanilla.
+    Cheaper than vanillas but disappear when the market moves far
+    enough.
+  \item \textbf{TARFs} cap client upside and leverage client
+    downside --- the structural mis-selling trap that cost Asian
+    corporates \$10bn+ in 2015.
+  \item \textbf{FX vol is quoted in delta space}: ATMF vol, plus
+    25-delta risk-reversal (skew) and 25-delta butterfly
+    (convexity).  Three numbers pin down three points on the smile.
+  \item \textbf{Negative 25\,RR} = market prices downside (for the
+    base currency) at higher vol than upside.  Standard in
+    EUR/USD; opposite in many USD/EM pairs.
+\end{itemize}

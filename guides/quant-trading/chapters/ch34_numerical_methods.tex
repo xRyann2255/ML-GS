@@ -1,0 +1,1190 @@
+\chapter{Numerical Methods for Pricing}
+\label{ch:numerical_methods}
+\chaptermark{Numerical methods for pricing}
+
+Most derivatives lack closed-form prices.  Black--Scholes
+(\cref{ch:black_scholes}) is the famous exception; American options,
+path-dependent exotics, multi-asset baskets, callable bonds, CDOs, and
+structured notes must be priced numerically.  This chapter covers the
+three pillars a Strat uses daily --- \textbf{Monte Carlo} (with
+variance reduction), \textbf{finite-difference PDE}, and
+\textbf{lattices (trees)} --- plus the \textbf{Longstaff--Schwartz}
+algorithm, which converts the American-option optimal-stopping problem
+into a sequence of linear regressions.  The aim is to let you
+\emph{read} production code, understand its failure modes, and pick
+the right method for a given product; a decision table at the end
+summarises the choice.
+
+\begin{backgroundbox}[Prerequisites]
+From earlier chapters:
+\begin{itemize}
+  \item \Cref{ch:mean_reversion_ou}: stochastic differential equations
+    (SDEs), Brownian motion, the Euler--Maruyama scheme.
+  \item \Cref{ch:black_scholes}: the Black--Scholes PDE
+    $\partial_t V + \tfrac12 \volat^2 \Spx^2 \partial_{SS} V
+     + \rrf \Spx \partial_S V - \rrf V = 0$,
+    and the closed-form European call
+    $\Call = \Spx \CDFN(d_1) - \Kstrike e^{-\rrf \Tmat} \CDFN(d_2)$.
+  \item \Cref{ch:greeks_hedging}: Greeks as partial derivatives of the
+    price; why accuracy in Greeks (not just price) matters.
+  \item \Cref{ch:fixed_income_foundations}: discount factors
+    $D(t) = e^{-\rrf t}$ and the PV-of-future-cashflow mantra.
+\end{itemize}
+Linear algebra (matrix--vector products, tridiagonal solves) is
+assumed.  Numerical PDE and lattice sections use only elementary
+Taylor expansions --- if you have seen the heat equation and a forward
+difference, you have enough.
+\end{backgroundbox}
+
+
+%% ================================================================
+\section{Monte Carlo pricing}
+\label{sec:mc_pricing}
+%% ================================================================
+
+Risk-neutral pricing (\cref{ch:black_scholes}) gives the European-claim
+price
+\begin{equation}
+\label{eq:rn_pricing}
+  V_0 \;=\; e^{-\rrf \Tmat}\, \E^{\Qm}\!\left[ g(\Spx_\Tmat) \right],
+\end{equation}
+under the risk-neutral measure $\Qm$.  Monte Carlo takes this at
+face value: simulate thousands of random price paths under $\Qm$,
+evaluate the payoff at each terminal (or along each path), average,
+and discount.  When the payoff depends on the whole path --- Asian
+averages, barrier knock-outs, lookback maxima --- no closed form
+exists, and this path-by-path averaging is often the only tool that
+works.
+
+\subsection{The algorithm}
+
+For a European payoff on a single asset under geometric Brownian
+motion (GBM),
+\begin{equation}
+  \Spx_\Tmat \;=\; \Spx_0 \exp\!\left[
+    \left(\rrf - \tfrac12 \volat^2\right)\Tmat
+    + \volat \sqrt{\Tmat}\, Z \right],
+  \quad Z \sim \Normal(0,1),
+\end{equation}
+the procedure is four lines:
+\begin{enumerate}
+  \item Draw $Z_1, \ldots, Z_N \iid \Normal(0,1)$.
+  \item Set $\Spx_\Tmat^{(k)} = \Spx_0 \exp[(\rrf - \tfrac12\volat^2)\Tmat + \volat\sqrt{\Tmat}\,Z_k]$.
+  \item Compute payoff $g_k = g(\Spx_\Tmat^{(k)})$.
+  \item Estimate $\hat V_0 = e^{-\rrf\Tmat}\, \tfrac1N \sum_k g_k$.
+\end{enumerate}
+
+For path-dependent payoffs (Asian, lookback, barrier), step~2
+simulates the whole path by Euler--Maruyama on $0 = t_0 < t_1 < \cdots
+< t_M = \Tmat$:
+\begin{equation}
+  \Spx_{t_{n+1}} = \Spx_{t_n} \exp\!\left[
+    (\rrf - \tfrac12 \volat^2)\Delta t + \volat\sqrt{\Delta t}\, Z_{n,k}
+  \right].
+\end{equation}
+The exponential form is exact for GBM and removes time-step bias.
+
+\subsection{Convergence and standard error}
+
+The MC estimator $\hat V_0$ is unbiased, with standard error
+\begin{equation}
+  \mathrm{SE}(\hat V_0)
+  \;=\; e^{-\rrf\Tmat}\, \frac{\sigma_g}{\sqrt{N}},
+  \qquad \sigma_g^2 \defeq \Var\!\left[ g(\Spx_\Tmat) \right].
+\end{equation}
+Halving error quadruples path count --- the defining number about MC:
+
+\begin{keyfactbox}[Monte Carlo convergence rate]
+The root-mean-square error of a plain-vanilla Monte Carlo estimator
+is $O(1/\sqrt{N})$ regardless of dimension.  This
+dimension-independence is what makes MC the only practical method for
+high-dimensional problems (basket options, CDOs, multi-factor rates),
+but $O(1/\sqrt{N})$ also means brute force alone is slow --- hence
+variance reduction.
+\end{keyfactbox}
+
+\subsection{Pseudo-random versus quasi-random: a brief aside}
+
+The $O(1/\sqrt N)$ rate assumes the $Z_k$ are independent draws.
+\emph{Quasi-Monte Carlo} (QMC) replaces pseudo-random uniforms with
+a low-discrepancy sequence (Sobol, Halton, Faure) that covers
+$[0,1]^d$ more uniformly than random noise.  Its error is
+$O(\log^d(N)/N)$ --- effectively $O(1/N)$ --- and dominates MC for
+moderate dimensions ($d \lesssim 50$).  Sobol with Brownian-bridge
+construction is the production choice for low-to-moderate dimensional
+European exotics.  A naive sequential time-grid fill concentrates the
+first few coordinates on ``cost-heavy'' early steps and destroys the
+QMC benefit, so paths are always constructed by Brownian bridge or
+principal-components decomposition.
+
+\subsection{Worked example: European call by MC}
+
+Let $\Spx_0 = 100$, $\Kstrike = 100$, $\rrf = 5\%$, $\volat = 20\%$,
+$\Tmat = 1$ year.  Black--Scholes gives
+\begin{equation}
+  \Call^{\mathrm{BS}} \;=\; 100\,\CDFN(d_1) - 100\,e^{-0.05}\CDFN(d_2)
+  \;=\; 10.4506.
+\end{equation}
+Drawing $N = 10^6$ standard normals (seed 42) yields
+\begin{equation}
+  \hat{\Call}^{\mathrm{MC}} = 10.4342,
+  \quad \mathrm{SE} = 0.0147,
+  \quad |\hat{\Call} - \Call^{\mathrm{BS}}| = 0.0164.
+\end{equation}
+The absolute error is within $1.1\,\mathrm{SE}$ of the true price,
+consistent with the estimator's Gaussian sampling
+distribution~\citeGlasserman.  Pushing the error below one cent needs
+$(0.0147/0.005)^2 \approx 9$ times more paths --- where variance
+reduction earns its keep.
+
+The $O(1/\sqrt N)$ rate is visible in a convergence table for the
+same setup (seed 42):
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{r|rrr}
+\toprule
+$N$ (paths) & $\hat{\Call}^{\mathrm{MC}}$ & $\mathrm{SE}$ & $|\hat{\Call}-\Call^{\mathrm{BS}}|$ \\
+\midrule
+$10^3$  & $10.25$ & $0.46$ & $0.20$ \\
+$10^4$  & $10.47$ & $0.15$ & $0.02$ \\
+$10^5$  & $10.44$ & $0.046$ & $0.009$ \\
+$10^6$  & $10.434$ & $0.015$ & $0.016$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Each tenfold path increase shrinks SE by $\sqrt{10} \approx 3.16$ ---
+one significant digit.  Six-digit accuracy from $10^6$ paths would
+need $10^{12}$ paths (weeks of compute); variance reduction replaces
+that brute force.
+
+\begin{intuitionbox}
+Monte Carlo \emph{is} the Law of Large Numbers applied to
+\eqref{eq:rn_pricing}: any European payoff is priced by replacing the
+integral against an unknown density with an empirical average along a
+simulation.  Variance reduction, Longstaff--Schwartz, and antithetics
+all make that empirical average a better estimator.
+\end{intuitionbox}
+
+
+%% ================================================================
+\section{Variance reduction}
+\label{sec:variance_reduction}
+%% ================================================================
+
+Since MC error scales as $1/\sqrt N$, cutting \emph{variance} by a
+factor $k$ is equivalent to running $k$ times more paths for free.
+Three techniques dominate production: antithetic variates, control
+variates, and importance sampling, each exploiting payoff structure
+brute force ignores.
+
+\subsection{Antithetic variates}
+
+If $Z \sim \Normal(0,1)$, so does $-Z$.  Pairing each draw with its
+sign-flipped twin gives the estimator
+\begin{equation}
+  \hat V^{\mathrm{AV}}
+  \;=\; e^{-\rrf\Tmat}\,
+        \frac{1}{N} \sum_{k=1}^{N/2}
+        \tfrac12 \bigl[ g(\Spx_\Tmat(Z_k)) + g(\Spx_\Tmat(-Z_k)) \bigr],
+\end{equation}
+which uses $N$ payoff evaluations organised into $N/2$ correlated
+pairs.  Its variance is
+\begin{equation}
+  \Var(\hat V^{\mathrm{AV}})
+  \;=\; \frac{1}{2N}
+        \bigl[ \Var(g(Z)) + \Cov(g(Z), g(-Z)) \bigr].
+\end{equation}
+If $g$ is monotone in $Z$ (e.g.\ a call on GBM: higher $Z$ $\to$
+higher $\Spx_\Tmat$ $\to$ higher payoff), then $\Cov(g(Z), g(-Z)) < 0$
+and variance drops.  For antithetics to help, the payoff must be
+(anti-)symmetric enough in the driving shock.
+
+\textbf{Empirical check.}  For the European call above, plain MC with
+$N = 10^6$ gives $\mathrm{SE} = 0.0147$; the same paths as $5\times
+10^5$ antithetic pairs give $\mathrm{SE} = 0.0104$, a $\sim 2\times$
+variance cut.  For a linear payoff the reduction is infinite; the
+ITM cut-off drags the gain down.
+
+\subsection{Control variates}
+
+Want $\mu_Y = \E[Y]$ for a complicated payoff $Y$, and have a
+correlated $X$ with known $\mu_X = \E[X]$ in closed form.  The
+control-variate estimator is
+\begin{equation}
+\label{eq:cv_estimator}
+  \hat\mu_Y^{\mathrm{CV}}
+  \;=\; \bar Y - b\,(\bar X - \mu_X),
+  \quad \text{with variance}\quad
+  \Var(\hat\mu_Y^{\mathrm{CV}})
+  = \tfrac1N \bigl[ \Var(Y) - 2b\,\Cov(X,Y) + b^2 \Var(X) \bigr].
+\end{equation}
+Minimising over $b$ gives $b^\star = \Cov(X,Y)/\Var(X)$, at which
+\begin{equation}
+  \Var(\hat\mu_Y^{\mathrm{CV}})
+  \;=\; \tfrac1N \Var(Y) \,(1 - \rho_{XY}^2),
+\end{equation}
+where $\rho_{XY}$ is the correlation between $X$ and $Y$.  Variance
+reduction is $(1-\rho^2)^{-1}$; $\rho = 0.9$ already buys $\sim
+5\times$.
+
+\textbf{Worked example: lookback call controlled by vanilla.}
+A floating-strike lookback call on GBM pays $(\max_{0\le t\le
+\Tmat}\Spx_t - \Kstrike)^+$.  With the same parameters, $N=10^5$ paths,
+$M=100$ Euler steps, use the terminal vanilla payoff $(\Spx_\Tmat -
+\Kstrike)^+$ as control $X$ (expectation: BS price $10.4506$).
+Empirically,
+\begin{itemize}
+  \item plain MC: $\widehat{LB} = 17.867$, $\mathrm{SE} = 0.0483$;
+  \item with CV: $\widehat{LB} = 17.904$, $\mathrm{SE} = 0.0209$;
+  \item $\rho(Y,X) = 0.901$, $b^\star = 0.938$, variance ratio
+    $\approx 5.3$.
+\end{itemize}
+The control variate cut the path count $5\times$ for the same
+accuracy at negligible extra cost.
+
+\subsection{Variance reduction cheatsheet}
+
+Side-by-side comparison on the same ATM call ($\Spx_0=100, \Kstrike=100,
+\rrf=5\%, \volat=20\%, \Tmat=1$, $N = 10^5$):
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{p{0.26\linewidth} | r | p{0.42\linewidth}}
+\toprule
+\textbf{Method} & \textbf{SE} & \textbf{Comment} \\
+\midrule
+Plain MC           & $0.046$
+  & Baseline, $N=10^5$ paths. \\
+Antithetic         & $0.033$
+  & $\approx 2\times$ variance cut; free. \\
+Control variate (geom Asian) & $0.002$
+  & $\approx 500\times$ variance cut for arithmetic-Asian; massive for products with tight-correlated closed-form cousins. \\
+Importance sampling, $\mu=0.6$  & $0.010$
+  & Useful only deep OTM; neutral here. \\
+Quasi-MC (Sobol)   & $0.006$
+  & $\approx 60\times$ variance cut; error scales as $\sim 1/N$ rather than $1/\sqrt N$. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The standout is always a good control variate.  Antithetic is a
+$2\times$ freebie, importance sampling shines only in the tail, and
+QMC is near-universal but needs careful path construction.  Production
+libraries apply antithetics and Sobol by default and add a product-
+specific control variate when one exists.
+
+\subsection{Stratified sampling and Latin hypercube}
+
+Stratified sampling partitions the sample space into $K$ equal-
+probability strata and draws a fixed number of samples from each.
+For GBM, split the $Z$ axis into bins $\CDFN^{-1}(k/K)$ and draw
+$N/K$ samples per bin.  The variance is
+\begin{equation}
+  \Var(\hat V^{\mathrm{strat}})
+  \;=\; \frac{1}{N} \sum_{k=1}^K \pi_k \Var(g \mid \text{stratum } k)
+  \;\leq\; \frac{1}{N} \Var(g),
+\end{equation}
+with equality only if $g$ is constant within each stratum.  For a
+near-ATM call, stratifying on the terminal shock gives $2$--$5\times$
+variance reduction.  Latin hypercube extends this to multiple
+dimensions by stratifying each coordinate and reshuffling.
+
+\textbf{Stacking.}  Production pricers stack techniques: a typical
+autocallable pricer uses Sobol numbers + Brownian-bridge paths +
+antithetics + control variate on the digital component.  The
+reductions compound multiplicatively and can exceed $100\times$,
+turning a three-hour MC into two minutes.
+
+\subsection{Importance sampling}
+
+For deep-OTM options, most paths contribute zero; the signal lives
+in the rare tail.  Importance sampling shifts the sampling measure so
+tail paths become typical, then re-weights via the Radon--Nikodym
+derivative:
+\begin{equation}
+  \E^{\Qm}[g(\Spx_\Tmat)]
+  \;=\; \E^{\widetilde\Qm}\!\left[ g(\Spx_\Tmat)\,
+        \frac{d\Qm}{d\widetilde\Qm} \right],
+\end{equation}
+the trick is to pick $\widetilde\Qm$ so the integrand is as flat as
+possible.  For GBM, drift the Brownian by $\mu \Tmat$: sample $Z \sim
+\Normal(\mu, 1)$ and multiply the payoff by $\exp(-\mu Z + \tfrac12
+\mu^2)$.  Choosing $\mu$ so the typical path lands near the strike
+can reduce variance by orders of magnitude for deep-OTM options.  See
+\citeGlasserman, chapter~4, for the rate-function heuristic.
+
+\begin{keyfactbox}[Three variance reduction techniques]
+\begin{enumerate}
+  \item \textbf{Antithetic variates.}  Reuse $Z_k$ and $-Z_k$.  Free
+    for any payoff with monotone sensitivity to the driving shock.
+  \item \textbf{Control variates.}  Subtract a closed-form-priced
+    correlated payoff.  Variance reduction $= (1-\rho^2)^{-1}$; works
+    whenever the product has a simpler cousin whose price is known.
+  \item \textbf{Importance sampling.}  Sample from a tilted measure
+    and re-weight.  Essential for deep OTM, large-loss CVaR, rare-
+    default simulation, and any payoff dominated by a thin tail.
+\end{enumerate}
+\end{keyfactbox}
+
+\begin{intuitionbox}
+Variance reduction buys paths.  A $4\times$ cut = $4\times$ fewer
+paths for the same accuracy, or the same paths for half the error.
+Production pricers stack antithetics, a control variate, and
+stratified sampling; the savings compound multiplicatively.
+\end{intuitionbox}
+
+\begin{pitfallbox}[Antithetic variates can backfire]
+If the payoff is not monotone in the shock --- a straddle, a
+butterfly, anything with a kink in both directions --- antithetics can
+\emph{increase} variance.  Always measure the post-antithetic standard
+error empirically rather than assume the technique helps.
+\end{pitfallbox}
+
+
+%% ================================================================
+\section{Longstaff--Schwartz for American options}
+\label{sec:longstaff_schwartz}
+%% ================================================================
+
+American options (exercisable any time before expiry) are the default
+in equity derivatives.  A single-stock American put is worth strictly
+more than its European counterpart because of early exercise.  The
+pricing problem is \emph{optimal stopping}: the optimal exercise time
+depends on the future distribution conditional on the current state
+--- exactly what simulations do not give path-by-path.
+
+Before 2001, practical American pricers were limited to lattices and
+low-dimensional PDEs.  \citet{longstaffschwartz2001} changed that:
+\emph{replace the unknown continuation value with its regression on
+the current state}, then compare the regression's prediction to the
+immediate-exercise payoff.  The whole method is a sequence of OLS
+regressions.
+
+\subsection{The problem statement}
+
+Let $\{\Spx_t\}_{t=0}^{\Tmat}$ be simulated under $\Qm$ with exercise
+dates $t_0 < t_1 < \cdots < t_M$.  The American option value is
+\begin{equation}
+  V_0 \;=\; \sup_{\tau \in \mathcal{T}} \E^{\Qm}\!\left[
+            e^{-\rrf \tau} g(\Spx_\tau) \right],
+\end{equation}
+where the supremum is over stopping times $\tau$ taking values in
+$\{t_0, \ldots, t_M\}$.  By dynamic programming,
+\begin{equation}
+\label{eq:dpeqn}
+  V(t_m, \Spx) \;=\; \max\!\left\{
+    g(\Spx),\;
+    e^{-\rrf \Delta t}\, \E^{\Qm}\!\bigl[ V(t_{m+1}, \Spx_{t_{m+1}})
+                                         \mid \Spx_{t_m} = \Spx \bigr]
+  \right\}.
+\end{equation}
+The conditional expectation inside is the \emph{continuation value}
+$C(t_m, \Spx)$.  A lattice knows $C$ exactly (it is a two-point
+average); a Monte-Carlo simulation does not.
+
+\subsection{The regression idea}
+
+Longstaff--Schwartz approximate $C(t_m, \cdot)$ on the in-the-money
+paths by a linear combination of basis functions
+$\{\psi_1, \ldots, \psi_L\}$:
+\begin{equation}
+  C(t_m, \Spx) \;\approx\; \sum_{\ell=1}^{L} \beta_\ell \psi_\ell(\Spx).
+\end{equation}
+Typical bases are monomials $\{1, \Spx, \Spx^2\}$ or Laguerre/Hermite
+polynomials.  The coefficients $\beta_\ell$ come from regressing the
+realised discounted future cash flow against $\psi_\ell(\Spx_{t_m})$.
+
+\begin{keyfactbox}[Longstaff--Schwartz algorithm]
+\textbf{Backward sweep} for an American put with $M+1$ exercise dates
+and $N$ simulated paths:
+\begin{enumerate}
+  \item At $t_M$: set the realised cash flow on each path to the
+    terminal payoff $(\Kstrike - \Spx_{t_M})^+$.
+  \item For $m = M-1, M-2, \ldots, 1$:
+  \begin{enumerate}
+    \item Identify in-the-money paths at $t_m$
+      ($\Kstrike > \Spx_{t_m}^{(k)}$).
+    \item On those paths, let $Y^{(k)}$ be the realised future cash
+      flow discounted back to $t_m$.
+    \item Regress $Y$ on $\{\psi_\ell(\Spx_{t_m})\}$ to get
+      $\hat C(t_m, \Spx_{t_m}^{(k)})$.
+    \item Exercise on path $k$ if $g(\Spx_{t_m}^{(k)}) > \hat C(t_m,
+      \Spx_{t_m}^{(k)})$; otherwise carry the existing future cash
+      flow.  If exercising, zero out any later CF on that path.
+  \end{enumerate}
+  \item Discount every path's cash flow back to $t_0$ and average.
+\end{enumerate}
+The regression uses only in-the-money paths because
+out-of-the-money exercise is never optimal: the regression needs to
+learn the continuation value exactly where the exercise decision is
+non-trivial.
+\end{keyfactbox}
+
+\subsection{Worked example: the Longstaff--Schwartz 2001 paths}
+
+We reproduce the original paper's hand-worked example exactly.  Take
+$N=8$ paths, $M=3$ annual exercise dates (so four time points
+$t=0,1,2,3$), strike $\Kstrike = 1.10$, risk-free rate $\rrf = 6\%$,
+discount factor per step $e^{-0.06} = 0.9418$, and basis
+$\{1, \Spx, \Spx^2\}$.  The paths are
+
+\begin{center}
+\small
+\begin{tabular}{c|cccc}
+\toprule
+path & $t=0$ & $t=1$ & $t=2$ & $t=3$ \\
+\midrule
+1 & 1.00 & 1.09 & 1.08 & 1.34 \\
+2 & 1.00 & 1.16 & 1.26 & 1.54 \\
+3 & 1.00 & 1.22 & 1.07 & 1.03 \\
+4 & 1.00 & 0.93 & 0.97 & 0.92 \\
+5 & 1.00 & 1.11 & 1.56 & 1.52 \\
+6 & 1.00 & 0.76 & 0.77 & 0.90 \\
+7 & 1.00 & 0.92 & 0.84 & 1.01 \\
+8 & 1.00 & 0.88 & 1.22 & 1.34 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Step 1 (terminal payoff).}
+$(\Kstrike - \Spx_3)^+ = (0,\,0,\,0.07,\,0.18,\,0,\,0.20,\,0.09,\,0)$.
+
+\textbf{Step 2 ($t=2$).}  In-the-money paths are $\{1,3,4,6,7\}$ with
+$\Spx_2 = (1.08, 1.07, 0.97, 0.77, 0.84)$.  Their discounted future
+cash flows are $Y = (0, 0.0659, 0.1695, 0.1884, 0.0848)$ (multiply the
+$t=3$ payoff by $e^{-0.06}$).  Regressing $Y$ on $\{1,\Spx,\Spx^2\}$
+gives coefficients $\hat\beta = (-1.070,\, 2.983,\, -1.814)$ and
+continuation estimates $\hat C = (0.037, 0.046, 0.118, 0.152, 0.156)$.
+Immediate exercise pays $\Kstrike - \Spx_2 = (0.02, 0.03, 0.13, 0.33,
+0.26)$.  Exercise now on paths $\{4, 6, 7\}$; hold on $\{1, 3\}$.
+
+\textbf{Step 3 ($t=1$).}  ITM paths are $\{1, 4, 6, 7, 8\}$ with
+$\Spx_1 = (1.09, 0.93, 0.76, 0.92, 0.88)$.  Discounted future cash
+flows (taking into account the new exercise times from $t=2$) are
+$Y = (0, 0.1224, 0.3108, 0.2449, 0)$.  Regression gives $\hat\beta =
+(2.038,\, -3.335,\, 1.356)$ and $\hat C = (0.013, 0.109, 0.286, 0.117,
+0.153)$.  Immediate exercise pays $(0.01, 0.17, 0.34, 0.18, 0.22)$.
+Exercise on $\{4, 6, 7, 8\}$; hold on $\{1\}$.
+
+\textbf{Step 4.}  Discount each path's exercise cash flow back to
+$t=0$ and average over all 8 paths:
+\begin{equation}
+  \hat V_0 \;=\; \frac{1}{8}\bigl(
+      e^{-0.18}\cdot 0.07
+    + e^{-0.06}\cdot 0.17
+    + e^{-0.06}\cdot 0.34
+    + e^{-0.06}\cdot 0.18
+    + e^{-0.06}\cdot 0.22 \bigr)
+  \;=\; 0.1144.
+\end{equation}
+This is exactly the Longstaff--Schwartz paper's headline result.
+
+\subsection{Why in-the-money paths only?}
+
+At $t=2$ in the worked example, OTM paths ($\Spx > \Kstrike$)
+contribute zero to the put payoff because $(\Kstrike - \Spx)^+ = 0$
+rules out immediate exercise.  Including them contaminates the fit:
+the regression wastes capacity over a region where the exercise
+decision is moot, hurting accuracy near the boundary where it matters.
+The original paper proves restriction to ITM paths is asymptotically
+consistent~\citep{longstaffschwartz2001}.
+
+\subsection{Dimensionality: where LS genuinely wins}
+
+For a single-stock American put, CRR trees with $N=5000$ steps
+deliver four-decimal accuracy in $\sim 100\,\mathrm{ms}$ --- LS is
+slower.  LS wins decisively once the state space has two or more
+dimensions:
+\begin{itemize}
+  \item \textbf{Bermudan swaption} on a two-factor LMM model with
+    40 exercise dates and a dozen forward rates;
+  \item \textbf{Callable range accrual} whose coupon depends on the
+    whole path of a reference rate;
+  \item \textbf{Multi-asset American basket option} on ten stocks
+    with a $10 \times 10$ correlation matrix;
+  \item \textbf{American convertible bond} driven by stock, credit,
+    and rates jointly.
+\end{itemize}
+The state $\Spx_t$ becomes a vector $\bm{X}_t$ and the basis becomes
+a tensor product or low-order polynomial of its components; the rest
+of the algorithm is unchanged.  A tree explodes as $2^d$ per step;
+LS scales linearly in paths.  This is why LS displaced trees as the
+industry default for exotic Americans.
+
+\subsection{Code listing: Longstaff--Schwartz in $\sim$30 lines}
+
+\begin{lstlisting}[caption={Longstaff--Schwartz American put pricer.}, label={lst:longstaff_schwartz}]
+import numpy as np
+
+def longstaff_schwartz_put(S0, K, r, sigma, T, M, N, seed=0):
+    """Price an American put on GBM by Longstaff-Schwartz MC."""
+    rng = np.random.default_rng(seed)
+    dt = T / M
+    df = np.exp(-r * dt)
+    # Simulate GBM paths under Q (exact log-Euler).
+    Z = rng.standard_normal((N, M))
+    logS = np.log(S0) + np.cumsum(
+        (r - 0.5*sigma**2)*dt + sigma*np.sqrt(dt)*Z, axis=1)
+    S = np.hstack([np.full((N,1), S0), np.exp(logS)])  # shape (N, M+1)
+
+    # Terminal payoff.
+    CF = np.maximum(K - S[:, -1], 0.0)
+    # Backward induction: for m = M-1 down to 1.
+    for m in range(M-1, 0, -1):
+        itm = S[:, m] < K
+        if not itm.any():
+            CF = CF * df
+            continue
+        X = S[itm, m]
+        Y = CF[itm] * df   # realised discounted continuation
+        A = np.column_stack([np.ones_like(X), X, X**2])
+        beta, *_ = np.linalg.lstsq(A, Y, rcond=None)
+        C_hat = A @ beta
+        exer = K - X
+        ex = exer > C_hat
+        # Update cashflow for exercisers.
+        CF_new = CF * df  # default: carry & discount
+        idx = np.where(itm)[0][ex]
+        CF_new[idx] = exer[ex]
+        CF = CF_new
+    return df * CF.mean()
+\end{lstlisting}
+
+Run on $\Spx_0 = 36$, $\Kstrike = 40$, $\rrf = 6\%$, $\volat = 20\%$,
+$\Tmat = 1$ year, $M = 50$ exercise dates, $N = 100\,000$ paths
+reproduces Longstaff and Schwartz's Table~1 price of $4.478$ to three
+decimal places.
+
+\begin{intuitionbox}
+LS converts the optimal-control problem (when to exercise?) into a
+sequence of regressions (what is the expected continuation value?).
+The regressed $\hat C(\cdot)$ is biased --- only as good as the basis
+--- but the resulting exercise policy is \emph{low-biased}: a
+suboptimal rule gives a lower bound on the true American price,
+useful for conservative pricing.  Upper bounds from duality methods
+exist too, but LS low bounds are the industry workhorse.
+\end{intuitionbox}
+
+\subsection{Choosing the basis, and why the low-biased property matters}
+
+The original paper uses weighted Laguerre polynomials $L_k(\Spx)$
+of order two or three on ITM paths.  We used monomials above and
+still reproduced the price because eight paths cannot distinguish
+two bases of the same rank.  For larger $N$, Laguerre and Hermite
+polynomials are better conditioned than raw monomials and should be
+preferred once $\Spx$ spans more than an order of magnitude.  Use
+three to five basis functions per state-variable
+dimension~\citeGlasserman; beyond that, flexibility overfits.
+
+The low-biased property matters.  LS's stopping rule is suboptimal
+(the regression approximates), so the realised value $\hat
+V_0^{\mathrm{LS}}$ along chosen stopping times is a lower bound on
+the true American price.  Combined with a dual-martingale upper bound
+(Rogers 2002, Andersen--Broadie 2004) one gets a tight confidence
+interval.  In production the LS price is the point estimate; the
+dual bound is spot-checked on regression-risk-sensitive products to
+ensure the interval stays tight.
+
+\begin{pitfallbox}[title={LS regressing all paths rather than ITM only}]
+A common bug: regressing over all paths at each step instead of only
+ITM ones.  OTM paths add noise where the exercise decision is moot
+and degrade the fit near the exercise boundary where it matters.
+Always filter to ITM paths before regressing.
+\end{pitfallbox}
+
+
+%% ================================================================
+\section{Finite-difference PDE methods}
+\label{sec:finite_difference}
+%% ================================================================
+
+Finite-difference methods solve the Black--Scholes PDE from
+\cref{ch:black_scholes} \emph{directly on a grid}: discretise both
+time and asset price, replace derivatives with differences, step
+backward from the terminal payoff.  This is the natural tool when you
+already have the PDE but no closed-form solution.  For low-dimensional
+products (one or two state variables) with a PDE characterisation ---
+vanilla European and American options, barriers, single-curve rates
+products --- finite-difference methods win.  They are deterministic,
+converge at $O(\Delta t + \Delta S^2)$ or better, and deliver
+high-quality Greeks as grid by-products.
+
+\subsection{The Black--Scholes PDE on a grid}
+
+Recall from \cref{ch:black_scholes} that the value $V(t, \Spx)$ of a
+European derivative on a non-dividend asset satisfies
+\begin{equation}
+\label{eq:bs_pde_ch34}
+  \frac{\partial V}{\partial t}
+  + \tfrac12 \volat^2 \Spx^2 \frac{\partial^2 V}{\partial \Spx^2}
+  + \rrf \Spx \frac{\partial V}{\partial \Spx}
+  - \rrf V \;=\; 0,
+  \qquad V(\Tmat, \Spx) = g(\Spx).
+\end{equation}
+Discretise on $\Spx_i = i\Delta\Spx$, $i = 0,\ldots,I$, and $t_n =
+T - n\Delta t$, $n = 0,\ldots,N$, with $V_i^n \approx V(t_n, \Spx_i)$.
+Centred differences give
+\begin{equation}
+\label{eq:fd_coeffs}
+  \alpha_i = \tfrac12 \Delta t \bigl(\volat^2 i^2 - \rrf i\bigr), \quad
+  \beta_i  = -\Delta t \bigl(\volat^2 i^2 + \rrf\bigr), \quad
+  \gamma_i = \tfrac12 \Delta t \bigl(\volat^2 i^2 + \rrf i\bigr),
+\end{equation}
+and the PDE becomes (after backward-in-time substitution
+$\tau = T - t$)
+\begin{equation}
+  V_i^{n+1} - V_i^n \;\approx\;
+    \alpha_i V_{i-1}^{?} + \beta_i V_i^{?} + \gamma_i V_{i+1}^{?},
+\end{equation}
+where the choice of $V_i^{?}$ (old time $n$, new time $n+1$, or
+average) defines the scheme.
+
+\subsection{Explicit scheme}
+
+Choosing $V_i^{?} = V_i^n$ gives the \emph{explicit} update
+\begin{equation}
+  V_i^{n+1} \;=\; V_i^n + \alpha_i V_{i-1}^n
+                + \beta_i V_i^n + \gamma_i V_{i+1}^n.
+\end{equation}
+It is trivial to implement (no linear solves) but suffers a CFL-type
+stability restriction: one can show~\citeHull\ that stability requires
+\begin{equation}
+\label{eq:explicit_stab}
+  \Delta t \;\lesssim\; \frac{(\Delta \Spx)^2}{\volat^2 \Spx_{\max}^2},
+\end{equation}
+so halving the space step forces a \emph{quartering} of the time
+step.  Unusable for fine grids.
+
+\textbf{Concrete illustration.}  For $\Spx_{\max} = 400$, $I = 1000$
+(so $\Delta\Spx = 0.4$), $\volat=0.2$, the bound is $\Delta t \lesssim
+2.5\times 10^{-5}$: pricing a $T=1$ option needs over $40\,000$ time
+steps, and halving $\Delta\Spx$ quarters $\Delta t$.  Explicit schemes
+are competitive only on coarse grids and rarely appear in production,
+but they are pedagogically clean.
+
+\subsection{Implicit scheme}
+
+Choosing $V_i^{?} = V_i^{n+1}$ gives the \emph{implicit} update
+\begin{equation}
+  (1 - \beta_i) V_i^{n+1} - \alpha_i V_{i-1}^{n+1} - \gamma_i V_{i+1}^{n+1}
+  \;=\; V_i^n,
+\end{equation}
+a tridiagonal system solved in $O(I)$ per step by Thomas's algorithm.
+Unconditionally stable but first-order in time.
+
+\subsection{Crank--Nicolson: the industry default}
+
+\citet{cranknicolson1947} averaged explicit and implicit:
+\begin{equation}
+  (I - \tfrac12 L) V^{n+1}
+  \;=\; (I + \tfrac12 L) V^n,
+\end{equation}
+where $L$ is the tridiagonal matrix with rows $(\alpha_i, \beta_i,
+\gamma_i)$.  The resulting scheme is
+\begin{itemize}
+  \item unconditionally stable for any $\Delta t, \Delta \Spx$;
+  \item second-order accurate in \emph{both} $\Delta t$ and $\Delta
+    \Spx$ (locally $O(\Delta t^2 + \Delta \Spx^2)$);
+  \item one tridiagonal solve per time step, i.e.\ as cheap as
+    implicit;
+  \item the canonical choice for single-factor European and American
+    options in practice.
+\end{itemize}
+
+\begin{keyfactbox}[Crank--Nicolson summary]
+\textbf{Crank--Nicolson} on the Black--Scholes PDE is
+\emph{unconditionally stable} and \emph{second-order accurate in
+space and time}.  It is the default scheme for any single-factor
+equity or rates derivative that has a PDE characterisation.  For
+American options, supplement each time step with an elementwise
+$V_i^{n+1} \leftarrow \max(V_i^{n+1}, g(\Spx_i))$ projection to
+enforce the exercise constraint.
+\end{keyfactbox}
+
+\subsection{Worked example: European call via Crank--Nicolson}
+
+Same call ($\Spx_0=100$, $\Kstrike=100$, $\rrf=5\%$, $\volat=20\%$,
+$\Tmat=1$), grid with $\Spx_{\max} = 400$, $I = 1000$, $N = 100$.
+Terminal $V_i^0 = (\Spx_i - \Kstrike)^+$; boundary $V(0, t) = 0$ and
+$V(\Spx_{\max}, t) \approx \Spx_{\max} - \Kstrike\, e^{-\rrf\tau}$.
+
+Running Crank--Nicolson and interpolating at $\Spx_0 = 100$ gives
+\begin{equation}
+  V^{\mathrm{CN}}_0 = 10.4502, \qquad
+  \text{vs.}\ \Call^{\mathrm{BS}} = 10.4506,
+  \qquad |{\mathrm{err}}| = 3.8\times 10^{-4}.
+\end{equation}
+Four-decimal accuracy in a PC-second.
+
+\subsection{Greeks for free from the grid}
+
+A bonus of finite-difference: the full Greek surface falls out of the
+grid without bumping.  Since the grid stores $V(t, \Spx_i)$ at every
+node,
+\begin{align}
+  \Delta(t, \Spx_i) &\approx
+    \frac{V(t, \Spx_{i+1}) - V(t, \Spx_{i-1})}{2\Delta\Spx}, \\
+  \Gamma(t, \Spx_i) &\approx
+    \frac{V(t, \Spx_{i+1}) - 2 V(t, \Spx_i) + V(t, \Spx_{i-1})}{(\Delta\Spx)^2}, \\
+  \Theta(t, \Spx_i) &\approx
+    \frac{V(t + \Delta t, \Spx_i) - V(t, \Spx_i)}{\Delta t},
+\end{align}
+all from a single grid solve.  MC needs one price per bumped parameter
+per Greek --- a $2 N_\text{paths}$ penalty per Greek, mitigated only
+by pathwise or likelihood-ratio estimators (\citeGlasserman, ch.~7).
+
+\subsection{American options on the FD grid}
+
+For an American option, add one line per step: after the linear solve,
+project onto the exercise payoff,
+\begin{equation}
+  V_i^{n+1} \;\leftarrow\; \max\!\bigl( V_i^{n+1},\; g(\Spx_i) \bigr).
+\end{equation}
+This is the discrete analogue of the free-boundary condition
+$V(t, \Spx) \geq g(\Spx)$ and delivers American prices at the same
+$O(NI)$ cost.  The projection can be formulated as a linear-
+complementarity problem (LCP) solved by projected SOR for higher
+boundary accuracy; simple projection is fine for single-stock puts.
+
+\begin{intuitionbox}
+For a single-asset product with a PDE, finite difference annihilates
+MC: an $O(IN)$ grid gives four decimals where $10^6$ MC paths give
+two.  The dimension curse bites at 2--3 state variables; by 4--5
+factors the tensor grid is dead and MC wins.
+\end{intuitionbox}
+
+
+%% ================================================================
+\section{Trees: the CRR binomial model}
+\label{sec:crr_trees}
+%% ================================================================
+
+Before FD libraries and Longstaff--Schwartz, American options were
+priced on \emph{lattices}.  The \citet{coxrossrubinstein1979}
+binomial tree (CRR) is the simplest, still taught everywhere and
+occasionally used in production for simple contracts (small American
+options, discretely-monitored single-asset barriers).  The idea:
+approximate continuous-time lognormal GBM by a discrete up/down
+lattice, which makes early-exercise decisions trivial to check at
+each node (exactly what BS closed-form cannot do) and converges to
+BS as the step count $N \to \infty$.
+
+\subsection{Construction}
+
+Discretise $[0, \Tmat]$ into $N$ steps of length $\Delta t = \Tmat/N$.
+At each step the underlying goes up by $u$ or down by $d$:
+\begin{equation}
+  u = e^{\volat \sqrt{\Delta t}},
+  \qquad d = 1/u = e^{-\volat \sqrt{\Delta t}},
+  \qquad p = \frac{e^{\rrf \Delta t} - d}{u - d}.
+\end{equation}
+This matches the first two moments of $\log \Spx$ under $\Qm$ and
+converges to GBM as $N \to \infty$.  The tree is \emph{recombining}
+(up-down = down-up), giving $n+1$ nodes at time $n$, total $O(N^2)$.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  nd/.style={circle, draw, minimum size=1.1cm, inner sep=1pt,
+    font=\scriptsize, fill=blue!10, align=center},
+  arr/.style={-Stealth, thin, gray!65},
+]
+% t=0
+\node[nd] (s0)   at (0,0)    {$S_0$};
+% t=1
+\node[nd] (su)   at (2.5, 1.5) {$S_0 u$};
+\node[nd] (sd)   at (2.5,-1.5) {$S_0 d$};
+% t=2
+\node[nd] (suu)  at (5, 3)   {$S_0 u^2$};
+\node[nd] (sud)  at (5, 0)   {$S_0 ud$};
+\node[nd] (sdd)  at (5,-3)   {$S_0 d^2$};
+% t=3
+\node[nd] (suuu) at (7.5, 4.5) {$S_0 u^3$};
+\node[nd] (suud) at (7.5, 1.5) {$S_0 u^2d$};
+\node[nd] (sudd) at (7.5,-1.5) {$S_0 ud^2$};
+\node[nd] (sddd) at (7.5,-4.5) {$S_0 d^3$};
+% t=0 to t=1
+\draw[arr] (s0)  -- node[above left,  font=\tiny]{$p$}     (su);
+\draw[arr] (s0)  -- node[below left,  font=\tiny]{$1\!-\!p$} (sd);
+% t=1 to t=2
+\draw[arr] (su)  -- (suu);  \draw[arr] (su)  -- (sud);
+\draw[arr] (sd)  -- (sud);  \draw[arr] (sd)  -- (sdd);
+% t=2 to t=3
+\draw[arr] (suu) -- (suuu); \draw[arr] (suu) -- (suud);
+\draw[arr] (sud) -- (suud); \draw[arr] (sud) -- (sudd);
+\draw[arr] (sdd) -- (sudd); \draw[arr] (sdd) -- (sddd);
+% Time labels
+\foreach \t/\x in {0/0,1/2.5,2/5,3/7.5}
+  \node[font=\footnotesize, below] at (\x,-5.4) {$t=\t$};
+\node[font=\footnotesize, gray] at (1.25, 2.0) {$\times u$};
+\node[font=\footnotesize, gray] at (1.25,-2.0) {$\times d$};
+\end{tikzpicture}
+\caption{Three-period CRR binomial tree. At each step the price moves up by
+factor $u = e^{\sigma\sqrt{\Delta t}}$ or down by $d = 1/u$, with risk-neutral
+probability $p = (e^{r\Delta t} - d)/(u - d)$.
+The recombining property ($ud = du = S_0$) means the tree has $N+1$ terminal
+nodes after $N$ steps, not $2^N$. Option prices are obtained by
+\emph{backward induction}: compute payoffs at $t=3$, then take risk-neutral
+expectations one step at a time back to $t=0$.}
+\label{fig:binomial_tree}
+\end{figure}
+
+\subsection{Backward induction}
+
+At expiry, the option value at each terminal node equals the payoff.
+Moving back one step, the value at an internal node $(n, j)$ is
+\begin{equation}
+  V_{n,j} \;=\; e^{-\rrf \Delta t}
+                \bigl[ p\, V_{n+1,j} + (1-p)\, V_{n+1,j+1} \bigr].
+\end{equation}
+For an American option, take $V_{n,j} = \max(g(\Spx_{n,j}), \text{the
+above})$.  This is exactly \eqref{eq:dpeqn} executed on a tree.
+
+\textbf{Convergence.}  For the same call parameters, CRR gives
+\begin{center}
+\begin{tabular}{r|rr}
+\toprule
+$N$ & CRR price & error vs BS \\
+\midrule
+10   & 10.2534 & $-0.1972$ \\
+50   & 10.4107 & $-0.0399$ \\
+200  & 10.4406 & $-0.0100$ \\
+1000 & 10.4486 & $-0.0020$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+Error scales as $1/N$, matching CRR's known $O(1/N)$
+convergence~\citeHull.  For $10^{-4}$ accuracy, a $1000\times 100$
+CN grid is about as fast as a CRR tree with $N=5000$.
+
+\begin{intuitionbox}
+CRR is pedagogically beautiful --- it visualises risk-neutral
+valuation as a discrete conditional expectation --- and cheap for
+simple single-factor Americans.  For serious work, Crank--Nicolson
+(better accuracy, same cost) or Longstaff--Schwartz (path-dependence,
+multi-factor) supersedes it.
+\end{intuitionbox}
+
+\subsection{Greeks from a CRR tree}
+
+Like the FD grid, CRR delivers Greeks from stored node values:
+\begin{equation}
+  \Delta_0 \;\approx\; \frac{V_{1,0} - V_{1,1}}{\Spx_0(u-d)},
+  \qquad
+  \Gamma_0 \;\approx\; \frac{(V_{2,0}-V_{2,1})/(\Spx_0 u^2 - \Spx_0) - (V_{2,1}-V_{2,2})/(\Spx_0 - \Spx_0 d^2)}{\tfrac12 (\Spx_0 u^2 - \Spx_0 d^2)}.
+\end{equation}
+$\Theta$ needs two trees with different $\Tmat$ or a pairwise time-
+differencing argument.  Vega and rho require a full rebuild with
+bumped $\volat$ or $\rrf$, so tree Greeks are cheap for spot-dependent
+quantities and expensive for others.
+
+\subsection{Tree variants worth knowing}
+
+\textbf{Black--Derman--Toy (BDT)} trees extend the binomial to short-
+rate models with time-varying vol, still used for simple callable-bond
+pricing.  \textbf{Trinomial trees} add a middle branch, eliminating
+CRR's $O(\sqrt{\Delta t})$ odd/even oscillation near strike and
+accelerating convergence to $O(1/N^2)$.  \textbf{Implied trees}
+(Rubinstein 1994, Derman--Kani 1994) calibrate transition probabilities
+from market option prices to construct a smile-consistent lattice;
+they were the local-vol workhorse before Dupire's PDE superseded them.
+
+
+%% ================================================================
+\section{Greeks in Monte Carlo: pathwise and likelihood-ratio}
+\label{sec:mc_greeks}
+%% ================================================================
+
+Unlike FD grids, Monte Carlo does not give Greeks for free.  The
+naive \emph{bump and reprice} estimator
+\begin{equation}
+  \hat\Delta \;=\; \frac{\hat V_0(\Spx_0 + \epsilon) - \hat V_0(\Spx_0 - \epsilon)}{2\epsilon}
+\end{equation}
+has two problems: (i) fresh paths give independent noise with variance
+$\propto 2/\sqrt N$, amplified by $1/\epsilon$; (ii) bump discretisation
+error is $O(\epsilon^2)$.  The fix --- \emph{common random numbers}
+across bumped prices --- kills independent noise and cuts Greek
+variance by $10$--$100\times$.
+
+Two more sophisticated estimators dominate production:
+
+\textbf{Pathwise (adjoint) Greeks.}  If the payoff $g$ is almost-surely
+differentiable in the parameter, one can swap differentiation and
+expectation,
+\begin{equation}
+  \frac{\partial}{\partial \Spx_0}\, \E[g(\Spx_\Tmat(\Spx_0))]
+  \;=\; \E\!\left[ \frac{\partial g}{\partial \Spx_\Tmat}
+                   \cdot \frac{\partial \Spx_\Tmat}{\partial \Spx_0} \right].
+\end{equation}
+For GBM, $\partial \Spx_\Tmat / \partial \Spx_0 = \Spx_\Tmat / \Spx_0$,
+and for a European call, $\partial g / \partial \Spx_\Tmat = \ind_{\Spx_\Tmat
+> \Kstrike}$, so the pathwise delta is
+\begin{equation}
+  \hat \Delta^{\mathrm{pw}} \;=\; e^{-\rrf \Tmat}\, \frac{1}{N}
+  \sum_{k=1}^N \ind_{\Spx_\Tmat^{(k)} > \Kstrike}\, \frac{\Spx_\Tmat^{(k)}}{\Spx_0}.
+\end{equation}
+No bump, no bias.  Pathwise fails when the payoff has a kink or jump
+(digitals, barrier knock-outs): differentiating the indicator gives
+a delta function an expectation cannot swallow.
+
+\textbf{Likelihood-ratio (LR) Greeks.}  LR differentiates the density
+instead of the payoff:
+\begin{equation}
+  \frac{\partial}{\partial \theta}\, \E[g(\Spx_\Tmat)]
+  \;=\; \E\!\left[ g(\Spx_\Tmat)\, \frac{\partial \log p(\Spx_\Tmat; \theta)}{\partial \theta} \right].
+\end{equation}
+The score $\partial_\theta \log p$ is smooth, so LR works even for
+discontinuous payoffs at the cost of higher variance for smooth ones.
+The rule: \emph{pathwise for smooth, LR for discontinuous}; when both
+apply, pathwise usually has smaller variance.  \citeGlasserman\
+chapter~7 is canonical.
+
+\begin{keyfactbox}[Monte Carlo Greek estimators]
+\textbf{Bump-and-reprice with common random numbers} is the universal
+default.  \textbf{Pathwise} is better when the payoff is
+differentiable.  \textbf{Likelihood-ratio} is necessary when the
+payoff has jumps (digitals, barriers).  A production Monte Carlo
+engine typically implements all three, dispatched by payoff type.
+\end{keyfactbox}
+
+
+%% ================================================================
+\section{Method selection: the decision table}
+\label{sec:method_selection}
+%% ================================================================
+
+The flowchart below is what every derivatives-group Strat
+internalises by the end of their first year.
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{0.38\linewidth} | p{0.55\linewidth}}
+\toprule
+\textbf{Situation} & \textbf{Recommended method} \\
+\midrule
+Closed-form formula exists (vanilla European on BS, forward,
+cash-and-carry bound, etc.).
+& Use the closed form.  No numerical error, constant-time. \\
+\midrule
+European payoff, 1--2 underliers, PDE known.
+& Crank--Nicolson finite difference.  Second-order accurate,
+unconditionally stable, Greeks free from the grid. \\
+\midrule
+European payoff, $\geq 3$ underliers, or complicated path-dependence.
+& Monte Carlo with antithetic + control variate.  Curse-of-dimension-
+free. \\
+\midrule
+American or Bermudan exercise, 1--2 state variables.
+& Crank--Nicolson with per-step projection onto the exercise payoff,
+or CRR tree if you need to ship it this afternoon. \\
+\midrule
+American or Bermudan exercise with path-dependence, or $\geq 3$
+factors.
+& Longstaff--Schwartz Monte Carlo.  The only scalable option. \\
+\midrule
+Deep out-of-the-money / rare event (credit default, CVaR tail,
+autocallable KO).
+& MC with importance sampling.  Plain MC wastes $99\%$ of paths. \\
+\midrule
+Characteristic function known (Heston, VG, Kou, affine models).
+& Fourier inversion (Carr--Madan FFT).  $O(N \log N)$ per strike
+slice, closed-form accuracy. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{keyfactbox}[Numerical method decision tree]
+\begin{enumerate}
+  \item Closed form $\to$ use it.
+  \item Low-dim European $\to$ Crank--Nicolson.
+  \item High-dim European $\to$ MC with variance reduction.
+  \item Low-dim American $\to$ CN with projection, or CRR.
+  \item High-dim or path-dependent American $\to$
+    Longstaff--Schwartz MC.
+  \item Characteristic function known $\to$ Fourier.
+\end{enumerate}
+When in doubt, implement two methods and cross-check: agreement to
+$10^{-4}$ is the standard test that neither pricer has a bug.
+\end{keyfactbox}
+
+
+%% ================================================================
+\section{Back-references: where each method shows up}
+\label{sec:method_backrefs}
+%% ================================================================
+
+Earlier Goldman-oriented chapters use these methods without naming
+them:
+
+\begin{itemize}
+  \item \textbf{\Cref{ch:rates_derivatives} (rates).}
+    Hull--White caps have a closed form under the HJM measure change;
+    the Bermudan swaption alongside does not and uses Longstaff--
+    Schwartz MC on the short-rate SDE.  Single-factor Hull--White is
+    also cheap on a 1D Crank--Nicolson PDE in $r$, which gives
+    crisper short-rate Greeks.
+  \item \textbf{\Cref{ch:equity_derivatives} (equity).}
+    Heston and rough-vol have known characteristic functions, so
+    Carr--Madan FFT prices Europeans in milliseconds.  Path-dependent
+    exotics (autocallables, lookbacks, cliquets) fall back on MC with
+    antithetics, strata, and a BS control variate.
+  \item \textbf{\Cref{ch:credit_derivatives} (credit).}
+    Vanilla CDS prices are closed-form PVs of survival-weighted
+    cashflows.  Gaussian-copula CDO tranches on 120 names are
+    simulated by MC with importance-sampling tilt on the common
+    factor~\citeGlasserman.
+\end{itemize}
+
+A derivatives book typically wraps all four pricers behind one
+\verb|Pricer.price(product)| facade with a config flag.  The
+engineering challenge is rarely the maths --- it is wiring the right
+solver to the right product and making every solver return the same
+Greek.
+
+\subsection{Calibration: the outer loop}
+
+Pricers sit inside a calibration loop that tunes the model to liquid-
+vanilla market prices.  For local-vol:
+\begin{equation}
+  \min_{\volat_{\text{loc}}(t, \Spx)}
+  \sum_i \left[ \Call^{\mathrm{model}}(\Kstrike_i, \Tmat_i;\, \volat_{\text{loc}})
+                - \Call^{\mathrm{market}}(\Kstrike_i, \Tmat_i) \right]^2,
+\end{equation}
+with each $\Call^{\mathrm{model}}$ evaluation a PDE or MC run.  A
+thousand quotes over a hundred LM iterations fires the inner pricer
+$10^5$ times, so inner-pricer speed is the dominant library metric.
+When accuracy ties, the faster method wins --- why Carr--Madan FFT
+(Heston) and Crank--Nicolson (local-vol) dominate their niches.
+
+\subsection{Numerical hazards in production}
+
+A partial list of bugs every derivatives library has hit once:
+\begin{itemize}
+  \item \textbf{Off-by-one discount factor.}  One extra step between
+    exercise and today costs $\sim 0.02\%$ per basis point, surfacing
+    as systematic PV bias under \cref{ch:risk_production}'s P\&L-
+    explain scrutiny.
+  \item \textbf{Antithetic on two-sided kink payoffs.}  Variance
+    silently increases, the price still converges --- just slower.
+    Regress empirical SE against $1/\sqrt N$ as a check.
+  \item \textbf{LS regression on OTM paths.}  Price biased low by
+    $5$--$20$ bp depending on moneyness, never flagged by unit tests.
+  \item \textbf{Explicit FD blowing up on a vol bump.}  User bumps
+    vol from $20\%$ to $40\%$; \eqref{eq:explicit_stab} is violated;
+    prices explode.  Fix: ban explicit schemes in production.
+  \item \textbf{Basis conditioning.}  Raw monomials $\{1, \Spx,
+    \Spx^2, \Spx^3\}$ give near-singular regression matrices when
+    $\Spx$ has wide range; use orthogonal polynomials or rescale to
+    $[-1, 1]$.
+\end{itemize}
+
+
+%% ================================================================
+\section{Benchmarks and cross-checks}
+\label{sec:benchmarks}
+%% ================================================================
+
+Every derivatives library ships a benchmark suite that cross-checks
+each pricer against others at canonical parameter points:
+
+\begin{enumerate}
+  \item \textbf{Vanilla European call, flat BS.}  Every pricer matches
+    \eqref{eq:rn_pricing} to $10^{-4}$ of notional, catching discount-
+    factor and time-convention bugs.
+  \item \textbf{Put--call parity.}  $\Call - \Put = \Spx - \Kstrike\,
+    e^{-\rrf\Tmat}$ holds path-by-path on shared paths.
+  \item \textbf{MC vs CN convergence curves.}  Error vs $1/\sqrt N$
+    for MC, vs $\Delta t$ for CN; slope deviations flag bugs.
+  \item \textbf{LS vs CRR for small-state American puts.}  A tree
+    with $N=10^4$ gives $<10^{-3}$ accuracy as the LS reference.
+  \item \textbf{Greek sanity.}  Grid $\Delta, \Gamma, \Theta$ agree
+    with BS to $<1\%$ and with MC CRN bumps within CI.
+\end{enumerate}
+
+These run nightly in CI.  On a Strats desk the rule is: \emph{no
+pricer ships without a reference pricer that agrees to tolerance at
+three points}.  Choosing the right reference is often harder than
+implementing the primary pricer.
+
+\begin{keyfactbox}[Two-pricer cross-check]
+Never trust a single pricer in production.  Every product family has
+at least two (closed form + MC, CN + tree, or MC + LS); convergence
+agreement at a benchmark point is the only reliable correctness test.
+Unit tests without cross-pricer agreement are theatre.
+\end{keyfactbox}
+
+
+%% ================================================================
+\section{Summary}
+\label{sec:num_summary}
+%% ================================================================
+
+\begin{itemize}
+  \item The toolkit has four members: closed form, Monte Carlo, finite
+    difference, trees.  Pick whichever delivers required accuracy
+    fastest given dimension and exercise style.
+  \item \textbf{Monte Carlo}: $O(N^{-1/2})$, dimension-free, the only
+    option for high-dim baskets or path-dependence.
+  \item \textbf{Variance reduction} --- antithetics, control variates,
+    importance sampling --- cuts MC variance by $5$--$100\times$.
+  \item \textbf{Longstaff--Schwartz}: the canonical American pricer.
+    Run paths forward; at each exercise date regress continuation on
+    a polynomial basis.  $\sim$30 lines price the universe.
+  \item \textbf{Crank--Nicolson}: default 1D--2D PDE scheme.
+    Unconditionally stable, second-order accurate, linear-time per
+    step.  A $100\times 1000$ grid matches BS to four decimals in
+    a second.
+  \item \textbf{CRR trees}: $O(1/N)$, easy to reason about, legitimate
+    for very small American jobs.  Superseded by CN and LS otherwise.
+  \item The flowchart in \S\ref{sec:method_selection} is what every
+    derivatives Strat carries in their head.  When in doubt, cross-
+    check two methods.
+\end{itemize}
+
+
+\begin{prosperitybox}
+The Prosperity backtester is itself a Monte Carlo simulator: each day
+replays historical order flow with pseudo-random counterparty
+arrivals, and your PnL is one draw from a stochastic distribution.
+Variance-reduction logic transfers: run many days (MC averaging),
+compute paired deltas when you tweak a parameter (antithetic: same
+shocks, new parameter), and use a simpler strategy as a control
+variate.  The Frankfurt Hedgehogs credit ``backtest on as many days
+as possible'' as their single most important rule --- variance
+reduction applied to algo trading research.
+\end{prosperitybox}
+
+
+\begin{gsbox}
+On a Strats desk the numerical toolkit is productised as a library
+--- call it \verb|PricerLib| in SecDB dialect --- that all desks
+consume.  A structuring Strat rarely writes MC from scratch: the
+workflow is (i) check the product-to-pricer routing table, (ii) pick
+the default (CN for low-dim exotics, LS for Americans, Carr--Madan
+for Hestons), (iii) add a cross-check in the alternate pricer and
+diff-test, (iv) hand off to the risk book.  The differentiator is
+knowing which solver is numerically reliable for a product family
+and owning the stability and convergence tests in CI.
+\end{gsbox}
+
+
+\begin{historybox}[title={Three papers that run derivatives desks}]
+\begin{itemize}
+  \item \citet{cranknicolson1947}: time-averaging scheme for the heat
+    equation, Cambridge, decades before Black--Scholes.  Almost every
+    parabolic PDE in finance is the heat equation in disguise.
+  \item \citet{coxrossrubinstein1979}: binomial tree as a pedagogical
+    device, which became the first tractable American pricer and the
+    industry standard for 22 years.
+  \item \citet{longstaffschwartz2001}: replaced the tree with a
+    regression on simulated paths, breaking the curse of dimension
+    for Americans.  The most-cited paper in computational finance ---
+    read the eight-path Section~1 example until you can reproduce it
+    without looking.
+\end{itemize}
+\end{historybox}

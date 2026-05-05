@@ -1,0 +1,239 @@
+% latex/conventions.tex — shared preamble and macros for the quant textbook.
+% Loaded once from main.tex. No chapter may redefine symbols declared here.
+
+% ===== Page layout (match NLP_NOTES.pdf reference: ~1in margins) =====
+\setlrmarginsandblock{1in}{1in}{*}
+\setulmarginsandblock{1in}{1in}{*}
+\checkandfixthelayout
+
+% ===== Encoding & typography =====
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[protrusion=true,expansion=true,final]{microtype}
+
+% ===== Line-breaking slack =====
+% Absorb minor overfull hboxes silently by allowing up to 3em of extra glue
+% per paragraph as a last resort before breaking a line. This is the standard
+% remedy for stubborn overfulls in LaTeX books with narrow columns, long
+% technical terms, and inline \texttt{code_identifiers_with_underscores}.
+\setlength{\emergencystretch}{3em}
+\tolerance=2000
+\hbadness=2000
+
+% ===== URL and path line-breaking =====
+% Allow breaking long URLs and file paths at any character. Without this,
+% bibliography entries with long DOIs/URLs and inline \texttt{research/papers/...}
+% paths produce 100+pt overfulls in the bibliography.
+\usepackage{xurl}
+% xurl's default is to break between any pair of characters. Don't redefine
+% \UrlBreaks here — xurl already does the optimal thing.
+
+% Apply \sloppy globally inside the bibliography so long URLs and DOIs never
+% create overfull hboxes that escape the text column. This is standard practice
+% for books with extensive reference lists.
+\usepackage{etoolbox}
+\AtBeginEnvironment{thebibliography}{\sloppy}
+
+% ===== Math =====
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}
+
+% ===== Graphics & figures =====
+\usepackage{graphicx}
+
+% Float placement parameters. The memoir defaults are conservative; these
+% make figures/tables less likely to be deferred to their own float page,
+% which gives a better flow through a math/derivation-heavy book.
+\renewcommand{\topfraction}{0.9}         % up to 90% of top of text page is floats
+\renewcommand{\bottomfraction}{0.8}      % up to 80% of bottom
+\renewcommand{\textfraction}{0.07}       % min 7% of page must be text
+\renewcommand{\floatpagefraction}{0.7}   % a float page must be >= 70% floats
+\setcounter{topnumber}{3}                % up to 3 floats at top of page
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+% Make default float specifier [tbp] for any float without explicit placement
+% (not applied retroactively but useful for consistency).
+\usepackage{placeins}                    % provides \FloatBarrier for sections
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes.geometric, decorations.pathreplacing}
+
+% ===== Tables =====
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+
+% ===== Colour & boxes =====
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{theorems, breakable, skins}
+
+% ===== Code listings (Python) =====
+\usepackage{listings}
+\definecolor{codekw}{RGB}{106, 27, 154}
+\definecolor{codestr}{RGB}{56, 142, 60}
+\definecolor{codecm}{RGB}{96, 96, 96}
+\definecolor{codebg}{RGB}{250, 250, 250}
+\lstdefinestyle{pythonstyle}{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{codekw}\bfseries,
+  stringstyle=\color{codestr},
+  commentstyle=\color{codecm}\itshape,
+  backgroundcolor=\color{codebg},
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny\color{codecm},
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{codecm!30},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  captionpos=b,
+}
+\lstset{style=pythonstyle}
+
+% ===== Index =====
+\usepackage{imakeidx}
+\makeindex[title=Index, intoc, columns=2]
+
+% ===== Hyperref & cleveref (load LAST of the referencing packages) =====
+\usepackage[colorlinks=true,
+            linkcolor=blue!50!black,
+            citecolor=blue!50!black,
+            urlcolor=blue!50!black]{hyperref}
+\usepackage[capitalise, noabbrev]{cleveref}
+
+% ===== Citations =====
+\usepackage[round, authoryear]{natbib}
+
+% ===== Theorem environments =====
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% ===== Callout boxes (tcolorbox) =====
+% Style matches the NLP revision-notes reference in example-notes/NLP_NOTES.pdf:
+% coloured header bar with bold white title, coloured border, light tinted
+% background. Use these liberally — the book's visual identity is "textbook
+% with prominent boxed highlights" not "continuous prose".
+\newtcolorbox{intuitionbox}[1][]{
+  enhanced, colback=green!5, colframe=green!45!black,
+  coltitle=white, fonttitle=\bfseries,
+  title=Intuition, breakable, sharp corners=south, #1}
+\newtcolorbox{keyfactbox}[1][Key fact]{
+  enhanced, colback=blue!5, colframe=blue!55!black,
+  coltitle=white, fonttitle=\bfseries,
+  title=#1, breakable, sharp corners=south}
+\newtcolorbox{backgroundbox}[1][Background]{
+  enhanced, colback=gray!8, colframe=gray!60!black,
+  coltitle=white, fonttitle=\bfseries,
+  title=#1, breakable, sharp corners=south}
+\newtcolorbox{prosperitybox}[1][]{
+  enhanced, colback=orange!5, colframe=orange!65!black,
+  coltitle=white, fonttitle=\bfseries,
+  title=Prosperity example, breakable, sharp corners=south, #1}
+\newtcolorbox{gsbox}[1][]{
+  enhanced, colback=teal!5, colframe=teal!60!black,
+  coltitle=white, fonttitle=\bfseries,
+  title=On a Goldman Sachs desk, breakable, sharp corners=south, #1}
+\newtcolorbox{pitfallbox}[1][Common mistake]{
+  enhanced, colback=red!5, colframe=red!65!black,
+  coltitle=white, fonttitle=\bfseries,
+  title=#1, breakable, sharp corners=south}
+\newtcolorbox{historybox}[1][]{
+  enhanced, colback=purple!5, colframe=purple!55!black,
+  coltitle=white, fonttitle=\bfseries,
+  title=Historical note, breakable, sharp corners=south, #1}
+
+% ===== Shared notation =====
+% Probability & stats
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\Qm}{\mathbb{Q}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\Corr}{\operatorname{Corr}}
+\newcommand{\ind}{\mathbb{1}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\iid}{\text{i.i.d.}}
+\newcommand{\Normal}{\mathcal{N}}
+\newcommand{\CDFN}{\Phi}           % standard normal CDF
+\newcommand{\pdfN}{\phi}           % standard normal PDF
+
+% Finance: underlying & options
+\newcommand{\Spx}{S}               % spot / underlying
+\newcommand{\Kstrike}{K}           % strike
+\newcommand{\rrf}{r}               % risk-free rate
+\newcommand{\volat}{\sigma}        % volatility
+\newcommand{\Tmat}{T}              % maturity
+\newcommand{\Call}{C}              % call price
+\newcommand{\Put}{P}               % put price
+
+% Microstructure & market making
+\newcommand{\bidp}{p^{\mathrm{bid}}}
+\newcommand{\askp}{p^{\mathrm{ask}}}
+\newcommand{\midp}{p^{\mathrm{mid}}}
+\newcommand{\mprice}{p^{\mathrm{micro}}}
+\newcommand{\wallmid}{p^{\mathrm{wall}}}
+\newcommand{\spreads}{s}
+\newcommand{\invq}{q}              % inventory
+\newcommand{\riskav}{\gamma}       % A-S risk aversion
+\newcommand{\arrate}{\kappa}       % A-S arrival intensity
+
+% Kyle model
+\newcommand{\lamk}{\lambda}        % Kyle's lambda (price impact coeff)
+\newcommand{\noiseu}{u}            % noise-trader order flow
+\newcommand{\insidx}{x}            % insider order flow
+
+% Misc
+\newcommand{\defeq}{\coloneqq}
+\newcommand{\eqdef}{\eqqcolon}
+
+% ===== Citation shortcuts — one per source in research/bibliography.md =====
+% These keep citation formatting consistent across all 39 chapters.
+\newcommand{\citeHarris}{\citep{harris2003trading}}
+\newcommand{\citeBouchaud}{\citep{bouchaud2018trades}}
+\newcommand{\citeHasbrouck}{\citep{hasbrouck2007empirical}}
+\newcommand{\citeFoucault}{\citep{foucault2024market}}
+\newcommand{\citeHull}{\citep{hull8ed}}
+\newcommand{\citeNatenberg}{\citep{natenberg2015option}}
+\newcommand{\citeChan}{\citep{chan2013algorithmic}}
+\newcommand{\citeChanQT}{\citep{chan2022quantitative}}
+\newcommand{\citeAFML}{\citep{lopezdeprado2018afml}}
+\newcommand{\citeJansen}{\citep{jansen2020ml}}
+\newcommand{\citeCartea}{\citep{cartea2015algorithmic}}
+\newcommand{\citeSinclair}{\citep{sinclair2013volatility}}
+\newcommand{\citeDerman}{\citep{derman2004mylife}}
+\newcommand{\citeGreenBook}{\citep{zhou2020quant}}
+\newcommand{\citeAS}{\citep{avellaneda2008high}}
+\newcommand{\citeAC}{\citep{almgren2000optimal}}
+\newcommand{\citeAL}{\citep{avellaneda2010stat}}
+\newcommand{\citeKyle}{\citep{kyle1985continuous}}
+\newcommand{\citeGM}{\citep{glosten1985bid}}
+\newcommand{\citeRoll}{\citep{roll1984simple}}
+\newcommand{\citeMOP}{\citep{moskowitz2012time}}
+\newcommand{\citeThorp}{\citep{thorp2006kelly}}
+\newcommand{\citeBennett}{\citep{bennett2014trading}}
+\newcommand{\citeGlasserman}{\citep{glasserman2004monte}}
+\newcommand{\citeHagan}{\citep{hagan2002managing}}
+\newcommand{\citeBlackSF}{\citep{black1976pricing}}
+\newcommand{\citeBGM}{\citep{braceetal1997}}
+\newcommand{\citeHW}{\citep{hullwhite1990}}
+\newcommand{\citeSchwartz}{\citep{schwartz1997stochastic}}
+\newcommand{\citeGibsonSchwartz}{\citep{gibsonschwartz1990}}
+\newcommand{\citeSchwartzSmith}{\citep{schwartzsmith2000}}

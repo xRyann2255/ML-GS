@@ -1,0 +1,529 @@
+\chapter{Panel Econometrics}
+\label{ch:panel}
+
+\begin{projectconnection}[Project Connection --- Phase 4A Panel Extension]
+In Phase 4A you move from firm-level aggregates to asset-class-level risk outputs and test within-class vs.\ cross-class prediction using panel data.
+This chapter teaches the econometric methods you need: fixed effects, clustered standard errors, and Fama--MacBeth regressions.
+The panel structure is also how you increase your effective sample size---a critical concern when firm-level VaR gives only ${\sim}1{,}250$ daily observations over five years.
+Stacking four asset classes doubles your observations; stacking seven (the He--Kelly--Manela setup) nearly sextuples them.
+\end{projectconnection}
+
+% ══════════════════════════════════════════════════════════════
+\section{Why Panel Data}
+\label{sec:panel-why}
+% ══════════════════════════════════════════════════════════════
+
+\begin{definition}[Panel Data]
+A \textbf{panel} (or \textbf{longitudinal}) data set tracks multiple entities $i = 1, \dots, N$ over multiple time periods $t = 1, \dots, T$.
+Each observation is indexed by the pair $(i, t)$, giving a total of up to $N \times T$ rows.
+When every entity is observed at every date, the panel is \emph{balanced}; when some $(i,t)$ pairs are missing, it is \emph{unbalanced}.
+\end{definition}
+
+Three data structures appear throughout empirical finance:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Cross-section.} Many entities, one date. Example: returns of 500 stocks on a single day.
+  \item \textbf{Time series.} One entity, many dates. Example: daily VIX over five years ($T \approx 1{,}250$).
+  \item \textbf{Panel.} Many entities, many dates. Example: daily VaR utilisation for each of $N = 7$ asset classes over $T = 1{,}250$ trading days.
+\end{enumerate}
+
+Panels give you three advantages a pure time series cannot:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{More observations.} Stacking $N$ entities multiplies your sample size. With $N = 7$ asset classes and $T = 1{,}250$ days you have up to $8{,}750$ rows instead of $1{,}250$.
+  \item \textbf{Control for unobserved heterogeneity.} Each entity may have a different average level of the dependent variable for reasons you cannot measure. Fixed effects absorb these permanent differences (Section~\ref{sec:panel-fe}).
+  \item \textbf{Cross-sectional variation in exposure.} At each date, some asset classes have high VaR utilisation and others have low. This within-date variation identifies the coefficient on VaR utilisation even if aggregate risk is trending over time.
+\end{itemize}
+
+\begin{prereq}[Your Panel]
+In this project your panel has:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Entities} ($i$): asset classes---equities, rates, credit, FX, commodities, and potentially finer subdivisions.
+  \item \textbf{Time} ($t$): trading days, typically $T \approx 1{,}000$--$1{,}500$ depending on history available in SecDB.
+  \item \textbf{Features} ($\bx_{it}$): asset-class-specific VaR utilisation, factor concentration ($\HHI$), scenario P\&L rank, component VaR share.
+  \item \textbf{Targets} ($y_{it}$): next-period return, realised volatility, drawdown indicator, or VIX innovation.
+\end{itemize}
+The key question is whether a risk signal that predicts returns in \emph{one} asset class also predicts returns in \emph{other} asset classes---the ``single pricing kernel'' test of He--Kelly--Manela (2017).
+\end{prereq}
+
+% ══════════════════════════════════════════════════════════════
+\section{Fixed Effects}
+\label{sec:panel-fe}
+% ══════════════════════════════════════════════════════════════
+
+\begin{prereq}[Dummy Variables and Degrees of Freedom]
+A \textbf{dummy variable} (indicator variable) equals 1 for one category and 0 otherwise.
+Including $N$ dummies for $N$ groups, plus an intercept, creates perfect collinearity; drop one dummy or suppress the intercept.
+Each dummy costs one degree of freedom, so adding 7 asset-class dummies to a regression with $8{,}750$ observations reduces $df$ by 6---negligible.
+With thousands of firm-level dummies, the cost is material.
+\end{prereq}
+
+\begin{definition}[Fixed Effects Model]
+The \textbf{entity fixed-effects} (FE) model is:
+\begin{equation}
+  y_{it} = \alpha_i + \bx_{it}'\bbeta + \varepsilon_{it}
+  \label{eq:fe-model}
+\end{equation}
+where:
+\begin{itemize}[leftmargin=*]
+  \item $y_{it}$ --- outcome for entity $i$ at time $t$ (e.g., next-day return for asset class $i$),
+  \item $\alpha_i$ --- entity-specific intercept, absorbing all \emph{time-invariant} differences across entities,
+  \item $\bx_{it}$ --- $K \times 1$ vector of time-varying regressors (e.g., VaR utilisation, factor $\HHI$),
+  \item $\bbeta$ --- $K \times 1$ coefficient vector, common across entities,
+  \item $\varepsilon_{it}$ --- idiosyncratic error, assumed $\E[\varepsilon_{it} \mid \alpha_i, \bx_{it}] = 0$.
+\end{itemize}
+\end{definition}
+
+The intercept $\alpha_i$ captures everything that differs across entities but does not change over time: equities have structurally higher average returns than FX carry; credit VaR operates at different levels than rates VaR.
+Fixed effects absorb these level differences so that $\bbeta$ is identified purely from \emph{within-entity} variation over time.
+
+\subsection{The Within Estimator}
+
+\begin{keyidea}[Demeaning Removes Entity Effects]
+To estimate $\bbeta$ in the FE model, subtract each entity's time-series mean from both sides:
+\begin{equation}
+  y_{it} - \bar{y}_i = (\bx_{it} - \bar{\bx}_i)'\bbeta + (\varepsilon_{it} - \bar{\varepsilon}_i)
+  \label{eq:within-estimator}
+\end{equation}
+where $\bar{y}_i = \frac{1}{T}\sum_{t=1}^{T} y_{it}$ and similarly for $\bar{\bx}_i$ and $\bar{\varepsilon}_i$.
+The entity effects $\alpha_i$ cancel.
+OLS on the demeaned data yields the \textbf{within estimator}, also called the \textbf{LSDV} (Least Squares Dummy Variable) estimator.
+\end{keyidea}
+
+You can equivalently include $N$ dummy variables---one per entity---and run OLS on the full model.
+The coefficient $\hat{\bbeta}$ is identical; demeaning is just computationally cheaper when $N$ is large (Wooldridge, 2010, Chapter~10).
+
+\begin{prereq}[Between vs.\ Within Variation]
+Panel data contains two sources of variation:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Between variation}: differences \emph{across} entities in their time-series averages. Example: equities have higher average VaR utilisation than FX.
+  \item \textbf{Within variation}: fluctuations \emph{over time within} a single entity. Example: equity VaR utilisation rises from 60\% to 85\% during a stress event, then falls back.
+\end{itemize}
+The FE estimator discards between variation entirely---it uses only within variation.
+This is a feature, not a bug: between variation is contaminated by omitted time-invariant confounders.
+The cost is that you cannot estimate the effect of any time-invariant regressor (e.g., ``is this asset class a derivative?'').
+If you need those effects, consider Mundlak's (1978) compromise: include entity means $\bar{\bx}_i$ as additional regressors in a RE model, which is algebraically equivalent to FE for the time-varying coefficients while also estimating between-entity effects.
+\end{prereq}
+
+\begin{workedexample}{Fixed Effects with 4 Asset Classes}
+Suppose you have $N = 4$ asset classes (equities, rates, credit, FX) observed over $T = 252$ trading days, giving $4 \times 252 = 1{,}008$ panel observations.
+You regress next-day return $y_{it}$ on VaR utilisation $x_{it}$ with entity fixed effects:
+\[
+  y_{it} = \alpha_i + \beta \cdot x_{it} + \varepsilon_{it}
+\]
+\textbf{Step 1: Compute entity means.}
+For each asset class $i$, compute $\bar{y}_i$ and $\bar{x}_i$ across its 252 days.
+
+\textbf{Step 2: Demean.}
+Create $\tilde{y}_{it} = y_{it} - \bar{y}_i$ and $\tilde{x}_{it} = x_{it} - \bar{x}_i$.
+
+\textbf{Step 3: OLS on demeaned data.}
+\[
+  \hat{\beta}_{\text{FE}} = \frac{\sum_{i=1}^{4}\sum_{t=1}^{252} \tilde{x}_{it}\,\tilde{y}_{it}}{\sum_{i=1}^{4}\sum_{t=1}^{252} \tilde{x}_{it}^2}
+\]
+If $\hat{\beta}_{\text{FE}} = -0.03$ with $\text{SE} = 0.01$, the interpretation is: within a given asset class, a one-standard-deviation increase in VaR utilisation predicts a 3\,bp decrease in next-day return.
+The negative sign is consistent with the Coval--Stafford (2007) forced-selling channel (see Chapter~\ref{ch:intermediary}).
+
+\textbf{Degrees of freedom:} $N \times T - N - K = 1{,}008 - 4 - 1 = 1{,}003$.
+The 4 dummies consume only 4 degrees of freedom.
+\end{workedexample}
+
+\subsection{Time Fixed Effects}
+
+You can also include \textbf{time fixed effects} $\delta_t$:
+\begin{equation}
+  y_{it} = \alpha_i + \delta_t + \bx_{it}'\bbeta + \varepsilon_{it}
+  \label{eq:twoway-fe}
+\end{equation}
+Time effects absorb market-wide shocks common to all entities on a given day---aggregate volatility spikes, macro announcements, or Fed meetings.
+This is a \textbf{two-way fixed effects} model.
+After adding time effects, $\bbeta$ is identified only from variation that differs \emph{across entities within the same date}, net of the entity average.
+
+\begin{prereq}[When to Use Time Fixed Effects]
+Include time fixed effects when you want to control for aggregate shocks that hit all asset classes simultaneously.
+This is appropriate when you care about the \emph{relative} effect of VaR utilisation across asset classes, not whether VaR utilisation predicts returns in general.
+If your goal is to predict absolute returns, omit time effects---they absorb the common signal.
+\end{prereq}
+
+% ══════════════════════════════════════════════════════════════
+\section{Random Effects and the Hausman Test}
+\label{sec:panel-re}
+% ══════════════════════════════════════════════════════════════
+
+The fixed-effects model treats $\alpha_i$ as parameters to estimate.
+The \textbf{random effects} (RE) model treats them as draws from a distribution:
+\begin{equation}
+  y_{it} = \mu + \bx_{it}'\bbeta + \alpha_i + \varepsilon_{it}, \qquad
+  \alpha_i \sim (0, \sigma_\alpha^2), \quad
+  \varepsilon_{it} \sim (0, \sigma_\varepsilon^2)
+  \label{eq:re-model}
+\end{equation}
+The critical assumption is $\E[\alpha_i \mid \bx_{it}] = 0$: the entity effect is \emph{uncorrelated} with the regressors.
+
+If the RE assumption holds, the RE estimator is more efficient than FE because it uses both within-entity and between-entity variation.
+If the assumption fails---$\alpha_i$ correlates with $\bx_{it}$---the RE estimator is inconsistent, and FE is the safe choice.
+
+\begin{intuition}[Fixed Effects vs.\ Random Effects]
+Fixed effects says: ``I do not care \emph{why} asset classes differ in their average return levels.
+Maybe equities have a higher equity premium, maybe credit has illiquidity compensation---I just want to control for it.''
+Random effects says: ``The differences across asset classes are random draws from a common distribution, and they are unrelated to VaR utilisation.''
+
+In finance, the RE assumption almost always fails.
+Asset classes with structurally higher returns (equities) also tend to have structurally different risk profiles (higher VaR utilisation limits).
+That correlation between $\alpha_i$ and $\bx_{it}$ biases the RE estimator.
+Default to fixed effects.
+\end{intuition}
+
+\subsection{The Hausman Test}
+
+The \textbf{Hausman test} (1978) formalises the FE-vs-RE choice:
+\begin{equation}
+  H = (\hat{\bbeta}_{\text{FE}} - \hat{\bbeta}_{\text{RE}})' \bigl[\widehat{\operatorname{Var}}(\hat{\bbeta}_{\text{FE}}) - \widehat{\operatorname{Var}}(\hat{\bbeta}_{\text{RE}})\bigr]^{-1} (\hat{\bbeta}_{\text{FE}} - \hat{\bbeta}_{\text{RE}}) \;\sim\; \chi^2_K
+  \label{eq:hausman}
+\end{equation}
+where $K$ is the number of regressors.
+Under $H_0$: RE is consistent (both estimators converge to the same $\bbeta$).
+Under $H_1$: RE is inconsistent (FE and RE diverge).
+If you reject $H_0$, use FE.
+
+In practice, for finance panels, the Hausman test almost always rejects.
+Use fixed effects as your default.
+
+% ══════════════════════════════════════════════════════════════
+\section{Clustered Standard Errors}
+\label{sec:panel-cluster}
+% ══════════════════════════════════════════════════════════════
+
+Fixed effects handle the \emph{point estimate} correctly, but the \emph{standard errors} require separate treatment.
+The problem: panel residuals are not independent.
+Returns of the same asset class are correlated over time (autocorrelation), and returns of different asset classes on the same date are correlated in the cross section (common shocks).
+Ignoring this correlation produces standard errors that are too small, $t$-statistics that are too large, and false discoveries.
+
+\begin{keyresult}[Petersen (2009) --- Standard Errors in Finance Panels]
+Petersen (2009, \textit{Review of Financial Studies}) uses Monte Carlo simulations to show that OLS standard errors are severely downward biased in finance panels.
+Specific findings:
+\begin{itemize}[leftmargin=*]
+  \item With a firm effect ($\rho_X = \rho_\varepsilon = 0.50$), OLS reports $\widehat{\text{SE}} = 0.0283$ while the true standard error is $0.0506$---understating by 44\%.
+  \item The bias grows with panel length: from ${\sim}30\%$ understatement with 5 years per entity to ${\sim}73\%$ with 50 years.
+  \item Using unclustered OLS standard errors, 15.3\% of $t$-statistics are significant at the 1\% level---over 15 times the nominal rate.
+  \item Only clustering by the correct dimension (firm, time, or both) produces unbiased standard errors.
+\end{itemize}
+\end{keyresult}
+
+\begin{warning}[Never Report Unclustered Standard Errors from a Finance Panel]
+Unclustered standard errors in finance panels produce $t$-statistics that are inflated by a factor that grows with the panel's length and the strength of within-cluster correlation.
+In Petersen's simulations, a nominal 1\% test rejects 15.3\% of the time.
+A ``significant'' result with unclustered SEs is not evidence of anything.
+Always cluster---the question is only \emph{by what dimension}.
+\end{warning}
+
+\subsection{One-Way Clustering}
+
+\begin{definition}[Clustered Standard Errors]
+Let the panel regression be $y_{it} = \bx_{it}'\bbeta + \varepsilon_{it}$.
+The \textbf{cluster-robust} variance estimator, clustering by entity $i$, is:
+\begin{equation}
+  \widehat{\operatorname{Var}}(\hat{\bbeta}) = (\bX'\bX)^{-1} \left(\sum_{i=1}^{N} \bX_i' \hat{\bm{\varepsilon}}_i \hat{\bm{\varepsilon}}_i' \bX_i \right) (\bX'\bX)^{-1}
+  \label{eq:cluster-var}
+\end{equation}
+where $\bX_i$ is the $T \times K$ submatrix of regressors for entity $i$ and $\hat{\bm{\varepsilon}}_i$ is the $T \times 1$ vector of residuals for entity $i$.
+\end{definition}
+
+\textbf{Cluster by entity} when residuals are correlated within the same entity over time (autocorrelation).
+This is the standard in corporate finance panels where firms have persistent unobservables.
+
+\textbf{Cluster by time} when residuals are correlated across entities within the same period (cross-sectional dependence).
+This is common in asset pricing when a market shock hits all assets on the same date.
+
+\subsection{Two-Way (Double) Clustering}
+
+Finance panels typically exhibit \emph{both} entity-level and time-level correlation.
+The two-way cluster-robust variance estimator (Cameron, Gelbach, and Miller, 2011) is:
+\begin{equation}
+  \widehat{\operatorname{Var}}_{\text{double}} = \widehat{\operatorname{Var}}_{\text{entity}} + \widehat{\operatorname{Var}}_{\text{time}} - \widehat{\operatorname{Var}}_{\text{entity} \times \text{time}}
+  \label{eq:double-cluster}
+\end{equation}
+where $\widehat{\operatorname{Var}}_{\text{entity} \times \text{time}}$ clusters by the intersection (each unique $(i,t)$ pair---equivalent to heteroskedasticity-robust SEs).
+Petersen (2009) shows this is the only approach that produces correct standard errors when both dimensions of correlation are present.
+
+\begin{workedexample}{Unclustered vs.\ Clustered Standard Errors}
+You run a panel regression of next-day return on VaR utilisation with entity fixed effects, using $N = 7$ asset classes and $T = 1{,}000$ days ($7{,}000$ observations).
+The coefficient estimate is $\hat{\beta} = -0.025$.
+
+\medskip
+\begin{center}
+\begin{tabular}{lccc}
+  \toprule
+  \textbf{SE Method} & \textbf{SE($\hat{\beta}$)} & \textbf{$t$-statistic} & \textbf{$p$-value} \\
+  \midrule
+  OLS (no clustering)          & 0.004 & $-6.25$ & $< 0.001$ \\
+  Clustered by entity          & 0.008 & $-3.13$ & $0.002$ \\
+  Clustered by time            & 0.007 & $-3.57$ & $< 0.001$ \\
+  Double-clustered             & 0.010 & $-2.50$ & $0.013$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+The unclustered $t$-statistic ($-6.25$) overstates significance by a factor of 2.5 relative to the double-clustered $t$-statistic ($-2.50$).
+In this example all methods still reject at 5\%, but in a marginal case the unclustered SE would produce a false discovery.
+With $N = 7$ clusters on the entity dimension, entity-clustered SEs may themselves be unreliable---the asymptotic approximation requires $N$ large.
+When $N$ is small, report double-clustered SEs and note the small $N$ caveat, or use the wild cluster bootstrap (Cameron, Gelbach, and Miller, 2008).
+\end{workedexample}
+
+\begin{prereq}[How Many Clusters Is Enough?]
+Clustered standard errors rely on an asymptotic argument in the number of clusters.
+With $N = 7$ asset classes, you have only 7 entity-level clusters---below the common rule-of-thumb of ${\sim}50$ for reliable asymptotics (Cameron and Miller, 2015).
+Solutions: (a) use finer entities (sub-desks or individual products rather than broad asset classes); (b) use the wild cluster bootstrap; (c) cluster by time (where $T \approx 1{,}000$ gives many clusters) and note the limitation.
+\end{prereq}
+
+% ══════════════════════════════════════════════════════════════
+\section{Fama--MacBeth Regressions}
+\label{sec:panel-fm}
+% ══════════════════════════════════════════════════════════════
+
+Fama and MacBeth (1973) introduced an alternative to pooled panel regression that has become the workhorse of cross-sectional asset pricing.
+
+\begin{keyidea}[Fama--MacBeth Two-Pass Procedure]
+\textbf{Pass 1 (time-series).} For each asset $i = 1, \dots, N$, regress returns on factor realisations to estimate factor loadings:
+\begin{equation}
+  R_{it} = \alpha_i + \beta_{i,1} F_{1t} + \cdots + \beta_{i,K} F_{Kt} + \varepsilon_{it}, \qquad t = 1, \dots, T
+  \label{eq:fm-pass1}
+\end{equation}
+This gives $\hat{\beta}_{i,k}$ for each asset and factor.
+
+\textbf{Pass 2 (cross-sectional).} At each date $t$, regress returns on the estimated betas:
+\begin{equation}
+  R_{it} = \gamma_{0t} + \gamma_{1t} \hat{\beta}_{i,1} + \cdots + \gamma_{Kt} \hat{\beta}_{i,K} + u_{it}, \qquad i = 1, \dots, N
+  \label{eq:fm-pass2}
+\end{equation}
+This gives a time series of coefficient estimates $\{\hat{\gamma}_{kt}\}_{t=1}^T$ for each factor $k$.
+
+\textbf{Estimate and inference.} The risk premium for factor $k$ is the time-series average:
+\begin{equation}
+  \hat{\lambda}_k = \frac{1}{T}\sum_{t=1}^T \hat{\gamma}_{kt}
+  \label{eq:fm-lambda}
+\end{equation}
+The standard error uses the time-series variation of the cross-sectional estimates:
+\begin{equation}
+  \widehat{\text{SE}}(\hat{\lambda}_k) = \frac{1}{\sqrt{T}} \sqrt{\frac{1}{T-1}\sum_{t=1}^T (\hat{\gamma}_{kt} - \hat{\lambda}_k)^2}
+  \label{eq:fm-se}
+\end{equation}
+\end{keyidea}
+
+The key insight is that by running separate cross-sectional regressions at each date and then averaging, Fama--MacBeth \emph{automatically accounts for cross-sectional correlation}.
+If all assets move together on a given date, the cross-sectional coefficient for that date reflects it, and the time-series averaging smooths it out.
+
+However, Fama--MacBeth does \emph{not} correct for time-series autocorrelation.
+If $\hat{\gamma}_{kt}$ is persistent over time, the standard error in Equation~\eqref{eq:fm-se} is too small.
+The fix: apply Newey--West (1987) correction to the time series of $\hat{\gamma}_{kt}$ estimates.
+
+\begin{prereq}[Fama--MacBeth vs.\ Clustered Panel Regression]
+Petersen (2009) proves:
+\begin{itemize}[leftmargin=*]
+  \item Fama--MacBeth SEs $\approx$ clustering by time. Both handle cross-sectional correlation; neither handles time-series correlation unless adjusted.
+  \item Clustering by entity handles time-series correlation but not cross-sectional correlation.
+  \item Double-clustering handles both.
+\end{itemize}
+Use Fama--MacBeth for \textbf{pricing tests} (``is this factor priced in the cross section?'').
+Use panel FE with double-clustered SEs for \textbf{prediction} (``does VaR utilisation predict returns, controlling for entity effects?'').
+\end{prereq}
+
+\subsection{Fama--MacBeth in Practice: He--Kelly--Manela}
+
+He, Kelly, and Manela (2017, \textit{JFE}) use Fama--MacBeth regressions to test whether intermediary capital risk is priced across asset classes.
+Their setup:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Factor:} Shocks to the equity capital ratio of New York Fed primary dealers.
+  \item \textbf{Test assets:} Portfolios spanning seven asset classes---equities, US government bonds, corporate bonds, sovereign bonds, options, CDS, commodities, and FX.
+  \item \textbf{Pass 1:} Estimate each portfolio's beta to the intermediary capital factor using time-series regression.
+  \item \textbf{Pass 2:} Cross-sectional regression of average excess returns on estimated betas.
+\end{itemize}
+
+\begin{keyresult}[He--Kelly--Manela (2017) --- Single Pricing Kernel]
+A single intermediary capital risk factor prices the cross section of returns across seven asset classes with a cross-sectional $R^2$ of 77\%.
+The estimated capital risk premium is approximately 9\% per year, with a range of 7--11\% for five of the seven asset classes.
+The price of risk is consistently positive and of similar magnitude when estimated separately for individual asset classes---evidence for a single stochastic discount factor driven by dealer balance-sheet constraints.
+\end{keyresult}
+
+This is the test you replicate in Phase 4A: if SecDB risk outputs capture the same dealer-constraint channel, your risk signals should price assets across classes in a similar Fama--MacBeth framework.
+
+\begin{workedexample}{Fama--MacBeth with 3 Asset Classes}
+Suppose you have $N = 20$ portfolios across 3 asset classes and $T = 60$ monthly observations.
+You want to test whether exposure to a VaR-utilisation factor earns a risk premium.
+
+\textbf{Pass 1.} For each portfolio $i$, run a time-series regression:
+\[
+  R_{it} = \alpha_i + \beta_i \cdot \Delta\text{VaRUtil}_t + \varepsilon_{it}, \qquad t = 1, \dots, 60
+\]
+This gives 20 estimated betas $\hat{\beta}_1, \dots, \hat{\beta}_{20}$.
+
+\textbf{Pass 2.} At each month $t$, regress the cross section of 20 portfolio returns on their betas:
+\[
+  R_{it} = \gamma_{0t} + \gamma_{1t}\,\hat{\beta}_i + u_{it}, \qquad i = 1, \dots, 20
+\]
+This gives 60 estimates of $\hat{\gamma}_{1t}$---the risk premium for VaR-utilisation exposure in month $t$.
+
+\textbf{Estimate.} Average: $\hat{\lambda} = \frac{1}{60}\sum_{t=1}^{60}\hat{\gamma}_{1t} = 0.42\%$ per month.
+
+\textbf{Standard error.}
+$\widehat{\text{SE}}(\hat{\lambda}) = \frac{1}{\sqrt{60}}\sqrt{\frac{1}{59}\sum_t (\hat{\gamma}_{1t} - 0.42\%)^2} = 0.18\%$.
+
+\textbf{$t$-statistic.} $t = 0.42 / 0.18 = 2.33$ ($p = 0.023$).
+
+Interpretation: portfolios with higher exposure to VaR-utilisation shocks earn 42\,bp/month (5.0\% annualised) more than low-exposure portfolios, significant at 5\%.
+\end{workedexample}
+
+% ══════════════════════════════════════════════════════════════
+\section{Panel ML vs.\ Panel Regression}
+\label{sec:panel-ml}
+% ══════════════════════════════════════════════════════════════
+
+Panel regression and ML are complements, not substitutes.
+They answer different questions:
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  & \textbf{Panel FE Regression} & \textbf{Panel ML (LightGBM)} \\
+  \midrule
+  \textbf{Goal} & Causal interpretation, pricing tests & Out-of-sample prediction \\
+  \textbf{Inference} & Clustered SEs, $t$-statistics & Purged CV, information coefficient \\
+  \textbf{Flexibility} & Linear in features & Nonlinear, interactions \\
+  \textbf{Entity effects} & Absorbed via demeaning & Dummy features for asset class \\
+  \textbf{Interpretability} & Coefficient table & $\SHAP$ values \\
+  \textbf{Weakness} & Misses nonlinearities & No valid $p$-values \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Using Both in Your Project}
+
+\begin{keyidea}[Two-Track Panel Analysis]
+Your project uses panel data in two complementary ways:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Panel FE regression} for the He--Kelly--Manela pricing test.
+    Run Fama--MacBeth or panel FE with double-clustered SEs.
+    Report $\hat{\lambda}$ (price of risk), $t$-statistics, and cross-sectional $R^2$.
+    This tells you whether SecDB risk signals are \emph{priced}---whether bearing exposure to VaR-utilisation shocks earns a premium.
+
+  \item \textbf{LightGBM with asset-class indicators} for prediction.
+    Include one-hot encoded asset-class dummies as features alongside risk signals.
+    The tree can learn asset-class-specific nonlinear relationships (e.g., VaR utilisation matters more for credit than for FX).
+    Evaluate with purged cross-validation (Chapter~\ref{ch:validation}) and $\IC$ (Chapter~\ref{ch:backtesting}).
+\end{enumerate}
+The regression answers ``is the signal priced?'' with proper statistical inference.
+The ML model answers ``can the signal predict?'' with proper out-of-sample evaluation.
+Present both in your deliverable.
+\end{keyidea}
+
+\subsection{Entity Features in Tree Models}
+
+When you include asset-class dummies in LightGBM, the tree can split on them.
+A split on ``is\_credit = 1'' followed by a split on VaR utilisation is equivalent to estimating a different VaR-utilisation slope for credit vs.\ other classes---an interaction effect that panel FE with a single $\bbeta$ cannot capture without explicit interaction terms.
+
+However, with only $N = 7$ asset classes, the dummies are low-cardinality.
+LightGBM handles this natively.
+Do \emph{not} target-encode the asset-class variable---with 7 categories and time-series data, target encoding will leak future information unless you are extremely careful with temporal ordering.
+
+\begin{prereq}[Panel ML Validation Pitfall]
+When cross-validating a panel model, you must respect the time dimension.
+A random $K$-fold split will place observations from the same date into both train and test folds, leaking cross-sectional correlation.
+Use the purged $K$-fold CV from Chapter~\ref{ch:validation}: split by \emph{time}, not by row.
+For panel data, this means entire dates go into train or test, never split across folds.
+\end{prereq}
+
+% ══════════════════════════════════════════════════════════════
+\section{Choosing the Right Panel Method}
+\label{sec:panel-choice}
+% ══════════════════════════════════════════════════════════════
+
+With multiple methods available, the decision tree is:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Is your question ``is this factor priced?'' or ``can I predict returns?''}
+    \begin{itemize}[leftmargin=*]
+      \item Pricing test $\Rightarrow$ Fama--MacBeth (Section~\ref{sec:panel-fm}). Report $\hat{\lambda}$, $t$-stat, cross-sectional $R^2$.
+      \item Prediction $\Rightarrow$ Panel FE regression or panel ML (Sections~\ref{sec:panel-fe},~\ref{sec:panel-ml}).
+    \end{itemize}
+  \item \textbf{Do you need interpretable coefficients with valid inference?}
+    \begin{itemize}[leftmargin=*]
+      \item Yes $\Rightarrow$ Panel FE with double-clustered SEs. Report $\hat{\bbeta}$, $t$-stats.
+      \item No, you want the best forecast $\Rightarrow$ LightGBM with asset-class dummies and purged CV.
+    \end{itemize}
+  \item \textbf{How many entity-level clusters do you have?}
+    \begin{itemize}[leftmargin=*]
+      \item $N \geq 50$ $\Rightarrow$ entity clustering is reliable.
+      \item $N < 50$ $\Rightarrow$ cluster by time ($T$ is large), or use wild cluster bootstrap, and note the caveat.
+    \end{itemize}
+  \item \textbf{Present both.} In your deliverable, the panel FE regression gives the desk a causal story (``VaR utilisation predicts returns because forced selling depletes liquidity''), while the ML model gives a tradeable signal.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════
+\section{Practical Considerations}
+\label{sec:panel-practical}
+% ══════════════════════════════════════════════════════════════
+
+\subsection{Unbalanced Panels}
+
+Your panel will likely be unbalanced: CDS data starts later than equity data, some products were introduced or discontinued, and SecDB history depth varies by desk.
+Fixed effects handle unbalanced panels naturally---the within estimator only requires variation over whatever time periods exist for each entity.
+Document which entities have shorter histories and check that results are not driven solely by the longest series.
+
+\subsection{Stationarity}
+
+Panel regressions assume stationarity within each entity's time series.
+If VaR utilisation has a unit root (it drifts without mean reversion), the regression is spurious.
+Pre-test each feature: compute the augmented Dickey--Fuller statistic within each entity.
+If a feature is non-stationary, take first differences or use the $z$-score (deviation from rolling mean divided by rolling standard deviation), which you already construct in your feature engineering pipeline (Chapter~\ref{ch:features}).
+
+\subsection{Survivorship Bias}
+
+If your panel includes only asset classes that currently exist in SecDB, you miss any that were discontinued.
+This is less of a concern for broad asset classes (equities and rates are permanent) than for individual products.
+Note the limitation; do not overstate generalisability.
+
+\subsection{Implementation in Python}
+
+\begin{prereq}[Python Packages for Panel Econometrics]
+The \texttt{linearmodels} package (by Kevin Sheppard) implements panel FE, RE, Fama--MacBeth, and clustered SEs directly:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{PanelOLS} --- entity/time fixed effects with clustered SEs.
+  \item \texttt{FamaMacBeth} --- two-pass Fama--MacBeth with Newey--West adjustment.
+  \item \texttt{RandomEffects} --- RE estimator with Hausman test via \texttt{compare()}.
+\end{itemize}
+Set your DataFrame to a \texttt{MultiIndex} with levels \texttt{(entity, time)} before fitting.
+Specify clustering with the \texttt{cluster\_entity} and \texttt{cluster\_time} arguments.
+Always check that the index is sorted by time within each entity to avoid silent misalignment.
+
+For the ML track, \texttt{LightGBM} does not know about panel structure---it treats each row independently.
+You enforce temporal ordering through your validation strategy (purged $K$-fold from Chapter~\ref{ch:validation}), not through the model itself.
+\end{prereq}
+
+\subsection{Nickell Bias}
+
+When $T$ is small relative to the persistence of the dependent variable, the within estimator is biased.
+This is the \textbf{Nickell (1981) bias}: in a dynamic panel where $y_{it}$ depends on $y_{i,t-1}$, demeaning creates correlation between the demeaned lagged dependent variable and the demeaned error.
+The bias is $O(1/T)$, so it vanishes as $T \to \infty$.
+With $T \approx 1{,}000$ daily observations, Nickell bias is negligible for your panel.
+It becomes a concern only if you aggregate to monthly frequency ($T \approx 60$) and include a lagged dependent variable.
+
+% ══════════════════════════════════════════════════════════════
+\section{Summary}
+\label{sec:panel-summary}
+% ══════════════════════════════════════════════════════════════
+
+\begin{center}
+\begin{tabular}{lp{10cm}}
+  \toprule
+  \textbf{Concept} & \textbf{Key Takeaway} \\
+  \midrule
+  Panel data & Multiple entities $\times$ multiple time periods; increases sample size and controls for unobserved heterogeneity. \\
+  Fixed effects & Absorb entity-level intercepts via demeaning; identify $\bbeta$ from within-entity variation only. \\
+  Random effects & More efficient \emph{if} $\alpha_i \perp \bx_{it}$; use Hausman test, but default to FE in finance. \\
+  Clustered SEs & OLS SEs are 30--73\% too small in Petersen's (2009) simulations; cluster by entity, time, or both. \\
+  Fama--MacBeth & Two-pass: time-series betas, then cross-sectional risk premia; accounts for cross-sectional but not time-series correlation. \\
+  He--Kelly--Manela & Single intermediary capital factor prices 7 asset classes with $R^2 = 77\%$ and ${\sim}9\%$ annual premium. \\
+  Panel ML & Complement regression with LightGBM using asset-class dummies; validate with time-based purged CV. \\
+  \bottomrule
+\end{tabular}
+\end{center}
