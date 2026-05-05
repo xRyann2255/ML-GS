@@ -21,7 +21,8 @@ A stock price on its own tells you almost nothing about performance.
 Knowing that Apple closed at \$187 today is useless without knowing where it closed yesterday.
 \emph{Returns} solve this: they express price changes as fractions (or percentages), making different assets and time periods comparable.
 
-There are two standard ways to compute a return.
+To compare price movements across different assets and time periods, we need to express changes as fractions rather than absolute dollar amounts.
+There are two standard ways to do this.
 
 \begin{prereq}[Natural Logarithm Properties]
 The natural logarithm $\ln(\cdot)$ is the inverse of the exponential function: $\ln(e^x) = x$.
@@ -36,7 +37,8 @@ Three properties matter here:
 \subsection{Simple Returns}
 \label{sec:simple-returns}
 
-The simple (arithmetic) return over one period measures the fractional price change:
+We want a single number that tells us ``what fraction of my investment did I gain or lose in one period?''
+The simple (arithmetic) return does exactly this:
 
 \begin{equation}
   R_t = \frac{P_t - P_{t-1}}{P_{t-1}}
@@ -48,12 +50,25 @@ The simple (arithmetic) return over one period measures the fractional price cha
   \item $P_{t-1}$: price at the end of the previous period
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+This equation says: ``take the price change (today minus yesterday) and divide by yesterday's price to get the fractional change.''
+The result is a dimensionless number: 0.02 means a 2\% gain, $-0.03$ means a 3\% loss.
+It's the same calculation as ``what percentage did my investment grow?''
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Returns are the raw input to everything in this project.
+Realized volatility is computed by summing \emph{squared} returns, so every RV estimate you build in later chapters starts from this quantity.
+If you don't understand what a return measures, the entire volatility pipeline won't make sense.
+\end{projectconnection}
+
 A simple return of $0.05$ means the price rose by 5\%.
 
 \subsection{Log Returns}
 \label{sec:log-returns}
 
-The log (continuously compounded) return uses the natural logarithm of the price ratio:
+The simple return works fine in many contexts, but for volatility research we almost always use a different version: the log return.
+Instead of computing the fractional change directly, we take the natural logarithm of the price ratio:
 
 \begin{equation}
   r_t = \ln\!\left(\frac{P_t}{P_{t-1}}\right) = \ln P_t - \ln P_{t-1}
@@ -64,16 +79,32 @@ The log (continuously compounded) return uses the natural logarithm of the price
   \item $\ln(\cdot)$: natural logarithm
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+This equation says: ``take the ratio of today's price to yesterday's price, then take the natural log of that ratio.''
+For small price changes (under ~5\%), the log return is almost identical to the simple return.
+The reason we use it instead is purely mathematical convenience: log returns add up over time, which makes the math for volatility much cleaner.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Every volatility model in this guide uses log returns as its input.
+When you compute realized volatility in Chapter~\ref{ch:rv}, you will square log returns and sum them.
+The time-additivity property below is what makes realized volatility estimators mathematically valid.
+\end{projectconnection}
+
 \begin{keyidea}[Why Log Returns?]
 Log returns have two properties that make them the default in volatility research:
 \begin{enumerate}[nosep]
   \item \textbf{Time additivity.}
   The multi-period log return is the sum of single-period log returns:
   $r_{1:T} = r_1 + r_2 + \cdots + r_T$.
-  Simple returns compound multiplicatively, which is harder to work with.
+
+  \emph{Why this works:} the 2-day log return is $\ln(P_2/P_0) = \ln\bigl((P_1/P_0)\cdot(P_2/P_1)\bigr) = \ln(P_1/P_0) + \ln(P_2/P_1) = r_1 + r_2$.
+  The log property $\ln(AB) = \ln A + \ln B$ does all the work.
+  Simple returns compound multiplicatively instead: the 2-day simple return is $(1+R_1)(1+R_2) - 1$, not $R_1 + R_2$, which makes variance formulas much more complicated.
+
   \item \textbf{Approximate symmetry.}
-  A log return of $+0.05$ followed by $-0.05$ returns you close to your starting price.
-  Simple returns do not: a $+5\%$ gain followed by a $-5\%$ loss leaves you at $\$99.75$, not $\$100$.
+  If you gain $+0.05$ log return and then lose $-0.05$ log return, the total is $\ln(P_{\text{final}}/P_{\text{start}}) = 0.05 + (-0.05) = 0$, meaning $P_{\text{final}} = P_{\text{start}}$ exactly.
+  Simple returns don't cancel this way: $\$100 \times 1.05 \times 0.95 = \$99.75 \neq \$100$.
 \end{enumerate}
 Throughout this guide, $r_t$ always means the log return unless stated otherwise.
 \end{keyidea}
@@ -111,8 +142,15 @@ For daily equity returns, which are typically well under 1\%, the two are nearly
 With returns in hand, the next question is: how spread out are they?
 Variance answers this by measuring the average squared deviation from the mean return.
 
+\begin{prereq}[Expected Value Notation]
+Throughout this guide, $\E[X]$ means the \textbf{expected value} of $X$: the long-run average you would get if you could observe $X$ infinitely many times.
+For example, $\E[r_t]$ is the average return you'd observe over an infinite number of trading days.
+When you see $\E[\cdot]$ in a formula, read it as ``the average of what's inside the brackets.''
+\end{prereq}
+
 \begin{definition}[Sample Variance and Standard Deviation]
-Given $T$ log returns $r_1, r_2, \ldots, r_T$ with sample mean $\bar{r} = \frac{1}{T}\sum_{t=1}^T r_t$, the sample variance is:
+Given $T$ log returns $r_1, r_2, \ldots, r_T$ with sample mean $\bar{r} = \frac{1}{T}\sum_{t=1}^T r_t$, we want a single number that captures ``how spread out are these returns?''
+The sample variance answers this by measuring the average squared distance of each return from the mean:
 
 \begin{equation}
   \hat{\sigma}^2 = \frac{1}{T-1}\sum_{t=1}^{T}\bigl(r_t - \bar{r}\bigr)^2
@@ -125,6 +163,18 @@ Given $T$ log returns $r_1, r_2, \ldots, r_T$ with sample mean $\bar{r} = \frac{
   \item $\bar{r}$: sample mean of returns
   \item $T-1$: Bessel's correction (dividing by $T-1$ instead of $T$ gives an unbiased estimate)
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+This equation says: ``for each return, measure how far it is from the average return, square that distance (so negatives don't cancel positives), then average all those squared distances.''
+A large variance means returns are spread far from the mean (volatile); a small variance means they cluster tightly around the mean (calm).
+Squaring is what makes this sensitive to outliers: one large move contributes disproportionately.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Variance is the quantity you are forecasting in this entire project.
+Realized volatility (Chapter~\ref{ch:rv}) is essentially this formula applied to high-frequency returns within a single day.
+Every model from GARCH to deep learning is trying to predict tomorrow's version of this number.
+\end{projectconnection}
 
 The sample standard deviation is $\hat{\sigma} = \sqrt{\hat{\sigma}^2}$.
 \end{definition}
@@ -140,7 +190,9 @@ For large $T$ the difference is negligible.
 \label{sec:annualizing}
 
 Raw daily standard deviations are tiny numbers (around 0.01 for a typical equity index), so practitioners report volatility on an annual scale.
-If daily returns are independent, the variance over $n$ days is $n$ times the one-day variance, so the standard deviation scales by $\sqrt{n}$.
+The key insight: if daily returns are independent, variances add.
+The $n$-day return is $r_1 + r_2 + \cdots + r_n$ (time additivity), and for independent random variables, $\operatorname{Var}(r_1 + r_2 + \cdots + r_n) = \operatorname{Var}(r_1) + \operatorname{Var}(r_2) + \cdots + \operatorname{Var}(r_n) = n\sigma^2$.
+Taking the square root: the $n$-day standard deviation is $\sqrt{n}\,\sigma$.
 
 \begin{equation}
   \hat{\sigma}_{\text{annual}} = \hat{\sigma}_{\text{daily}} \times \sqrt{252}
@@ -151,49 +203,30 @@ If daily returns are independent, the variance over $n$ days is $n$ times the on
   \item $\sqrt{252} \approx 15.87$
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+This equation says: ``multiply the daily volatility by about 16 to get the annual volatility.''
+The $\sqrt{252}$ comes from the fact that if daily returns are independent, variances add over time (252 trading days), so standard deviations scale by the square root.
+A stock with 1\% daily volatility has roughly 16\% annual volatility.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Practitioners quote volatility in annualized terms.
+When someone says ``the VIX is at 20,'' they mean 20\% annualized volatility.
+Your model's output (daily RV forecasts) will need to be converted to this scale for comparison with implied volatility and industry benchmarks.
+\end{projectconnection}
+
 \begin{warning}[The Square-Root-of-Time Rule]
 The $\sqrt{252}$ scaling assumes returns are independent and identically distributed.
 When volatility clusters (Section~\ref{sec:stylized-facts}), this assumption fails, and multi-day volatility may be higher or lower than the square-root rule predicts.
 Chapters~\ref{ch:garch} and \ref{ch:har} develop models that handle this.
 \end{warning}
 
-\begin{workedexample}{From Daily Returns to Annualized Volatility}
-Five consecutive daily log returns for the S\&P~500 (in decimal):
-\[
-  r_1 = 0.0032,\quad r_2 = -0.0051,\quad r_3 = 0.0018,\quad r_4 = 0.0074,\quad r_5 = -0.0028
-\]
+\begin{workedexample}{Annualized Volatility in Context}
+Five consecutive daily S\&P~500 log returns give a daily standard deviation of $\hat{\sigma}_{\text{daily}} = 0.50\%$.
+Annualizing: $\hat{\sigma}_{\text{annual}} = 0.50\% \times \sqrt{252} = 0.50\% \times 15.87 = 7.9\%$.
 
-\textbf{Step 1: Mean.}
-\[
-  \bar{r} = \frac{0.0032 + (-0.0051) + 0.0018 + 0.0074 + (-0.0028)}{5} = \frac{0.0045}{5} = 0.0009
-\]
-
-\textbf{Step 2: Squared deviations.}
-\begin{align*}
-  (r_1 - \bar{r})^2 &= (0.0032 - 0.0009)^2 = (0.0023)^2 = 0.00000529 \\
-  (r_2 - \bar{r})^2 &= (-0.0051 - 0.0009)^2 = (-0.0060)^2 = 0.00003600 \\
-  (r_3 - \bar{r})^2 &= (0.0018 - 0.0009)^2 = (0.0009)^2 = 0.00000081 \\
-  (r_4 - \bar{r})^2 &= (0.0074 - 0.0009)^2 = (0.0065)^2 = 0.00004225 \\
-  (r_5 - \bar{r})^2 &= (-0.0028 - 0.0009)^2 = (-0.0037)^2 = 0.00001369
-\end{align*}
-
-\textbf{Step 3: Variance.}
-\[
-  \hat{\sigma}^2 = \frac{0.00000529 + 0.00003600 + 0.00000081 + 0.00004225 + 0.00001369}{4}
-               = \frac{0.00009804}{4}
-               = 0.00002451
-\]
-
-\textbf{Step 4: Daily and annualized volatility.}
-\[
-  \hat{\sigma}_{\text{daily}} = \sqrt{0.00002451} = 0.00495 \quad (0.50\%\text{ per day})
-\]
-\[
-  \hat{\sigma}_{\text{annual}} = 0.00495 \times \sqrt{252} = 0.00495 \times 15.87 = 0.0786 \quad (7.9\%)
-\]
-
-For context, the S\&P~500's long-run annualized volatility is roughly 15--20\%.
-Our five-day sample yields a lower figure because five observations cannot capture the full range of market conditions.
+For context, the S\&P~500's long-run annualized volatility is roughly 15--20\%, so this five-day window happened to be calm.
+The key insight: daily returns are tiny numbers (fractions of a percent); the $\sqrt{252}$ multiplier transforms them into the annual percentage figures that practitioners actually discuss.
 \end{workedexample}
 
 % ═══════════════════════════════════════════════════
@@ -219,10 +252,8 @@ Chapter~\ref{ch:volsurface} explores this connection.
 
 \paragraph{Risk management.}
 Value-at-Risk ($\VaR$) estimates the worst-case loss over a holding period at a given confidence level.
-In the simplest (Gaussian) version, $\VaR$ is proportional to portfolio volatility:
-$\VaR_\alpha = -\mu + z_\alpha \,\sigma$,
-where $z_\alpha$ is the normal quantile.
-When volatility doubles, the risk bound roughly doubles.
+In the simplest version, VaR is directly proportional to volatility: if volatility doubles, your risk bound roughly doubles.
+For a 99\% daily VaR, the worst expected loss is about 2.33 times the daily volatility (e.g., if daily vol is 1\%, the worst-case daily loss at 99\% confidence is roughly 2.33\%).
 
 \paragraph{Portfolio construction.}
 Mean-variance optimization \citep{Markowitz1952} and risk-parity strategies both require a covariance matrix as input.
@@ -238,6 +269,14 @@ Volatility is one of the few quantities in finance that is (a)~directly observab
 That combination makes it the right place to apply ML carefully.
 \end{keyidea}
 
+\begin{prereq}[Preview: What Is Realized Volatility?]
+The central concept of this guide is \textbf{realized volatility} (RV): the sum of squared intraday returns over one day,
+$\text{RV}_t = \sum_{i=1}^{M} r_{t,i}^2$,
+where $M$ is the number of intraday observations (e.g., 78 five-minute returns per trading day).
+Instead of using a model to \emph{estimate} what volatility was, RV directly \emph{measures} it from high-frequency data.
+Chapter~\ref{ch:rv} develops this fully; for now, just know that RV gives you a daily number that tells you ``how volatile was the market today,'' and your project's goal is to forecast tomorrow's RV given today's information.
+\end{prereq}
+
 % ═══════════════════════════════════════════════════
 \section{Stylized Facts of Financial Returns}
 \label{sec:stylized-facts}
@@ -249,6 +288,12 @@ Four of these facts matter most for volatility modeling.
 
 \subsection{Fact 1: Returns Are Approximately Uncorrelated}
 \label{sec:fact-uncorrelated}
+
+\begin{prereq}[Autocorrelation]
+\textbf{Autocorrelation} at lag $k$ measures how correlated a time series is with itself shifted $k$ periods into the past.
+A value near $+1$ means ``if it was high today, it will tend to be high $k$ days from now''; near $0$ means ``no relationship''; near $-1$ means ``high today predicts low $k$ days later.''
+When we say ``return autocorrelations are zero,'' we mean knowing today's return tells you nothing about tomorrow's.
+\end{prereq}
 
 Daily return autocorrelations are statistically indistinguishable from zero for lags beyond a few minutes \citep{Cont2001}.
 In plain terms: knowing today's return tells you almost nothing about tomorrow's return.
@@ -272,6 +317,13 @@ Chapter~\ref{ch:garch} develops this family of models in detail.
 \begin{keyresult}[\citet{Cont2001}, Stylized Fact: Volatility Clustering]
 The autocorrelation of absolute returns remains significantly positive over lags of several weeks and decays slowly (approximately as a power law with exponent $\beta \in [0.2, 0.4]$), a pattern that is remarkably stable across asset classes and time periods.
 \end{keyresult}
+
+\begin{intuition}[What ``Power Law Decay'' Means]
+A \textbf{power law decay} means the autocorrelation drops as $\text{lag}^{-\beta}$ --- much more slowly than exponential decay.
+With $\beta \approx 0.3$, the autocorrelation at lag 100 is still about $100^{-0.3} \approx 0.25$: volatility 100 days ago is still informative about today's volatility.
+This ``long memory'' is why simple models that only look at yesterday fail.
+The HAR model (Chapter~\ref{ch:har}) addresses this by explicitly including weekly and monthly vol averages as predictors.
+\end{intuition}
 
 Figure~\ref{fig:vol-clustering-ts} shows volatility clustering visually: returns alternate between calm and turbulent stretches.
 
@@ -447,7 +499,8 @@ The return distribution has ``fat tails'' (also called heavy tails): extreme ret
 \citet{Fama1965} confirmed the finding for stock returns, observing leptokurtic (heavy-tailed) distributions across U.S.\ equities.
 
 \begin{definition}[Kurtosis]
-The kurtosis of a distribution measures the weight of its tails relative to a normal distribution:
+We need a way to measure ``how fat are the tails?'' compared to a normal distribution.
+Kurtosis does this by looking at the fourth power of deviations (which amplifies extreme values even more than squaring):
 \begin{equation}
   \kappa = \frac{\E\bigl[(r_t - \mu)^4\bigr]}{\bigl(\E\bigl[(r_t - \mu)^2\bigr]\bigr)^2}
   \label{eq:kurtosis}
@@ -458,12 +511,27 @@ The kurtosis of a distribution measures the weight of its tails relative to a no
   \item For a normal distribution, $\kappa = 3$
   \item \emph{Excess kurtosis} $= \kappa - 3$; values above zero indicate fatter tails than normal
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+This equation says: ``take each return's deviation from the mean, raise it to the 4th power (which massively amplifies outliers), average those, and normalize by the squared variance.''
+The 4th power is the key: if extreme returns are rare (thin tails), raising them to the 4th power doesn't add much.
+If extreme returns are common (fat tails), the 4th power blows them up and the ratio exceeds 3.
+The further above 3, the fatter the tails.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Fat tails mean that extreme vol events (crashes, spikes) are far more likely than a normal model predicts.
+Your vol forecasting model must handle these outliers gracefully: if you assume normality, you will systematically underestimate the risk of large moves, and your model will appear to work in calm markets but fail catastrophically during crises.
+\end{projectconnection}
+
 Typical daily equity index returns have excess kurtosis in the range 5--10 \citep{Cont2001}.
 \end{definition}
 
-Figure~\ref{fig:fat-tails-qq} illustrates fat tails with a Q--Q plot.
-If the data were normal, all points would lie on the diagonal.
-The S-shaped departure shows that extreme returns occur more often than a normal distribution allows.
+Figure~\ref{fig:fat-tails-qq} illustrates fat tails with a \textbf{Q--Q (quantile-quantile) plot}.
+Here is how it works: sort your actual returns from smallest to largest, then ask ``if these returns \emph{were} normally distributed, what values would I expect at each position in the sorted list?''
+Plot the expected-if-normal values on the $x$-axis and the actual values on the $y$-axis.
+If the data is truly normal, expected equals actual at every point, so you get a straight diagonal line.
+When the dots curve away from the line at the extremes, it means the tails of your actual distribution are fatter than normal: extreme moves happen more often than the bell curve predicts.
 
 \begin{figure}[htbp]
 \centering
@@ -543,6 +611,18 @@ The leverage effect is the negative correlation between an asset's return and ch
   \item $\sigma_{t+1}^2$: conditional variance at time $t+1$
   \item The negative sign means: price drops $\to$ volatility rises
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+This equation says: ``when today's return is negative (a price drop), tomorrow's volatility tends to be higher; when today's return is positive (a price rise), tomorrow's volatility tends to be lower.''
+The relationship is asymmetric: markets get more volatile when they fall, but don't calm down as much when they rise.
+Think of it as ``fear is louder than greed'': a crash makes everyone nervous, but a rally doesn't make everyone equally calm.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The leverage effect means your vol forecasting model should treat negative and positive returns differently.
+A symmetric model (basic GARCH) that treats $+2\%$ and $-2\%$ as equally informative about tomorrow's vol will systematically underpredict vol after selloffs and overpredict after rallies.
+This is why GJR-GARCH and EGARCH (Chapter~\ref{ch:garch}) add an asymmetry term, and why it often improves forecast accuracy.
+\end{projectconnection}
 \end{definition}
 
 In equity markets, the leverage effect is pronounced.
@@ -589,7 +669,10 @@ A single number, constant over time. It is the long-run average variance.
 \end{equation}
 \begin{itemize}[nosep]
   \item $\sigma_t^2$: variance of the return at time $t$, conditional on past information
-  \item $\mathcal{F}_{t-1}$: the information set (filtration) available at time $t-1$, which includes all past returns, prices, and any other observable data up through time $t-1$
+  \item $\mathcal{F}_{t-1}$: the \textbf{information set} available at time $t-1$.
+  Read this as ``everything you could possibly know as of yesterday'': all past returns, prices, volumes, news, and any other observable data up through time $t-1$.
+  The fancy script-$\mathcal{F}$ notation comes from probability theory (where it is called a ``filtration''); all it means in practice is ``given what we knew yesterday.''
+  This notation appears throughout the entire guide whenever a quantity is conditioned on past information.
 \end{itemize}
 The conditional variance changes from day to day as new information arrives.
 \end{definition}
@@ -600,7 +683,21 @@ Conditional volatility is the weather forecast: it uses recent data (yesterday's
 This guide is about building the forecast, not computing the average.
 \end{intuition}
 
-The unconditional variance is related to the conditional variance by the law of total variance:
+\begin{projectconnection}[Why This Matters]
+Your entire project is about forecasting \emph{conditional} variance: given everything you know up to today, what will volatility be tomorrow?
+The unconditional variance is just a naive baseline (always predict the long-run average).
+Every model you build, from HAR to neural networks, is trying to produce a better estimate of $\sigma_t^2$ than that naive baseline by using the information in $\mathcal{F}_{t-1}$.
+\end{projectconnection}
+
+\begin{workedexample}{Conditional vs.\ Unconditional in Practice}
+Over 2024, the S\&P~500's annualized volatility was about 16\% (the unconditional estimate).
+But during a single turbulent week in August, realized daily vol spiked to 35\% annualized; during a calm stretch in November, it dropped to 9\%.
+The unconditional model always says ``16\%.'' A conditional model notices the recent spike and says ``tomorrow will be around 30\%'' (or notices the calm and says ``around 10\%'').
+Computing the conditional variance requires a model: for example, GARCH uses a weighted average of recent squared returns (Chapter~\ref{ch:garch}), and realized volatility directly measures it from intraday data (Chapter~\ref{ch:rv}).
+\end{workedexample}
+
+The unconditional variance and conditional variance are connected by a standard probability result called the \textbf{law of total variance}.
+You do not need to derive it; just understand what it says about how the long-run average relates to the time-varying quantity:
 \begin{equation}
   \sigma^2 = \E[\sigma_t^2] + \operatorname{Var}\bigl(\E[r_t \mid \mathcal{F}_{t-1}]\bigr)
   \label{eq:total-variance}
@@ -610,8 +707,67 @@ The unconditional variance is related to the conditional variance by the law of 
   \item $\operatorname{Var}\bigl(\E[r_t \mid \mathcal{F}_{t-1}]\bigr)$: variance of the conditional mean (small for equities, since expected returns are nearly constant at daily frequency)
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+This equation says: ``the long-run average variance equals the average of all the daily conditional variances, plus a small correction for the fact that expected returns also fluctuate slightly.''
+For equities at daily frequency, the second term is negligible because expected returns barely change day to day.
+So in practice: the unconditional variance is just what you get if you average all the conditional variances over a long period.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This equation tells you that the long-run average vol is a meaningful ``anchor'' for your forecasts.
+Many models (GARCH, HAR) build in mean-reversion: after a vol spike, forecasts should gradually drift back toward this long-run level.
+If your model's forecasts don't average out to something close to the unconditional variance over long horizons, something is likely wrong.
+\end{projectconnection}
+
 When the conditional mean is approximately constant (a reasonable assumption for daily equity returns), the unconditional variance is simply the time average of the conditional variances.
 The gap between the two is what makes volatility modeling interesting.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.85\textwidth,
+  height=6cm,
+  xlabel={Trading day},
+  ylabel={Volatility (\% annualized)},
+  xmin=0, xmax=250,
+  ymin=0, ymax=45,
+  grid=major,
+  grid style={gray!20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={Conditional vs.\ Unconditional Volatility},
+  legend style={font=\small, at={(0.02,0.98)}, anchor=north west},
+]
+% Conditional variance (time-varying)
+\addplot[defblue, thick, mark=none] coordinates {
+(1,14)(5,13)(10,12)(15,11)(20,12)(25,13)(30,14)(35,13)(40,12)
+(45,11)(50,10)(55,11)(60,12)(65,14)(70,16)(75,19)(80,23)(85,28)
+(90,33)(95,38)(100,41)(105,39)(110,36)(115,32)(120,28)(125,25)
+(130,22)(135,20)(140,18)(145,16)(150,15)(155,14)(160,13)(165,12)
+(170,11)(175,12)(180,13)(185,14)(190,15)(195,14)(200,13)(205,12)
+(210,11)(215,12)(220,14)(225,15)(230,16)(235,15)(240,14)(245,13)(250,12)
+};
+\addlegendentry{Conditional $\sigma_t$ (what we forecast)}
+
+% Unconditional variance (flat line)
+\addplot[warnred, thick, dashed, mark=none] coordinates {
+(0,17)(250,17)
+};
+\addlegendentry{Unconditional $\sigma$ (long-run average)}
+
+% Annotations
+\node[font=\small, anchor=west] at (axis cs: 92, 43) {Crisis spike};
+\draw[-{Stealth}, gray] (axis cs: 100, 42) -- (axis cs: 100, 41.5);
+\node[font=\small, anchor=south] at (axis cs: 50, 9.5) {Calm regime};
+\end{axis}
+\end{tikzpicture}
+\caption{The unconditional volatility (dashed red) is a single long-run average: it tells you nothing about which regime you're in today.
+The conditional volatility (solid blue) varies over time, spiking during crises and falling during calm periods.
+Your project's goal is to forecast the blue line one step ahead, not just know the red line.}
+\label{fig:cond-vs-uncond}
+\end{figure}
 
 \begin{keyidea}[The Central Goal of This Guide]
 The goal of every model in Chapters~\ref{ch:garch}--\ref{ch:hybrid} is to produce accurate estimates of the conditional variance $\sigma_t^2$.
