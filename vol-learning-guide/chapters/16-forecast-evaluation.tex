@@ -72,6 +72,12 @@ where:
   \item $T$ is the number of forecast evaluation days.
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+MSE measures the average squared gap between what you predicted and what actually happened.
+Squaring means big misses count disproportionately: a forecast that is off by 2 units contributes 4 to the loss, while being off by 4 units contributes 16.
+It treats over-prediction and under-prediction identically.
+\end{intuition}
+
 \subsection{The Proxy Problem}
 
 We never observe true variance $\sigma^2_t$.
@@ -99,6 +105,12 @@ MSE is proxy-robust, which is valuable.
 But its sensitivity to extreme realized variance values makes it a poor primary metric for volatility.
 Report it as a secondary check alongside $\QLIKE$.
 \end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+In your HAR vs.\ ML comparison, MSE will be dominated by a handful of crisis days (e.g., COVID March 2020, VIX spikes).
+A model that slightly better predicts those extremes will look dramatically better under MSE, even if it performs worse on the 95\% of normal days that matter for daily risk management.
+Always report MSE as a secondary metric, but never let it drive model selection.
+\end{projectconnection}
 
 
 % ══════════════════════════════════════════════════════════════
@@ -128,6 +140,13 @@ where:
   \item $\sigma^2_t / h_t$ penalizes forecasts that are too small (under-prediction),
   \item $T$ is the number of evaluation days.
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+QLIKE has two parts pulling in opposite directions.
+The $\ln h_t$ term punishes you for forecasting too high (wasting capital on unnecessary hedges), while the $\sigma^2_t / h_t$ term punishes you for forecasting too low (holding unrecognized risk).
+Critically, the under-prediction penalty ($\sigma^2_t / h_t$) explodes as $h_t \to 0$, so QLIKE is far harsher on dangerous under-estimates than on conservative over-estimates.
+This asymmetry matches real-world priorities: underestimating volatility gets you fired; overestimating it merely costs some opportunity.
+\end{intuition}
 
 \begin{intuition}[Why QLIKE Is Less Sensitive to Outliers]
 When true variance spikes to $\sigma^2_t = 10$ and your forecast is $h_t = 1$, the QLIKE contribution is $\ln(1) + 10/1 = 10$.
@@ -195,6 +214,64 @@ Report MSE as a secondary check.
 If the two metrics disagree on model rankings, the QLIKE ranking is more reliable for practical forecasting because it is less distorted by a few extreme days.
 \end{keyidea}
 
+\begin{projectconnection}[Why This Matters]
+QLIKE is THE primary evaluation metric for your project.
+When you report that your ML model beats HAR, the headline number is the percentage reduction in QLIKE.
+The asymmetry is critical: QLIKE penalizes you more for underestimating vol than overestimating it (through the $\sigma^2_t / h_t$ ratio), which aligns with risk management priorities where underestimating vol means holding too much risk.
+Target a 30--80 bps QLIKE improvement over HAR to claim a meaningful result.
+\end{projectconnection}
+
+% ── Diagram: QLIKE vs MSE Penalty Asymmetry ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=11cm, height=7cm,
+  xlabel={Forecast ratio $h_t / \sigma^2_t$},
+  ylabel={Loss contribution (normalized)},
+  xmin=0.2, xmax=3.5,
+  ymin=0, ymax=12,
+  legend pos=north west,
+  legend style={font=\small},
+  grid=major,
+  grid style={gray!20},
+  every axis label/.style={font=\small},
+  tick label style={font=\footnotesize},
+]
+
+% MSE: (sigma^2 - h)^2 / sigma^4 = (1 - h/sigma^2)^2 * sigma^4 / sigma^4
+% Normalized: let sigma^2 = 1, then MSE = (1 - r)^2 where r = h/sigma^2
+\addplot[thick, blue, domain=0.2:3.5, samples=100]
+  {(1 - x)^2};
+\addlegendentry{MSE: $(1 - h_t/\sigma^2_t)^2$}
+
+% QLIKE: ln(h) + sigma^2/h, normalized by subtracting minimum (at h=sigma^2)
+% min of ln(r) + 1/r is at r=1, value = 0 + 1 = 1
+% So QLIKE contribution = ln(r) + 1/r - 1 (shifted so min = 0)
+\addplot[thick, red, domain=0.2:3.5, samples=100]
+  {ln(x) + 1/x - 1};
+\addlegendentry{QLIKE: $\ln(h_t/\sigma^2_t) + \sigma^2_t/h_t - 1$}
+
+% Vertical line at perfect forecast
+\addplot[dashed, black, thin] coordinates {(1,0) (1,12)};
+\node[font=\scriptsize, anchor=south] at (axis cs:1,10.5) {Perfect forecast};
+
+% Annotations for asymmetry
+\draw[-{Stealth}, thick, red!70!black] (axis cs:0.35,7) -- (axis cs:0.35,4.5);
+\node[font=\scriptsize, text width=2.2cm, align=center, red!70!black] at (axis cs:0.55,8.5) {QLIKE: harsh penalty for under-prediction};
+
+\draw[-{Stealth}, thick, blue!70!black] (axis cs:2.8,4.5) -- (axis cs:2.8,3.2);
+\node[font=\scriptsize, text width=2.5cm, align=center, blue!70!black] at (axis cs:2.8,5.8) {MSE: symmetric penalty};
+
+\end{axis}
+\end{tikzpicture}
+\caption{QLIKE vs.\ MSE penalty as a function of the forecast ratio $h_t / \sigma^2_t$.
+Both losses are minimized at the perfect forecast ($h_t = \sigma^2_t$, ratio $= 1$).
+MSE penalizes over- and under-prediction symmetrically.
+QLIKE penalizes under-prediction (ratio $< 1$) much more harshly than over-prediction (ratio $> 1$), matching the asymmetric risk preferences in volatility forecasting: underestimating vol means holding too much risk.}
+\label{fig:qlike-vs-mse}
+\end{figure}
+
 
 % ══════════════════════════════════════════════════════════════
 \section{Mincer--Zarnowitz Regressions}
@@ -219,6 +296,18 @@ where:
   \item $b$ is the slope (efficiency term),
   \item $\varepsilon_t$ is the residual.
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+The Mincer--Zarnowitz regression asks: ``If I plot realized variance against my forecast, do the points lie along the 45-degree line?''
+A perfect forecast gives intercept $a = 0$ (no constant bias) and slope $b = 1$ (every unit increase in the forecast corresponds to exactly one unit increase in reality).
+If $b < 1$, your forecast is too timid; if $b > 1$, it overreacts.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+After fitting your ML model, run the MZ regression before anything else.
+HAR models typically show $b$ slightly below 1 (they smooth too much in high-vol regimes), and your ML extension should fix this.
+If your HARQ-ML model still shows $b = 0.85$, you know the improvement needs to come from making the forecast more reactive to recent variance spikes, not from reducing average bias.
+\end{projectconnection}
 
 \begin{definition}[Unbiased and Efficient Forecast]
 A forecast is \textbf{unbiased} if $a = 0$ (no systematic over- or under-prediction) and \textbf{efficient} if $b = 1$ (the forecast captures the full scale of variance movements).
@@ -274,6 +363,12 @@ where:
 If $d_t > 0$ on average, model B has lower loss (model B wins).
 The question is whether $\bar{d}$ is significantly different from zero.
 
+\begin{intuition}[In Plain English]
+The loss differential $d_t$ is simply the daily scorecard: on each day, which model had a worse QLIKE score?
+Some days model A wins, some days model B wins.
+You are asking whether model B wins often enough, by enough, that it cannot be explained by random chance.
+\end{intuition}
+
 \subsection{The Test Statistic}
 
 \begin{equation}
@@ -286,6 +381,19 @@ where:
   \item $\widehat{\text{Var}}(\bar{d})$ is estimated using HAC (Newey--West) standard errors to account for serial correlation in $d_t$,
   \item Under $H_0: \E[d_t] = 0$, the DM statistic is asymptotically standard normal \citep{DieboldMariano1995}.
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+The DM statistic is a t-test on the average loss difference.
+The numerator is ``how much better is model B on average?'' and the denominator is ``how uncertain are we about that average, given that consecutive days are correlated?''
+If the ratio exceeds roughly 2, you have a statistically significant winner at the 5\% level.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The DM test is the formal statistical test you need to claim ``my ML model significantly beats HAR.''
+Without it, a reviewer can dismiss any QLIKE improvement as sampling noise.
+When you report results, the DM $p$-value goes right next to the QLIKE numbers.
+If $p > 0.05$, your improvement is not credible regardless of how good the point estimate looks.
+\end{projectconnection}
 
 \begin{prereq}[HAC Standard Errors]
 When observations are serially correlated, the usual variance estimator $\widehat{\text{Var}}(\bar{d}) = s^2_d / T$ is biased downward.
@@ -369,6 +477,44 @@ The MCS produces a \emph{set}, not a ranking.
 Reporting ``these 4 models are in the 90\% MCS'' is more honest than reporting ``model X has the lowest QLIKE'' when differences are small.
 \end{keyresult}
 
+% ── Diagram: Model Confidence Set ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  every node/.style={font=\small},
+]
+% Outer rectangle: all candidate models
+\draw[thick, rounded corners=8pt] (-4.5,-2.5) rectangle (4.5,2.5);
+\node[font=\small\bfseries, anchor=north west] at (-4.3,2.3) {All candidate models $\mathcal{M}_0$};
+
+% MCS ellipse (90%)
+\draw[thick, fill=intgreen!12, rounded corners=5pt] (-3.2,-1.6) rectangle (2.8,1.6);
+\node[font=\footnotesize\bfseries, text=intgreen!70!black, anchor=north west] at (-3.0,1.4) {MCS$_{90\%}$};
+
+% Models inside MCS
+\node[fill=blue!15, rounded corners=3pt, minimum width=1.8cm, minimum height=0.55cm] at (-1.5,0.7) {LightGBM};
+\node[fill=blue!15, rounded corners=3pt, minimum width=1.8cm, minimum height=0.55cm] at (1.2,0.7) {HAR};
+\node[fill=blue!15, rounded corners=3pt, minimum width=1.8cm, minimum height=0.55cm] at (-1.5,-0.1) {GARCH};
+\node[fill=blue!15, rounded corners=3pt, minimum width=1.8cm, minimum height=0.55cm] at (1.2,-0.1) {Rand.\ Forest};
+
+% Models outside MCS (eliminated)
+\node[fill=warnred!15, rounded corners=3pt, minimum width=1.8cm, minimum height=0.55cm, text=warnred!70!black] at (3.5,-1.8) {LSTM};
+\node[fill=warnred!15, rounded corners=3pt, minimum width=1.8cm, minimum height=0.55cm, text=warnred!70!black] at (3.5,2.0) {Hist.\ avg.};
+
+% Annotation
+\node[font=\scriptsize, text width=2.8cm, align=center, anchor=north] at (-0.2,-1.0) {Statistically indistinguishable\\at 90\% confidence};
+
+% Elimination arrows
+\draw[-{Stealth}, warnred, thick, dashed] (2.8,1.8) -- (3.2,1.9);
+\draw[-{Stealth}, warnred, thick, dashed] (2.8,-1.5) -- (3.2,-1.7);
+\node[font=\scriptsize, text=warnred!70!black, anchor=west] at (3.3,-0.5) {Eliminated};
+
+\end{tikzpicture}
+\caption{The Model Confidence Set retains all models whose performance is statistically indistinguishable from the best (green region) and eliminates models that are significantly worse (red, outside).
+The surviving models cannot be ranked among themselves with statistical confidence.}
+\label{fig:mcs-venn}
+\end{figure}
+
 \subsection{Practical Use}
 
 Report which models survive at both $\alpha = 0.10$ and $\alpha = 0.05$:
@@ -397,6 +543,13 @@ The MCS often reveals an uncomfortable truth: many models that look different in
 A 2\% QLIKE improvement is rarely significant with 3--5 years of daily data.
 If your fancy model is in the same MCS as HAR, be honest about it.
 \end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+Your model needs to be IN the Model Confidence Set, and ideally, simpler baselines like raw HAR should be excluded.
+If your LightGBM model and plain HAR both survive in the 90\% MCS, you cannot honestly claim superiority.
+The MCS is also your defense: if a reviewer asks ``why not use an LSTM?'', you can show it was eliminated from the MCS.
+Use the \texttt{MCS} package in R or the \texttt{arch} library in Python to compute MCS $p$-values.
+\end{projectconnection}
 
 
 % ══════════════════════════════════════════════════════════════
@@ -521,6 +674,14 @@ A typical embargo is 1--2\% of total sample size.
 You lose 30 training observations per fold (3\% of the total). This is a small price for preventing look-ahead bias.
 \end{workedexample}
 
+\begin{projectconnection}[Why This Matters]
+Your vol forecasting labels use multi-day forward realized variance (typically 1-day or 5-day), which means label windows overlap across consecutive observations.
+Standard K-fold would train on day 502 (whose label includes returns from days 502--506) while testing on day 500 (whose label includes days 500--504).
+The overlapping days 502--504 leak test information into training.
+Purging removes this overlap; embargo handles the residual serial correlation in features like lagged RV.
+Use \texttt{sklearn.model\_selection.TimeSeriesSplit} as a starting point, then add purging and embargo manually or use the \texttt{purged\_cv} implementation from \citet{LopezdePrado2018}.
+\end{projectconnection}
+
 \begin{warning}[Random K-Fold on Time Series Is Catastrophic]
 Random K-fold on time series data (shuffling observations before splitting) is the single most common evaluation error in ML-for-finance papers.
 A model trained on January and March, tested on February, has literally seen the future.
@@ -562,6 +723,18 @@ where:
 For $N = 30$, this gives $\E[\max \SR] \approx \sqrt{2 \ln 30} \approx 2.61$.
 A reported Sharpe of 1.5 after 30 trials is \emph{below} what you would expect from pure luck.
 
+\begin{intuition}[In Plain English]
+This formula says: the more strategies you try, the higher the Sharpe ratio you should expect from the luckiest one, even if none of them have any real skill.
+It grows slowly (as $\sqrt{\ln N}$), but 30 trials already pushes the luck threshold to a Sharpe of 2.6.
+Your observed Sharpe must exceed this threshold to be credible.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+If you test 20 hyperparameter configurations for your vol-timing strategy, the expected maximum Sharpe under pure luck is $\sqrt{2 \ln 20} \approx 2.45$.
+Any backtest Sharpe below this number is entirely consistent with having no skill.
+This is why you must log every experiment from the start: $N$ only grows, and forgetting trials inflates your apparent performance.
+\end{projectconnection}
+
 \subsection{The DSR Formula}
 
 The Deflated Sharpe Ratio adjusts the observed Sharpe ratio for the number of trials:
@@ -579,6 +752,18 @@ where:
   \item $\hat{\gamma}_4$ is the sample kurtosis of returns,
   \item $\Phi(\cdot)$ is the standard normal CDF.
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+The DSR converts your observed Sharpe ratio into a probability: ``What is the chance that this Sharpe is real, given how many strategies I tried?''
+It subtracts the luck threshold ($\SR_0$) from your observed Sharpe, scales by sample size, and adjusts for skewness and fat tails in your returns.
+A DSR near 1 means your Sharpe is almost certainly genuine; a DSR near 0 means it is probably luck.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+If your vol-forecasting project includes a variance risk premium trading strategy (Chapter~\ref{ch:vrp}), you will need to report DSR alongside the raw Sharpe.
+With the typical 10--30 experiments you will run during hyperparameter tuning, even a Sharpe of 1.5 can be entirely consistent with luck.
+DSR $> 0.95$ is the bar for a credible backtest result.
+\end{projectconnection}
 
 \begin{keyresult}[Bailey and Lopez de Prado (2014): The Deflated Sharpe Ratio]
 \citet{Bailey2014DSR} show that ignoring the number of trials leads to systematic over-reporting of Sharpe ratios in backtested strategies.
