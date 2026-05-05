@@ -27,15 +27,24 @@ You can think of $\int_a^b f(x)\,dx$ as ``add up all the tiny contributions of $
 \end{prereq}
 
 \begin{prereq}[Price Processes (Informal)]
-In continuous-time finance, a price process $P_t$ is modeled as a \emph{semimartingale}.
-For this chapter, the key property is that the log price $p_t = \ln P_t$ evolves according to
+In continuous-time finance, the log price $p_t = \ln P_t$ evolves according to
 \[
   dp_t = \mu_t\,dt + \sigma_t\,dW_t
 \]
-where $\mu_t$ is the drift (expected return per unit time), $\sigma_t$ is the instantaneous volatility (how rapidly the price fluctuates at time $t$), and $W_t$ is a Wiener process (continuous random walk).
-The drift is usually negligible at intraday horizons; the volatility $\sigma_t$ is the quantity we care about.
-You do not need to understand stochastic calculus to follow this chapter.
-The key takeaway: $\sigma_t$ can change from moment to moment within the day.
+You do not need stochastic calculus to follow this chapter.
+Here is what the equation says in plain English: over any tiny time interval, the change in the log price is made up of two pieces:
+\begin{itemize}[nosep]
+  \item $\mu_t\,dt$: a small predictable nudge (the drift, or expected return per unit time). At intraday horizons this is negligibly small and we ignore it.
+  \item $\sigma_t\,dW_t$: a random shock whose size is controlled by $\sigma_t$ (the instantaneous volatility). $W_t$ is a Wiener process (continuous random walk), so $dW_t$ is a tiny random push that is equally likely to be positive or negative.
+\end{itemize}
+The key takeaway: $\sigma_t$ is the quantity that controls how much the price wiggles at each instant, and it can change from moment to moment within the day.
+\end{prereq}
+
+\begin{prereq}[Time Notation Convention]
+Throughout this guide, $t$ is an integer day counter.
+Day $t$ runs from the market close on day $t-1$ to the market close on day $t$.
+Inside day $t$, we use $s$ (in integrals) or $i$ (in sums) to index moments or sub-intervals within that day.
+So $\sigma_s$ is the instantaneous volatility at some moment $s$ during the day, while $r_{t,i}$ is the return over the $i$-th intraday interval on day $t$.
 \end{prereq}
 
 The intuition is straightforward.
@@ -63,11 +72,18 @@ For a log-price process $p_t$ with instantaneous variance $\sigma^2_t$, the inte
 Integrated variance is a \emph{latent} quantity: you never observe $\sigma^2_s$ directly.
 The entire point of this chapter is to estimate $\IVol_t$ from observable intraday price data.
 
-\begin{keyidea}[Integrated Variance = Energy of Price Movements]
-$\IVol_t$ measures the total ``energy'' of price movements during day $t$.
-A day with high $\IVol_t$ is a day where the price path wiggled a lot (even if the open-to-close return was small).
-A day with low $\IVol_t$ is a day where the price drifted smoothly.
-\end{keyidea}
+\begin{intuition}[In Plain English]
+This equation says: ``add up the instantaneous variance at every moment throughout the trading day.''
+Imagine volatility as a dial that moves up and down throughout the day as news arrives and liquidity shifts.
+Integrated variance is the total accumulated reading on that dial from open to close.
+A day with high $\IVol_t$ is one where the dial was turned up for most of the day (lots of wiggling, even if the price ended flat); a day with low $\IVol_t$ is one where the dial stayed low (calm, smooth drift).
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Integrated variance is the \emph{true} volatility you are trying to forecast.
+Every model in this guide (HAR, GARCH, neural networks) is ultimately trying to predict tomorrow's $\IVol_{t+1}$.
+You never observe $\IVol_t$ directly, so you estimate it with realized variance (next section), but this is the theoretical gold standard your estimates are aiming at.
+\end{projectconnection}
 
 % ═══════════════════════════════════════════════════
 \section{Realized Variance as an Estimator}
@@ -99,17 +115,35 @@ Given $n$ intraday log returns $r_{t,1}, r_{t,2}, \ldots, r_{t,n}$ within day $t
 \end{itemize}
 \end{definition}
 
-\begin{intuition}[Why Squaring Works]
-Consider a single intraday log return $r_{t,i} = \sigma_{t,i}\,\epsilon_i$, where $\sigma_{t,i}$ is the local volatility level and $\epsilon_i$ is a noise term with mean zero and variance one.
-Squaring gives $r^2_{t,i} \approx \sigma^2_{t,i}\,\epsilon^2_i$.
-Since $\E[\epsilon^2_i] = 1$, each squared return is (on average) an estimate of the local variance.
-Summing them across the day accumulates these local estimates into a total.
-As the intervals shrink ($n \to \infty$), the noise in each $\epsilon^2_i$ averages out, and the sum converges to the integrated variance.
+\begin{intuition}[In Plain English]
+This equation says: ``take every intraday return, square it, and add them all up.''
+Squaring serves two purposes: it makes every return positive (so up moves and down moves both contribute), and it captures the \emph{magnitude} of price movement rather than the direction.
+Each squared return is a noisy snapshot of how volatile the market was during that interval; summing them accumulates these snapshots into a total for the day.
 \end{intuition}
+
+\begin{intuition}[Why Squaring Works (Deeper)]
+From the price process equation above ($dp_t = \mu_t\,dt + \sigma_t\,dW_t$), each small intraday return is approximately the local volatility times a random draw: $r_{t,i} \approx \sigma_{t,i}\,\epsilon_i$, where $\sigma_{t,i}$ is the volatility during interval $i$ and $\epsilon_i$ is a random variable with mean zero and variance one (coming from the Wiener process increments).
+Squaring gives $r^2_{t,i} \approx \sigma^2_{t,i}\,\epsilon^2_i$.
+Since $\epsilon_i$ has variance 1 and mean 0, $\E[\epsilon^2_i] = \operatorname{Var}(\epsilon_i) + (\E[\epsilon_i])^2 = 1 + 0 = 1$.
+So on average, each squared return equals the local variance: $\E[r^2_{t,i}] \approx \sigma^2_{t,i}$.
+Summing across the day accumulates these local variance snapshots.
+As intervals shrink ($n \to \infty$), the random fluctuations in each $\epsilon^2_i$ average out, and the sum converges to the integrated variance.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This is the formula you will compute every single day in your project.
+RV is your dependent variable: the thing you're trying to forecast.
+When you build a HAR model (Chapter~\ref{ch:har}) or train a neural network (Chapter~\ref{ch:deeplearning}), the $y$ in your regression is $\RV_{t+1}$ (or $\ln \RV_{t+1}$), and your goal is to predict it from today's information.
+Understanding what this sum of squared returns actually measures is essential because your model's accuracy depends on the quality of this estimate.
+\end{projectconnection}
 
 \subsection{Why It Works: Convergence to Quadratic Variation}
 
-The theoretical justification comes from the theory of \emph{quadratic variation}.
+We've defined RV as the sum of squared returns.
+But why should summing squared returns give us anything meaningful?
+Why not sum absolute returns, or cubed returns?
+The answer comes from a deep result in probability theory: for processes like stock prices, the sum of squared increments converges to a specific quantity called the \textbf{quadratic variation}, and this quantity equals the integrated variance we're trying to measure.
+This subsection explains that result.
 
 \begin{prereq}[Quadratic Variation (Informal)]
 For a continuous-time stochastic process $X_t$, the quadratic variation $[X]_t$ measures the cumulative squared increments of the path up to time $t$.
@@ -119,42 +153,166 @@ It is defined as the limit of the sum of squared increments as the partition bec
 \]
 For a process with continuous paths (no jumps), the quadratic variation equals the integrated variance: $[X]_t = \int_0^t \sigma^2_s\,ds$.
 If the process has jumps, the quadratic variation also captures the sum of squared jumps.
+
+The chain to remember: RV (what you compute from data) $\to$ QV (the limit as sampling gets infinitely fine) $=$ IV (the true volatility you want, if there are no jumps).
+Quadratic variation is the theoretical bridge connecting your finite-sample computation to the true quantity of interest.
 \end{prereq}
 
-As you sample more frequently (as $n \to \infty$ and the length of each interval $\Delta \to 0$), $\RV_t$ converges to the quadratic variation of the log-price process \citep{ABDL2001, BNS2002}:
+The central result is this: as you sample more frequently (as $n \to \infty$ and the length of each interval $\Delta \to 0$), the sum of squared returns converges to the quadratic variation of the log-price process \citep{ABDL2001, BNS2002}:
 
 \begin{equation}
   \RV_t \xrightarrow{p} [p]_t \quad \text{as } \Delta \to 0
   \label{eq:rv-convergence}
 \end{equation}
 \begin{itemize}[nosep]
-  \item $\xrightarrow{p}$: convergence in probability
+  \item $\xrightarrow{p}$: convergence in probability (meaning the estimate gets arbitrarily close to the true value as sampling gets finer)
   \item $[p]_t$: quadratic variation of the log-price process on day $t$
   \item $\Delta = 1/n$: the length of each sampling interval (as a fraction of the trading day)
 \end{itemize}
 
-If the price path is continuous (no jumps), then the quadratic variation equals the integrated variance:
+\begin{intuition}[In Plain English]
+This equation says: ``if you chop the trading day into finer and finer intervals, compute the return over each tiny interval, square it, and sum them all up, the result converges to a specific number called the quadratic variation.''
+Think of it like measuring the total wobble of a drunk person's walk: the more finely you measure their steps, the more zigzags you capture.
+As your measurement gets infinitely fine, you converge on the \emph{true} total wobble.
+That true total wobble is the quadratic variation $[p]_t$.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This convergence result is the entire theoretical foundation for using RV as a volatility measure.
+It tells you that what you're computing (sum of squared returns) is not just an arbitrary statistic: it is a \emph{consistent estimator} of a well-defined theoretical quantity.
+Without this result, RV would have no theoretical grounding, and you'd have no reason to believe it measures anything meaningful about the price process.
+\end{projectconnection}
+
+Now, what exactly is this quadratic variation equal to?
+That depends on whether the price path had any sudden jumps during the day.
+
+If the price path is continuous (no jumps), then the quadratic variation equals the integrated variance, exactly:
 \begin{equation}
   [p]_t = \IVol_t \qquad (\text{no jumps})
   \label{eq:qv-equals-iv}
 \end{equation}
 
-If the price path has jumps, the quadratic variation includes a jump component:
+\begin{intuition}[In Plain English]
+When there are no jumps, this equation says: ``the total wobble of the price path equals the total accumulated instantaneous variance.''
+This is the ideal case.
+It means your sum of squared returns converges to exactly the thing you want to measure ($\IVol_t$), with no contamination from other sources.
+\end{intuition}
+
+If the price path has jumps (sudden discontinuous moves, like a price gap after an earnings announcement), the quadratic variation picks up an extra component:
 \begin{equation}
-  [p]_t = \IVol_t + \sum_{s \leq t} (\Delta p_s)^2 \qquad (\text{with jumps})
+  [p]_t = \IVol_t + \sum_{s \leq t} (J_s)^2 \qquad (\text{with jumps})
   \label{eq:qv-with-jumps}
 \end{equation}
 \begin{itemize}[nosep]
-  \item $\Delta p_s$: the jump in log price at time $s$ (zero if no jump occurs at $s$)
-  \item The sum collects all jumps within the day
-  \item Separating jumps from continuous variation is the subject of Chapter~\ref{ch:jumps}
+  \item $J_s$: the jump in log price at time $s$ (zero if no jump occurs at $s$). Some papers write this as $\Delta p_s$; we use $J_s$ here to avoid confusion with $\Delta$ (sampling interval length) used elsewhere.
+  \item The sum looks like it runs over infinitely many times, but in practice there are only a few jumps per day (or none), so the sum has at most a handful of nonzero terms.
+  \item Separating jumps from continuous variation is the subject of Chapter~\ref{ch:jumps}.
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+This equation says: ``when there are jumps, the total wobble (quadratic variation) equals the smooth continuous wiggling ($\IVol_t$) \emph{plus} the squared sizes of all the sudden jumps.''
+Your RV estimate picks up both components.
+If you want to measure only the smooth, continuous volatility (which is more persistent and forecastable), you need to strip out the jumps.
+That's what Chapter~\ref{ch:jumps} does.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+In practice, jumps are relatively rare but can be large.
+Including jump variation in your forecasting target adds noise: jumps are hard to predict (they're often driven by surprise events), so your model gets a noisier signal.
+Many of the best forecasting models (HAR-CJ, SHAR) separate the jump and continuous components and model them separately, because the continuous part is far more persistent and predictable.
+\end{projectconnection}
 
 \begin{keyresult}[\citet{ABDL2001}, \citet{BNS2002}: RV Consistency]
 Under mild regularity conditions, realized variance $\RV_t$ is a consistent estimator of quadratic variation $[p]_t$.
 In the absence of jumps, $\RV_t$ consistently estimates integrated variance $\IVol_t$.
 This result holds regardless of the specific form of $\sigma_t$; the volatility process can be stochastic, path-dependent, or driven by latent factors.
 \end{keyresult}
+
+Figure~\ref{fig:iv-qv-rv-chain} summarizes the full chain of relationships between the quantities introduced so far.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners, fill=#1!8, minimum width=3.2cm, minimum height=1.1cm, align=center, font=\small},
+  arr/.style={-{Stealth}, thick},
+]
+% Boxes
+\node[box=defblue] (rv) at (0, 0) {$\RV_t = \sum r^2_{t,i}$\\(what you compute)};
+\node[box=keyorange] (qv) at (5.5, 0) {$[p]_t$\\(quadratic variation)};
+\node[box=intgreen] (iv) at (11, 1) {$\IVol_t = \int \sigma^2_s\,ds$\\(what you want)};
+\node[box=warnred] (jumps) at (11, -1) {$\sum J_s^2$\\(jump component)};
+
+% Noise disruption
+\node[box=warnred, minimum width=2.8cm] (noise) at (0, -2.5) {Microstructure noise\\diverges to $2n\omega^2$};
+
+% Arrows
+\draw[arr] (rv) -- (qv) node[midway, above, font=\scriptsize] {converges as $n \to \infty$};
+\draw[arr] (qv) -- (iv) node[midway, above, font=\scriptsize, sloped] {no jumps: $=$};
+\draw[arr] (qv) -- (jumps) node[midway, below, font=\scriptsize, sloped] {jumps: $= \IVol_t +$};
+\draw[arr, warnred, dashed] (noise) -- (rv) node[midway, right, font=\scriptsize, align=left] {disrupts at\\high frequency};
+\end{tikzpicture}
+\caption{The conceptual chain connecting the three key quantities.
+\textbf{RV} (what you compute from data) converges to \textbf{QV} (a mathematical limit) as sampling gets finer.
+Without jumps, QV equals \textbf{IV} (the true volatility you want).
+With jumps, QV includes both IV and a jump component (Chapter~\ref{ch:jumps} separates them).
+Microstructure noise disrupts the convergence at high sampling frequencies (Chapter~\ref{ch:noise} fixes this).}
+\label{fig:iv-qv-rv-chain}
+\end{figure}
+
+Figure~\ref{fig:rv-convergence-diagram} illustrates the convergence idea: as you chop the day into more intervals, the sum of squared returns gets closer to the true integrated variance.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.85\textwidth,
+  height=6.5cm,
+  xlabel={Number of intraday intervals ($n$)},
+  ylabel={Realized variance estimate},
+  xmin=0, xmax=110,
+  ymin=0.5, ymax=2.5,
+  xtick={6, 13, 26, 52, 78, 100},
+  xticklabels={6, 13, 26, 52, 78, 100},
+  grid=major,
+  grid style={gray!20},
+  tick label style={font=\small},
+  label style={font=\small},
+  title style={font=\small\bfseries},
+  title={RV Converges to Integrated Variance as Sampling Gets Finer},
+  legend style={font=\small, at={(0.98,0.98)}, anchor=north east},
+]
+
+% True IV (horizontal line)
+\addplot[dashed, defblue, very thick, mark=none] coordinates {(0, 1.1) (110, 1.1)};
+\addlegendentry{True $\IVol_t$}
+
+% RV estimates converging (with decreasing scatter)
+\addplot[only marks, mark=*, mark size=2.5pt, warnred] coordinates {
+  (6, 1.85) (6, 0.62) (6, 2.15) (6, 0.78) (6, 1.55)
+  (13, 1.52) (13, 0.81) (13, 1.38) (13, 0.92) (13, 1.45)
+  (26, 1.32) (26, 0.93) (26, 1.22) (26, 1.01) (26, 1.28)
+  (52, 1.21) (52, 1.02) (52, 1.15) (52, 1.05) (52, 1.18)
+  (78, 1.15) (78, 1.05) (78, 1.12) (78, 1.07) (78, 1.14)
+  (100, 1.13) (100, 1.06) (100, 1.11) (100, 1.08) (100, 1.12)
+};
+\addlegendentry{RV estimates (different days)}
+
+% Annotations
+\node[font=\scriptsize, anchor=west] at (axis cs: 8, 2.2) {Few intervals:};
+\node[font=\scriptsize, anchor=west] at (axis cs: 8, 2.0) {high scatter};
+\node[font=\scriptsize, anchor=east] at (axis cs: 98, 0.75) {Many intervals:};
+\node[font=\scriptsize, anchor=east] at (axis cs: 98, 0.55) {tight around truth};
+
+\end{axis}
+\end{tikzpicture}
+\caption{Convergence of RV to integrated variance.
+Each red dot is an RV estimate from a different simulated day.
+With only 6 intervals (hourly sampling), estimates are scattered widely around the true $\IVol_t$ (dashed blue).
+With 78 intervals (5-minute sampling), estimates cluster tightly.
+This is the convergence result of Equation~\eqref{eq:rv-convergence} in action.
+(In practice, microstructure noise prevents going much beyond 78 intervals.)}
+\label{fig:rv-convergence-diagram}
+\end{figure}
 
 \subsection{Diagram: Building RV from a Price Path}
 
@@ -289,16 +447,38 @@ In practice, it fails.
 The convergence result in Equation~\eqref{eq:rv-convergence} says that RV becomes a better estimator as $\Delta$ shrinks.
 More precisely, \citet{BNS2002} showed that the estimation error has a central limit theorem:
 
+The convergence result tells you RV approaches $\IVol_t$ as you sample more frequently, but how \emph{fast} does it converge?
+How precise is your estimate with, say, 78 five-minute intervals versus 390 one-minute intervals?
+\citet{BNS2002} showed the estimation error follows a central limit theorem:
+
 \begin{equation}
   \sqrt{n}\,(\RV_t - \IVol_t) \xrightarrow{d} \N\!\left(0,\; 2\int_{t-1}^{t}\sigma^4_s\,ds\right)
   \label{eq:rv-clt}
 \end{equation}
 \begin{itemize}[nosep]
-  \item $\xrightarrow{d}$: convergence in distribution
+  \item $\xrightarrow{d}$: convergence in distribution (the error becomes approximately normally distributed)
   \item $\sqrt{n}$: the estimation error shrinks at rate $1/\sqrt{n}$
-  \item $2\int_{t-1}^{t}\sigma^4_s\,ds$: the asymptotic variance (it depends on the ``quarticity,'' the integral of $\sigma^4$)
-  \item The message: doubling the number of intervals cuts the standard error by a factor of $\sqrt{2}$
+  \item $\RV_t - \IVol_t$: the gap between your estimate and the truth
+  \item $2\int_{t-1}^{t}\sigma^4_s\,ds$: the asymptotic variance of the error (it depends on the ``quarticity,'' the integral of $\sigma^4$, which measures how variable the volatility itself was during the day)
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+This equation says: ``the error in your RV estimate is approximately bell-shaped, centered on zero, and shrinks as $1/\sqrt{n}$.''
+Doubling the number of intervals (going from 5-minute to 2.5-minute sampling) cuts your standard error by a factor of $\sqrt{2} \approx 1.41$.
+
+Why does $\sigma^4$ appear?
+Each squared return $r^2_{t,i}$ estimates the local variance $\sigma^2_{t,i}$, but with some error.
+The variance of that estimation error is proportional to $\sigma^4_{t,i}$ (because computing the variance of a squared quantity involves squaring something that is already squared).
+Summing these error variances across the day gives $\int \sigma^4_s\,ds$, called the ``quarticity.''
+On days when volatility was itself highly variable within the day, quarticity is large, and your RV estimate is less precise.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This CLT tells you how noisy each day's RV estimate is, and that directly affects your forecasting model.
+RV is your dependent variable (the $y$ you're predicting); if some days' $y$ values are noisier than others, your model trains on noisy labels, which degrades performance.
+The HARQ model (Chapter~\ref{ch:har}) explicitly accounts for this: it estimates each day's RV precision from the CLT and downweights noisy observations.
+Days with few intraday observations (holiday-shortened sessions) or wildly variable intraday vol have noisier RV, and a smart model adjusts for this.
+\end{projectconnection}
 
 So with perfect data, you would sample every millisecond and get an essentially noise-free estimate of integrated variance.
 
@@ -315,7 +495,8 @@ Even if the true value is perfectly constant, alternating buys and sells cause t
 This artificial oscillation creates spurious volatility in very high-frequency returns.
 \end{prereq}
 
-The standard model for microstructure noise \citep{ABDL2001, BNS2002} adds a noise term to the observed log price:
+The standard model for microstructure noise \citep{ABDL2001, BNS2002} captures this with a simple additive structure:
+the price you actually observe is the ``true'' price plus some random noise from trading frictions.
 \begin{equation}
   p^*_{t,i} = p_{t,i} + \varepsilon_{t,i}
   \label{eq:noise-model}
@@ -326,14 +507,40 @@ The standard model for microstructure noise \citep{ABDL2001, BNS2002} adds a noi
   \item $\varepsilon_{t,i}$: microstructure noise, typically assumed i.i.d.\ with $\E[\varepsilon_{t,i}] = 0$ and $\operatorname{Var}(\varepsilon_{t,i}) = \omega^2$
 \end{itemize}
 
-When you compute returns from noisy prices and sample very frequently, the noise dominates.
-Instead of converging to $\IVol_t$, realized variance computed from noisy prices diverges:
+\begin{intuition}[In Plain English]
+This equation says: ``the price you see on your screen is the true underlying price plus some random jitter from the mechanics of trading.''
+The jitter ($\varepsilon$) averages to zero (it doesn't systematically push prices up or down) but it adds random noise to every price observation.
+The noise variance $\omega^2$ is a property of the market: liquid stocks with tight bid-ask spreads have small $\omega^2$; illiquid stocks have larger $\omega^2$.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+When you download high-frequency price data for your project, you are downloading $p^*_{t,i}$, not $p_{t,i}$.
+This noise is baked into your data and cannot be removed by cleaning alone.
+The entire next chapter (Chapter~\ref{ch:noise}) is about building RV estimators that work correctly despite this contamination.
+\end{projectconnection}
+
+When you compute returns from noisy prices, each observed return picks up the noise:
+$r^*_{t,i} = r_{t,i} + (\varepsilon_{t,i} - \varepsilon_{t,i-1})$.
+The noise part $(\varepsilon_{t,i} - \varepsilon_{t,i-1})$ has variance $\operatorname{Var}(\varepsilon_{t,i}) + \operatorname{Var}(\varepsilon_{t,i-1}) = 2\omega^2$ (since the two noise terms are independent).
+When you sample very frequently, the true returns $r_{t,i}$ become tiny (the price barely moves in a millisecond), but each noise contribution is still $2\omega^2$ regardless of the interval length.
+So the noise dominates, and RV diverges:
 \begin{equation}
   \RV_t^{(\text{noisy})} \to 2n\omega^2 \quad \text{as } n \to \infty
   \label{eq:rv-noise-divergence}
 \end{equation}
 
-The estimate explodes linearly in $n$ because each noisy return contributes roughly $2\omega^2$ on average, and you are summing $n$ of them.
+\begin{intuition}[In Plain English]
+This equation says: ``if you sample too frequently, your RV estimate doesn't converge to the true volatility; it explodes to infinity.''
+Each noisy return contributes roughly $2\omega^2$ of garbage on average (from the noise term bouncing back and forth), and you're summing $n$ of these.
+As $n$ grows, the garbage accumulates linearly while the true signal grows more slowly, so the noise wins.
+This is why sampling every tick or every second gives you a wildly inflated RV.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This divergence result is the reason you cannot simply use the highest-frequency data available.
+It creates the central practical challenge of RV estimation: you want high frequency for precision, but too-high frequency is destroyed by noise.
+The 5-minute convention and the noise-robust estimators in Chapter~\ref{ch:noise} are both responses to this problem.
+\end{projectconnection}
 
 \begin{warning}[Sampling Too Fast Destroys the Estimate]
 With tick-by-tick or second-by-second data, the bid-ask bounce inflates realized variance far above the true integrated variance.
@@ -425,7 +632,7 @@ The plot has three regions:
 \begin{enumerate}[nosep]
   \item \textbf{High-frequency region} (left): RV rises sharply, contaminated by bid-ask bounce and microstructure effects.
   \item \textbf{Intermediate region} (center): RV flattens near the true integrated variance. This is the practical sweet spot.
-  \item \textbf{Low-frequency region} (right): RV drifts downward and becomes noisy because too few observations produce imprecise estimates.
+  \item \textbf{Low-frequency region} (right): RV drifts downward and becomes noisy. The downward bias occurs because with fewer sample points, you miss many intraday price wiggles. Returns computed over long intervals smooth out the zigzags between your sparse sample points, producing smaller squared returns and hence a lower RV estimate.
 \end{enumerate}
 
 \begin{keyidea}[The Fundamental Tradeoff]
