@@ -62,6 +62,22 @@ The signal (real price moves) scales with the time interval $\Delta$, but the no
 As you shrink $\Delta$, the noise-to-signal ratio explodes: each return is mostly noise, and you are summing $n = 1/\Delta$ of them.
 \end{intuition}
 
+\paragraph{Source 4: Adverse selection (information asymmetry).}
+Beyond mechanical noise, spreads reflect a deeper economic force.
+\citet{GlostenMilgrom1985} showed that market makers widen spreads because some counterparties possess private information.
+The \textbf{bid-ask spread} must compensate for losses to informed traders:
+\[
+  s_t \;\propto\; \alpha \cdot \sigma_v
+\]
+where $\alpha$ is the probability the counterparty is informed and $\sigma_v$ is the volatility of the information signal.
+When volatility is high, information asymmetry increases (there is more to know), so spreads widen mechanically.
+This creates a feedback loop: high vol leads to wider spreads, which creates more noise in transaction prices, which creates more biased RV estimates.
+
+This means microstructure noise is not merely a nuisance to filter; it carries information about market quality and \textbf{informed-trading intensity} that can itself predict future volatility (Chapter~\ref{ch:features}).
+
+A related insight from \citet{Kyle1985}: the first-order autocovariance of price changes satisfies $\Cov(\Delta p_t, \Delta p_{t+1}) = -s^2/4$.
+This connects the noise-robust estimators developed later in this chapter (which exploit autocovariance structure) to a liquidity interpretation.
+
 \subsection{Quantifying the Bias}
 
 The standard noise model assumes the observed log price is the true (efficient) price plus i.i.d.\ noise:
