@@ -34,6 +34,67 @@ would forecast for period $t$, given everything you know up through period $t-1$
 conditional variance.
 \end{prereq}
 
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+    width=12cm, height=4.5cm,
+    xlabel={Trading day},
+    ylabel={Daily return (\%)},
+    xmin=0, xmax=100,
+    ymin=-5, ymax=5,
+    grid=major,
+    grid style={gray!15},
+    ytick={-4,-2,0,2,4},
+    xtick={0,20,40,60,80,100},
+    every axis plot/.append style={mark=none},
+    title={\small Volatility clustering: calm periods alternate with turbulent periods},
+    title style={at={(0.5,1.05)}},
+  ]
+
+  % Calm period (days 1-30): small returns
+  \addplot[blue!70, thick] coordinates {
+    (1,0.3) (2,-0.2) (3,0.5) (4,-0.1) (5,0.4) (6,-0.3) (7,0.1)
+    (8,0.2) (9,-0.4) (10,0.3) (11,-0.1) (12,0.5) (13,-0.2) (14,0.3)
+    (15,-0.1) (16,0.2) (17,-0.3) (18,0.1) (19,0.4) (20,-0.2)
+    (21,0.3) (22,-0.1) (23,0.2) (24,-0.4) (25,0.1) (26,0.3)
+    (27,-0.2) (28,0.1) (29,-0.3) (30,0.2)
+  };
+
+  % Turbulent period (days 31-65): large returns
+  \addplot[red!70, thick] coordinates {
+    (30,0.2) (31,-1.8) (32,2.5) (33,-3.1) (34,1.9) (35,-2.7)
+    (36,3.4) (37,-2.2) (38,1.5) (39,-3.8) (40,2.8) (41,-1.6)
+    (42,3.2) (43,-2.9) (44,1.7) (45,-3.5) (46,2.1) (47,-1.4)
+    (48,2.6) (49,-2.3) (50,3.0) (51,-1.8) (52,2.4) (53,-2.1)
+    (54,1.3) (55,-1.9) (56,2.0) (57,-1.5) (58,1.1) (59,-1.7)
+    (60,1.4) (61,-1.2) (62,0.9) (63,-1.0) (64,0.7) (65,-0.8)
+  };
+
+  % Calm again (days 65-100)
+  \addplot[blue!70, thick] coordinates {
+    (65,-0.8) (66,0.4) (67,-0.2) (68,0.3) (69,-0.1) (70,0.5)
+    (71,-0.3) (72,0.2) (73,-0.4) (74,0.1) (75,0.3) (76,-0.2)
+    (77,0.4) (78,-0.1) (79,0.2) (80,-0.3) (81,0.5) (82,-0.1)
+    (83,0.3) (84,-0.2) (85,0.4) (86,-0.3) (87,0.1) (88,0.2)
+    (89,-0.4) (90,0.3) (91,-0.1) (92,0.2) (93,-0.3) (94,0.1)
+    (95,0.4) (96,-0.2) (97,0.3) (98,-0.1) (99,0.2) (100,-0.3)
+  };
+
+  % Annotations
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}, gray]
+    (axis cs:1,-4.5) -- (axis cs:30,-4.5)
+    node[midway, below=5pt, font=\footnotesize, gray] {calm};
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}, gray]
+    (axis cs:31,-4.5) -- (axis cs:65,-4.5)
+    node[midway, below=5pt, font=\footnotesize, gray] {turbulent};
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}, gray]
+    (axis cs:66,-4.5) -- (axis cs:100,-4.5)
+    node[midway, below=5pt, font=\footnotesize, gray] {calm};
+
+\end{axis}
+\end{tikzpicture}
+\end{center}
+
 \begin{intuition}[Why Squared Returns?]
 If a stock fell 3\% yesterday, you expect higher volatility today. If it barely
 moved (0.1\%), you expect calm. Squaring the return strips away the sign and gives a
@@ -57,6 +118,20 @@ variance is a weighted sum of past squared returns.
         realized variance
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+Tomorrow's variance equals a floor level plus a correction based on how big today's
+move was. If the market barely moved, the forecast stays near the floor. If it moved
+a lot, the forecast jumps. This is the simplest possible ``volatility responds to
+recent news'' model.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+ARCH is the conceptual ancestor of every conditional variance model you will compare
+against. Its core idea (past squared returns predict future variance) reappears in
+the HAR model, which replaces squared returns with realized variance at multiple
+horizons.
+\end{projectconnection}
+
 The general ARCH($q$) model adds more lags:
 %
 \begin{equation}
@@ -68,6 +143,12 @@ The general ARCH($q$) model adds more lags:
   \item $q$: number of lags included
   \item $\alpha_i \geq 0$: weight on the squared return from $i$ days ago
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+ARCH($q$) generalizes the same idea: instead of looking only at yesterday, you look
+at the last $q$ days of squared returns and take a weighted average. More lags let
+the model capture longer memory in volatility, but each lag adds a free parameter.
+\end{intuition}
 
 \begin{warning}[ARCH's Parameter Problem]
 Volatility is persistent: a shock today still affects volatility weeks later.
@@ -153,6 +234,23 @@ persistence.
   \item $\sigma^2_{t-1}$: yesterday's conditional variance forecast (the ``memory'')
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+Tomorrow's variance is a weighted average of three things: the long-run average
+variance ($\omega$), how big today's surprise was ($\alpha \, r^2_{t-1}$), and what
+you already thought variance was ($\beta \, \sigma^2_{t-1}$). The memory term
+$\beta \, \sigma^2_{t-1}$ is the key innovation over ARCH: it lets one parameter do
+the work of many lagged squared returns, because yesterday's forecast already
+encodes the entire history.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+GARCH(1,1) is your simplest conditional-variance baseline. In a model horse race,
+any ML model or HAR variant that cannot beat GARCH(1,1) out of sample is not worth
+the added complexity. Typical $\alpha + \beta \approx 0.98$ for equity indices,
+meaning volatility shocks are extremely persistent, the same stylized fact that HAR
+captures with its weekly and monthly RV components.
+\end{projectconnection}
+
 \begin{definition}[Stationarity Condition for GARCH(1,1)]
 \label{def:garch-stationarity}
 The process is covariance-stationary if and only if
@@ -173,6 +271,22 @@ If $\alpha + \beta = 1$, the model becomes IGARCH (Integrated GARCH): shocks
 never decay, and the unconditional variance is undefined
 \citep{engle1986}.
 \end{definition}
+
+\begin{intuition}[In Plain English]
+The unconditional variance is the ``gravity'' level that the conditional variance
+always pulls toward. When $\alpha + \beta$ is close to 1, the pull is very weak:
+after a volatility spike, it takes weeks or months for the forecast to drift back to
+normal. This is mean reversion in volatility, and the speed of that reversion is
+$1 - \alpha - \beta$.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+When you forecast RV at the 22-day horizon, mean-reversion speed matters enormously.
+A GARCH model with $\alpha + \beta = 0.98$ will still forecast elevated volatility
+three weeks after a shock, while HAR's monthly component captures the same
+persistence more flexibly. Comparing the implied half-lives of GARCH versus HAR
+forecasts is a simple diagnostic for your project.
+\end{projectconnection}
 
 \begin{workedexample}{GARCH(1,1) One-Step Forecast}
 \label{ex:garch11-calc}
@@ -335,6 +449,21 @@ The effect is straightforward:
         $\alpha + \gamma$, giving a stronger volatility response.
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+GJR-GARCH is just GARCH(1,1) with a bonus penalty for bad news. After a positive
+return, the equation is identical to standard GARCH. After a negative return, the
+indicator switches on and adds extra sensitivity ($\gamma$) to the squared return.
+The model has two ``gears'': a calm gear for up days and a reactive gear for down
+days.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The leverage effect is one of the strongest predictable patterns in equity volatility.
+Adding an asymmetry term (whether in GJR-GARCH or as a signed-return feature in your
+ML model) typically improves QLIKE by 5--15\%. If your HAR baseline does not include
+a negative-return indicator, GJR-GARCH shows exactly why it should.
+\end{projectconnection}
+
 \begin{workedexample}{GJR-GARCH: Positive vs.\ Negative Shocks}
 Using $\omega = 0.00001$, $\alpha = 0.04$, $\gamma = 0.08$, $\beta = 0.90$,
 and $\sigma^2_{t-1} = 0.0004$:
@@ -421,6 +550,14 @@ log-variance falls. The same shock magnitude produces opposite effects depending
 sign.
 \end{intuition}
 
+\begin{projectconnection}[Why This Matters]
+EGARCH's log-variance formulation has a practical benefit for your project: working
+in logs stabilizes estimation and makes the variance automatically positive. Many ML
+models for realized volatility also work in log space ($\log \RV_t$) for the same
+reason. If you include EGARCH as a baseline, its sign-effect coefficient $\gamma$
+gives you a direct comparison point for how well your ML model captures asymmetry.
+\end{projectconnection}
+
 \begin{warning}[EGARCH Forecasting Complication]
 Multi-step forecasts from EGARCH require computing $\E[\exp(\cdot)]$, which does
 not simplify as cleanly as for linear GARCH. In practice, simulation-based forecasts
@@ -481,6 +618,22 @@ The full FIGARCH(1,$d$,1) specification is written using the lag operator $L$:
 
 The key point is not the algebra but the implication: FIGARCH matches the slow decay
 of volatility autocorrelations far better than GARCH.
+
+\begin{intuition}[In Plain English]
+Standard GARCH forgets shocks exponentially: a volatility spike from two months ago
+has almost no influence on today's forecast. FIGARCH forgets shocks more slowly,
+following a power law. The parameter $d$ controls how slowly: $d = 0$ is normal GARCH
+(fast forgetting), and $d$ closer to 1 means shocks linger almost indefinitely. This
+matches what we see empirically, where volatility autocorrelations are still
+detectable at lags of 100 days or more.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Long memory in volatility is precisely why HAR works: its weekly and monthly
+components act as a discrete approximation to the slow-decaying memory that FIGARCH
+models continuously. If your ML residual model finds that long-lag features improve
+forecasts, FIGARCH's $d$ parameter gives you a theoretical explanation for why.
+\end{projectconnection}
 
 \begin{keyidea}[FIGARCH vs.\ Rough Volatility]
 Both FIGARCH and rough volatility models (Chapter~\ref{ch:rough}) address the same
@@ -571,6 +724,10 @@ r_t = \sqrt{h_t}\; z_t, \qquad z_t \sim \N(0,1)
   \item $z_t$: standardized innovation, assumed i.i.d.\ standard normal
 \end{itemize}
 
+This is the standard return-generating process: the daily return is volatility times
+a random shock. It is shared with standard GARCH and is not where Realized GARCH
+innovates.
+
 The measurement equation links the observed $\RV_t$ to the latent $h_t$:
 %
 \begin{equation}
@@ -601,6 +758,25 @@ The GARCH equation uses $\RV_t$ instead of $r^2_t$:
   \item $\gamma$: sensitivity to the realized measure; this is where intraday
         information enters the model
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+Realized GARCH is a three-part system. (1) Returns are driven by latent variance, as
+usual. (2) The measurement equation says ``realized volatility is a noisy, possibly
+biased reading of that latent variance, with an asymmetry correction.'' (3) The
+GARCH equation says ``tomorrow's latent variance depends on today's latent variance
+(persistence) plus today's realized volatility (new information).'' The key upgrade
+over standard GARCH is in step (3): instead of feeding in the noisy squared return
+$r^2_t$, you feed in $\RV_t$, which is orders of magnitude more precise.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Realized GARCH is the bridge between the GARCH world and the RV world your project
+lives in. It uses $\RV_t$ directly as an input, just as your HAR and ML models do.
+Including Realized GARCH as a baseline lets you ask: ``Does my ML model add value
+beyond what a well-specified parametric model can extract from the same $\RV_t$
+data?'' If your ML model only matches Realized GARCH, the complexity may not be
+justified.
+\end{projectconnection}
 
 \begin{keyresult}[Realized GARCH Outperforms Standard GARCH]
 \citet{hansen2012realized} find that Realized GARCH with log-linear specification
@@ -650,6 +826,24 @@ The second governs the conditional expectation of realized variance:
   \item $\alpha_M, \beta_M$: analogous to GARCH parameters but for the realized
         measure
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+HEAVY runs two GARCH-like equations side by side. The first forecasts the variance of
+daily returns, and the second forecasts realized variance itself. Both use
+yesterday's $\RV$ as input instead of $r^2$. Think of it as two parallel trackers:
+one for ``what will the daily return variance be?'' and one for ``what will intraday
+volatility look like?'' Because $\RV$ reacts to intraday information immediately, the
+HEAVY model adjusts to regime changes (like a volatility spike) much faster than
+standard GARCH, which must wait for large daily returns to accumulate.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The second HEAVY equation (Equation~\ref{eq:heavy-rv}) is essentially forecasting
+$\RV_t$ using an AR(1) in $\RV$ with GARCH-style persistence, making it a
+close relative of the HAR model's daily component. Comparing HEAVY's $\mu_{M,t}$
+forecasts against your HAR forecasts at the one-day horizon reveals how much the
+multi-horizon structure of HAR adds beyond a simple autoregressive specification.
+\end{projectconnection}
 
 \begin{keyresult}[HEAVY Model Performance]
 \citet{shephard2010heavy} find that the HEAVY model outperforms GARCH both in-sample
