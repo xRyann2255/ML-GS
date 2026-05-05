@@ -74,6 +74,13 @@ Your payoff is never negative.
 This asymmetry is the entire reason options have value, and why someone must be paid a premium to write them.
 \end{intuition}
 
+\begin{projectconnection}[Why This Matters]
+The asymmetric payoff structure is what makes options sensitive to volatility in the first place.
+A stock's P\&L is symmetric around its expected return, so only direction matters.
+An option's P\&L is asymmetric, so both the direction \emph{and magnitude} of moves matter, which is why option prices encode information about the distribution of future returns, not just the mean.
+This is the foundation for extracting implied volatility and the variance risk premium (Chapter~\ref{ch:vrp}) from option prices.
+\end{projectconnection}
+
 Figure~\ref{fig:payoff-diagrams} shows the payoff profiles.
 The kink at $K$ is the signature of an option; linear instruments (stocks, futures) have straight-line payoffs.
 
@@ -241,6 +248,12 @@ The call is out-of-the-money ($S < K$), so the premium is modest: \$2.47 on a \$
 You are paying for the \emph{possibility} that the index rises above 105 within three months.
 \end{workedexample}
 
+\begin{projectconnection}[Why This Matters]
+Black-Scholes tells you the fair price of an option given a \emph{fixed} volatility assumption, but volatility is not fixed.
+That disconnect is the entire point of the volatility surface and of your forecasting project.
+The formula's single most important role for you is as the \emph{inverse function} that maps observed option prices to implied volatilities (Section~\ref{sec:implied-vol}), which then become features and benchmarks for your ML model.
+\end{projectconnection}
+
 \begin{warning}[Black-Scholes Is Wrong, but Universal]
 Black-Scholes is wrong in nearly all its assumptions.
 Returns have fat tails (Chapter~\ref{ch:returns}), volatility is not constant (Chapters~\ref{ch:garch}--\ref{ch:rough}), and prices jump (Chapter~\ref{ch:jumps}).
@@ -248,6 +261,86 @@ But the formula remains the market's common language for quoting option prices.
 When a trader says ``this option is trading at 25 vol,'' they mean the Black-Scholes implied volatility is 25\%.
 The formula is not a belief about reality; it is a translation device.
 \end{warning}
+
+\subsection{The Greeks: Sensitivity to Inputs}
+\label{sec:greeks}
+
+The Black-Scholes formula expresses the option price as a function of five inputs.
+The partial derivatives of the price with respect to each input are called the \textbf{Greeks}, and they tell you how sensitive the option's value is to small changes in market conditions.
+
+\begin{definition}[Key Greeks]
+\label{def:greeks}
+For a European call option priced by Black-Scholes:
+\begin{itemize}[nosep]
+  \item \textbf{Delta} ($\Delta = \partial C / \partial S$): sensitivity to the underlying price. A delta of 0.60 means the call gains roughly \$0.60 for each \$1 rise in the stock.
+  \item \textbf{Gamma} ($\Gamma = \partial^2 C / \partial S^2$): rate of change of delta. High gamma means delta shifts rapidly with the stock price, making hedging more difficult.
+  \item \textbf{Theta} ($\Theta = \partial C / \partial T$): time decay. Options lose value as expiry approaches (all else equal), and theta quantifies that bleed.
+  \item \textbf{Vega} ($\mathcal{V} = \partial C / \partial \sigma$): sensitivity to volatility. This is the Greek that matters most for your project.
+  \item \textbf{Rho} ($\rho = \partial C / \partial r$): sensitivity to the risk-free rate. Usually small for short-dated options.
+\end{itemize}
+\end{definition}
+
+\begin{intuition}[In Plain English]
+The Greeks answer five practical questions: how much does my option gain or lose if (1) the stock moves, (2) the stock moves \emph{fast}, (3) a day passes, (4) volatility changes, or (5) interest rates change?
+Vega is the most important Greek for volatility trading because it tells you how many dollars you make or lose per percentage-point change in implied vol.
+A high-vega position is a direct bet on volatility; a zero-vega portfolio is insulated from vol changes.
+\end{intuition}
+
+Figure~\ref{fig:vega-profile} shows how vega varies with moneyness and time to expiry.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=12cm, height=7cm,
+  xlabel={Moneyness ($S/K$)},
+  ylabel={Vega (per 1\% vol change)},
+  xmin=0.80, xmax=1.20,
+  ymin=0, ymax=0.45,
+  xtick={0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15},
+  grid=major,
+  grid style={gray!30},
+  legend pos=north east,
+  legend style={font=\small},
+  axis lines=left,
+  every axis x label/.style={at={(ticklabel* cs:1.0)}, anchor=west},
+  every axis y label/.style={at={(ticklabel* cs:1.0)}, anchor=south},
+]
+% 1-month option (narrow, peaked)
+\addplot[ultra thick, warnred, smooth] coordinates {
+  (0.80, 0.02) (0.85, 0.06) (0.90, 0.14) (0.95, 0.25) (1.00, 0.30)
+  (1.05, 0.25) (1.10, 0.14) (1.15, 0.06) (1.20, 0.02)
+};
+\addlegendentry{$T = 1$ month}
+% 6-month option (wider, higher peak)
+\addplot[ultra thick, defblue, smooth, dashed] coordinates {
+  (0.80, 0.10) (0.85, 0.18) (0.90, 0.28) (0.95, 0.36) (1.00, 0.40)
+  (1.05, 0.36) (1.10, 0.28) (1.15, 0.18) (1.20, 0.10)
+};
+\addlegendentry{$T = 6$ months}
+% 12-month option (widest)
+\addplot[ultra thick, intgreen, smooth, densely dotted] coordinates {
+  (0.80, 0.15) (0.85, 0.22) (0.90, 0.30) (0.95, 0.37) (1.00, 0.40)
+  (1.05, 0.37) (1.10, 0.30) (1.15, 0.22) (1.20, 0.15)
+};
+\addlegendentry{$T = 12$ months}
+% ATM annotation
+\draw[-{Stealth}, thick, gray] (axis cs:1.00,0.43) -- (axis cs:1.00,0.41)
+  node[pos=0, above, font=\scriptsize, align=center]{ATM: peak vega};
+\end{axis}
+\end{tikzpicture}
+\caption{Vega profiles across moneyness for different maturities.
+Vega peaks at-the-money and falls off for deep ITM or OTM options.
+Longer-dated options have higher vega (more time for vol to matter) and a wider peak (more strikes are sensitive to vol changes).
+Short-dated ATM options have concentrated vega, making them efficient instruments for short-horizon vol trades.}
+\label{fig:vega-profile}
+\end{figure}
+
+\begin{projectconnection}[Why This Matters]
+Vega tells you how sensitive option prices are to volatility changes, which is critical when trading vol forecasts.
+If your ML model predicts that realized vol will be higher than implied vol, you want to buy options with high vega to maximize your dollar exposure to that view.
+Understanding the vega profile also explains why ATM options are the most liquid instruments for vol trading and why the variance swap (Section~\ref{sec:var-swap}) is designed to provide constant dollar exposure to variance regardless of the stock price.
+\end{projectconnection}
 
 
 % ═══════════════════════════════════════════════════════
@@ -287,6 +380,13 @@ It is the market's consensus price of uncertainty, contaminated by:
 \end{itemize}
 Despite all this, IV is extremely useful. It is a real-time, forward-looking, market-priced measure of uncertainty.
 \end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Implied volatility is the market's consensus forecast of future vol.
+Comparing it to your RV forecast gives you the \textbf{variance risk premium}: $\text{VRP} \approx \text{IV}^2 - \widehat{\text{RV}}^2$.
+If your ML model produces a more accurate RV forecast than the market's implied estimate, the VRP becomes a tradeable signal (Chapter~\ref{ch:vrp}).
+IV is also one of the strongest single features for predicting future realized vol \citep{Gu2020}, so it will appear directly in your feature set (Chapter~\ref{ch:features}).
+\end{projectconnection}
 
 \begin{workedexample}{Backing Out Implied Volatility}
 Continuing the example from Section~\ref{sec:black-scholes}: $S = 100$, $K = 105$, $r = 5\%$, $T = 0.25$.
@@ -331,6 +431,11 @@ If Black-Scholes were correct (constant volatility, log-normal returns, no jumps
 The surface would be perfectly flat.
 The fact that the surface is \emph{not} flat is direct evidence that Black-Scholes is wrong, and the shape of the surface tells you \emph{how} it is wrong.
 \end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+The volatility surface encodes information about jump risk, tail risk, and market fear that goes beyond what backward-looking realized volatility captures.
+Changes in the surface's shape (steepening skew, inverting term structure) are forward-looking signals that could serve as features for your ML model, potentially improving on a pure HAR baseline that only uses past RV.
+\end{projectconnection}
 
 \subsection{The Volatility Smile and Skew}
 \label{sec:smile-skew}
@@ -411,6 +516,56 @@ At-the-money IV is not the same at 1~month as at 1~year.
   \item Short-dated IV is more volatile than long-dated IV, consistent with the mean-reverting nature of volatility established in Chapters~\ref{ch:garch} and~\ref{ch:har}.
 \end{itemize}
 \end{keyidea}
+
+Figure~\ref{fig:iv-term-structure} contrasts these two regimes.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=12cm, height=7cm,
+  xlabel={Maturity (months)},
+  ylabel={ATM Implied Volatility (\%)},
+  xmin=0.5, xmax=12.5,
+  ymin=12, ymax=42,
+  xtick={1, 2, 3, 6, 9, 12},
+  ytick={15, 20, 25, 30, 35, 40},
+  grid=major,
+  grid style={gray!30},
+  legend pos=north east,
+  legend style={font=\small},
+  axis lines=left,
+  every axis x label/.style={at={(ticklabel* cs:1.0)}, anchor=west},
+  every axis y label/.style={at={(ticklabel* cs:1.0)}, anchor=south},
+]
+% Normal upward-sloping term structure
+\addplot[ultra thick, defblue, smooth] coordinates {
+  (1, 16) (2, 17.2) (3, 18.0) (6, 19.5) (9, 20.2) (12, 20.8)
+};
+\addlegendentry{Normal (upward-sloping)}
+% Inverted crisis term structure
+\addplot[ultra thick, warnred, smooth, dashed] coordinates {
+  (1, 40) (2, 36) (3, 33) (6, 28) (9, 25.5) (12, 24)
+};
+\addlegendentry{Crisis (inverted)}
+% Flat reference
+\addplot[thin, gray, dotted] coordinates {
+  (0.5, 20) (12.5, 20)
+};
+\addlegendentry{BS reference (flat)}
+% Annotations
+\draw[-{Stealth}, thick, intgreen] (axis cs:1.5, 42) -- (axis cs:1.5, 40.5)
+  node[pos=0, above, font=\scriptsize, text=intgreen, align=center]{Near-term\\panic};
+\draw[-{Stealth}, thick, intgreen] (axis cs:10, 22.5) -- (axis cs:10, 20.9)
+  node[pos=0, above, font=\scriptsize, text=intgreen, align=center]{Long-term\\mean reversion};
+\end{axis}
+\end{tikzpicture}
+\caption{ATM implied volatility term structure under two regimes.
+In normal conditions (\textcolor{defblue}{blue}), the term structure slopes upward as longer horizons carry greater uncertainty.
+During crises (\textcolor{warnred}{red dashed}), the term structure inverts: near-term IV spikes while long-term IV reflects the expectation that volatility will eventually normalize.
+The spread between short-dated and long-dated ATM IV is itself a useful feature for forecasting models.}
+\label{fig:iv-term-structure}
+\end{figure}
 
 \subsection{The Full Surface}
 \label{sec:full-surface}
@@ -576,6 +731,13 @@ The numerator combines two effects: $\partial C / \partial T$ captures the time 
 The denominator, $\frac{1}{2}K^2\,\partial^2 C / \partial K^2$, is proportional to the \textbf{risk-neutral density} of the underlying at strike $K$ and maturity $T$ -- it measures how much probability the market assigns to the stock landing near $K$.
 For the formula to be well-defined, the denominator must be strictly positive (a condition equivalent to the absence of butterfly arbitrage).
 
+\begin{intuition}[In Plain English]
+The Dupire formula asks: given how option prices change as you shift the strike and the maturity, what instantaneous volatility must the market be assigning to each specific price level at each specific future time?
+The numerator measures how much extra option value you get by extending the horizon (adjusted for interest rates).
+The denominator measures how tightly the market's probability is concentrated near that strike.
+Dividing the two gives you the local ``speed of randomness'' the market prices at that point.
+\end{intuition}
+
 \begin{intuition}[Local Vol as Market-Implied Instantaneous Vol]
 Local vol is the unique diffusion coefficient $\sigma(S,t)$ such that a one-factor model
 \[
@@ -661,10 +823,11 @@ Use it as an interpolation and arbitrage-checking tool, not as a model of realit
 For forecasting, use the realized measures and ML models from later chapters.
 \end{warning}
 
-\begin{application}[Project Connection]
+\begin{projectconnection}[Why This Matters]
 Local vol extractions at specific moneyness levels (e.g., 90\% and 110\% of spot) encode the market's current pricing of tail risk at different horizons.
 These can serve as ML features (Chapter~\ref{ch:features}) that complement backward-looking realized measures with forward-looking options information.
-\end{application}
+The ratio of local vol at 90\% moneyness to ATM local vol is a cleaner skew measure than raw IV skew, potentially giving your model a more informative tail-risk signal.
+\end{projectconnection}
 
 
 % ═══════════════════════════════════════════════════════
@@ -714,6 +877,12 @@ Each option at strike $K$ provides local information about the probability of th
 By weighting them by $1/K^2$ and integrating, you reconstruct the full distribution and extract its second moment (variance) without ever assuming what that distribution looks like.
 \end{intuition}
 
+\begin{projectconnection}[Why This Matters]
+This integral is the theoretical foundation for VIX, which is one of the single strongest predictors of future realized vol.
+Because the model-free variance extracts \emph{risk-neutral} expected variance (not real-world expected variance), it systematically overestimates realized vol.
+That persistent gap is the variance risk premium (Chapter~\ref{ch:vrp}), and your ML model's ability to forecast the realized side more accurately than the market's implied estimate is what creates a tradeable signal.
+\end{projectconnection}
+
 \subsection{The VIX Index}
 \label{sec:vix-index}
 
@@ -743,6 +912,18 @@ In practice, the CBOE interpolates between the two nearest-to-30-day maturities 
 \end{definition}
 
 Equation~\eqref{eq:vix} is the discrete approximation of the continuous integral in Equation~\eqref{eq:model-free-var}: the sum over OTM options across all available strikes replaces the integral, and the $\Delta K_i / K_i^2$ weighting mirrors the $1/K^2$ in the continuous formula.
+
+\begin{intuition}[In Plain English]
+The VIX formula adds up the prices of out-of-the-money options across all available strikes, weighting each by $1/K^2$ so that lower-strike options (which capture crash risk) count proportionally more.
+The result is the options market's collective estimate of how much the S\&P~500 will bounce around over the next 30 days, expressed as an annualized percentage.
+The small correction term at the end accounts for the fact that the forward price may not land exactly on an available strike.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+VIX is the single most widely used implied-vol feature in volatility forecasting models and often the strongest univariate predictor of future realized vol \citep{Gu2020}.
+For your project, VIX (or VIX$^2$) enters the model both as a direct feature and as one side of the variance risk premium: $\text{VRP}_t = \text{VIX}_t^2 - \widehat{\text{RV}}_{t,t+30}$.
+Any improvement your ML model achieves in forecasting the RV side translates directly into a more accurate VRP signal and better trading decisions.
+\end{projectconnection}
 
 \begin{keyidea}[Interpreting VIX Levels]
 VIX is quoted in annualized percentage points.
@@ -817,6 +998,14 @@ where:
 \end{itemize}
 The buyer of the swap profits when realized variance exceeds the strike; the seller profits when it falls below.
 \end{definition}
+
+\begin{intuition}[In Plain English]
+A variance swap is a bet on how volatile the market will actually be.
+At the start, the two parties agree on a ``fair'' variance level ($K_{\text{var}}$).
+At expiry, they compare that to what actually happened (realized variance).
+The buyer gets paid the difference if markets were choppier than expected; the seller gets paid if markets were calmer.
+It is the purest financial instrument for expressing a view on volatility itself, stripped of any directional bet on the market.
+\end{intuition}
 
 Traders often think in terms of \textbf{vega notional} rather than variance notional, because it is more intuitive.
 The vega notional approximates the dollar P\&L per volatility point (not variance point):
@@ -908,12 +1097,12 @@ Also: before expiry, variance swaps have substantial mark-to-market risk as impl
 A position can be deeply underwater mid-life even if it ultimately settles in your favor.
 \end{warning}
 
-\begin{application}[Project Connection]
+\begin{projectconnection}[Why This Matters]
 The variance swap makes the VRP a tradeable quantity.
 $\text{VIX}^2/10{,}000$ minus your forecast of 30-day RV $=$ variance risk premium (Chapter~\ref{ch:vrp}).
 If your ML model forecasts RV more accurately than the market-implied $K_{\text{var}}$, you can systematically harvest the mispricing.
-This is the core mechanism behind Project~5 (VRP ML Trader).
-\end{application}
+This is the core mechanism behind Project~5 (VRP ML Trader) and the economic-value test for any of the other project directions.
+\end{projectconnection}
 
 
 % ═══════════════════════════════════════════════════════
