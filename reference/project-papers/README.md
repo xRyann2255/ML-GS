@@ -1,75 +1,61 @@
-# ML for Realized Volatility — Essential Papers
+# ML for Realized Volatility Forecasting -- Project Papers
 
-Papers marked **Essential** are required reading for the project. **Recommended** papers provide useful extensions.
+Papers curated for the GS internship project: ML-based forecasting of realized volatility.
 
-## A. Foundational RV Econometrics
+## A. Foundational RV & HAR Baselines
 
-| # | Paper | Status |
-|---|---|---|
-| 1 | Andersen, Bollerslev, Diebold & Labys (2003), "Modeling and Forecasting Realized Volatility" — *Econometrica* | **Essential** |
-| 2 | Barndorff-Nielsen, Hansen, Lunde & Shephard (2008), "Designing Realized Kernels" — *Econometrica* 76 | **Essential** |
-| 3 | Zhang, Mykland & Aït-Sahalia (2005), "A Tale of Two Time Scales" — *JASA* | Recommended |
-| 4 | Liu, Patton & Sheppard (2015), "Does Anything Beat 5-Minute RV?" — *J. Econometrics* | **Essential** |
-| 5 | Patton (2011), "Volatility Forecast Comparison Using Imperfect Volatility Proxies" — *J. Econometrics* | **Essential** |
-| 6 | Hansen, Lunde & Nason (2011), "The Model Confidence Set" — *Econometrica* | **Essential** |
-| 7 | Lee & Mykland (2008), "Jumps in Financial Markets" — *RFS* | Recommended |
+| # | Paper | File | Status |
+|---|---|---|---|
+| 1 | Corsi (2009), "A Simple Approximate Long-Memory Model of Realized Volatility" (HAR) -- *J. Financial Econometrics* | `corsi-2009-har-realized-volatility.pdf` | **Essential** |
+| 2 | Bollerslev, Patton & Quaedvlieg (2016), "Exploiting the Errors" (HARQ) -- *J. Econometrics* | `bollerslev-patton-quaedvlieg-2016-harq.pdf` | **Essential** |
+| 3 | Patton & Sheppard (2015), "Good Volatility, Bad Volatility" (SHAR) -- *RestStat* | `patton-sheppard-2015-good-bad-volatility-shar.pdf` | **Essential** |
+| 4 | Bollerslev, Patton & Quaedvlieg (2018), "Modeling and Forecasting (Un)Reliable Realized Covariances" -- *J. Econometrics* | `bollerslev-patton-quaedvlieg-2018-unreliable-realized-covariances.pdf` | **Essential** |
 
-## B. HAR Family (Baselines to Beat)
+## B. ML for RV -- Core Empirical Evidence
 
-| # | Paper | Status |
-|---|---|---|
-| 8 | Corsi (2009), "A Simple Approximate Long-Memory Model of Realized Volatility" — *J. Financial Econometrics* | **Essential** |
-| 9 | Bollerslev, Patton & Quaedvlieg (2016), "Exploiting the Errors" (HARQ) — *J. Econometrics* | **Essential** |
-| 10 | Patton & Sheppard (2015), "Good Volatility, Bad Volatility" (SHAR) — *RestStat* | **Essential** |
-| 11 | Hansen, Huang & Shek (2012), "Realized GARCH" — *J. Applied Econometrics* | Recommended |
-| 12 | Barndorff-Nielsen, Kinnebrock & Shephard (2010), "Measuring Downside Risk — Realized Semi-variance" | Recommended |
+| # | Paper | File | Status |
+|---|---|---|---|
+| 5 | Christensen, Siggaard & Veliyev (2023), "A Machine Learning Approach to Volatility Forecasting" -- *J. Financial Econometrics* | `christensen-siggaard-veliyev-2023-ml-volatility-forecasting.pdf` | **Essential** |
+| 6 | "HARd to Beat" (2024), "The Overlooked Impact of Rolling Windows in the Era of Machine Learning" -- arXiv 2406.08041 | `hard-to-beat-2024-ml-vs-linear-rv.pdf` | **Essential** |
+| 7 | Bucci (2020), "Realized Volatility Forecasting with Neural Networks" -- *J. Financial Econometrics* | `bucci-2020-rv-forecasting-neural-networks.pdf` | **Essential** |
+| 8 | Rahimikia & Poon (2020), "Machine Learning for Realised Volatility Forecasting" -- SSRN/presentation | `rahimikia-poon-2020-ml-rv-forecasting.pdf` | **Essential** |
+| 9 | Fed (2025), "Linear and Nonlinear Econometric Models Against Machine Learning" -- FEDS Working Paper | `fed-2025-linear-nonlinear-rv-forecasting.pdf` | **Essential** |
 
-## C. Rough Volatility
+## C. Deep Learning & Foundation Models for RV
 
-| # | Paper | Status |
-|---|---|---|
-| 13 | Gatheral, Jaisson & Rosenbaum (2018), "Volatility Is Rough" — *Quantitative Finance* | **Essential** |
-| 14 | Cont & Das (2024), "Rough Volatility: Fact or Artefact?" — *Sankhya B* | **Essential** |
-| 15 | Rosenbaum & Zhang (2022), "On the universality of the volatility formation process" — arXiv 2206.14114 | **Essential** |
-| 16 | Horvath, Muguruza & Tomas (2021), "Deep Learning Volatility" — *Quantitative Finance* | Recommended |
+| # | Paper | File | Status |
+|---|---|---|---|
+| 10 | Moreno-Pino & Zohren (2022), "DeepVol" -- arXiv 2210.04797 | `moreno-pino-zohren-2022-deepvol.pdf` | **Essential** |
+| 11 | Foundation Time-Series AI Model for RV Forecasting (2025) -- arXiv 2505.11163 | `foundation-model-rv-forecasting-2025.pdf` | **Essential** |
+| 12 | Data-Efficient RV Forecasting with Vision Transformers (2025) -- arXiv 2511.03046 | `vision-transformer-rv-2025.pdf` | Recommended |
+| 13 | Time-Series Foundation Model for VaR (2024) -- arXiv 2410.11773 | `time-series-foundation-model-var-2024.pdf` | Recommended |
+| 14 | Transfer Learning for RV of New Issues & Spin-Offs (2025) -- arXiv 2503.12648 | `transfer-learning-rv-new-issues-2025.pdf` | Recommended |
 
-## D. ML for RV — Core Empirical Evidence
+## D. Multivariate / Graph-Based RV
 
-| # | Paper | Status |
-|---|---|---|
-| 17 | Christensen, Siggaard & Veliyev (2023), "A Machine Learning Approach to Volatility Forecasting" — *J. Financial Econometrics* | **Essential** |
-| 18 | Rahimikia & Poon (2020), "Machine Learning for Realised Volatility Forecasting" — SSRN 3707796 | **Essential** |
-| 19 | Branco, Rubesam & Zevallos (2024), "Forecasting RV: Does Anything Beat Linear Models?" — *J. Empirical Finance* | **Essential** |
-| 20 | "HARd to Beat" (2024) — arXiv 2406.08041 | **Essential** |
-| 21 | Bucci (2020), "Realized Volatility Forecasting with Neural Networks" — *J. Financial Econometrics* | Recommended |
-| 22 | Moreno-Pino & Zohren (2022), "DeepVol" — arXiv 2210.04797 | Recommended |
-| 23 | Sirignano & Cont (2019), "Universal features of price formation" — *Quantitative Finance* | Recommended |
-| 24 | Chen & Robert (2022), "Multivariate RV Forecasting with Graph Neural Network" — ACM ICAIF | **Essential** |
-| 25 | Zhang, Cucuringu & Dong (2024), "Graph-Based Methods for Forecasting Realized Covariances" — *J. Financial Econometrics* | **Essential** |
-| 26 | Audrino & Knaus (2016), "Lassoing the HAR Model" — *Econometric Reviews* | Recommended |
+| # | Paper | File | Status |
+|---|---|---|---|
+| 15 | Chen & Robert (2022), "Multivariate Realized Volatility Forecasting with Graph Neural Network" -- ACM ICAIF | `chen-robert-2022-gnn-multivariate-rv.pdf` | **Essential** |
+| 16 | SpotV2Net (2024), "Multivariate Intraday Spot Volatility via Vol-of-Vol GATs" -- arXiv 2401.06249 | `spotv2net-2024-intraday-vol-gat.pdf` | **Essential** |
 
-## E. VRP and Options-Implied
+## E. Rough Volatility
 
-| # | Paper | Status |
-|---|---|---|
-| 27 | Bollerslev, Tauchen & Zhou (2009), "Expected Stock Returns and Variance Risk Premia" — *RFS* | **Essential** |
-| 28 | Bollerslev, Li & Todorov (2015), "Tail Risk Premia and Return Predictability" — *JFE* | Recommended |
+| # | Paper | File | Status |
+|---|---|---|---|
+| 17 | Gatheral, Jaisson & Rosenbaum (2018), "Volatility Is Rough" -- *Quantitative Finance* | `gatheral-jaisson-rosenbaum-2018-volatility-is-rough.pdf` | **Essential** |
+| 18 | Cont & Das (2024), "Rough Volatility: Fact or Artefact?" -- *Sankhya B* | `cont-das-2024-rough-volatility-fact-or-artefact.pdf` | **Essential** |
+| 19 | Rosenbaum & Zhang (2022), "On the Universality of the Volatility Formation Process" -- arXiv 2206.14114 | `rosenbaum-zhang-2022-universality-volatility-formation.pdf` | Recommended |
 
-## F. Multivariate / Cross-Asset
+## Papers Still Needed (paywalled)
 
-| # | Paper | Status |
-|---|---|---|
-| 29 | Bollerslev, Patton & Quaedvlieg (2018), "Modeling and Forecasting (Un)Reliable Realized Covariances" — *J. Econometrics* | **Essential** |
-| 30 | Bollerslev, Li, Patton & Quaedvlieg (2020), "Realized Semicovariances" — *Econometrica* | **Essential** |
-| 31 | Diebold & Yilmaz (2009/2012/2014), Connectedness/Spillovers — *Econ. Journal*, *IJF*, *J. Econometrics* | Recommended |
+- Branco, Rubesam & Zevallos (2024), "Forecasting RV: Does Anything Beat Linear Models?" -- *J. Empirical Finance*
+- Andersen, Bollerslev, Diebold & Labys (2003), "Modeling and Forecasting Realized Volatility" -- *Econometrica*
+- Barndorff-Nielsen, Hansen, Lunde & Shephard (2008), "Designing Realized Kernels" -- *Econometrica*
+- Liu, Patton & Sheppard (2015), "Does Anything Beat 5-Minute RV?" -- *J. Econometrics*
+- Hansen, Lunde & Nason (2011), "The Model Confidence Set" -- *Econometrica*
+- Bollerslev, Tauchen & Zhou (2009), "Expected Stock Returns and Variance Risk Premia" -- *RFS*
 
-## G. Methodology
-
-| # | Paper | Status |
-|---|---|---|
-| 32 | López de Prado (2018), *Advances in Financial Machine Learning* — Wiley | **Essential** |
-
-## H. Code & Data
+## Data Resources
 
 | Resource | Notes |
 |---|---|
@@ -77,6 +63,6 @@ Papers marked **Essential** are required reading for the project. **Recommended*
 | VOLARE (2025) | Open-access successor to Oxford-Man |
 | Optiver Kaggle (2021) | Free LOB data for intraday RV |
 | LOBSTER | L2/L3 NASDAQ LOB (paid academic subscription, free sample) |
-| Kevin Sheppard's `arch` | Python: GARCH, HAR, MCS, bootstrap. Essential code resource |
+| Kevin Sheppard's `arch` | Python: GARCH, HAR, MCS, bootstrap |
 | Nixtla NeuralForecast | N-BEATS, N-HiTS, PatchTST, TFT implementations |
 | `highfrequency` R package | All major realized estimators, jump tests, multivariate kernels |

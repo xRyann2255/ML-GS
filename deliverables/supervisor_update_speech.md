@@ -1,0 +1,9 @@
+# Supervisor Update -- 2 Minute Speech
+
+I've been spending the last few weeks doing a deep literature review on ML methods for forecasting realized volatility. The project exploits Goldman's internal tick-data infrastructure -- Chunk Store and TSDB -- to forecast realized volatility for 30 liquid S&P 500 constituents. The broad idea is to extract high-frequency features and see if machine learning can beat the traditional linear models currently used for vol forecasting.
+
+I have a few project directions scoped out that I want to run by people -- for example, training a universal LSTM pooled across all 30 names to learn a shared volatility formation process, rather than fitting each stock independently, which recent research has shown consistently outperforms asset-specific models. I've been working closely with Oriol Lozano who's been guiding my direction and course correcting me on what's realistic and useful for the desk. I also plan to have chats with Chris Miller and George Pampalis, and more broadly meet with others on the vol team.
+
+The main aim here is infrastructure. Even in the worst case where my model doesn't outperform existing approaches, I want to leave behind a fully modular data extraction pipeline that pulls all the relevant features from Chunk Store and TSDB into a clean feature set. That way anyone on the team can plug in different models afterwards. Oriol mentioned that if the project does produce good results, he'd be happy to implement it in his systems, so there's a clear path from research to production.
+
+In terms of next steps, I'm auditing what data I actually have access to so I can lock in the final scope. I'm planning to have a short-term deliverable in about two weeks focused on milestones for building out that data pipeline. I've been documenting everything as I go so there's a full record of decisions made and why.
