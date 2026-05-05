@@ -216,12 +216,69 @@ Empirically, $\log \RV$ behaves like the top-left panel.}
 \label{fig:hurst-paths}
 \end{figure}
 
+\begin{projectconnection}[Why This Matters]
+The Hurst exponent is the single number that determines how fast volatility autocorrelations decay.
+With $H \approx 0.1$, the decay is slow enough that observations from weeks ago still carry predictive power for tomorrow's volatility.
+This is exactly the long-memory structure that HAR approximates with its daily/weekly/monthly components, and the reason HAR works as well as it does as a forecasting baseline.
+\end{projectconnection}
+
 \begin{keyidea}[Roughness Means $H < 1/2$]
 A process is called ``rough'' when its Hurst exponent satisfies $H < 1/2$.
 The path is more jagged than Brownian motion, and its increments are negatively correlated.
 The lower $H$ is, the rougher the path.
 Empirical log-volatility has $H \approx 0.1$, which is far into the rough regime.
 \end{keyidea}
+
+Figure~\ref{fig:hurst-number-line} provides a compact reference for how different $H$ values map to path behavior and real-world examples.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+% ── Main number line ──
+\draw[thick, -{Stealth[length=3mm]}] (-0.3,0) -- (12.5,0);
+\node[below, font=\scriptsize] at (12.5,-0.1) {$H$};
+
+% Tick marks and labels
+\foreach \x/\lab in {0/0, 2.4/0.1, 6/0.5, 8.4/0.7, 12/1.0} {
+  \draw[thick] (\x,0.15) -- (\x,-0.15);
+  \node[below, font=\small] at (\x,-0.2) {$\lab$};
+}
+
+% Region shading
+\fill[warnred!15] (0,0.5) rectangle (6,1.8);
+\fill[intgreen!15] (6,0.5) rectangle (12,1.8);
+
+% Region labels
+\node[font=\small\bfseries, warnred] at (3,1.45) {Rough ($H < 0.5$)};
+\node[font=\scriptsize, warnred!80!black] at (3,1.05) {anti-persistent, jagged};
+\node[font=\small\bfseries, intgreen] at (9,1.45) {Smooth ($H > 0.5$)};
+\node[font=\scriptsize, intgreen!70!black] at (9,1.05) {persistent, trending};
+
+% Dividing line at H = 0.5
+\draw[defblue, thick, dashed] (6,-0.5) -- (6,2.0);
+\node[above, font=\scriptsize\bfseries, defblue] at (6,2.0) {Standard BM};
+
+% Key markers
+% Empirical log-vol
+\draw[warnred, very thick, -{Stealth[length=2.5mm]}] (2.4,3.2) -- (2.4,0.4);
+\node[above, font=\scriptsize\bfseries, warnred, align=center] at (2.4,3.2) {Empirical\\$\log \RV$};
+\node[above, font=\scriptsize, warnred] at (2.4,2.5) {$H \approx 0.1$};
+
+% Heston/SABR
+\draw[defblue, thick, -{Stealth[length=2.5mm]}] (6,-1.8) -- (6,-0.4);
+\node[below, font=\scriptsize, defblue, align=center] at (6,-1.8) {Heston, SABR\\$H = 0.5$};
+
+% Stock prices
+\draw[intgreen!80!black, thick, -{Stealth[length=2.5mm]}] (8.4,-1.8) -- (8.4,-0.4);
+\node[below, font=\scriptsize, intgreen!80!black, align=center] at (8.4,-1.8) {Some macro\\series};
+
+\end{tikzpicture}
+\caption{The Hurst exponent number line.
+Empirical log-volatility sits at $H \approx 0.1$, deep in the rough regime.
+Standard stochastic volatility models (Heston, SABR) assume $H = 0.5$.
+The gap between 0.1 and 0.5 is the motivation for the entire rough volatility program.}
+\label{fig:hurst-number-line}
+\end{figure}
 
 
 % ═══════════════════════════════════════════════════
@@ -266,6 +323,19 @@ If $X_t$ behaves like fBM with exponent $H$, then $m(q, h) \propto h^{qH}$.
 Taking logs: $\log m(q, h) = qH \cdot \log h + \text{const}$.
 Regressing $\log m(q, h)$ on $\log h$ across multiple lags gives a slope of $qH$, from which $H$ is recovered.
 \end{definition}
+
+\begin{intuition}[In Plain English]
+The variogram asks a simple question: when you look at how much log-volatility changes over a time window, does that change grow quickly or slowly as you widen the window?
+For a standard random walk, doubling the window roughly doubles the variance of the change.
+For rough volatility, doubling the window barely increases the variance at all, because the anti-persistent path keeps reversing direction and staying near its starting point.
+The slope of the log-log plot tells you the Hurst exponent, which quantifies this scaling behavior.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The variogram is your primary diagnostic tool for checking whether your realized volatility series exhibits the rough-vol property.
+Before fitting any model (HAR, RFSV, or LSTM), estimating $H$ from the data tells you whether the long-memory structure that these models exploit is actually present in your specific asset.
+If $\hat{H}$ comes back near 0.1, you have confirmation that multi-scale models like HAR are appropriate; if it comes back near 0.5, simpler AR(1)-type models may suffice.
+\end{projectconnection}
 
 \begin{workedexample}{Estimating $H$ from a Variogram}
 You have $T = 1{,}000$ daily observations of $\log \RV_t$ for the S\&P~500.
@@ -313,6 +383,59 @@ This is close to the $H \approx 0.1$ reported by \citet{GJR2018}.
 The slow increase of $m(2,h)$ with lag (i.e., the low slope) reflects the anti-persistent, rapidly oscillating nature of log-volatility.
 For comparison, a standard Brownian motion would give a slope of $2 \times 0.5 = 1.0$, meaning the variance of increments grows linearly with lag.
 \end{workedexample}
+
+Figure~\ref{fig:variogram-loglog} shows the variogram in log-log coordinates, illustrating how the slope distinguishes rough from smooth processes.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.75\textwidth, height=7cm,
+  xlabel={\small $\log_{10} h$ (lag)},
+  ylabel={\small $\log_{10} m(2, h)$},
+  xmin=-0.2, xmax=1.5,
+  ymin=-1.8, ymax=0.2,
+  xtick={0, 0.301, 0.699, 1.0, 1.301},
+  xticklabels={$0$, $0.3$, $0.7$, $1.0$, $1.3$},
+  tick label style={font=\scriptsize},
+  xlabel style={font=\small},
+  ylabel style={font=\small},
+  axis lines=left,
+  grid=major, grid style={gray!15},
+  legend style={at={(0.03,0.97)}, anchor=north west, font=\scriptsize, draw=gray!50},
+]
+
+% Rough vol line: slope = 2H = 0.2 (H = 0.1)
+\addplot[warnred, very thick, domain=-0.1:1.4] {0.2*x - 1.30};
+\addlegendentry{$H = 0.1$ (rough vol): slope $= 0.2$}
+
+% Standard BM line: slope = 2H = 1.0 (H = 0.5)
+\addplot[defblue, thick, dashed, domain=-0.1:1.4] {1.0*x - 1.30};
+\addlegendentry{$H = 0.5$ (standard BM): slope $= 1.0$}
+
+% Smooth/trending line: slope = 2H = 1.4 (H = 0.7)
+\addplot[intgreen, thick, dotted, domain=-0.1:1.4] {1.4*x - 1.30};
+\addlegendentry{$H = 0.7$ (smooth): slope $= 1.4$}
+
+% Data points for rough vol (from the worked example)
+\addplot[only marks, mark=*, mark size=2.5pt, warnred] coordinates {
+  (0.000, -1.301) (0.301, -1.229) (0.699, -1.131)
+  (1.000, -1.056) (1.301, -0.983)
+};
+
+% Annotation: slope bracket
+\draw[thick, gray, decorate, decoration={brace, amplitude=5pt, mirror}]
+  (axis cs:1.35, {0.2*1.35-1.30}) -- (axis cs:1.35, {1.0*1.35-1.30})
+  node[midway, right=6pt, font=\scriptsize, align=left, gray] {gap $=$ why\\standard models\\miss long memory};
+
+\end{axis}
+\end{tikzpicture}
+\caption{Variogram in log-log coordinates for three Hurst exponent values.
+The red line and data points ($H = 0.1$) show the flat slope characteristic of rough volatility: variance of increments grows very slowly with lag.
+The blue dashed line ($H = 0.5$) shows standard Brownian motion with a steep slope of 1.0.
+The gap between the two slopes quantifies how much standard diffusion models underestimate the persistence of volatility.}
+\label{fig:variogram-loglog}
+\end{figure}
 
 \begin{keyresult}[\citet{BLP2022}: Cross-Asset Universality]
 \citet{BLP2022} extend the analysis of \citet{GJR2018} to a broad cross-section of asset classes (equities, equity indices, FX, fixed income, commodities) and confirm that $H \approx 0.1$ is universal.
@@ -382,6 +505,13 @@ At $H = 0.1$, you are close to the second extreme.
 The weight on an observation from 22 days ago (one month) is still roughly 15--20\% of the weight on yesterday's observation.
 This is why HAR's monthly component ($\RV^{(m)}$) carries a large coefficient in Chapter~\ref{ch:har}: it is picking up the long tail of the RFSV weight function.
 \end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+RFSV is both a benchmark and a diagnostic for your vol forecasting project.
+As a benchmark, it tells you what a single-parameter model can achieve: if your ML model (LSTM, transformer) cannot beat RFSV out of sample, the added complexity is not justified.
+As a diagnostic, the RFSV weight function shows you exactly which lags carry information.
+If your ML model's learned attention pattern or feature importances do not roughly match the $k^{-1.4}$ decay shape, either the model has found genuinely new structure or it is overfitting.
+\end{projectconnection}
 
 \begin{workedexample}{Comparing RFSV Weights to HAR Structure}
 Consider a simplified RFSV with $H = 0.1$ and 22 past observations.
@@ -584,6 +714,13 @@ Chapter~\ref{ch:dl-vol} covers LSTMs in detail.
 This convergence is suggestive.
 Two very different approaches (a parametric fBM model with one parameter and a nonparametric neural network with thousands of parameters) arrive at the same forecast.
 The natural interpretation is that both are learning the same underlying statistical regularity in $\RV$ data.
+
+\begin{projectconnection}[Why This Matters]
+The universal LSTM result sets a clear success criterion for your project.
+If your deep learning model converges to the same forecast as RFSV (a one-parameter model), you have learned the rough-vol kernel but nothing beyond it, and RFSV wins on parsimony.
+To justify an LSTM or transformer, you need to demonstrate statistically significant improvement via Diebold-Mariano tests, not just lower in-sample QLIKE.
+The universality property also suggests that training on a broad cross-section of assets (rather than a single stock) may improve generalization.
+\end{projectconnection}
 
 \begin{keyidea}[Practical Equivalence Despite Theoretical Ambiguity]
 Whether spot volatility is truly rough or the roughness is an artefact of estimation noise (Section~\ref{sec:fact-or-artefact}), both RFSV and universal LSTM exploit the same statistical regularity in realized volatility estimates.
