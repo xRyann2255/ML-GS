@@ -785,6 +785,138 @@ This is only approximate (it assumes returns are normal and ignores the risk-pre
 
 
 % ═══════════════════════════════════════════════════════
+\section{Variance Swaps: Trading Realized Volatility}\label{sec:var-swap}
+% ═══════════════════════════════════════════════════════
+
+\begin{prereq}[Background for This Section]
+This section requires:
+\begin{itemize}[nosep]
+  \item The model-free implied variance integral (Section~\ref{sec:model-free}).
+  \item The VIX construction and interpretation (Section~\ref{sec:vix}).
+  \item Realized variance and its estimation (Chapter~\ref{ch:rv}).
+\end{itemize}
+\end{prereq}
+
+VIX tells you the fair price of future variance.
+But how do you actually \emph{trade} it?
+The \textbf{variance swap} is the instrument that lets you take a direct position on realized volatility without managing Greeks day-to-day.
+
+\subsection{Definition and Payoff}
+
+\begin{definition}[Variance Swap]
+A \textbf{variance swap} is an over-the-counter derivative whose payoff at expiry is:
+\begin{equation}
+  \text{Payoff} = N_{\text{var}} \times (\text{RV}^2 - K_{\text{var}})
+  \label{eq:varswap-payoff}
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $N_{\text{var}}$ = the \textbf{variance notional} (dollars per variance point squared).
+  \item $K_{\text{var}}$ = the \textbf{variance strike} (the agreed-upon fair variance level, set at inception so the swap has zero initial value).
+  \item $\text{RV}^2$ = the annualized realized variance of the underlying over the contract period, typically computed from daily log returns.
+\end{itemize}
+The buyer of the swap profits when realized variance exceeds the strike; the seller profits when it falls below.
+\end{definition}
+
+Traders often think in terms of \textbf{vega notional} rather than variance notional, because it is more intuitive.
+The vega notional approximates the dollar P\&L per volatility point (not variance point):
+\begin{equation}
+  N_{\text{vega}} = N_{\text{var}} \times 2\sqrt{K_{\text{var}}}
+  \label{eq:vega-notional}
+\end{equation}
+For example, if $K_{\text{var}} = 0.04$ (i.e., 20\% vol) and you want \$100{,}000 per vol point, then $N_{\text{var}} = N_{\text{vega}} / (2 \times 0.20) = \$250{,}000$ per variance point.
+
+\subsection{Log-Contract Replication}
+
+The theoretical foundation: \citet{BrittenJones2000} and \citet{Carr2009} showed that continuously delta-hedging a portfolio of OTM options weighted by $1/K^2$ replicates the payoff $-2\log(S_T/S_0)$.
+The realized P\&L from this hedge equals the realized variance minus the cost of the portfolio.
+Therefore, the cost of this portfolio -- which is exactly the model-free implied variance integral from Section~\ref{sec:model-free} -- equals the fair variance swap strike $K_{\text{var}}$.
+
+This is the deep connection: the VIX formula (Equation~\ref{eq:vix}) computes the fair strike of a 30-day variance swap on the S\&P~500.
+$\text{VIX}^2 / 10{,}000$ is the annualized $K_{\text{var}}$ for that maturity.
+
+\begin{workedexample}{Discretizing the Variance Swap Strike}
+\label{ex:varswap-strike}
+\textbf{Setup.} Consider an underlying at $S = 100$ with $r = 0$.
+We observe 5 OTM puts and 5 OTM calls with the following mid-market prices.
+Using uniform strike spacing $\Delta K = 5$ for simplicity:
+
+\textbf{Step 1: Compute weights.}
+For each option, the weight from the model-free integral discretization is:
+\[
+  w_i = \frac{2\,\Delta K_i}{K_i^2}
+\]
+
+\textbf{Step 2: Compute contributions.}
+Each option's contribution to $K_{\text{var}}$ is $w_i \times Q_i$, where $Q_i$ is the option price.
+
+\begin{center}
+\begin{tabular}{@{}rllccc@{}}
+\toprule
+$K$ & Type & Price $Q_i$ & $\Delta K$ & Weight $w_i$ & Contribution $w_i \times Q_i$ \\
+\midrule
+80  & Put  & 0.22 & 5 & $2 \times 5 / 80^2 = 0.001563$ & 0.000344 \\
+85  & Put  & 0.45 & 5 & $2 \times 5 / 85^2 = 0.001384$ & 0.000623 \\
+90  & Put  & 0.95 & 5 & $2 \times 5 / 90^2 = 0.001235$ & 0.001173 \\
+95  & Put  & 2.10 & 5 & $2 \times 5 / 95^2 = 0.001108$ & 0.002327 \\
+98  & Put  & 3.40 & 5 & $2 \times 5 / 98^2 = 0.001041$ & 0.003539 \\
+\addlinespace
+102 & Call & 3.20 & 5 & $2 \times 5 / 102^2 = 0.000961$ & 0.003076 \\
+105 & Call & 1.85 & 5 & $2 \times 5 / 105^2 = 0.000907$ & 0.001678 \\
+110 & Call & 0.80 & 5 & $2 \times 5 / 110^2 = 0.000826$ & 0.000661 \\
+115 & Call & 0.30 & 5 & $2 \times 5 / 115^2 = 0.000756$ & 0.000227 \\
+120 & Call & 0.10 & 5 & $2 \times 5 / 120^2 = 0.000694$ & 0.000069 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Step 3: Sum all contributions.}
+\[
+  K_{\text{var}} = \sum_i w_i \times Q_i = 0.000344 + 0.000623 + 0.001173 + 0.002327 + 0.003539
+\]
+\[
+  \quad + \; 0.003076 + 0.001678 + 0.000661 + 0.000227 + 0.000069 = 0.01372
+\]
+
+Annualizing over $T = 30/365 \approx 0.08219$ years:
+\[
+  K_{\text{var}}^{\text{ann}} = \frac{K_{\text{var}}}{T} = \frac{0.01372}{0.08219} \approx 0.0389
+\]
+
+\textbf{Step 4: Convert to implied vol.}
+\[
+  \sqrt{K_{\text{var}}^{\text{ann}}} = \sqrt{0.0389} \approx 19.7\%
+\]
+
+If VIX $= 20$, then $\text{VIX}^2/10{,}000 = 0.0400$.
+Our discrete approximation gives 0.0389.
+The gap is truncation error from missing strikes below 80 and above 120, where additional OTM options would contribute small but positive increments to the sum.
+\end{workedexample}
+
+\begin{intuition}[Trading Your Vol Forecast Directly]
+A variance swap lets you monetize your RV forecast without managing delta, gamma, or theta.
+If you believe next-month RV will be 22\% but the var swap strike is $K_{\text{var}}$ corresponding to 19\%, you buy the swap.
+At expiry your P\&L is simply $N_{\text{var}} \times (0.22^2 - 0.19^2) = N_{\text{var}} \times 0.0123$.
+No path dependence before expiry settlement, no Greeks to manage -- just a pure bet on realized variance.
+\end{intuition}
+
+\begin{warning}[Convexity and Mark-to-Market]
+A \textbf{volatility swap} (payoff $= \sigma_{\text{realized}} - K_{\text{vol}}$) is NOT the same as a variance swap.
+Because $\mathbb{E}[\sigma] < \sqrt{\mathbb{E}[\sigma^2]}$ (Jensen's inequality), the vol swap strike is lower than $\sqrt{K_{\text{var}}}$.
+The gap depends on the volatility of volatility (vol-of-vol, Chapter~\ref{ch:vrp} Section~\ref{sec:vvix}).
+Also: before expiry, variance swaps have substantial mark-to-market risk as implied vol moves.
+A position can be deeply underwater mid-life even if it ultimately settles in your favor.
+\end{warning}
+
+\begin{application}[Project Connection]
+The variance swap makes the VRP a tradeable quantity.
+$\text{VIX}^2/10{,}000$ minus your forecast of 30-day RV $=$ variance risk premium (Chapter~\ref{ch:vrp}).
+If your ML model forecasts RV more accurately than the market-implied $K_{\text{var}}$, you can systematically harvest the mispricing.
+This is the core mechanism behind Project~5 (VRP ML Trader).
+\end{application}
+
+
+% ═══════════════════════════════════════════════════════
 \section{Connecting the Vol Surface to Volatility Forecasting}
 \label{sec:surface-to-forecasting}
 % ═══════════════════════════════════════════════════════
