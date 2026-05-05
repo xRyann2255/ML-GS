@@ -144,3 +144,49 @@ For your internship deliverable, the key table is:
 \end{enumerate}
 This single table communicates economic value in the language every systematic desk speaks.
 \end{application}
+
+% ═══════════════════════════════════════════════════
+\section{Dealer Gamma and Structured Products Feedback}
+\label{sec:dealer-gamma}
+% ═══════════════════════════════════════════════════
+
+Beyond statistical forecasting, volatility is shaped by the mechanical hedging behavior of options dealers.
+When dealers hold large gamma positions, their hedging creates predictable effects on realized vol.
+Understanding this mechanism gives you both a novel feature and a deeper appreciation for what your model is capturing.
+
+\subsection{How Dealer Hedging Amplifies or Suppresses Vol}
+
+When dealers are \textbf{long gamma} (they own options), they delta-hedge by selling into rallies and buying dips.
+This mean-reversion pressure suppresses realized volatility below what pure news flow would generate.
+Conversely, when dealers are \textbf{short gamma} (common after selling structured products like autocallables), they hedge by buying into rallies and selling into dips, amplifying moves and increasing realized vol.
+
+\begin{keyidea}[GEX as a Volatility Feature]
+\textbf{Gamma Exposure (GEX)} estimates the net dealer gamma across all strikes from publicly available options open interest data.
+The estimate is approximate but directionally informative:
+\begin{equation}\label{eq:gex}
+  \text{GEX} \approx \sum_{\text{strikes}\,K} \text{OI}_K \times \Gamma_K \times 100 \times S
+\end{equation}
+\begin{itemize}[nosep]
+  \item Positive GEX (dealers long gamma): expect lower-than-forecast RV (mean reversion).
+  \item Negative GEX (dealers short gamma): expect higher-than-forecast RV (momentum/amplification).
+\end{itemize}
+Adding $\text{sign}(\text{GEX})$ or GEX-quintile as a feature to HAR-X is a novel extension not yet thoroughly explored in the academic literature \citep{Bennett2014}.
+\end{keyidea}
+
+\subsection{Structured Products and the Short-Gamma Overhang}
+
+The primary source of dealer short-gamma exposure is structured products (autocallables, barrier options, worst-of notes).
+These products embed knock-in/knock-out barriers near current spot levels.
+As spot approaches a barrier, the product's gamma becomes very negative, forcing dealers to hedge aggressively.
+The systematic issuance of these products (estimated at hundreds of billions of notional globally) creates a permanent structural short-gamma overhang in equity index markets.
+
+\subsection{Pin Risk at Expiry}
+
+Near options expiry, large open interest at specific strikes creates \textbf{pinning} effects: the stock gravitates toward the strike as dealers' gamma hedging intensifies near that level.
+This suppresses realized vol on expiry days, a calendar effect (Section~\ref{sec:feat-calendar}) with a mechanical explanation.
+
+\begin{application}[Novel HAR-X Features from Dealer Positioning]
+Dealer positioning features (GEX, distance to nearest barrier level, net open interest by strike) represent a genuinely novel addition to standard HAR-X feature sets.
+They are publicly computable from options market data and capture a mechanism (mechanical hedging feedback) that is distinct from any feature based on past returns or past RV.
+For your internship, including a GEX feature and documenting its incremental predictive power would demonstrate awareness of market microstructure that goes beyond the academic literature.
+\end{application}
