@@ -1,5 +1,5 @@
 % ══════════════════════════════════════════════════════════════
-% Chapter 14 — Realized Covariance and Multivariate Forecasting
+% Chapter 14 -- Realized Covariance and Multivariate Forecasting
 % ══════════════════════════════════════════════════════════════
 
 \chapter{Realized Covariance and Multivariate Forecasting}\label{ch:multivariate}
@@ -51,6 +51,98 @@ Under no noise and synchronous trading, $\mathbf{RC}_t$ converges to the
 integrated covariance matrix as $M \to \infty$
 \citep{BarndorffNielsenHansenLundeShephard2011}.
 \end{definition}
+
+\begin{projectconnection}[Why This Matters]
+You are not just forecasting one stock's volatility. Portfolio construction,
+hedging, and risk management all require the full covariance matrix. Realized
+covariance extends your RV pipeline (Chapter~\ref{ch:rv}) from a single number
+per day to a $p \times p$ matrix per day, with $p(p+1)/2$ unique entries. For
+$p = 50$ assets, that is 1{,}275 quantities to estimate and forecast daily.
+This is the starting point for Project Direction~3 (Multivariate RC with GNNs).
+\end{projectconnection}
+
+% ── TikZ: Covariance matrix heatmap schematic ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=0.45]
+  % Draw the matrix grid
+  \def\n{10}
+
+  % Sector blocks - Tech (assets 1-4), Finance (5-7), Energy (8-10)
+  % High covariance (dark fill) within sector, low (light fill) across sector
+
+  % Tech block (top-left 4x4) - strong covariance
+  \foreach \i in {0,...,3} {
+    \foreach \j in {0,...,3} {
+      \pgfmathsetmacro{\shade}{ifthenelse(\i==\j, 90, 55+5*rnd)}
+      \fill[defblue!\shade!white] (\i, \n-1-\j) rectangle ++(1,1);
+    }
+  }
+
+  % Finance block (middle 3x3) - strong covariance
+  \foreach \i in {4,...,6} {
+    \foreach \j in {4,...,6} {
+      \pgfmathsetmacro{\shade}{ifthenelse(\i==\j, 90, 50+5*rnd)}
+      \fill[keyorange!\shade!white] (\i, \n-1-\j) rectangle ++(1,1);
+    }
+  }
+
+  % Energy block (bottom-right 3x3) - strong covariance
+  \foreach \i in {7,...,9} {
+    \foreach \j in {7,...,9} {
+      \pgfmathsetmacro{\shade}{ifthenelse(\i==\j, 90, 55+5*rnd)}
+      \fill[warnred!\shade!white] (\i, \n-1-\j) rectangle ++(1,1);
+    }
+  }
+
+  % Cross-sector blocks - weak covariance (light gray)
+  \foreach \i in {0,...,3} {
+    \foreach \j in {4,...,6} {
+      \fill[gray!15] (\i, \n-1-\j) rectangle ++(1,1);
+      \fill[gray!15] (\j, \n-1-\i) rectangle ++(1,1);
+    }
+  }
+  \foreach \i in {0,...,3} {
+    \foreach \j in {7,...,9} {
+      \fill[gray!15] (\i, \n-1-\j) rectangle ++(1,1);
+      \fill[gray!15] (\j, \n-1-\i) rectangle ++(1,1);
+    }
+  }
+  \foreach \i in {4,...,6} {
+    \foreach \j in {7,...,9} {
+      \fill[gray!20] (\i, \n-1-\j) rectangle ++(1,1);
+      \fill[gray!20] (\j, \n-1-\i) rectangle ++(1,1);
+    }
+  }
+
+  % Grid lines
+  \draw[gray!50, thin] (0,0) grid (\n, \n);
+  \draw[thick] (0,0) rectangle (\n, \n);
+
+  % Sector labels
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}]
+    (0, -0.3) -- (4, -0.3) node[midway, below=6pt, font=\small]{Tech};
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}]
+    (4, -0.3) -- (7, -0.3) node[midway, below=6pt, font=\small]{Finance};
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}]
+    (7, -0.3) -- (10, -0.3) node[midway, below=6pt, font=\small]{Energy};
+
+  % Annotations
+  \node[right, font=\small, align=left] at (11, 8) {Dark = high covariance};
+  \node[right, font=\small, align=left] at (11, 7) {Light = low covariance};
+  \node[right, font=\small, align=left] at (11, 5.5) {Block structure:};
+  \node[right, font=\small, align=left] at (11, 4.7) {within-sector pairs};
+  \node[right, font=\small, align=left] at (11, 3.9) {co-move strongly};
+
+  % Dimension annotation
+  \draw[<->, thick] (0, 10.5) -- (10, 10.5) node[midway, above, font=\small]{$p$ assets};
+\end{tikzpicture}
+\caption{Schematic of a realized covariance matrix with $p = 10$ assets sorted
+by sector. The block-diagonal structure (strong within-sector covariance, weak
+cross-sector) is a key pattern that CNNs and factor models exploit. The diagonal
+entries are the realized variances from Chapter~\ref{ch:rv}.}
+\label{fig:rc-heatmap}
+\end{figure}
 
 \subsection{The Synchronicity Problem}
 
@@ -128,6 +220,24 @@ Hayashi--Yoshida realized covariance is
   \item Not guaranteed positive semi-definite (PSD) for $p > 2$.
 \end{itemize}
 \end{definition}
+
+\begin{intuition}[In Plain English]
+The Hayashi--Yoshida estimator says: if two assets' return intervals overlap in
+time at all, their returns carry information about comovement. Instead of
+forcing both assets onto a common clock (which throws away data), HY simply
+multiplies every pair of returns whose time intervals share any overlap and sums
+the products. It is like computing a dot product, but one that uses every
+available trade rather than only the synchronized ones.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Real equity data is messy: liquid large-caps trade every second while
+small-caps may go minutes between prints. If your project universe mixes
+liquid and illiquid names, naive RC biases covariances toward zero (the Epps
+effect), understating diversification benefits. The Hayashi--Yoshida estimator
+is the go-to fix for building an unbiased daily covariance matrix from raw
+trade data before feeding it into HAR-DRD or a GNN forecaster.
+\end{projectconnection}
 
 \begin{workedexample}{Hayashi--Yoshida with 2 Assets}
 Suppose on one day, asset A trades at times $\{0, 2, 5, 8\}$ with prices
@@ -226,6 +336,15 @@ The rate of convergence is $M^{-1/5}$ (slower than the noise-free $M^{-1/2}$),
 the same price paid in the univariate case.
 \end{keyresult}
 
+\begin{projectconnection}[Why This Matters]
+If your project uses high-frequency data to build daily covariance matrices,
+the multivariate realized kernel is the ``gold standard'' estimator: it handles
+both microstructure noise and non-synchronous trading while guaranteeing that
+the output is a valid (PSD) covariance matrix. This means you can feed $\mathbf{K}_t$
+directly into a portfolio optimizer or a downstream forecasting model (HAR-DRD,
+GNN) without worrying about negative eigenvalues.
+\end{projectconnection}
+
 
 % ──────────────────────────────────────────────────────────────
 \section{DCC-GARCH}\label{sec:multivariate:dcc}
@@ -318,6 +437,16 @@ only two free parameters ($\alpha$, $\beta$) regardless of dimension.
 \end{itemize}
 \end{warning}
 
+\begin{projectconnection}[Why This Matters]
+DCC-GARCH is the parametric baseline you should beat. It plays the same role
+in multivariate vol forecasting that plain GARCH plays in univariate: simple,
+well-understood, and surprisingly competitive. In a Diebold-Mariano test
+comparing your ML covariance forecasts against DCC, a statistically significant
+QLIKE improvement is the clearest evidence that high-frequency data and
+nonlinear models add value beyond what a two-parameter correlation dynamic
+can capture.
+\end{projectconnection}
+
 
 % ──────────────────────────────────────────────────────────────
 \section{Wishart Autoregressive (WAR) Model}\label{sec:multivariate:war}
@@ -354,6 +483,25 @@ naturally:
 where $\overline{\mathbf{RC}}_t^{(w)}$ and $\overline{\mathbf{RC}}_t^{(m)}$
 are averages over the past 5 and 22 trading days.
 \end{keyidea}
+
+\begin{intuition}[In Plain English]
+The WAR model is the matrix version of an AR(1) for time series. Instead of
+saying ``tomorrow's variance equals a constant plus a fraction of today's
+variance,'' it says ``tomorrow's covariance \emph{matrix} equals an intercept
+matrix plus a transformation of today's covariance matrix.'' The sandwich
+form $A\,\mathbf{RC}_t\,A^\top$ ensures the output remains symmetric (just as
+$\mathbf{RC}_t$ is), and the Wishart distribution is the natural error
+distribution for random matrices that must be positive semi-definite.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+WAR is conceptually the cleanest multivariate extension of HAR: model the
+whole matrix as one object. In practice, the curse of dimensionality kills it.
+With $p = 50$ assets, the coefficient matrix $A$ alone has 2{,}500 parameters,
+far exceeding typical sample sizes. This motivates the decomposition strategies
+(DRD, Cholesky) and graph-based approaches you would actually use in a GS
+project, where $p$ could easily be 50--500.
+\end{projectconnection}
 
 \begin{warning}[Parameter Explosion]
 Each coefficient matrix $A$ has $p^2$ free parameters. For $p = 50$ assets,
@@ -396,6 +544,75 @@ Then model $D_t$ and $R_t$ separately:
 \end{itemize}
 Reassemble: $\widehat{\mathbf{RC}}_{t+1} = \hat{D}_{t+1}\,\hat{R}_{t+1}\,\hat{D}_{t+1}$.
 \end{keyidea}
+
+\begin{intuition}[In Plain English]
+DRD says: instead of trying to forecast all $p(p+1)/2$ entries of a covariance
+matrix at once, split the problem into two simpler pieces. First, forecast how
+volatile each asset will be tomorrow (the diagonal, which you already know how
+to do with HAR/HARQ). Second, forecast how correlated each pair will be (the
+off-diagonal, after normalizing). Then multiply them back together. This
+``divide and conquer'' approach lets you reuse your best univariate tools on
+each piece.
+\end{intuition}
+
+% ── TikZ: DRD decomposition schematic ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth, node distance=0.8cm,
+    matbox/.style={draw, thick, minimum width=1.8cm, minimum height=1.8cm,
+                   font=\small, align=center}]
+
+  % RC matrix
+  \node[matbox, fill=gray!15] (rc) {$\mathbf{RC}_t$\\{\scriptsize full}\\{\scriptsize covariance}};
+
+  % Equals sign
+  \node[right=0.6cm of rc, font=\Large] (eq) {$=$};
+
+  % D matrix
+  \node[matbox, right=0.6cm of eq, fill=defblue!20] (d1) {$D_t$\\{\scriptsize diagonal}\\{\scriptsize volatilities}};
+
+  % Times sign
+  \node[right=0.3cm of d1, font=\Large] (t1) {$\times$};
+
+  % R matrix
+  \node[matbox, right=0.3cm of t1, fill=keyorange!20] (r) {$R_t$\\{\scriptsize correlation}\\{\scriptsize matrix}};
+
+  % Times sign
+  \node[right=0.3cm of r, font=\Large] (t2) {$\times$};
+
+  % D matrix again
+  \node[matbox, right=0.3cm of t2, fill=defblue!20] (d2) {$D_t$\\{\scriptsize diagonal}\\{\scriptsize volatilities}};
+
+  % Arrows to forecasting models below
+  \node[flowblock, fill=defblue!10, below=1.2cm of d1, minimum width=2.2cm,
+        font=\small, align=center] (har) {HAR / HARQ\\per asset};
+  \node[flowblock, fill=keyorange!10, below=1.2cm of r, minimum width=2.2cm,
+        font=\small, align=center] (harcorr) {HAR on Fisher\\$z$-transformed\\correlations};
+
+  \draw[arrow] (d1) -- (har);
+  \draw[arrow] (r) -- (harcorr);
+
+  % Labels
+  \node[defblue, font=\scriptsize, below=0.1cm of har] {$p$ univariate models};
+  \node[keyorange, font=\scriptsize, below=0.1cm of harcorr]
+    {$\binom{p}{2}$ univariate models};
+\end{tikzpicture}
+\caption{The DRD decomposition separates the covariance matrix into volatilities
+(modeled individually with HAR/HARQ) and correlations (modeled with HAR on
+Fisher $z$-transforms). Each piece is forecast with simple univariate models,
+then reassembled.}
+\label{fig:drd-decomp}
+\end{figure}
+
+\begin{projectconnection}[Why This Matters]
+HAR-DRD is arguably the strongest conventional baseline for multivariate vol
+forecasting. It directly extends the HARQ framework your project builds on:
+you can apply the $\sqrt{\mathrm{RQ}}$ measurement-error correction from
+Chapter~\ref{ch:har} to each variance element, improving forecasts on noisy
+days. If Project Direction~3 (GNN) is to justify its complexity, it must beat
+HAR-DRD on QLIKE across the full covariance matrix, not just on individual
+variances.
+\end{projectconnection}
 
 \begin{keyresult}[Separate Modeling Beats Joint]
 \citet{BollerslevPattonQuaedvlieg2018} show that the DRD decomposition, where
@@ -569,6 +786,25 @@ where
 \end{itemize}
 \end{keyidea}
 
+\begin{intuition}[In Plain English]
+Graph-HAR says: an asset's future volatility depends not only on its own past
+(the standard HAR terms) but also on what is happening to its neighbors. The
+``neighborhood'' is defined by the graph: assets that are highly correlated form
+a cluster, and when one member's volatility spikes, the others tend to follow.
+The extra term $\gamma \sum_k W_{jk}\,\RV_{k,t}$ is simply a weighted average
+of yesterday's volatility across connected assets, capturing spillover effects
+that a univariate model would miss entirely.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This is the linear foundation for Project Direction~3 (GNNs). Graph-HAR adds
+one cross-asset spillover term and already improves on standard HAR. The GNN
+extension (below) replaces this linear weighted average with learnable nonlinear
+message passing, potentially capturing richer interaction patterns. Your project
+contribution: show whether the nonlinear GNN spillover term yields statistically
+significant QLIKE gains over the linear Graph-HAR spillover on real equity data.
+\end{projectconnection}
+
 \begin{keyidea}[GNN for Covariance --- \citet{ZhangCucuringuDong2023}]
 Going further, Graph Neural Networks (GNNs) replace the linear spillover term
 with learnable message-passing layers:
@@ -585,6 +821,58 @@ with learnable message-passing layers:
 The advantage over Graph-HAR: nonlinear aggregation and multi-hop
 information flow (asset A learns from asset C through intermediary B).
 \end{keyidea}
+
+% ── TikZ: GNN message passing ──
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth, node distance=2.2cm,
+    assetnode/.style={circle, draw, thick, minimum size=1.1cm, font=\small},
+    msgbox/.style={rectangle, draw, rounded corners, thick, font=\scriptsize,
+                   fill=keyorange!10, minimum width=1.4cm, align=center}]
+
+  % Layer 0 (input)
+  \node[assetnode, fill=defblue!20] (a0) {A};
+  \node[assetnode, fill=defblue!20, below left=1.5cm and 2cm of a0] (b0) {B};
+  \node[assetnode, fill=defblue!20, below right=1.5cm and 2cm of a0] (c0) {C};
+
+  % Edges
+  \draw[thick, gray] (a0) -- (b0);
+  \draw[thick, gray] (a0) -- (c0);
+  \draw[thick, gray!40, dashed] (b0) -- (c0);
+
+  % Layer label
+  \node[above=0.3cm of a0, font=\small\bfseries] {Input features};
+  \node[below=0.1cm of a0, font=\scriptsize, defblue] {$\RV_A^{(d,w,m)}$};
+  \node[below=0.1cm of b0, font=\scriptsize, defblue] {$\RV_B^{(d,w,m)}$};
+  \node[below=0.1cm of c0, font=\scriptsize, defblue] {$\RV_C^{(d,w,m)}$};
+
+  % Arrow to aggregation
+  \node[right=3.5cm of a0] (mid) {};
+  \node[msgbox, above=0.2cm of mid] (agg) {Aggregate\\neighbors};
+  \node[msgbox, below=0.8cm of agg] (upd) {Update\\node $A$};
+
+  \draw[arrow, defblue] (b0.east) .. controls +(1.5,0.5) .. (agg.west);
+  \draw[arrow, defblue] (c0.north east) .. controls +(1,1) .. (agg.south west);
+  \draw[arrow] (agg) -- (upd);
+  \draw[arrow, dashed, gray] (a0) -- (upd);
+
+  % Output
+  \node[assetnode, fill=intgreen!20, right=1.5cm of upd] (out)
+    {$\hat{h}_A$};
+  \draw[arrow] (upd) -- (out);
+  \node[below=0.2cm of out, font=\scriptsize, intgreen, align=center]
+    {Updated\\representation};
+
+  % Annotation
+  \node[right=0.3cm of out, font=\scriptsize, align=left] (ann)
+    {After $K$ layers:\\asset $A$ has\\``seen'' $K$-hop\\neighbors};
+\end{tikzpicture}
+\caption{GNN message passing for one node. Asset A aggregates volatility
+features from its graph neighbors (B and C), then updates its own
+representation. After $K$ message-passing layers, each node has information
+from all assets within $K$ hops, capturing multi-step spillover effects.}
+\label{fig:gnn-message}
+\end{figure}
 
 
 % ──────────────────────────────────────────────────────────────
