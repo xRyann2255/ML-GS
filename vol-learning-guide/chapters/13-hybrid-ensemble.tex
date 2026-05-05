@@ -341,16 +341,16 @@ markets and crisis markets with the same update rule.
 \end{intuition}
 
 GINN replaces the fixed parameters $(\omega, \alpha, \beta)$ with
-time-varying outputs of a neural network $g_\btheta$:
+time-varying outputs of a neural network $g_{\btheta}$:
 \begin{equation}\label{eq:ginn}
   \sigma^2_{t+1} = \omega_t + \alpha_t\,\epsilon_t^2
     + \beta_t\,\sigma^2_t,
   \qquad
-  (\omega_t, \alpha_t, \beta_t) = g_\btheta(\bX_t),
+  (\omega_t, \alpha_t, \beta_t) = g_{\btheta}(\bX_t),
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $g_\btheta(\bX_t)$ --- a small feedforward network (typically 2
+  \item $g_{\btheta}(\bX_t)$ --- a small feedforward network (typically 2
         hidden layers, 32--64 units each) that maps auxiliary features
         $\bX_t$ to time-varying GARCH parameters,
   \item $\omega_t, \alpha_t, \beta_t$ --- the GARCH coefficients at time
@@ -394,7 +394,7 @@ architectural blueprint.
   % Inputs
   \node[block, fill=purple!12] (feat) {Features $\bX_t$};
   \node[block, fill=blue!12, right=2.0cm of feat] (nn)
-       {Neural net $g_\btheta$\\(2 layers, 32 units)};
+       {Neural net $g_{\btheta}$\\(2 layers, 32 units)};
   \node[block, fill=orange!12, right=2.0cm of nn] (params)
        {$(\omega_t, \alpha_t, \beta_t)$\\time-varying};
 

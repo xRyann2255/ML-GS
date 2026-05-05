@@ -429,7 +429,7 @@ Report the $p$-value and let the reader decide.
 
 \begin{warning}[Small-Sample Correction]
 \citet{DieboldMariano1995} derived the test for large samples.
-With fewer than 100 observations, use the modified DM statistic from \citet{HarveyLeybournNewbold1997}, which uses a $t$-distribution with $T-1$ degrees of freedom and applies a finite-sample correction factor.
+With fewer than 100 observations, use the modified DM statistic from \citet{HarveyLeybourneNewbold1997}, which uses a $t$-distribution with $T-1$ degrees of freedom and applies a finite-sample correction factor.
 \end{warning}
 
 
@@ -582,12 +582,11 @@ Worse, if your labels use multi-day returns (e.g., 5-day forward realized varian
 \begin{figure}[ht]
 \centering
 \begin{tikzpicture}[
-  xscale=0.018,
+  x=0.018cm,
   fold/.style={minimum height=0.7cm, anchor=west, font=\small\bfseries},
   purge/.style={minimum height=0.7cm, anchor=west, font=\small, pattern=north east lines, pattern color=warnred!60},
   embargo/.style={minimum height=0.7cm, anchor=west, font=\small, pattern=dots, pattern color=prereqpurple!80}
 ]
-\usetikzlibrary{patterns}
 
 % Timeline axis
 \draw[thick, -{Stealth}] (0,0) -- (680,0);
@@ -871,20 +870,20 @@ You now have all the individual tools. This section assembles them into a practi
 \begin{tikzpicture}[
   node distance=1.1cm,
   every node/.style={font=\small},
-  step/.style={flowblock, minimum width=5cm, minimum height=0.9cm},
+  wfstep/.style={flowblock, minimum width=5cm, minimum height=0.9cm},
   decision/.style={decisionblock, minimum width=3cm, inner sep=3pt},
 ]
 % Steps
-\node[step, fill=prereqpurple!10] (reserve) {1. Reserve holdout (3--6 months)};
-\node[step, fill=blue!8, below=of reserve] (log) {2. Initialize experiment log ($N = 0$)};
-\node[step, fill=blue!8, below=of log] (tune) {3. Tune with purged K-fold CV};
-\node[step, fill=blue!8, below=of tune] (qlike) {4. Evaluate: QLIKE (primary), MSE (secondary)};
-\node[step, fill=blue!8, below=of qlike] (mz) {5. MZ regression: check bias ($a=0$, $b=1$)};
-\node[step, fill=blue!8, below=of mz] (dm) {6. DM test: pairwise significance};
-\node[step, fill=keyorange!10, below=of dm] (mcs) {7. MCS: which models survive?};
+\node[wfstep, fill=prereqpurple!10] (reserve) {1. Reserve holdout (3--6 months)};
+\node[wfstep, fill=blue!8, below=of reserve] (log) {2. Initialize experiment log ($N = 0$)};
+\node[wfstep, fill=blue!8, below=of log] (tune) {3. Tune with purged K-fold CV};
+\node[wfstep, fill=blue!8, below=of tune] (qlike) {4. Evaluate: QLIKE (primary), MSE (secondary)};
+\node[wfstep, fill=blue!8, below=of qlike] (mz) {5. MZ regression: check bias ($a=0$, $b=1$)};
+\node[wfstep, fill=blue!8, below=of mz] (dm) {6. DM test: pairwise significance};
+\node[wfstep, fill=keyorange!10, below=of dm] (mcs) {7. MCS: which models survive?};
 \node[decision, below=1.2cm of mcs] (trade) {Strategy?};
-\node[step, fill=memgold!15, below left=1.2cm and -0.3cm of trade] (dsr) {8. DSR on Sharpe ratio};
-\node[step, fill=intgreen!10, below right=1.2cm and -0.3cm of trade] (report) {9. Report with all metrics};
+\node[wfstep, fill=memgold!15, below left=1.2cm and -0.3cm of trade] (dsr) {8. DSR on Sharpe ratio};
+\node[wfstep, fill=intgreen!10, below right=1.2cm and -0.3cm of trade] (report) {9. Report with all metrics};
 
 % Arrows
 \draw[arrow] (reserve) -- (log);

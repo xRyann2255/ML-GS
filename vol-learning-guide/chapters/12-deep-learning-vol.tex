@@ -631,19 +631,19 @@ These are frontier methods with thin evidence, but they represent the direction 
 \citet{Kidger2021NeuralSDE} develops the mathematical framework for embedding stochastic differential equations into neural networks.
 A neural SDE replaces the hand-specified drift and diffusion of classical models (Heston, SABR, rough Bergomi) with neural networks that learn these functions from data:
 \begin{equation}\label{eq:neural-sde}
-  dX_t = f_\btheta(X_t, t)\,dt + g_\btheta(X_t, t)\,dW_t
+  dX_t = f_{\btheta}(X_t, t)\,dt + g_{\btheta}(X_t, t)\,dW_t
 \end{equation}
 where:
 \begin{itemize}[nosep]
-  \item $f_\btheta(\cdot)$: drift function, parameterized by a neural network with weights $\btheta$.
-  \item $g_\btheta(\cdot)$: diffusion function, also a neural network.
+  \item $f_{\btheta}(\cdot)$: drift function, parameterized by a neural network with weights $\btheta$.
+  \item $g_{\btheta}(\cdot)$: diffusion function, also a neural network.
   \item $W_t$: standard Brownian motion.
 \end{itemize}
 
 \begin{intuition}[In Plain English]
 A classical stochastic volatility model says ``volatility evolves according to this specific formula'' (e.g., Heston's square-root process).
 A neural SDE says ``volatility evolves according to \emph{whatever function} a neural network learns from the data.''
-The drift $f_\btheta$ captures the predictable part of how volatility moves (mean reversion, trends), and the diffusion $g_\btheta$ captures the randomness (vol-of-vol, jump intensity).
+The drift $f_{\btheta}$ captures the predictable part of how volatility moves (mean reversion, trends), and the diffusion $g_{\btheta}$ captures the randomness (vol-of-vol, jump intensity).
 Both are flexible enough to approximate any continuous function, so you are not locked into a particular parametric assumption.
 \end{intuition}
 
@@ -660,22 +660,22 @@ The controlled differential equation (CDE) variant handles irregularly-spaced ob
 
 \begin{warning}[Neural SDEs Are Data-Hungry]
 Training neural SDEs requires backpropagation through the SDE solver (adjoint method), which is computationally expensive.
-The diffusion function $g_\btheta$ is especially hard to learn because it governs the noise, not the signal.
+The diffusion function $g_{\btheta}$ is especially hard to learn because it governs the noise, not the signal.
 With typical volatility dataset sizes (a few thousand daily observations), neural SDEs are prone to overfitting.
 They are most promising when combined with cross-asset pooling and intraday data, where sample sizes are orders of magnitude larger.
 \end{warning}
 
 \subsection{Autoencoders for the Implied Volatility Surface}
 
-The implied volatility (IV) surface from Chapter~\ref{ch:options} is high-dimensional: IV values at dozens of strikes and maturities, updated continuously.
+The implied volatility (IV) surface from Chapter~\ref{ch:volsurface} is high-dimensional: IV values at dozens of strikes and maturities, updated continuously.
 \citet{DingLuCheung2025} use autoencoders to compress this surface into a low-dimensional latent space.
 
 \begin{definition}[Autoencoder for IV Surface]
 An autoencoder consists of:
 \begin{itemize}[nosep]
-  \item \textbf{Encoder} $f_\btheta: \R^{K \times M} \to \R^d$: maps the IV surface ($K$ strikes $\times$ $M$ maturities) to a latent vector $\bz \in \R^d$ with $d \ll K \times M$.
-  \item \textbf{Decoder} $g_\btheta: \R^d \to \R^{K \times M}$: reconstructs the surface from the latent vector.
-  \item \textbf{Training objective}: minimize reconstruction error $\|\text{surface} - g_\btheta(f_\btheta(\text{surface}))\|^2$.
+  \item \textbf{Encoder} $f_{\btheta}: \R^{K \times M} \to \R^d$: maps the IV surface ($K$ strikes $\times$ $M$ maturities) to a latent vector $\bz \in \R^d$ with $d \ll K \times M$.
+  \item \textbf{Decoder} $g_{\btheta}: \R^d \to \R^{K \times M}$: reconstructs the surface from the latent vector.
+  \item \textbf{Training objective}: minimize reconstruction error $\|\text{surface} - g_{\btheta}(f_{\btheta}(\text{surface}))\|^2$.
 \end{itemize}
 The latent vector $\bz$ is a compressed summary of the entire IV surface.
 Typical latent dimensions are $d = 3$ to $8$, meaning the IV surface (perhaps $20 \times 10 = 200$ values) is compressed to fewer than 10 numbers.
@@ -684,7 +684,7 @@ Typical latent dimensions are $d = 3$ to $8$, meaning the IV surface (perhaps $2
 \begin{application}[IV Latent Factors as Volatility Features]
 The latent dimensions often correspond to interpretable factors: level (parallel shift in IV), slope (term structure tilt), and smile (convexity across strikes).
 These latent factors can be used as features for $\RV$ forecasting (Chapter~\ref{ch:features}).
-This connects the options-implied information from Chapter~\ref{ch:options} to the ML pipeline in a compact, learnable way.
+This connects the options-implied information from Chapter~\ref{ch:volsurface} to the ML pipeline in a compact, learnable way.
 \end{application}
 
 \subsection{Deep Stochastic Volatility}
