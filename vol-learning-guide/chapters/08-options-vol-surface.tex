@@ -555,6 +555,119 @@ This is a powerful dimensionality reduction for feature engineering (Chapter~\re
 
 
 % ═══════════════════════════════════════════════════════
+\section{Local Volatility}\label{sec:local-vol}
+% ═══════════════════════════════════════════════════════
+
+\begin{prereq}[Requirements for This Section]
+You should be comfortable with the Black-Scholes framework (Section~\ref{sec:black-scholes}), partial derivatives (including second-order), and the concept of the implied volatility surface from the preceding sections.
+\end{prereq}
+
+The implied volatility surface gives us a snapshot of how the market prices options across strikes and maturities, but it does not tell us \emph{how to interpolate} between quoted points or \emph{how to extrapolate} beyond them without introducing arbitrage.
+A naive interpolation (e.g., linear in strike) can easily violate calendar-spread or butterfly-spread no-arbitrage conditions.
+\textbf{Local volatility} solves this problem: it provides the unique continuous diffusion model consistent with all observed option prices.
+
+The key result is due to \citet{Dupire1994}.
+Given a continuum of European call prices $C(K,T)$ observed across strikes $K$ and maturities $T$, the \textbf{Dupire formula} extracts the local volatility:
+\begin{equation}\label{eq:dupire}
+  \sigma_{\text{loc}}^2(K,T) = \frac{\dfrac{\partial C}{\partial T} + rK\dfrac{\partial C}{\partial K}}{\dfrac{1}{2}K^2 \dfrac{\partial^2 C}{\partial K^2}}
+\end{equation}
+
+The numerator combines two effects: $\partial C / \partial T$ captures the time decay of the option (how much value accrues as the horizon extends), while $rK\,\partial C / \partial K$ is a cost-of-carry correction arising from discounting.
+The denominator, $\frac{1}{2}K^2\,\partial^2 C / \partial K^2$, is proportional to the \textbf{risk-neutral density} of the underlying at strike $K$ and maturity $T$ -- it measures how much probability the market assigns to the stock landing near $K$.
+For the formula to be well-defined, the denominator must be strictly positive (a condition equivalent to the absence of butterfly arbitrage).
+
+\begin{intuition}[Local Vol as Market-Implied Instantaneous Vol]
+Local vol is the unique diffusion coefficient $\sigma(S,t)$ such that a one-factor model
+\[
+  \frac{dS}{S} = \mu\,dt + \sigma(S,t)\,dW
+\]
+reproduces \emph{all} observed option prices simultaneously.
+It is the market's pricing of instantaneous volatility conditional on the stock being at price $K$ at time $T$.
+Unlike implied volatility (which averages over the entire path to expiry), local vol is a pointwise, path-independent quantity -- the ``microscopic'' volatility the market embeds at each node of the $(K,T)$ grid.
+\end{intuition}
+
+\begin{workedexample}{Computing Local Vol from a Call Surface}
+\label{ex:dupire-local-vol}
+\textbf{Setup.} Consider a stock at $S = 100$ with risk-free rate $r = 2\%$.
+We observe European call prices at three strikes and two maturities:
+
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Strike $K$ & $C(K, 0.25)$ & $C(K, 0.50)$ \\
+\midrule
+90  & 12.85 & 14.60 \\
+100 & 5.60  & 7.95  \\
+110 & 1.80  & 4.10  \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+We compute $\sigma_{\text{loc}}^2(100, 0.25)$ using finite differences.
+
+\textbf{Step 1: Estimate $\partial C / \partial T$ at $K=100$, $T=0.25$.}
+\[
+  \frac{\partial C}{\partial T} \approx \frac{C(100, 0.50) - C(100, 0.25)}{0.50 - 0.25}
+  = \frac{7.95 - 5.60}{0.25} = 9.40
+\]
+
+\textbf{Step 2: Estimate $\partial C / \partial K$ at $K=100$, $T=0.25$.}
+Using a central difference with $\Delta K = 10$:
+\[
+  \frac{\partial C}{\partial K} \approx \frac{C(110, 0.25) - C(90, 0.25)}{2 \times 10}
+  = \frac{1.80 - 12.85}{20} = -0.5525
+\]
+
+\textbf{Step 3: Estimate $\partial^2 C / \partial K^2$ at $K=100$, $T=0.25$.}
+\[
+  \frac{\partial^2 C}{\partial K^2} \approx \frac{C(110, 0.25) - 2\,C(100, 0.25) + C(90, 0.25)}{10^2}
+  = \frac{1.80 - 11.20 + 12.85}{100} = 0.0345
+\]
+
+\textbf{Step 4: Plug into the Dupire formula.}
+\begin{align*}
+  \text{Numerator} &= \frac{\partial C}{\partial T} + rK\frac{\partial C}{\partial K}
+    = 9.40 + 0.02 \times 100 \times (-0.5525)
+    = 9.40 - 1.105 = 8.295 \\[6pt]
+  \text{Denominator} &= \tfrac{1}{2}K^2 \frac{\partial^2 C}{\partial K^2}
+    = \tfrac{1}{2}(100)^2 \times 0.0345
+    = 172.5 \\[6pt]
+  \sigma_{\text{loc}}^2(100, 0.25) &= \frac{8.295}{172.5} = 0.0481
+\end{align*}
+
+Therefore $\sigma_{\text{loc}}(100, 0.25) = \sqrt{0.0481} \approx 21.9\%$.
+
+\begin{center}
+\begin{tabular}{@{}lc@{}}
+\toprule
+Quantity & Value \\
+\midrule
+$\partial C / \partial T$       & 9.40 \\
+$\partial C / \partial K$       & $-0.5525$ \\
+$\partial^2 C / \partial K^2$   & 0.0345 \\
+Numerator                        & 8.295 \\
+Denominator                      & 172.5 \\
+$\sigma_{\text{loc}}^2$         & 0.0481 \\
+$\sigma_{\text{loc}}$           & 21.9\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{workedexample}
+
+\begin{warning}[Local Vol Is Not a Forecast]
+Local vol perfectly fits today's option prices but has no predictive power for tomorrow.
+It generates flat forward volatility smiles (the smile does not move), which contradicts observed behavior.
+Use it as an interpolation and arbitrage-checking tool, not as a model of reality.
+For forecasting, use the realized measures and ML models from later chapters.
+\end{warning}
+
+\begin{application}[Project Connection]
+Local vol extractions at specific moneyness levels (e.g., 90\% and 110\% of spot) encode the market's current pricing of tail risk at different horizons.
+These can serve as ML features (Chapter~\ref{ch:features}) that complement backward-looking realized measures with forward-looking options information.
+\end{application}
+
+
+% ═══════════════════════════════════════════════════════
 \section{Model-Free Implied Variance and the VIX}
 \label{sec:vix}
 % ═══════════════════════════════════════════════════════
