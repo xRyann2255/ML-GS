@@ -307,6 +307,32 @@ A feature that works for liquid US equities may be meaningless for an illiquid c
 Always recalibrate when switching asset classes.
 \end{warning}
 
+\subsection{Microprice and Volume Features}\label{sec:feat-microprice}
+
+The simple midprice $(P_{\text{bid}} + P_{\text{ask}})/2$ assigns equal weight to both sides of the book regardless of depth.
+The \textbf{microprice} \citep{CarteaJaimungalPenalva2015} corrects for order-book imbalance:
+\begin{equation}\label{eq:microprice}
+  S^*_t = \frac{V_t^{\text{ask}} \cdot P_t^{\text{bid}} + V_t^{\text{bid}} \cdot P_t^{\text{ask}}}{V_t^{\text{bid}} + V_t^{\text{ask}}}.
+\end{equation}
+When bid volume dominates (buyers are eager), the microprice shifts toward the ask (fair value is higher).
+Computing returns from microprice rather than midprice reduces bid-ask-bounce noise in your RV estimate without needing a formal noise-robust estimator.
+
+\textbf{Volume features.}
+Daily trading volume is highly correlated with daily volatility.
+More usefully for forecasting, volume is \emph{persistent}: high-volume days tend to cluster, just like high-vol days.
+This means volume features can serve as leading indicators:
+\begin{itemize}[nosep]
+  \item $\log(\text{volume}/\text{MA}_{20}\text{volume})$: normalized volume; values above zero indicate above-average activity.
+  \item Volume acceleration: change in log-volume over the past 3 days.
+  \item Microprice--midprice deviation: $|S^* - S_{\text{mid}}|$ as a measure of book imbalance pressure.
+\end{itemize}
+
+\begin{keyidea}[Volume Predicts Vol]
+Abnormal volume today predicts elevated RV tomorrow, even after controlling for lagged RV.
+The intuition: volume spikes reflect new information arriving (earnings whispers, large block trades, portfolio rebalancing) that has not yet fully resolved into price moves.
+Include at least one volume feature in any feature set.
+\end{keyidea}
+
 % ──────────────────────────────────────────────────────────────
 \section{Options-Implied Features}\label{sec:feat-options}
 % ──────────────────────────────────────────────────────────────
