@@ -60,6 +60,71 @@ default first model for any volatility forecasting pipeline built on the
 features from Chapter~\ref{ch:features}.
 \end{keyidea}
 
+The diagram below contrasts the two main tree ensemble strategies.  A
+\textbf{random forest} trains many independent trees on bootstrapped samples
+and averages their predictions (variance reduction through decorrelation).
+\textbf{Gradient boosting} trains trees sequentially, each one correcting the
+errors of the ensemble so far (bias reduction through iterative refinement).
+Both are used in volatility forecasting, but gradient boosting (LightGBM,
+XGBoost) typically wins on tabular data.
+
+\begin{center}
+\begin{tikzpicture}[
+  tbox/.style={draw, rounded corners, minimum width=1.4cm,
+    minimum height=1.0cm, align=center, font=\small},
+  avgbox/.style={draw, rounded corners, fill=intgreen!12,
+    minimum width=2.2cm, minimum height=0.8cm, align=center, font=\small},
+  seqbox/.style={draw, rounded corners, fill=keyorange!12,
+    minimum width=2.2cm, minimum height=0.8cm, align=center, font=\small},
+  lbl/.style={font=\small\bfseries},
+  >=Stealth,
+]
+% --- Random Forest (left) ---
+\node[lbl] at (-4.2, 2.6) {Random Forest};
+\node[tbox, fill=defblue!10] (rf1) at (-5.6, 1.4) {Tree 1};
+\node[tbox, fill=defblue!10] (rf2) at (-4.2, 1.4) {Tree 2};
+\node[tbox, fill=defblue!10] (rf3) at (-2.8, 1.4) {Tree $B$};
+\node at (-3.5, 1.4) {$\cdots$};
+\node[avgbox] (rfavg) at (-4.2, -0.1) {Average};
+\node[font=\small] (rfout) at (-4.2, -1.2) {$\hat{y} = \frac{1}{B}\sum h_b(\bx)$};
+\draw[->, thick] (rf1) -- (rfavg);
+\draw[->, thick] (rf2) -- (rfavg);
+\draw[->, thick] (rf3) -- (rfavg);
+\draw[->, thick] (rfavg) -- (rfout);
+
+% Parallel annotation
+\draw[decorate, decoration={brace, amplitude=5pt, mirror}]
+  (-6.2, 0.8) -- (-6.2, 2.0) node[midway, left=6pt, font=\scriptsize, align=right] {independent\\(parallel)};
+
+% --- Gradient Boosting (right) ---
+\node[lbl] at (3.8, 2.6) {Gradient Boosting};
+\node[tbox, fill=defblue!10] (gb1) at (1.6, 1.4) {Tree 1};
+\node[tbox, fill=defblue!10] (gb2) at (3.4, 1.4) {Tree 2};
+\node[tbox, fill=defblue!10] (gb3) at (6.0, 1.4) {Tree $M$};
+\node at (4.7, 1.4) {$\cdots$};
+\node[seqbox] (gbsum) at (3.8, -0.1) {Sum (shrunk)};
+\node[font=\small] (gbout) at (3.8, -1.2) {$\hat{y} = \sum \eta\, h_m(\bx)$};
+\draw[->, thick] (gb1) -- (gbsum);
+\draw[->, thick] (gb2) -- (gbsum);
+\draw[->, thick] (gb3) -- (gbsum);
+\draw[->, thick] (gbsum) -- (gbout);
+
+% Sequential annotation
+\draw[->, thick, dashed, warnred] (gb1.east) -- (gb2.west)
+  node[midway, above, font=\scriptsize] {residual};
+\draw[->, thick, dashed, warnred] (gb2.east) -- ++(0.6,0)
+  node[midway, above, font=\scriptsize] {};
+\draw[->, thick, dashed, warnred] (5.3, 1.4) -- (gb3.west)
+  node[midway, above, font=\scriptsize] {residual};
+
+\draw[decorate, decoration={brace, amplitude=5pt, mirror}]
+  (0.8, 0.8) -- (0.8, 2.0) node[midway, left=6pt, font=\scriptsize, align=right] {sequential\\(corrective)};
+
+% Divider
+\draw[dashed, gray] (-1.0, -1.5) -- (-1.0, 3.0);
+\end{tikzpicture}
+\end{center}
+
 
 % ──────────────────────────────────────────────────────────────
 \section{LightGBM and XGBoost}\label{sec:trees:gbm}
@@ -158,6 +223,23 @@ where:
   \item $M$ is the number of boosting iterations (trees).
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+The final prediction is a team vote: each tree contributes a small correction,
+and you add up all the corrections.  The learning rate $\eta$ shrinks each
+tree's voice so that no single tree dominates.  More trees with a smaller
+learning rate generally gives a smoother, more reliable forecast than fewer
+trees with a larger rate.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This additive structure is how LightGBM and XGBoost produce your daily
+$\RV$ forecast.  Every tree in the ensemble sees the same feature vector
+$\bx_t$ (lagged RV, VIX, jumps, etc.\ from Chapter~\ref{ch:features})
+and contributes a correction.  Tuning $\eta$ and $M$ together (with early
+stopping) is the primary way to control overfitting on 1,250-row
+volatility samples.
+\end{projectconnection}
+
 \subsection*{Loss function choice}
 
 The standard loss for regression is MSE:
@@ -168,6 +250,31 @@ for volatility forecasting \citep{AudrinoKnaus2016}:
   \loss_{\QLIKE} \;=\; \frac{1}{N}\sum_{t=1}^{N}
   \left(\frac{\RV_t}{\hat{y}_t} - \ln\frac{\RV_t}{\hat{y}_t} - 1\right).
 \end{equation}
+\begin{itemize}[nosep]
+  \item $\RV_t$: the realized volatility actually observed on day $t$,
+  \item $\hat{y}_t$: the model's forecast for day $t$,
+  \item the summand equals zero when $\hat{y}_t = \RV_t$ and is strictly
+        positive otherwise.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+QLIKE penalizes you more harshly for under-predicting volatility than for
+over-predicting it by the same amount.  If realized vol is 20\% and you
+forecast 10\%, the penalty is much larger than if you forecast 30\%.  This
+asymmetry matches real risk management needs: underestimating volatility is
+more dangerous than overestimating it.  MSE, by contrast, penalizes both
+directions equally.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+QLIKE is the primary evaluation metric for the GS project.  Training your
+tree model directly on QLIKE (rather than MSE) aligns the optimization
+objective with the evaluation criterion.
+\citet{AudrinoKnaus2016} show that QLIKE-optimized trees outperform
+MSE-optimized trees for realized volatility, so this custom loss is not
+optional; it is a core part of the pipeline.
+\end{projectconnection}
+
 Neither LightGBM nor XGBoost provides $\QLIKE$ natively, but both accept
 custom objective functions.  You supply the gradient and Hessian:
 \begin{align}
@@ -176,6 +283,28 @@ custom objective functions.  You supply the gradient and Hessian:
   h_t &= \frac{\partial^2 \loss_{\QLIKE}}{\partial \hat{y}_t^2}
        = \frac{2\,\RV_t}{\hat{y}_t^3} - \frac{1}{\hat{y}_t^2}. \label{eq:trees:qlike_hess}
 \end{align}
+\begin{itemize}[nosep]
+  \item $g_t$: the gradient tells each tree which direction to adjust
+        predictions,
+  \item $h_t$: the Hessian tells each tree how aggressively to adjust
+        (curvature information).
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+The gradient $g_t$ answers: ``for observation $t$, should the next tree push
+the prediction up or down?''  The Hessian $h_t$ answers: ``how confident
+should that push be?''  Together, they let the boosting algorithm do
+Newton-step optimization in function space, which converges faster than
+using the gradient alone.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Implementing these two formulas as a custom objective function in LightGBM
+or XGBoost is a 10-line code change, but it is the single most impactful
+modification you can make to the default pipeline.  Without it, the tree
+model optimizes MSE, which does not match the QLIKE evaluation metric and
+systematically under-penalizes low forecasts in high-vol regimes.
+\end{projectconnection}
 
 \begin{warning}[Enforce Positive Predictions]
 $\QLIKE$ requires $\hat{y}_t > 0$.  Clip predictions to a small positive
@@ -507,6 +636,23 @@ majority weight but retaining HAR's stabilizing influence.
   \item $w$ is the HAR weight, estimated on the validation set.
 \end{itemize}
 
+\begin{intuition}[In Plain English]
+This is a weighted average of two forecasts.  When $w = 0.3$, the combined
+forecast is 30\% HAR and 70\% tree.  The weight is not a guess; you pick the
+$w$ that minimizes QLIKE on a held-out validation set.  The result inherits
+the tree's ability to capture nonlinear patterns while retaining HAR's
+stability during extreme events.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The HAR + tree combination is a strong candidate for the final model in the
+GS project.  It addresses the key weakness of standalone tree models
+(poor extrapolation in stress regimes) while preserving the QLIKE gains
+that trees deliver in normal markets.  Tuning $w$ on a purged validation
+set takes seconds, and the resulting ensemble is simple to explain to
+stakeholders.
+\end{projectconnection}
+
 \subsection*{Regime-switching combination}
 
 A more sophisticated version: let $w$ depend on the current regime.  Define
@@ -520,6 +666,24 @@ a GMM-based regime probability).  Then:
 with $w(s_t)$ increasing during stress (rely more on HAR when volatility is
 elevated).  This connects directly to the regime overlay in
 Chapter~\ref{ch:hybrid}.
+
+\begin{intuition}[In Plain English]
+Instead of using a fixed blend, the regime-switching version asks: ``are
+markets calm or stressed right now?''  In calm markets, it trusts the tree
+model more.  In stressed markets, it shifts weight toward HAR, which
+extrapolates more reliably when volatility spikes to levels unseen in
+training data.  The stress indicator $s_t$ acts as a dial that adjusts the
+blend in real time.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The regime-switching combination is the bridge to Chapter~\ref{ch:hybrid}'s
+full hybrid architecture.  If your holdout period includes a volatility
+spike (e.g., a VIX jump above 30), this adaptive weighting can recover
+QLIKE losses that a fixed-weight blend would miss.  It also provides a
+natural way to incorporate the VIX regime indicator from
+Chapter~\ref{ch:features} into the forecast combination step.
+\end{projectconnection}
 
 \begin{workedexample}{HAR + LightGBM Ensemble}
 Continuing the SPY example from Section~\ref{sec:trees:hyperparams}.  On
