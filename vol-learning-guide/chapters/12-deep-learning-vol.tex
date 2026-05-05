@@ -133,6 +133,14 @@ The cell state $\mathbf{c}_t$ flows through the network with only linear interac
 This is why LSTMs can learn long-range dependencies that simple RNNs cannot.
 \end{intuition}
 
+\begin{projectconnection}[Why This Matters]
+For volatility forecasting, the forget gate learns \emph{persistence}: how much of yesterday's volatility regime carries over to today.
+The input gate learns how much weight to give today's new information (today's realized volatility, jump indicators, or news sentiment).
+The output gate controls what the model passes forward as its forecast.
+An LSTM can learn the HAR structure automatically (daily, weekly, monthly lags map to different hidden-state components), but it can also discover more complex nonlinear patterns that HAR misses, such as asymmetric responses to positive and negative shocks.
+Because neural nets accept arbitrary loss functions, you can train the LSTM directly on QLIKE rather than MSE, which is straightforward in PyTorch or TensorFlow.
+\end{projectconnection}
+
 The GRU simplifies the LSTM by merging the forget and input gates into a single ``update gate'' and eliminating the separate cell state.
 GRUs have fewer parameters and train faster; in practice, performance differences between LSTM and GRU are small for volatility tasks.
 
@@ -194,6 +202,48 @@ LSTMs shine when you feed them \emph{raw sequences} (intraday returns, LOB snaps
 On pre-computed tabular features, trees are usually better (Chapter~\ref{ch:trees}).
 The LSTM's value comes from learning feature representations that you did not know to engineer by hand.
 \end{keyidea}
+
+% Neural network pipeline for vol forecasting
+\begin{center}
+\begin{tikzpicture}[
+  block/.style={draw, rounded corners, minimum height=0.85cm, minimum width=3cm, align=center, font=\small},
+  arr/.style={-{Stealth[length=2.5mm]}, thick},
+  scale=0.85, transform shape
+]
+  % Input features
+  \node[block, fill=gray!10] (input) at (0, 0)
+    {Input Features};
+  \node[font=\scriptsize, below=0.15cm of input, text=gray, align=center]
+    {$\RV_{t-1}, \RV_{t-5}, \RV_{t-22}$,\\jumps, sentiment, LOB, \ldots};
+
+  % Sequence encoder
+  \node[block, fill=blue!12] (encoder) at (0, 2)
+    {Sequence Encoder};
+  \node[font=\scriptsize, right=0.6cm of encoder, text=defblue, align=left]
+    {LSTM, GRU, TCN,\\or Transformer};
+  \draw[arr] (input) -- (encoder);
+
+  % Hidden layers
+  \node[block, fill=orange!10] (hidden) at (0, 4)
+    {Dense Hidden Layers};
+  \node[font=\scriptsize, right=0.6cm of hidden, text=keyorange, align=left]
+    {Dropout, BatchNorm,\\ReLU activations};
+  \draw[arr] (encoder) -- (hidden);
+
+  % Output
+  \node[block, fill=green!12] (output) at (0, 6)
+    {$\widehat{\RV}_{t+1}$};
+  \node[font=\scriptsize, right=0.6cm of output, text=intgreen, align=left]
+    {Single output node,\\trained with QLIKE or MSE};
+  \draw[arr] (hidden) -- (output);
+
+  % Left annotation: what changes between architectures
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}, thick, gray]
+    (-2.2, -0.5) -- (-2.2, 2.5)
+    node[midway, left=8pt, font=\scriptsize, text=gray, align=right]
+    {Architecture choice\\lives here};
+\end{tikzpicture}
+\end{center}
 
 
 % ──────────────────────────────────────────────────────────────
@@ -290,6 +340,13 @@ Layer 4 (dilation 8) sees steps 8 apart: the overall shape of the day.
 With just 8 layers and kernel size 2, you cover $2^8 = 256$ time steps.
 That is an entire trading day of 5-minute bars (78 bars) with room to spare.
 \end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The dilated convolution is the building block of DeepVol, a leading architecture for forecasting daily RV from raw intraday returns.
+By stacking a handful of layers, the network covers an entire trading day (or week) without hand-engineering the daily, weekly, and monthly windows that HAR uses.
+This means the model can discover temporal patterns at any scale, not just the three fixed horizons baked into HAR.
+For the HARQ baseline project, a TCN trained on the same 5-minute return data provides a strong ``does deep learning add anything?'' comparison.
+\end{projectconnection}
 
 \subsection{DeepVol}
 
@@ -469,6 +526,47 @@ With attention, every past observation can directly influence the current predic
 For volatility, this means the model can learn that, say, last Tuesday's intraday pattern is highly relevant to today's forecast (perhaps both are FOMC days) without relying on the hidden state to carry that information across the intervening days.
 \end{intuition}
 
+\begin{projectconnection}[Why This Matters]
+Attention lets the vol-forecasting model look back flexibly rather than at fixed windows.
+HAR hard-codes three lookback horizons (1 day, 5 days, 22 days); an attention layer learns \emph{which} past days matter for each prediction.
+If FOMC days, triple-witching days, or earnings dates carry outsized information, attention can upweight them automatically.
+The attention weight matrix also provides interpretability: you can inspect which past days the model attended to and verify that its behavior is economically sensible.
+\end{projectconnection}
+
+% Attention mechanism visualization: which past days get more weight
+\begin{center}
+\begin{tikzpicture}[
+  day/.style={draw, rounded corners, minimum height=0.6cm, minimum width=1.1cm, align=center, font=\footnotesize},
+  arr/.style={-{Stealth[length=2mm]}, thick},
+  scale=0.85, transform shape
+]
+  % Past days (bottom row)
+  \foreach \i/\lab/\col in {0/$t{-}22$/gray!15, 1/$t{-}21$/gray!15, 3/$t{-}5$/orange!20, 4/$t{-}4$/gray!15, 5/$t{-}3$/gray!15, 6/$t{-}2$/orange!15, 7/$t{-}1$/orange!35} {
+    \node[day, fill=\col] (d\i) at (\i*1.6, 0) {\lab};
+  }
+  % Dots for skipped days
+  \node[font=\small] at (2*1.6, 0) {$\cdots$};
+
+  % Target day (top)
+  \node[day, fill=defblue!20, minimum width=1.6cm, minimum height=0.8cm, font=\small] (target) at (3.5*1.6, 2.8) {Predict $\widehat{\RV}_{t+1}$};
+
+  % Attention arrows with varying thickness
+  \draw[arr, line width=0.4pt, gray!50] (d0.north) -- (target.south);
+  \draw[arr, line width=0.4pt, gray!50] (d1.north) -- (target.south);
+  \draw[arr, line width=1.8pt, keyorange] (d3.north) -- (target.south)
+    node[midway, left, font=\tiny, text=keyorange] {FOMC};
+  \draw[arr, line width=0.4pt, gray!50] (d4.north) -- (target.south);
+  \draw[arr, line width=0.4pt, gray!50] (d5.north) -- (target.south);
+  \draw[arr, line width=1.0pt, orange!70] (d6.north) -- (target.south);
+  \draw[arr, line width=2.2pt, keyorange] (d7.north) -- (target.south)
+    node[midway, right, font=\tiny, text=keyorange] {Yesterday};
+
+  % Legend
+  \node[font=\footnotesize, text=gray, align=center] at (3.5*1.6, -1.0)
+    {Arrow thickness $=$ attention weight.\\The model learns which past days matter most.};
+\end{tikzpicture}
+\end{center}
+
 \subsection{Graph Transformers for Cross-Asset Volatility}
 
 \citet{ChenRobert2022} extend the transformer with a graph structure over assets.
@@ -531,7 +629,7 @@ These are frontier methods with thin evidence, but they represent the direction 
 \subsection{Neural SDEs and CDEs}
 
 \citet{Kidger2021NeuralSDE} develops the mathematical framework for embedding stochastic differential equations into neural networks.
-A neural SDE parameterizes both the drift and diffusion functions with neural networks:
+A neural SDE replaces the hand-specified drift and diffusion of classical models (Heston, SABR, rough Bergomi) with neural networks that learn these functions from data:
 \begin{equation}\label{eq:neural-sde}
   dX_t = f_\btheta(X_t, t)\,dt + g_\btheta(X_t, t)\,dW_t
 \end{equation}
@@ -541,6 +639,20 @@ where:
   \item $g_\btheta(\cdot)$: diffusion function, also a neural network.
   \item $W_t$: standard Brownian motion.
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+A classical stochastic volatility model says ``volatility evolves according to this specific formula'' (e.g., Heston's square-root process).
+A neural SDE says ``volatility evolves according to \emph{whatever function} a neural network learns from the data.''
+The drift $f_\btheta$ captures the predictable part of how volatility moves (mean reversion, trends), and the diffusion $g_\btheta$ captures the randomness (vol-of-vol, jump intensity).
+Both are flexible enough to approximate any continuous function, so you are not locked into a particular parametric assumption.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+For the HARQ baseline project, neural SDEs offer a way to move beyond point forecasts to full distributional predictions of future RV.
+Instead of predicting ``tomorrow's RV is 15\%,'' the neural SDE produces a probability distribution: ``15\% is the median, but there is a 5\% chance RV exceeds 30\%.''
+This is directly useful for variance risk premium estimation and tail-risk-aware portfolio construction.
+The controlled differential equation (CDE) variant handles irregularly-spaced tick data naturally, which matters for intraday volatility estimation.
+\end{projectconnection}
 
 This is appealing for volatility because the ground truth \emph{is} an SDE (Chapter~\ref{ch:rv}).
 The neural SDE learns the drift and diffusion from data without committing to a specific parametric form (Heston, SABR, rough Bergomi).
@@ -601,6 +713,21 @@ where:
   \item For $\RV$ forecasting, the flow learns to map a Gaussian to the empirical distribution of future $\RV$ conditional on past information.
 \end{itemize}
 \end{definition}
+
+\begin{intuition}[In Plain English]
+Start with a blob of points drawn from a simple Gaussian (a bell curve).
+Now warp that blob through a series of smooth, reversible stretches and squishes.
+After enough transformations, the warped blob can match any complicated distribution you want, such as the right-skewed, heavy-tailed distribution of realized volatility.
+Equation~\eqref{eq:nflow} is the forward direction (Gaussian $\to$ complex distribution), and Equation~\eqref{eq:nflow-density} tells you how to compute the probability of any point in the output space by tracking how much each transformation stretches or compresses the density.
+The key constraint is that every transformation must be invertible, so you can always go backward from data to the Gaussian and compute exact likelihoods.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+For realized volatility, normalizing flows produce a full predictive distribution rather than a single point forecast.
+This is valuable for two reasons: first, the QLIKE loss cares about the ratio $\RV / \widehat{\RV}$, and knowing the full distribution lets you optimize QLIKE-like objectives directly.
+Second, the variance risk premium (VRP) depends on the expected future distribution of RV, not just its mean, so distributional forecasts feed directly into VRP trading strategies.
+Compared to quantile regression (which gives you a few percentiles), a normalizing flow gives you the entire density, enabling richer risk analysis.
+\end{projectconnection}
 
 \begin{keyidea}[Why Distributional Forecasts Matter for Volatility]
 A point forecast $\widehat{\RV}_{t+1} = 15\%$ tells you the expected level.
