@@ -24,7 +24,9 @@ The reader understands individual symbols (the bullet-list definitions work) but
 
 ### Mandatory Equation Pattern
 
-Every equation in the guide must follow this structure:
+Every logically distinct equation (i.e., each `\label{eq:...}`) must follow this structure. Multi-line derivations (`align` environments) need one intuition + projectconnection block for the final result, not for each intermediate step. Trivial definitional equations (e.g., `\sigma^2 = \text{Var}(r)`) may share a combined box with adjacent equations.
+
+Existing `keyidea` boxes that already serve the plain English role may remain in place; the mandatory `intuition[In Plain English]` box is required only when no equivalent explanation currently exists, or when the existing box focuses on something other than the equation's conceptual meaning.
 
 ```latex
 % 1-2 setup sentences: what we're trying to capture
@@ -59,12 +61,12 @@ Add geometric/graphical TikZ illustrations when:
 - A concept involves a process or flow easier to SEE than read
 - The relationship between quantities is spatial or temporal
 
-Do NOT add diagrams for every equation. Target 3-5 diagrams per chapter for genuinely important concepts.
+Do NOT add diagrams for every equation. Target approximately 3-5 diagrams per chapter on average; individual chapters may have fewer or more based on content.
 
 ### Worked Example Policy
 
-- **Keep**: worked examples that serve theory comprehension (showing WHY a formula produces a surprising result, building intuition about magnitudes or edge cases)
-- **Remove**: worked examples that exist purely for computation practice (step-by-step arithmetic the reader will never perform by hand)
+- **Keep**: worked examples that serve theory comprehension (e.g., showing that realized variance computed at 1-second vs. 5-minute sampling gives wildly different answers, demonstrating microstructure noise impact)
+- **Remove**: worked examples that exist purely for computation practice (e.g., stepping through summing 10 squared returns to get a variance number -- pure arithmetic drill)
 
 ### Tone and Verbosity
 
@@ -103,6 +105,8 @@ Every retrofitted chapter passes through the write-chapter skill's Pass 4 (Naive
 - Flags any equation missing a project connection as CRITICAL
 - Flags every moment of confusion, no matter how small
 - Suggests where diagrams are needed but missing
+
+The naive reader deliberately over-flags; the implementer uses judgment about which flags to address vs. defer based on the actual reader's quantitative background (strong in math/stats, building finance domain intuition).
 
 A chapter is "done" when the naive reader finds zero CRITICAL issues and remaining flags are addressed or consciously deferred.
 
