@@ -17,6 +17,34 @@ Instead of asking ``how should I model the autocorrelation structure?'' it asks:
 The answer, proposed by \citet{GJR2018}, is that the log of realized volatility behaves like a \emph{fractional Brownian motion} with a very low Hurst exponent, around $H \approx 0.1$.
 This makes the volatility path much rougher (more jagged) than standard Brownian motion ($H = 0.5$).
 
+% ═══════════════════════════════════════════════════
+\section{Why Path Shape Matters: A Hedging Motivation}
+\label{sec:path-dependence}
+% ═══════════════════════════════════════════════════
+
+Before diving into the mathematics of roughness, consider a practical puzzle that motivates the entire chapter.
+
+An options trader buys a 30-day ATM straddle and delta-hedges daily.
+Over the month, realized vol comes in at exactly 20\%.
+But the trader's P\&L depends on \emph{when} the moves happened, not just their aggregate size.
+
+\begin{intuition}[Two Paths, Same RV, Different P\&L]
+Path A: the stock drifts quietly for 25 days then has 5 days of extreme moves.
+Path B: moves are spread evenly across all 30 days.
+Both paths have identical 30-day RV = 20\%.
+But the trader's cumulative gamma P\&L (Section~\ref{sec:gamma-pnl}) differs because:
+\begin{itemize}[nosep]
+  \item Gamma varies with moneyness: it is highest when the stock is near the strike.
+  \item On Path A, most of the vol occurs after the stock has moved away from the strike (gamma is low), so the trader captures less.
+  \item On Path B, moves happen while gamma is still high, so the trader captures more.
+\end{itemize}
+The conclusion: forecasting \emph{average} realized vol is necessary but not sufficient.
+The \textbf{path texture}, how vol is distributed across time and price levels, also determines economic outcomes.
+\end{intuition}
+
+This is exactly what rough volatility ($H \ll 0.5$) captures: rough paths have more fine-grained variation at short time scales, meaning the vol arrives in frequent small bursts rather than rare large moves.
+For a delta-hedger, rough paths produce more predictable P\&L (the vol arrives continuously rather than in lumps).
+\citet{RosenbaumZhang2022} showed that both the universal LSTM and the parametric rough-vol model converge on this same characterization of the volatility process: one from data, one from theory.
 
 % ═══════════════════════════════════════════════════
 \section{What Is Roughness?}
