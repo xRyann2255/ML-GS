@@ -4,6 +4,8 @@
 **Author:** Ryan Vincent
 **Status:** Active
 **Primary reference:** Christensen, Siggaard & Veliyev (2023, *J. Financial Econometrics*)
+**Chapter references:** All "Ch N" citations refer to the vol-learning-guide unless otherwise noted.
+**Observation count:** ~2,800 daily obs per symbol (11.3 years x 252 trading days/year = 2,848).
 
 ---
 
@@ -79,7 +81,7 @@ volforecast/
 |   +-- layer1_micro.yaml
 |   +-- layer2_implied.yaml
 |   +-- layer3_crossasset.yaml
-|   +-- layer4_signal.yaml
+|   +-- signal.yaml              # signal generation + backtest params
 |
 +-- volforecast/                # importable library
 |   +-- data/
@@ -95,12 +97,12 @@ volforecast/
 |   |   +-- micro_features.py   # Layer 1: E-mini index-level OFI, depth, signed vol
 |   |   +-- implied_features.py # Layer 2: ATM IV, skew, term slope, VRP, VVIX
 |   |   +-- cross_features.py   # Layer 3: Treasury curve, FX, commodity, DY spillover
-|   |   +-- calendar.py         # FOMC, NFP, earnings, expiry dummies
+|   |   +-- calendar.py         # FOMC, NFP, earnings, expiry dummies (Sprint 7+)
 |   |
 |   +-- models/
 |   |   +-- base.py             # abstract VolModel interface
 |   |   +-- har.py              # HAR, HAR-J, HAR-CJ, SHAR, HARQ
-|   |   +-- garch.py            # GARCH(1,1), GJR-GARCH, Realized GARCH
+|   |   +-- garch.py            # GARCH(1,1), GJR-GARCH, Realized GARCH (Sprint 7+)
 |   |   +-- trees.py            # LightGBM/XGBoost with custom QLIKE loss
 |   |   +-- ensemble.py         # HAR+Tree blend, regime-switching ensemble
 |   |   +-- lstm.py             # LSTM/GRU sequential baseline (optional, Sprint 7+)
@@ -270,11 +272,17 @@ These are directional targets. If h=1 shows no improvement but h=5 and h=22 do, 
 - **Model Confidence Set** (Hansen-Lunde-Nason 2011) at 10% elimination significance. Reports which models survive. Run both per-symbol (34 separate MCS, report survival frequency) and on pooled panel (one headline MCS table).
 - **Mincer-Zarnowitz regression:** slope=1, intercept=0 under forecast efficiency. Diagnoses systematic bias.
 
-**Cross-validation:**
-- Purged k-fold CV, 5 folds
+**Final holdout test set:**
+- Reserve the final 12 months of data as a held-out test set, locked before any modeling begins. No model sees this data during selection or tuning.
+- Purged CV runs on the remaining ~10 years for hyperparameter tuning and model selection.
+- All headline DM/MCS results reported on the holdout. CV results reported separately as "tuning performance."
+- This follows the learning guide's evaluation workflow (Ch 16): "Step 1: Reserve holdout."
+
+**Cross-validation (on non-holdout data):**
+- Expanding-window purged CV, 5 folds. Folds are contiguous temporal blocks. For each test fold, only chronologically prior data (minus purge) is used for training. This is strictly more conservative than shuffled k-fold because it never trains on data after the test period. This addresses the "HARd to Beat" criticism that standard k-fold inflates results for time series.
 - **Purge window = h days** (horizon-dependent, not fixed). At h=1: purge 1 day. At h=5: purge 5 days. At h=22: purge 22 days. This prevents label overlap leakage.
 - Embargo = 25 days (fixed, captures serial correlation decay)
-- **Data loss at h=22:** each fold boundary loses 22 + 25 = 47 days. With 5 folds and ~2,800 obs per symbol, total loss is ~235 obs (8.4%). For pooled models (~95,000 obs), this is 1,645 obs (1.7%). Acceptable but reported. h=22 results will have wider confidence intervals.
+- **Data loss at h=22:** each fold boundary loses ~47 days (22 purge + 25 embargo). With 5 folds and ~2,500 obs per symbol (after holdout removal), total loss is ~188 obs (~7.5%). For pooled models (~85,000 obs), this is ~1.3%. Acceptable but reported. h=22 results will have wider confidence intervals.
 
 **Secondary:** MSE (for comparability with older literature), R-squared from MZ regression.
 
@@ -290,12 +298,13 @@ These are directional targets. If h=1 shows no improvement but h=5 and h=22 do, 
 **Straddle P&L:**
 - Delta-hedged ATM straddle on SPX
 - **Daily gamma recomputation** using Black-Scholes (not constant gamma approximation). The learning guide (Ch 9) explicitly warns that constant gamma breaks down when the underlying moves away from the strike. The backtest module computes Gamma_t from the Black-Scholes formula at each rebalance date.
-- P&L_t = (1/2) * Gamma_t * S_t^2 * (sigma_realized_t^2 - sigma_implied^2) * dt
+- **Long-position P&L:** P&L_t = (1/2) * Gamma_t * S_t^2 * (sigma_realized_t^2 - sigma_implied^2) * dt
+- **Sign convention:** the formula above gives long-position P&L. When Signal 1 > 0 (sell vol), the trade is a short straddle and the P&L is negated: P&L_short_t = -(1/2) * Gamma_t * S_t^2 * (sigma_realized_t^2 - sigma_implied^2) * dt. The `backtest.py` module takes a `direction` parameter (+1 long, -1 short) driven by the signal sign.
 - Benchmark: always-short-vol (harvests VRP ~85% of months, Carr 2009)
 
 **Transaction costs:**
 - ERDVOL provides implied vols, not bid-ask spreads. Direct option bid-ask data may not be available.
-- **Default approach:** conservative flat cost assumption of 0.5 vol points per ATM option leg (standard in VRP literature). Run sensitivity at 0.25, 0.5, and 1.0 vol points to show break-even cost.
+- **Default approach:** conservative flat cost assumption of 0.5 vol points per ATM option leg (standard in VRP literature). Cost is applied per-leg at trade initiation (entry and exit). For a straddle (2 legs), total entry cost = 2 * 0.5 = 1.0 vol points, amortized over the holding period (22 trading days for Signal 1). Run sensitivity at 0.25, 0.5, and 1.0 vol points per leg to show break-even cost.
 - If option tick data with bid/ask becomes available, substitute actual spreads.
 - For delta-hedging costs: futures bid-ask spread for E-mini (typically <1 tick, negligible for daily rebalancing).
 - All P&L reported net of costs. No result without costs.
@@ -330,9 +339,9 @@ Paper: BTZ (2009). The improvement over BTZ is replacing their backward-looking 
 
 **Signal 2: Term-Structure-Aware Gap (requires ERDVOL surface)**
 ```
-S2_t^(h) = IV_t^(h)^2 - RV_forecast_{t,t+h}    for h in {5, 22, 63}
+S2_t^(h) = IV_t^(h)^2 - RV_forecast_{t,t+h}    for h in {5, 22}
 ```
-Computed at multiple tenors using the ERDVOL tenor dimension. The term structure slope of the gap (short vs long) captures whether the market prices a near-term event (steep) or structural shift (flat).
+Computed at both forecast tenors using the ERDVOL tenor dimension. The term structure slope of the gap (5-day vs 22-day) captures whether the market prices a near-term event (steep short-dated gap) or structural shift (flat across tenors). Uses only h=5 and h=22, which align with the forecast horizons defined in Section 1.3.
 
 Paper: Bekaert-Hoerova (2014) showed the VRP component at different horizons has different predictive content.
 
@@ -340,10 +349,10 @@ Paper: Bekaert-Hoerova (2014) showed the VRP component at different horizons has
 ```
 Position_t = (S2_t / vol(S2)) * w(regime_t)
 ```
-Same gap as Signal 2, but position size modulated by regime. w(regime_t) scales down when forecast uncertainty is high. Regime indicators:
-- VVIX > trailing 80th percentile (must be trailing, not full-sample, to avoid lookahead)
-- VIX term structure in backwardation (front > back)
-- Model disagreement (HAR forecast vs ML forecast divergence)
+Same gap as Signal 2, but position size modulated by regime. w(regime_t) scales down when forecast uncertainty is high. Regime indicators (all trailing to avoid lookahead):
+- VVIX > trailing 252-day 80th percentile (1-year rolling window)
+- VIX term structure in backwardation (front-month VIX > 3-month VIX futures)
+- Model disagreement: |HAR_forecast - ML_forecast| / HAR_forecast > 0.3 (30% divergence threshold)
 
 Paper: Rahimikia-Poon (2020) showed ML beats HAR 90% of days but fails in stress. Regime conditioning addresses exactly this.
 
@@ -411,7 +420,7 @@ Split into two explicit milestones due to tick-processing risk:
 
 **Sprint 4 -- Full Evaluation (Weeks 9-10)**
 
-- Layer 3: cross-asset signals (Treasury curve, FX/commodity vol, DY spillover index)
+- Layer 3: cross-asset signals (Treasury curve, FX/commodity vol, DY spillover index). DY spillover computed via VAR(1) on daily RV of 34 symbols with 200-day rolling window, generalized FEVD at H=10 step horizon (Diebold-Yilmaz 2012). Extract: total spillover index, directional FROM for each symbol, and 5-day change.
 - Full MCS across all models and feature combinations
 - Replace simple train/test with purged k-fold CV (horizon-scaled purge)
 - SHAP/ALE interpretability on best-performing model (Ch 10 importance stability protocol)
@@ -528,7 +537,16 @@ Written at sprint boundaries, not daily. Each notebook:
 | 8 | **Presentation doesn't come together** | Low | Very High | Daily log + sprint notebooks = raw material always exists. Budget entire last sprint for polish. | Start final notebook skeleton at Sprint 4 (week 10) |
 | 9 | **Compliance review delays** | Low-Med | Medium | Factor 1-2 weeks for compliance review of final presentation. Internal-only results may have lighter review. | Submit for review at Sprint 6 (week 14), leaving buffer |
 
-**Meta-mitigation:** every sprint produces a standalone deliverable. If pulled onto another project at week 10, you have baselines, ML comparison, feature attribution, and MCS tables -- a complete academic result.
+**Meta-mitigation:** every sprint produces a standalone deliverable:
+
+| If project stops after... | You have |
+|---|---|
+| Sprint 1 (week 4) | Baseline QLIKE table for 34 symbols, validated RV pipeline |
+| Sprint 2 (week 6) | ML vs HAR comparison with DM significance, pooled vs per-symbol |
+| Sprint 3 (week 8) | Feature layer attribution (which data source adds value) |
+| Sprint 4 (week 10) | Full MCS membership table, SHAP interpretability -- complete academic result |
+| Sprint 5 (week 12) | P&L backtest, vol-targeting Sharpe -- complete desk result |
+| Sprint 6 (week 14) | Signal comparison, regime analysis -- full project |
 
 ---
 
