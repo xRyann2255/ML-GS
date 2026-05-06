@@ -78,6 +78,9 @@
 - Archived Risk-as-Alpha deliverables to archive/ directory
 - Decision: project direction locked in as Layered Feature Value (HARQ-X + ML with IV-RV gap signal)
 
-**Next:** Execute Task 0 (package skeleton), then begin Sprint 1 data pipeline
+- Executed Task 0: created volforecast/ package skeleton with data/, features/, models/, evaluation/, signals/, utils/ modules
+- Default config with universe, horizons, CV params; progress-log skill with post-commit hook; editable pip install verified
+
+**Next:** Begin Sprint 1 -- Task 1 (units.py), Task 2 (rv.py), Task 3 (universe.py)
 
 ---

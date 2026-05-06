@@ -3,7 +3,7 @@ name: progress-log
 description: Update the daily progress log. Invoke after meaningful progress, decisions, or at session end.
 ---
 
-Read `volforecast/logs/progress.md`. Check if today's date has an existing entry.
+Read `logs/progress.md`. Check if today's date has an existing entry.
 
 **If post-commit (granular update):**
 - Read the latest git diff/commit message

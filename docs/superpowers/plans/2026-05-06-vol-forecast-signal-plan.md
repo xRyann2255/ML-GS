@@ -26,7 +26,7 @@
 - Create: `volforecast/volforecast/utils/__init__.py`
 - Create: `volforecast/tests/__init__.py`
 - Create: `volforecast/config/default.yaml`
-- Create: `volforecast/logs/progress.md`
+- Create: `logs/progress.md`
 - Create: `volforecast/results/tables/.gitkeep`
 - Create: `volforecast/results/figures/.gitkeep`
 - Create: `volforecast/pyproject.toml`
@@ -109,7 +109,7 @@ evaluation:
 
 - [ ] **Step 5: Create progress log with backfilled entries**
 
-File: `volforecast/logs/progress.md`
+File: `logs/progress.md`
 
 Backfill from git history for weeks 1-2 (April 21 - May 5). Include: learning guide writing, repo restructuring, project scoping, paper reading, direction decision.
 
@@ -123,7 +123,7 @@ name: progress-log
 description: Update the daily progress log. Invoke after meaningful progress, decisions, or at session end.
 ---
 
-Read `volforecast/logs/progress.md`. Check if today's date has an existing entry.
+Read `logs/progress.md`. Check if today's date has an existing entry.
 
 **If post-commit (granular update):**
 - Read the latest git diff/commit message
