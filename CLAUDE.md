@@ -1,17 +1,55 @@
-# ML for Realized Volatility Forecasting — Internship Project
+# ML for Realized Volatility Forecasting -- Internship Project
+
+## Session Workflow (READ THIS FIRST)
+
+**Research-first, not plan-first.** Do not jump to implementation plans, sprints, or task lists. The project's value comes from deep understanding of features and data, not from shipping code fast.
+
+### Every session should:
+
+1. **Read `notes/research-journal.md`** to pick up where the last session left off
+2. **Read `notes/open-questions.md`** to see what's queued for exploration
+3. **Ask the user** what they want to explore today -- one topic, in depth
+4. **Go deep** -- compute things on real data, look at distributions, test assumptions, run baselines. Do not skim.
+5. **At session end**, append findings to `notes/research-journal.md` and update the relevant `notes/features/*.md` file with what was learned. Move answered questions out of `open-questions.md`.
+
+### Do NOT:
+- Create implementation plans, sprint structures, or task breakdowns unless the user explicitly asks
+- Jump from "I read a paper that says X" to "let's build X" -- first verify X on our data
+- Propose model architectures before the user understands the features that would feed them
+- Rush to write code when the user is still exploring and learning
+
+### The implementation plan emerges from research, not the other way around.
+
+---
 
 ## Purpose
-Scratchpad for planning and executing a Goldman Sachs ML internship project (~10-12 weeks, active May 2026) focused on forecasting realized volatility. Not a production codebase.
+Research scratchpad for a Goldman Sachs ML internship project (~20 weeks, active May-Sep 2026) focused on forecasting realized volatility. Currently in the exploration and feature understanding phase.
 
 ## Repository Structure
 ```
-ML-GS/
+ML/
 ├── CLAUDE.md                    # this file
-├── .claude/skills/              # custom skills (write-chapter, research, status)
+├── .claude/skills/              # custom skills (write-chapter, research, status, etc.)
+├── logs/progress.md             # daily progress log
 ├── deliverables/                # project deliverables (pitch, plans, scripts)
-├── docs/superpowers/            # design specs and implementation plans
-├── notes/                       # project notes
-│   └── volatility.md            # main research/scoping document (~45 papers)
+├── docs/                        # project plans, guide specs, and design docs
+│   ├── project-plans/           # internship project directions
+│   ├── vol-learning-guide/      # learning guide specs and plans
+│   └── claude-code-optimization/# tooling and harness config
+├── notes/                       # research notes and findings
+│   ├── volatility.md            # literature survey (~45 papers)
+│   ├── research-journal.md      # session-by-session findings (append-only)
+│   ├── open-questions.md        # running list of things to investigate
+│   ├── data-access.md           # GS data inventory
+│   ├── features/                # per-feature-family exploration notes
+│   │   ├── har-components.md
+│   │   ├── jump-detection.md
+│   │   ├── leverage-effect.md
+│   │   ├── microstructure.md
+│   │   ├── cross-asset.md
+│   │   └── implied-vol.md
+│   ├── glossary.md
+│   └── faq.md
 ├── reference/                   # all reference materials
 │   ├── books/                   # textbooks (Hull, AFML, Natenberg, etc.)
 │   ├── papers/                  # general reference papers + course materials
@@ -22,18 +60,13 @@ ML-GS/
     └── quant-trading/           # quant trading (38 chapters)
 ```
 
-## Project Directions (one to be finalized)
-1. **HARQ-X + ML residual** (Safest) — public data, clearest "where ML adds value" story
-2. **Intraday RV from LOB** (Medium) — Optiver-style, options MM relevance
-3. **Multivariate RC with GNNs** (Medium-Ambitious) — covariance forecasting, portfolio backtest
-4. **Rough vol vs deep learning** (Ambitious) — Rosenbaum-Zhang replication + extension
-5. **VRP ML trader** (Highest Wow) — variance risk premium signal, end-to-end PnL
+## Current Phase: Exploration & Feature Understanding
 
-## Key Baselines
-HAR, HAR-J/CJ, SHAR, HARQ, Realized GARCH, Ridge/Lasso-HAR
+The project direction is ML forecasting for realized volatility. Before locking in a specific approach, methodology, or architecture, we are exploring the data and understanding what features capture and why.
 
-## Evaluation
-QLIKE (primary), MSE, Diebold-Mariano tests, Model Confidence Set, purged k-fold CV. Target: 30-80 bps QLIKE improvement + economic-value test.
+**Key baselines to understand first:** HAR, HAR-J/CJ, SHAR, HARQ, Realized GARCH, Ridge/Lasso-HAR
+
+**Evaluation (when we get there):** QLIKE (primary), MSE, Diebold-Mariano tests, Model Confidence Set, purged k-fold CV. Target: 30-80 bps QLIKE improvement + economic-value test.
 
 ---
 
@@ -97,8 +130,9 @@ The `docs-only` branch contains only compiled PDFs, deliverables, and markdown n
 ---
 
 ## Conventions
-- `docs/superpowers/specs/` for design documents
-- `docs/superpowers/plans/` for implementation plans
+- `docs/project-plans/` for internship project plans (grouped by direction)
+- `docs/vol-learning-guide/` for learning guide specs and plans
+- `docs/claude-code-optimization/` for tooling docs
 - `notes/` for project notes
 - `reference/project-papers/` for ML vol papers, `reference/papers/` for general
 - All code follows TDD: failing test → implement → pass → commit

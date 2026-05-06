@@ -8,7 +8,7 @@
 
 **Tech Stack:** LaTeX (report class, tcolorbox, TikZ, pgfplots, natbib, amsmath), pdflatex for compilation
 
-**Spec:** `docs/superpowers/specs/2026-05-01-vol-learning-guide-design.md`
+**Spec:** `docs/vol-learning-guide/design.md`
 
 ---
 

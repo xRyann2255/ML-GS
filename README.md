@@ -15,7 +15,10 @@ Internship project repo: planning, research, and learning guides for a Goldman S
 ```
 ML-GS/
 ├── deliverables/          # pitch decks, project plans, speaker scripts
-├── docs/superpowers/      # design specs and implementation plans
+├── docs/                  # project plans, guide specs, and design docs
+│   ├── project-plans/     # internship project directions
+│   ├── vol-learning-guide/# learning guide specs and plans
+│   └── claude-code-optimization/
 ├── guides/
 │   ├── ml-finance/        # ML for finance LaTeX guide
 │   └── quant-trading/     # quant trading LaTeX guide

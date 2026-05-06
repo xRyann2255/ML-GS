@@ -25,10 +25,10 @@ Slim CLAUDE.md from ~280 lines to ~80-100 lines. Keep only what's needed every t
 - "The honest bottom line" paragraph (becomes part of project-status memory)
 
 **Delete stale files:**
-- `docs/superpowers/specs/2026-04-23-risk-as-alpha-design.md`
-- `docs/superpowers/specs/2026-04-23-risk-as-alpha-learning-guide-design.md`
-- `docs/superpowers/plans/2026-04-23-risk-as-alpha-plan.md`
-- `docs/superpowers/plans/2026-04-23-risk-as-alpha-learning-guide-plan.md`
+- `archive/risk-as-alpha/specs/ (already archived)`
+- `archive/risk-as-alpha/specs/ (already archived)`
+- `archive/risk-as-alpha/plans/ (already archived)`
+- `archive/risk-as-alpha/plans/ (already archived)`
 
 ---
 
@@ -175,10 +175,10 @@ Three files in Claude Code's built-in memory directory (`~/.claude/projects/<pro
 ## 6. Cleanup & Configuration
 
 ### Stale files to delete
-- `docs/superpowers/specs/2026-04-23-risk-as-alpha-design.md`
-- `docs/superpowers/specs/2026-04-23-risk-as-alpha-learning-guide-design.md`
-- `docs/superpowers/plans/2026-04-23-risk-as-alpha-plan.md`
-- `docs/superpowers/plans/2026-04-23-risk-as-alpha-learning-guide-plan.md`
+- `archive/risk-as-alpha/specs/ (already archived)`
+- `archive/risk-as-alpha/specs/ (already archived)`
+- `archive/risk-as-alpha/plans/ (already archived)`
+- `archive/risk-as-alpha/plans/ (already archived)`
 
 ### `.claude/settings.json`
 Not needed at this stage. Current setup works without custom permissions or hooks. Can add later if a repeated friction point emerges.

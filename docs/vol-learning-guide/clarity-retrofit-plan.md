@@ -8,7 +8,7 @@
 
 **Tech Stack:** LaTeX (tcolorbox environments), TikZ/pgfplots for diagrams, pdflatex for compilation verification.
 
-**Spec:** `docs/superpowers/specs/2026-05-05-vol-guide-clarity-retrofit-design.md`
+**Spec:** `docs/vol-learning-guide/clarity-retrofit-design.md`
 
 ---
 

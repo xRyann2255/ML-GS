@@ -20,11 +20,12 @@ ML-GS/
 │       ├── research.md           # 3-agent parallel research pipeline
 │       └── status.md             # read-only project status surface
 ├── CLAUDE.md                     # slimmed to ~80-100 lines
-└── docs/superpowers/
-    ├── specs/
-    │   └── 2026-05-05-claude-code-optimization-design.md  # (exists)
-    └── plans/
-        └── 2026-05-05-claude-code-optimization-plan.md    # this file
+└── docs/
+    ├── project-plans/           # internship project directions
+    ├── vol-learning-guide/      # learning guide specs and plans
+    └── claude-code-optimization/
+        ├── design.md            # (exists)
+        └── plan.md              # this file
 
 ~/.claude/projects/C--Users-RyanPC-Documents-Projects-ML-GS/memory/
 ├── MEMORY.md                     # index file (pointers to memory files)
@@ -38,18 +39,12 @@ ML-GS/
 ### Task 1: Delete stale Risk-as-Alpha files
 
 **Files:**
-- Delete: `docs/superpowers/specs/2026-04-23-risk-as-alpha-design.md`
-- Delete: `docs/superpowers/specs/2026-04-23-risk-as-alpha-learning-guide-design.md`
-- Delete: `docs/superpowers/plans/2026-04-23-risk-as-alpha-plan.md`
-- Delete: `docs/superpowers/plans/2026-04-23-risk-as-alpha-learning-guide-plan.md`
+- Delete: stale Risk-as-Alpha files (already archived to `archive/risk-as-alpha/`)
 
 - [ ] **Step 1: Delete the four stale files**
 
 ```powershell
-git rm "docs/superpowers/specs/2026-04-23-risk-as-alpha-design.md"
-git rm "docs/superpowers/specs/2026-04-23-risk-as-alpha-learning-guide-design.md"
-git rm "docs/superpowers/plans/2026-04-23-risk-as-alpha-plan.md"
-git rm "docs/superpowers/plans/2026-04-23-risk-as-alpha-learning-guide-plan.md"
+# Already archived to archive/risk-as-alpha/ — no action needed
 ```
 
 - [ ] **Step 2: Commit**
@@ -208,7 +203,7 @@ ML-GS/
 ├── CLAUDE.md                    # this file
 ├── .claude/skills/              # custom skills (write-chapter, research, status)
 ├── deliverables/                # project deliverables (pitch, plans, scripts)
-├── docs/superpowers/            # design specs and implementation plans
+├── docs/                        # project plans, guide specs, and design docs
 ├── notes/                       # project notes
 │   └── volatility.md            # main research/scoping document (~45 papers)
 ├── reference/                   # all reference materials
@@ -267,8 +262,9 @@ New guides go in `guides/<guide-name>/`. Follow existing conventions from `guide
 ---
 
 ## Conventions
-- `docs/superpowers/specs/` for design documents
-- `docs/superpowers/plans/` for implementation plans
+- `docs/project-plans/` for internship project plans (grouped by direction)
+- `docs/vol-learning-guide/` for learning guide specs and plans
+- `docs/claude-code-optimization/` for tooling docs
 - `notes/` for project notes
 - `reference/project-papers/` for ML vol papers, `reference/papers/` for general
 - All code follows TDD: failing test → implement → pass → commit
@@ -562,8 +558,7 @@ Expected: `MEMORY.md`, `decisions.md`, `project-status.md`, `user.md`
 - [ ] **Step 2: Confirm stale files are gone**
 
 ```powershell
-Test-Path "docs/superpowers/specs/2026-04-23-risk-as-alpha-design.md"
-Test-Path "docs/superpowers/plans/2026-04-23-risk-as-alpha-plan.md"
+# Stale files already archived — verification no longer needed
 ```
 
 Expected: both return `False`

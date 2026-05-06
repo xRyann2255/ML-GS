@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.10+, numpy, pandas, statsmodels (HAR/OLS), LightGBM, scipy, pytest. GS-internal: gs-quant/Marquee SDK, Chunk Store API.
 
-**Spec:** `docs/superpowers/specs/2026-05-06-vol-forecast-signal-design.md`
+**Spec:** `docs/project-plans/vol-forecast-signal/design.md`
 
 ---
 

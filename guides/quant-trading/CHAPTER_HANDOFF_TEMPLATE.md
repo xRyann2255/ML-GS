@@ -2,7 +2,7 @@
 
 **Model to use:** Claude Opus 4.6 (`claude-opus-4-6`). Mandatory per design spec §9.
 
-**Spec:** `docs/superpowers/specs/2026-04-11-quant-textbook-design.md` §7, Ch NN entry.
+**Spec:** See the relevant guide design doc in `docs/`, §7, Ch NN entry.
 
 **Target file:** `latex/chapters/chNN_name.tex`
 

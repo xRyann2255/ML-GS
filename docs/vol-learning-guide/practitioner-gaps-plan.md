@@ -8,7 +8,7 @@
 
 **Tech Stack:** LaTeX (report class, tcolorbox, natbib, booktabs, tikz/pgfplots), pdflatex + bibtex on MiKTeX.
 
-**Spec:** `docs/superpowers/specs/2026-05-05-vol-guide-practitioner-gaps-design.md`
+**Spec:** `docs/vol-learning-guide/practitioner-gaps-design.md`
 
 ---
 
