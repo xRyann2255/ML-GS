@@ -852,7 +852,7 @@ class TestMakeTarget:
     def test_last_h_rows_are_nan(self, daily_rv):
         target = make_target(daily_rv, horizon=5)
         assert target.iloc[-5:].isna().all()
-        assert target.iloc[-6] is not pd.NaT and np.isfinite(target.iloc[-6])
+        assert pd.notna(target.iloc[-6]) and np.isfinite(target.iloc[-6])
 
     def test_length_matches_input(self, daily_rv):
         target = make_target(daily_rv, horizon=22)
@@ -1039,6 +1039,8 @@ class RVFeatureLayer(FeatureLayer):
         features["rq"] = rv_df["rq"]
         features["rq_sqrt"] = np.sqrt(rv_df["rq"].clip(lower=0))
         features["bpv"] = rv_df["bpv"]
+        features["bpv_w"] = rv_df["bpv"].rolling(5).mean()
+        features["bpv_m"] = rv_df["bpv"].rolling(22).mean()
         features["rv_pos"] = rv_df["rv_pos"]
         features["rv_neg"] = rv_df["rv_neg"]
         features["jump"] = rv_df["jump"]
@@ -1055,7 +1057,9 @@ class RVFeatureLayer(FeatureLayer):
             "log_rv_w": "Log transform, weekly",
             "log_rv_m": "Log transform, monthly",
             "rv_ratio_wd": "Weekly/daily RV ratio, persistence indicator",
-            "bpv": "Bipower variation, BNS (2004, 2006)",
+            "bpv": "Bipower variation (daily continuous), BNS (2004, 2006)",
+            "bpv_w": "Weekly avg BPV, for HAR-CJ decomposition",
+            "bpv_m": "Monthly avg BPV, for HAR-CJ decomposition",
             "rq": "Realized quarticity, BPQ (2016)",
             "rq_sqrt": "sqrt(RQ) for HARQ interaction, BPQ (2016)",
             "rv_pos": "Positive semivariance, Patton-Sheppard (2015)",
@@ -1153,10 +1157,13 @@ class TestHARJ:
 class TestHARCJ:
     def test_uses_continuous_and_jump(self, synthetic_data):
         X, y = synthetic_data
+        X["bpv_w"] = X["bpv"].rolling(5).mean()
+        X["bpv_m"] = X["bpv"].rolling(22).mean()
+        X = X.dropna()
+        y = y[-len(X):]
         model = HARCJModel()
-        model.fit(X.iloc[:300], y[:300], X.iloc[300:], y[300:])
-        assert "bpv" in model._feature_cols
-        assert "jump" in model._feature_cols
+        model.fit(X.iloc[:250], y[:250], X.iloc[250:], y[250:])
+        assert set(model._feature_cols) == {"bpv", "bpv_w", "bpv_m", "jump"}
         assert "rv_d" not in model._feature_cols
 
 
@@ -1254,7 +1261,7 @@ class _OLSModel(VolModel):
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         Xc = self._prepare_X(X)
-        return self._results.predict(Xc)
+        return np.maximum(self._results.predict(Xc), 1e-10)
 
     def feature_importance(self) -> pd.Series | None:
         return None
@@ -1272,7 +1279,7 @@ class HARJModel(_OLSModel):
 
 class HARCJModel(_OLSModel):
     name = "har_cj"
-    _feature_cols = ["bpv", "rv_w", "rv_m", "jump"]
+    _feature_cols = ["bpv", "bpv_w", "bpv_m", "jump"]
 
 
 class SHARModel(_OLSModel):
@@ -1282,6 +1289,7 @@ class SHARModel(_OLSModel):
 
 class HARQModel(_OLSModel):
     name = "harq"
+    _input_cols = ["rv_d", "rv_w", "rv_m", "rq_sqrt"]
     _feature_cols = ["rv_d", "rv_w", "rv_m", "harq_interaction"]
 
     def _prepare_X(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -1558,10 +1566,11 @@ Test that `PurgedExpandingCV`:
 - [ ] **Step 2: Implement cv.py**
 
 Key: folds are contiguous time blocks. For fold k as test:
-- Training = all dates strictly before `(fold_k_start - h)` where h is the purge window (equals the forecast horizon)
-- The purge removes the h days immediately before the test fold to prevent label leakage (multi-day target at boundary overlaps)
-- The embargo adds a 25-day gap after the last training date before fold k to handle serial correlation decay
-- Net effect: training ends at `fold_k_start - h - embargo` at the latest
+- Training = all dates strictly before `(fold_k_start - h - embargo)` where h = forecast horizon, embargo = 25 days
+- The purge (h days) prevents label leakage: multi-day target windows at the boundary overlap with test dates
+- The embargo (25 days) is an additional gap that guards against autocorrelation in *features* (e.g., rv_m uses 22-day rolling window, so features near the fold boundary still depend on test-period data). This is conservative but standard practice per de Prado (2018) Ch 7
+- Net effect: training ends at `fold_k_start - h - 25` at the latest
+- Data loss per fold boundary: h + 25 days (e.g., ~47 days at h=22, ~26 days at h=1)
 - This is expanding-window: each successive fold sees a strictly larger training set
 
 - [ ] **Step 3: Run tests, commit**
@@ -1590,7 +1599,7 @@ Test that `diebold_mariano`:
 
 - [ ] **Step 2: Implement tests.py**
 
-DM test: compute loss differential series d_t = L(actual, forecast_A) - L(actual, forecast_B). Estimate HAC variance with Newey-West. DM stat = mean(d) / SE_HAC. Apply HLN correction: multiply by sqrt((T + 1 - 2h + h(h-1)/T) / T) and use t(T-1) distribution.
+DM test: compute loss differential series d_t = L(actual, forecast_A) - L(actual, forecast_B) using QLIKE loss. Estimate HAC variance with Newey-West, bandwidth = h - 1 (matches MA(h-1) structure in overlapping forecast errors, per West 1996). For h=1 bandwidth=0 (no HAC needed), h=5 bandwidth=4, h=22 bandwidth=21. DM stat = mean(d) / SE_HAC. Apply HLN correction: multiply by sqrt((T + 1 - 2h + h(h-1)/T) / T) and use t(T-1) distribution. Report one-sided p-value (testing whether model A improves over model B).
 
 - [ ] **Step 3: Run tests, commit**
 
@@ -1906,7 +1915,7 @@ Test that:
 
 - [ ] **Step 2: Implement backtest.py and costs.py**
 
-`costs.py`: flat cost model with configurable vol points per leg. For a straddle (2 legs), total entry cost = 2 * cost_vol_points (default 0.5 per leg = 1.0 total), amortized over holding period (22 trading days) so daily cost impact = total_cost / 22. `backtest.py`: daily loop computing BS gamma, realized variance vs implied variance, cumulative P&L with direction parameter derived from signal sign.
+`costs.py`: flat cost model with configurable vol points per leg. For a straddle (2 legs), total entry cost = 2 * cost_vol_points (default 0.5 per leg = 1.0 total), amortized over holding period (22 trading days) so daily cost impact = total_cost / 22. `backtest.py`: daily loop computing `P&L_t = direction * 0.5 * Gamma_t * S_t^2 * (RV_daily_t - IV_annual/252) * dt` where `dt = 1/252` when using annualized quantities. Note: RV_daily_t is single-day realized variance (not annualized), IV_annual is annualized implied variance, and the `/ 252` converts IV to daily scale. Add a sanity test: daily P&L on $1 notional should be in the range of basis points to a few percent.
 
 - [ ] **Step 3: Run tests, commit**
 
