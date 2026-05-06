@@ -1,330 +1,1049 @@
-# The quant trading self-study canon: 30 resources from zero to competition-ready
+# ML for Realized Volatility Forecasting -- Structured Bibliography
 
-**The single most important insight from this research: there is no shortcut through the canon.** The best path for a math/CS person with zero finance knowledge runs through exactly three layers — market structure intuition (Harris), quantitative microstructure (Bouchaud), and applied strategy (Chan) — before branching into specialisations. Ten resources form the irreducible core: Harris's *Trading and Exchanges* for vocabulary, Bouchaud et al.'s *Trades, Quotes and Prices* for microstructure, Chan's *Algorithmic Trading* for stat arb, the Avellaneda-Stoikov paper for market making, Almgren-Chriss for execution, Natenberg for options intuition, Colin Bennett's free PDF for volatility surfaces, MIT OCW 18.S096 for rigorous Black-Scholes, López de Prado's *Advances in Financial Machine Learning* for methodology, and jmerle's Prosperity backtester for competition prep. Read in that order. Budget **250–350 hours** total; the priority topics (B, D, F, L, M) consume roughly 60% of that time. Eleven of the thirty resources are completely free. For IMC Prosperity 4 specifically, the winning pattern is clear from three years of data: market-make the fixed-price product at 10,000, pairs-trade the basket, Black-Scholes the options product, and copy-trade the informed bot in Round 5. For Goldman Sachs engineering, understand SecDB's dependency graph architecture and prepare with the Green Book.
-
----
-
-## A. How markets actually work — the essential vocabulary layer
-
-**Larry Harris — *Trading and Exchanges: Market Microstructure for Practitioners* (2003)**
-Book · Oxford University Press · ~$40 used · 30–50 hours
-The definitive single-volume treatment of exchanges, order types, order books, matching engines, maker/taker dynamics, fees, and clearing. Harris was SEC Chief Economist; the *Journal of Investment Management* called it "the most comprehensive treatment of market microstructure I have seen." It assumes zero finance knowledge and uses no heavy math — just clear institutional detail. The trader taxonomy (Chapter 4–7) provides the intellectual scaffolding for understanding *who* is on the other side of every trade, which directly feeds strategy selection. Published 2003, so it misses modern HFT and T+1 settlement, but the fundamentals are timeless.
-**Prerequisites:** None. **Quality: Essential.**
-
-**Jelle Pelgrims — "Matching Engines" (blog post, ~2020)**
-Blog post + Python code · https://jellepelgrims.com/posts/matching_engines · Free · 2–4 hours
-Converts order book mechanics into working Python data structures: `Order` and `Trade` classes, sorted bid/ask lists, FIFO matching. The insight that "a market order is just a limit order with price = 0 or ∞" elegantly demystifies order types for programmers. Covers only price/time priority; no fees, clearing, or pro-rata matching.
-**Prerequisites:** Basic Python. **Quality: Recommended.**
+This bibliography contains ~80 entries relevant to the GS internship project on ML-based realized volatility forecasting. Each entry uses a machine-parseable format with slug IDs, controlled topic tags, and quality ratings (essential / recommended / optional). Entries are grouped by topic area (A-K) following the annotated bibliography in `notes/deep-research-vol-papers.md`. PDF paths are relative to the repository root.
 
 ---
 
-## B. Market microstructure — the physics of price formation
+## Table of Contents
 
-This is where a math/CS person's advantage is largest. The field sits at the intersection of stochastic processes, econometrics, and empirical data analysis.
-
-**Bouchaud, Bonart, Donier & Gould — *Trades, Quotes and Prices: Financial Markets Under the Microscope* (2018)**
-Book · Cambridge University Press · ~$60 · 60–80 hours
-**The single best microstructure book for a math/CS reader.** Written by Jean-Philippe Bouchaud (co-founder of Capital Fund Management, CNRS Silver Medal, Risk Quant of the Year 2017), it approaches price formation from a physics/data perspective: order flow statistics, limit order book dynamics, bid-ask spread decomposition, the square-root law of market impact, queue dynamics, Hawkes processes, and optimal execution — all calibrated against real NASDAQ data. Jim Gatheral calls it "an impressive book that no serious student of market microstructure can afford to be without." The data-first approach resonates with programmers: every model is tested against empirical facts.
-**Weakness:** Some chapters require comfort with statistical physics (Fokker-Planck equations). Equity-centric.
-**Prerequisites:** Probability theory, basic stochastic processes. **Quality: Essential.**
-
-**Joel Hasbrouck — *Empirical Market Microstructure* (2007)**
-Book · Oxford University Press · ~$55 · 40–50 hours
-The standard PhD-level empirical toolkit: the Roll model (spread decomposition from serial covariance), Glosten-Milgrom sequential trade model, Kyle 1985, VAR models for microstructure, and information share measurement. Used at Columbia, Indiana, and the Foucault-Menkveld Stockholm summer school. Provides the econometric machinery to actually *work with* tick data. Published 2007, so it predates modern HFT, but the econometric methods are permanent.
-**Prerequisites:** Time series analysis, VAR models. **Quality: Essential.**
-
-**Dale Rosenthal — Market Microstructure course materials (UIC, 2020+)**
-15-week slide deck + homework + R code · https://sites.google.com/site/dalerosenthal/teaching/market-microstructure · Free · 30–40 hours
-Complete graduate course with executable R code for Kyle 1985 and Glosten-Milgrom simulations. The best free structured resource for learning microstructure systematically. Slides may be hard to follow without lecture audio, and weeks 12–13 (electronic trading tools) are embargoed.
-**Prerequisites:** Basic probability, some R. **Quality: Essential (free complement).**
-
-**Foucault, Pagano & Röell — *Market Liquidity: Theory, Evidence, and Policy* (2nd ed. 2024)**
-Book · Oxford University Press · ~$55 · 50–60 hours
-The economics/institutional counterpart to Bouchaud's physics approach. Covers limit order markets, dealer markets, dark pools, fragmentation, and HFT from a game-theoretic perspective. The 2024 second edition adds modern topics. Provides the *why* behind market structures.
-**Prerequisites:** Intermediate microeconomics, basic game theory. **Quality: Recommended.**
+- [A. Realized Volatility -- Estimators and Theory](#a-realized-volatility----estimators-and-theory)
+- [B. HAR Family and Econometric Baselines](#b-har-family-and-econometric-baselines)
+- [C. Rough Volatility](#c-rough-volatility)
+- [D. ML for Volatility -- Empirical Studies](#d-ml-for-volatility----empirical-studies)
+- [E. Limit-Order-Book Deep Learning](#e-limit-order-book-deep-learning)
+- [F. Variance Risk Premium and Options](#f-variance-risk-premium-and-options)
+- [G. Forecast Evaluation and Validation](#g-forecast-evaluation-and-validation)
+- [H. Rashomon Sets and Optimal Sparse Decision Trees](#h-rashomon-sets-and-optimal-sparse-decision-trees)
+- [I. Modern Deep Time-Series Forecasting](#i-modern-deep-time-series-forecasting)
+- [J. Code Repositories and Data Sources](#j-code-repositories-and-data-sources)
+- [K. Practitioner and Industry Resources](#k-practitioner-and-industry-resources)
+- [Topic Tag Vocabulary](#topic-tag-vocabulary)
 
 ---
 
-## C. Market making — from Avellaneda-Stoikov to production
+## A. Realized Volatility -- Estimators and Theory
 
-**Avellaneda & Stoikov — "High-Frequency Trading in a Limit Order Book" (2008)**
-Paper · 20 pages · https://people.orie.cornell.edu/sfs33/LimitOrderBook.pdf · Free · 4–8 hours
-**The foundational paper for quantitative market making.** Derives optimal bid/ask quotes using stochastic control: a reservation price that shifts with inventory, and an optimal spread calibrated to order arrival intensity. Clean two-step derivation, intuitive parameters (γ for risk aversion, κ for arrival rate, σ for volatility). Every market making quant has read this. Assumes continuous prices, Poisson arrivals, and no adverse selection — significant extensions needed for production.
-**Prerequisites:** Stochastic calculus, CARA utility. **Quality: Essential.**
+### andersen-bollerslev-etal-2003
+- **Title**: Modeling and Forecasting Realized Volatility
+- **Authors**: Andersen, Bollerslev, Diebold, Labys
+- **Year**: 2003
+- **Venue**: Econometrica 71:579-625
+- **Quality**: essential
+- **Topics**: rv-estimators, foundational
+- **PDF**: none
+- **Key finding**: Canonical paper introducing daily RV-based forecasting from high-frequency returns. Established that realized variance converges to integrated variance and is approximately log-normal.
+- **Relevance**: The paper that launched the modern RV forecasting literature; every baseline model builds on this.
 
-**Hummingbot — "A Comprehensive Guide to Avellaneda & Stoikov's Market-Making Strategy" (2021)**
-Blog post + open-source implementation · https://hummingbot.org/blog/guide-to-the-avellaneda--stoikov-strategy/ · Free · 2–3 hours
-Best practitioner-written explanation of A-S for programmers. Translates the math into "what does each parameter mean and how do I tune it?" The Hummingbot framework (Python, open source) runs the strategy on crypto exchanges. Crypto-focused but concepts transfer.
-**Prerequisites:** None for blog; Python for code. **Quality: Recommended.**
+### barndorff-nielsen-shephard-2002
+- **Title**: Econometric Analysis of Realized Volatility and Its Use in Estimating Stochastic Volatility Models
+- **Authors**: Barndorff-Nielsen, Shephard
+- **Year**: 2002
+- **Venue**: JRSS-B 64:253-280
+- **Quality**: essential
+- **Topics**: rv-estimators, jump-detection, foundational
+- **PDF**: none
+- **Key finding**: Theoretical foundation establishing CLT for realized volatility and introducing bipower variation (BV) for jump-robust integrated variance estimation.
+- **Relevance**: BV and the jump decomposition QV = IV + sum(J^2) are used in HAR-J/CJ and every jump-aware model.
 
-**Cartea, Jaimungal & Penalva — *Algorithmic and High-Frequency Trading* (2015)**
-Book · Cambridge University Press · ~$70 · 60–80 hours
-**The graduate textbook that unifies microstructure, execution, and market making under a single stochastic control framework.** Covers optimal execution (extending Almgren-Chriss), VWAP/POV targeting, market making (extending A-S), pairs trading, and order imbalance — all with rigorous HJB equation derivations. Endorsed by Almgren, Foucault, and used at UCL, Toronto, Oxford. Mathematically demanding but self-contained (stochastic optimal control is taught in Chapter 5). **This single book covers Topics B, C, and H.**
-**Prerequisites:** SDEs, Poisson processes. Strong math background required. **Quality: Essential.**
+### barndorff-nielsen-etal-2008
+- **Title**: Designing Realized Kernels to Measure the Ex Post Variation of Equity Prices in the Presence of Noise
+- **Authors**: Barndorff-Nielsen, Hansen, Lunde, Shephard
+- **Year**: 2008
+- **Venue**: Econometrica 76:1481-1536 (SSRN 620203)
+- **Quality**: essential
+- **Topics**: rv-estimators, microstructure-noise, foundational
+- **PDF**: none
+- **Key finding**: Introduced realized kernels using flat-top kernel weights of autocovariances to neutralize i.i.d. and dependent microstructure noise, achieving optimal convergence rates.
+- **Relevance**: Gold-standard noise-robust RV estimator; relevant if working with tick-level data.
 
----
+### zhang-mykland-aitsahalia-2005
+- **Title**: A Tale of Two Time Scales: Determining Integrated Volatility With Noisy High-Frequency Data
+- **Authors**: Zhang, Mykland, Ait-Sahalia
+- **Year**: 2005
+- **Venue**: JASA 100:1394-1411
+- **Quality**: recommended
+- **Topics**: rv-estimators, microstructure-noise
+- **PDF**: none
+- **Key finding**: Two-scale realized volatility (TSRV) combines subsampled RV at fast and slow frequencies to remove noise bias while preserving efficiency.
+- **Relevance**: Alternative to realized kernels for noise correction; simpler to implement.
 
-## D. Statistical arbitrage — cointegration, mean reversion, and beyond
+### hansen-lunde-2006
+- **Title**: Realized Variance and Market Microstructure Noise
+- **Authors**: Hansen, Lunde
+- **Year**: 2006
+- **Venue**: JBES 24:127-161
+- **Quality**: essential
+- **Topics**: rv-estimators, microstructure-noise
+- **PDF**: none
+- **Key finding**: Formalized the bias-variance trade-off in RV estimation under microstructure noise. Introduced the volatility signature plot (RV vs. sampling frequency) as the key diagnostic.
+- **Relevance**: The signature plot is step one of any HF data analysis; understanding this trade-off is prerequisite for choosing an estimator.
 
-**Ernest P. Chan — *Algorithmic Trading: Winning Strategies and Their Rationale* (2013)**
-Book · Wiley · ~$50 · 20–30 hours
-**The definitive practitioner guide to stat arb for self-taught quants.** Chapters 2–5 cover ADF tests, Hurst exponent, variance ratio, Engle-Granger and Johansen cointegration, Ornstein-Uhlenbeck half-life, Kalman filter trading, z-score entry/exit, and walk-forward estimation — with MATLAB code (widely ported to Python). Chan ran stat arb at Morgan Stanley and Millennium Partners. The value is in the methodology: he emphasizes what goes wrong (look-ahead bias, regime changes, false positives) as much as what works. Universally recommended on r/quant and Quant Stack Exchange.
-**Weakness:** MATLAB code, not Python. Published strategies may have alpha-decayed. **Quality: Essential.**
+### liu-patton-sheppard-2015
+- **Title**: Does Anything Beat 5-Minute RV? A Comparison of Realized Measures Across Multiple Asset Classes
+- **Authors**: Liu, Patton, Sheppard
+- **Year**: 2015
+- **Venue**: J. Econometrics 187:293-311
+- **Quality**: essential
+- **Topics**: rv-estimators, evaluation, microstructure-noise
+- **PDF**: none
+- **Key finding**: Compared ~400 estimators across 31 assets in 5 asset classes. Concluded that 5-minute RV is very hard to beat; MCS contained ~40 estimators on average (~11% of universe).
+- **Relevance**: Justifies using simple 5-min RV as the base realized measure rather than complex noise-robust alternatives.
 
-**Avellaneda & Lee — "Statistical Arbitrage in the U.S. Equities Market" (2010)**
-Paper · 22 pages · https://math.nyu.edu/~avellane/AvellanedaLeeStatArb071108.pdf · Free · 4–8 hours
-The canonical academic treatment of institutional-grade stat arb. Presents **PCA-based factor extraction** and **sector ETF regression** to generate market-neutral signals, models residuals as OU processes, and backtests with transaction costs over 1997–2007. Reports **Sharpe ratios of 1.1–1.5**. Also studies the 2007 quant crisis. Bridges the gap between toy pairs trading and production multi-asset strategies. 400+ citations.
-**Weakness:** No code. Specific parameters are competed away. Performance degraded post-2007. **Quality: Essential.**
+### aitsahalia-jacod-2014
+- **Title**: High-Frequency Financial Econometrics
+- **Authors**: Ait-Sahalia, Jacod
+- **Year**: 2014
+- **Venue**: Princeton University Press (textbook)
+- **Quality**: essential
+- **Topics**: rv-estimators, microstructure-noise, jump-detection, foundational
+- **PDF**: none
+- **Key finding**: Definitive textbook covering the full theory of high-frequency financial econometrics: realized volatility, jump detection, microstructure noise, and semimartingale estimation.
+- **Relevance**: The reference for anyone going deep on HF estimator theory and jump tests.
 
-**Letian Wang — "Cointegration and Pairs Trading" (blog + GitHub, 2018)**
-Blog post + Python code · https://letianzj.github.io/cointegration-pairs-trading.html · Free · 3–5 hours
-Complete pairs trading pipeline in Python: Engle-Granger CADF, Johansen test with eigenvector hedge ratios, Bollinger band trading on the spread, and walk-forward estimation. Reproduces Chan's classic EWA/EWC examples with clean, runnable statsmodels code. The best free Python implementation tutorial for someone going from theory to code.
-**Prerequisites:** Python, basic statistics. **Quality: Essential (free companion to Chan).**
+### lee-mykland-2008
+- **Title**: Jumps in Financial Markets: A New Nonparametric Test and Jump Dynamics
+- **Authors**: Lee, Mykland
+- **Year**: 2008
+- **Venue**: RFS 21:2535-2563
+- **Quality**: recommended
+- **Topics**: jump-detection, rv-estimators
+- **PDF**: none
+- **Key finding**: Workhorse intraday jump test based on comparing individual returns against local volatility estimates. Identifies exact jump times within the trading day.
+- **Relevance**: Primary tool for constructing jump indicator features in HAR-J/CJ models.
 
----
-
-## E. Momentum and signal construction — two flavours of trend
-
-**Moskowitz, Ooi & Pedersen — "Time Series Momentum" (2012)**
-Paper · *Journal of Financial Economics* · http://docs.lhpedersen.com/TimeSeriesMomentum.pdf · Free · 5–8 hours
-**The foundational paper defining time-series momentum (TSMOM):** a security's own past 12-month return positively predicts its future return. Tested across 58 liquid futures contracts spanning equities, currencies, commodities, and bonds over 25+ years, demonstrating **Sharpe ~1.0** with little exposure to standard risk factors. Cleanly distinguishes TS momentum from cross-sectional momentum. AQR provides free, regularly updated data at https://www.aqr.com/Insights/Datasets. 4,000+ citations.
-**Weakness:** Empirical, no causal explanation. Alpha may partly be volatility scaling. **Quality: Essential.**
-
-**Baz, Granger, Harvey, Le Roux & Rattray — "Dissecting Investment Strategies in the Cross Section and Time Series" (2015)**
-Paper · https://www.cmegroup.com/education/files/dissecting-investment-strategies-in-the-cross-section-and-time-series.pdf · Free · 4–6 hours
-Written by senior practitioners at **Man AHL** and PIMCO. Key insight: cross-sectional weights equal time-series weights minus their cross-sectional average. TS momentum outperforms CS when the global factor is trending. Covers carry, momentum, and value across asset classes in a unified framework.
-**Quality: Recommended.**
-
----
-
-## F. Options and volatility — four resources, one rigorous stack
-
-**MIT OCW 18.S096 — "Topics in Mathematics with Applications in Finance" (Fall 2013)**
-26 video lectures + notes + problem sets · https://ocw.mit.edu/courses/18-s096-topics-in-mathematics-with-applications-in-finance-fall-2013/ · Free · 6–8 hours (Lectures 19–21 for options)
-The **only free resource providing a truly rigorous Black-Scholes derivation** via both PDE and probabilistic routes, co-taught by Morgan Stanley quants. The full course covers Itô calculus, SDEs, and stochastic processes — perfect for a math/CS background. Start here for the formal foundations.
-**Quality: Essential.**
-
-**Sheldon Natenberg — *Option Volatility and Pricing* (2nd ed., 2015)**
-Book · ~$45 · 40–60 hours
-Universally cited as **the first book given to new professional options traders at prop firms worldwide**. Exceptional at conveying *intuition* for how Greeks behave — the qualitative, trader-oriented perspective a math person needs to complement their quantitative skills. Covers spreads, dynamic hedging, and basic volatility concepts. The math is deliberately accessible (the Black-Scholes derivation is not rigorous — that's what MIT OCW is for).
-**Quality: Essential.**
-
-**Colin Bennett — *Trading Volatility: Correlation, Term Structure and Skew* (2014)**
-Book/report · **FREE PDF:** https://www.trading-volatility.com/Trading-Volatility.pdf · 20–35 hours
-Written by the former Head of Quantitative & Derivative Strategy at Banco Santander (previously Barclays, Deutsche Bank). **Best single resource on volatility surface, smile, skew, term structure, and correlation trading** — all for free. Endorsed by CBOE, Eurex, and Bloomberg. Kris Abdelmessih (ex-SIG, 21 years) took detailed public notes calling it "an outstanding reference." Fills the crucial gap between introductory derivatives books and quant modeling texts.
-**Weakness:** Dated (2014 data); no second edition. Slightly sell-side research report style. **Quality: Essential.**
-
-**Euan Sinclair — *Volatility Trading* (2nd ed., 2013)**
-Book · Wiley · ~$60 · 25–40 hours
-Written by a PhD physicist with 15+ years as a professional options trader at Bluefin Trading. Aaron Brown (AQR risk manager) called it "the classic work on practical options trading." Uniquely bridges quantitative rigour (GARCH, vol forecasting, mean-reversion of IV) with practical trading philosophy (when to trade, how to size, how to evaluate results). Key insight: **"Volatility trading is not dependent on the ability to trade directionally."** Companion spreadsheets included.
-**Quality: Essential.**
-
-**Euan Sinclair — *Positional Option Trading* (2020)**
-Book · Wiley · ~$55 · 15–25 hours
-Chapter 5 presents **~10 specific, empirically-backed trading edges** (variance premium, term-structure premia, earnings effects, post-earnings drift). Chapter 9 is a unique treatment of Kelly criterion applied to options. Robot Wealth called Chapter 5 alone "worth the price."
-**Prerequisites:** Natenberg + Sinclair Vol Trading. **Quality: Recommended.**
-
----
-
-## G. The arbitrage zoo — recognising structural mispricings
-
-**Aswath Damodaran — "Options Arbitrage" (NYU Stern lecture notes)**
-Lecture notes · https://pages.stern.nyu.edu/~adamodar/New_Home_Page/invfables/optionarb.htm · Free · 2–3 hours
-Covers exercise arbitrage, replicating portfolios (step-by-step binomial tree), **put-call parity** with full derivation and empirical frequency of violations, and spread arbitrage conditions (strike, calendar, butterfly). Derives results from first principles using concrete dollar amounts.
-**Weakness:** Options arbitrage only. For triangular FX arb, see IFT World (https://ift.world/); for ETF creation/redemption, see ETF.com; for cross-market and index arb, see Harris Chapter 17. **Quality: Essential.**
-
----
-
-## H. Execution — Almgren-Chriss and the efficient frontier of trading
-
-**Almgren & Chriss — "Optimal Execution of Portfolio Transactions" (2000)**
-Paper · 40 pages · Free · 6–10 hours
-**The foundational paper for optimal execution**, defining the trade-off: minimise E[cost] + λ·Var[cost]. Introduces permanent vs. temporary market impact, derives closed-form hyperbolic sine trajectories under linear impact, and constructs the efficient frontier of execution strategies. Almgren co-founded Quantitative Brokers. The paper is beautifully written and surprisingly accessible — uses static optimisation, not dynamic programming. A math/CS reader will find it very approachable.
-**Weakness:** Linear impact assumptions; static strategies don't adapt to conditions. **Quality: Essential.**
-
-**joshuapjacob/almgren-chriss-optimal-execution (GitHub)**
-Jupyter Notebook · https://github.com/joshuapjacob/almgren-chriss-optimal-execution · Free · 3–5 hours
-Most complete open-source implementation. Uses real data (GOOG, META), implements optimal trajectory computation, efficient frontier visualisation, and multi-asset extension including cross-exchange examples.
-**Quality: Recommended.**
-
----
-
-## I. Risk management — Kelly, metrics, and the art of not blowing up
-
-**Edward O. Thorp — "The Kelly Criterion in Blackjack, Sports Betting, and the Stock Market" (2006)**
-Paper/chapter · https://web.williams.edu/Mathematics/sjmiller/public_html/341/handouts/Thorpe_KellyCriterion2007.pdf · Free · 4–6 hours
-**The definitive practitioner treatment of Kelly** by the person who pioneered its use in both gambling and finance. Covers the binary formula, multi-asset continuous-time extension, geometric growth rate maximisation, the case for **fractional Kelly** (half or quarter Kelly to reduce variance at modest growth cost), and practical stock market application. Thorp ran Princeton Newport Partners for 19 years with essentially no losing years. Reads like a math paper, not a trading blog.
-**Weakness:** Does not cover VaR, ES, Sharpe, or drawdown. **Quality: Essential.**
-
-For **VaR, Expected Shortfall, Sharpe/Sortino/Calmar ratios, and drawdown analysis**, the QuantInsti survey at https://blog.quantinsti.com/performance-metrics-risk-metrics-optimization/ provides formulas, Python code, and clear progression from simple (Sharpe) to sophisticated (CVaR). Free, 2–3 hours. **Quality: Recommended.**
+### jacod-etal-2009
+- **Title**: Microstructure Noise in the Continuous Case: The Pre-Averaging Approach
+- **Authors**: Jacod, Li, Mykland, Podolskij, Vetter
+- **Year**: 2009
+- **Venue**: Stochastic Processes and Their Applications 119:2249-2276
+- **Quality**: optional
+- **Topics**: rv-estimators, microstructure-noise
+- **PDF**: none
+- **Key finding**: Pre-averaging approach to estimating integrated volatility under microstructure noise, extending to covariance estimation.
+- **Relevance**: Relevant only if working heavily with HF data at sub-second frequencies.
 
 ---
 
-## J. The quant dev toolkit — frameworks, pitfalls, and honest comparisons
+## B. HAR Family and Econometric Baselines
 
-The Python backtesting ecosystem is fragmented. No single framework dominates. The right choice depends on your workflow stage:
+### corsi-2009
+- **Title**: A Simple Approximate Long-Memory Model of Realized Volatility
+- **Authors**: Corsi
+- **Year**: 2009
+- **Venue**: J. Financial Econometrics 7:174-196
+- **Quality**: essential
+- **Topics**: har, long-memory, foundational
+- **PDF**: reference/project-papers/corsi-2009-har-realized-volatility.pdf
+- **Key finding**: The HAR model -- a three-component OLS regression of next-day RV on daily, weekly, and monthly RV averages -- captures the long-memory property of volatility with a simple, interpretable specification.
+- **Relevance**: The benchmark every ML model must beat; 2,100+ citations as of 2021.
 
-- **Learning/prototyping:** Backtesting.py (https://kernc.github.io/backtesting.py/) — lightweight, Pythonic, interactive HTML charts. Best entry point. Free.
-- **Research/parameter exploration:** vectorbt (https://vectorbt.dev/) — vectorised with Numba JIT. Processes millions of parameter combos simultaneously. Fastest Python backtester. Free core; Pro is paid.
-- **Production/live trading:** NautilusTrader (https://nautilustrader.io/) — Rust core, Python API, nanosecond resolution, backtest-to-live code parity. Most architecturally ambitious open-source engine. Steep learning curve, breaking API changes between releases. Free.
-- **Full ecosystem (data + compute + live):** QuantConnect LEAN (https://www.quantconnect.com/) — 400TB+ point-in-time data, cloud IDE, C# engine (40–50x faster than Python). Trustpilot 4.5/5 but polarised reviews (IDE stability complaints). Free tier available.
-- **Avoid as primary framework:** backtrader — feature-rich but **effectively abandoned** (no significant commits since ~2020, community forum disabled).
+### andersen-bollerslev-diebold-2007
+- **Title**: Roughing It Up: Including Jump Components in the Measurement, Modeling, and Forecasting of Return Volatility
+- **Authors**: Andersen, Bollerslev, Diebold
+- **Year**: 2007
+- **Venue**: RES 89:701-720
+- **Quality**: essential
+- **Topics**: har, har-extensions, jump-detection
+- **PDF**: none
+- **Key finding**: HAR-J and HAR-CJ models separate continuous and jump components of realized volatility, showing that jumps have different predictive content from continuous variation.
+- **Relevance**: The standard jump-augmented HAR baseline; jump features are among the first extensions to test.
 
-**Critical backtesting pitfalls** that every quant must internalise: **look-ahead bias** (using information unavailable at decision time), **survivorship bias** (testing only on currently-listed securities), and **overfitting** (optimising parameters until backtests look perfect on historical data but fail live). López de Prado's **combinatorial purged cross-validation (CPCV)** addresses all three by generating C(N,k) train/test splits with temporal purging and embargo buffers, producing a *distribution* of out-of-sample performance rather than a single point estimate. See *Advances in Financial Machine Learning* Chapter 12.
+### bollerslev-patton-quaedvlieg-2016
+- **Title**: Exploiting the Errors: A Simple Approach for Improved Volatility Forecasting
+- **Authors**: Bollerslev, Patton, Quaedvlieg
+- **Year**: 2016
+- **Venue**: J. Econometrics 192:1-18
+- **Quality**: essential
+- **Topics**: har, harq, har-extensions, rv-estimators
+- **PDF**: reference/project-papers/bollerslev-patton-quaedvlieg-2016-harq.pdf
+- **Key finding**: HARQ exploits time-varying measurement error in realized volatility by interacting HAR regressors with realized quarticity (RQ), delivering ~8% MSE / ~6% QLIKE improvement over HAR on S&P 500.
+- **Relevance**: The most reliable single-feature HAR improvement; a must-have baseline and feature source.
 
-**jmerle's IMC Prosperity backtester** (https://github.com/jmerle/imc-prosperity-3-backtester, `pip install prosperity3bt`) — the community-standard tool for competition prep, compatible with jmerle's visualiser. Competition-specific; not general-purpose. **Quality: Essential for Prosperity.**
+### patton-sheppard-2015
+- **Title**: Good Volatility, Bad Volatility: Signed Jumps and the Persistence of Volatility
+- **Authors**: Patton, Sheppard
+- **Year**: 2015
+- **Venue**: RES 97:683-697
+- **Quality**: essential
+- **Topics**: har, har-extensions, jump-detection, leverage-effect
+- **PDF**: reference/project-papers/patton-sheppard-2015-good-bad-volatility-shar.pdf
+- **Key finding**: Signed semi-variances (SHAR) decompose RV into positive and negative components, capturing the leverage effect and improving forecasts by 2-4% QLIKE.
+- **Relevance**: Signed decomposition features are cheap to compute and reliably improve HAR; essential baseline.
 
----
+### hansen-huang-shek-2012
+- **Title**: Realized GARCH: A Joint Model for Returns and Realized Measures of Volatility
+- **Authors**: Hansen, Huang, Shek
+- **Year**: 2012
+- **Venue**: J. Applied Econometrics 27:877-906
+- **Quality**: recommended
+- **Topics**: realized-garch, garch, har-extensions
+- **PDF**: none
+- **Key finding**: Realized GARCH jointly models returns and realized measures in a GARCH framework with a measurement equation, allowing feedback between returns and RV.
+- **Relevance**: Important parametric alternative to HAR; available in the `arch` Python package.
 
-## K. Machine learning for trading — where it helps, where it's overfit garbage
+### shephard-sheppard-2010
+- **Title**: Realising the Future: Forecasting with High-Frequency-Based Volatility (HEAVY) Models
+- **Authors**: Shephard, Sheppard
+- **Year**: 2010
+- **Venue**: J. Applied Econometrics 25:197-231
+- **Quality**: recommended
+- **Topics**: har-extensions, realized-garch
+- **PDF**: none
+- **Key finding**: HEAVY models use realized measures to drive the conditional variance dynamics, capturing the faster response to volatility shocks that GARCH misses.
+- **Relevance**: Bridges the gap between GARCH and HAR families; worth testing as a baseline.
 
-**Marcos López de Prado — *Advances in Financial Machine Learning* (2018)**
-Book · Wiley · ~$50 · 60–100 hours
-**The foundational text on financial ML methodology.** López de Prado managed $13B at Guggenheim Partners and heads ML at ADIA. The book's central message — **"the hardest problem is not prediction, it's validation"** — is the most important insight in financial ML. Novel contributions include **triple-barrier labeling**, **meta-labeling** (a secondary ML model determining whether a primary signal is worth acting on), **CPCV**, **fractional differentiation** (preserving memory while achieving stationarity), and **information-driven bars** (volume/dollar/tick bars with better statistical properties than time bars). 100,000+ copies sold.
-**Weakness:** Not a tutorial — a research monograph with disconnected chapters. Python code is sometimes incomplete. Assumes more finance knowledge than a zero-finance reader has. Use the Reasonable Deviations summary (https://reasonabledeviations.com/notes/adv_fin_ml/) as companion.
-**Prerequisites:** Strong ML, Python, graduate statistics. **Quality: Essential.**
+### clements-preve-2021
+- **Title**: Forecasting with the HAR Model
+- **Authors**: Clements, Preve
+- **Year**: 2021
+- **Venue**: J. Banking & Finance 133:106285
+- **Quality**: recommended
+- **Topics**: har, har-extensions, evaluation
+- **PDF**: none
+- **Key finding**: Modern fitting guide showing that HAR implementation details (window estimation, log vs. level, intercept treatment) materially affect out-of-sample performance.
+- **Relevance**: Critical for ensuring fair HAR baselines; implementation choices must be documented.
 
-**Where ML actually helps:** Feature engineering and selection, execution optimisation, alternative data processing (NLP on earnings calls), risk management (regime detection, HRP portfolio construction), and **meta-labeling** (sizing bets on existing signals). **Where ML fails:** Naked return prediction from price data alone, standard k-fold CV on time series, excessive hyperparameter optimisation. AQR demonstrated a moving average strategy's Sharpe dropping from **1.2 to −0.2** on fresh data after optimisation.
+### wilms-etal-2024
+- **Title**: HARd to Beat: The Overlooked Impact of Rolling Windows in the Era of Machine Learning
+- **Authors**: Wilms, Rombouts, Croux, Boudt
+- **Year**: 2024
+- **Venue**: arXiv 2406.08041
+- **Quality**: recommended
+- **Topics**: har, har-extensions, ml-vol, evaluation
+- **PDF**: reference/project-papers/hard-to-beat-2024-ml-vs-linear-rv.pdf
+- **Key finding**: Fitting choices (rolling window length, log transform, lag structure) matter more than the choice between linear and ML models. A well-tuned HAR beats naively-applied ML.
+- **Relevance**: Crucial methodological warning: must control for fitting choices before claiming ML superiority.
 
----
-
-## L. "Which strategy when?" — the hardest question in quant trading
-
-**This is genuinely the hardest topic to find good resources on. No single published resource provides a complete decision tree mapping market diagnostics to strategy choice.** The knowledge is largely tacit, held inside prop trading firms. What follows is the best available assemblage.
-
-**Ernest P. Chan — *Quantitative Trading* (2nd ed., 2022) + *Algorithmic Trading* (2013) + CPO blog posts**
-Chan's work across multiple books is the closest thing to a practitioner's strategy selection framework. *Quantitative Trading* Ch. 2 ("How to Identify a Strategy That Suits You") and Ch. 7 ("Mean-Reverting Versus Momentum Strategies" + "Regime Switching") directly address when each strategy works. His **Conditional Parameter Optimisation (CPO)** blog post (https://predictnow-ai.medium.com/conditional-parameter-optimization-adapting-parameters-to-changing-market-regimes-b7158ab78ed4, free) uses random forests to adapt strategy parameters to changing regimes — the most direct treatment of the meta-problem found anywhere.
-**Quality: Essential.**
-
-**López de Prado's meta-labeling** (Ch. 3 of *AFML*) is strategy selection at the trade level: a secondary model determines whether a primary model's signal is likely to be profitable *given current market conditions*. This is the "should I act on this signal right now?" question reduced to an ML classification problem.
-**Quality: Recommended (as building block).**
-
-**Regime detection** is the necessary prerequisite. The best practical tutorial is QuantStart's "Market Regime Detection using Hidden Markov Models" (https://www.quantstart.com/articles/market-regime-detection-using-hidden-markov-models-in-qstrader/) — a concrete Python implementation using HMMs as a trade filter for trend-following. Meudt et al. (2020, open access at https://www.mdpi.com/1911-8074/13/12/311) demonstrate that **value investing works in high-variance regimes while momentum works in low-variance regimes**, providing an empirical strategy-regime mapping.
-
-The practical framework synthesised from these sources: (1) Classify market regime using HMM/clustering on volatility + returns; (2) Diagnose opportunity type — wide spreads → market making, cointegrated divergence → stat arb, order-flow imbalance → directional signal, vol smile kinks → options mispricing, cross-venue gaps → arbitrage; (3) Apply meta-labeling or CPO to filter signals; (4) Rotate allocation conditionally. **No single resource walks through this complete pipeline — this is the major gap in the literature.**
-
----
-
-## M. IMC Prosperity — three years of data, one clear playbook
-
-IMC Prosperity is an annual algorithmic trading competition (Python, ~15 days, 5 rounds) that has run since 2023. **Prosperity 4 begins April 14, 2026** — four days from now. The competition reuses product archetypes with remarkable consistency.
-
-### Year-over-year product patterns
-
-| Product archetype | P1 (2023) | P2 (2024) | P3 (2025) |
-|---|---|---|---|
-| **Fixed price (~10,000)** | PEARLS | AMETHYSTS | RAINFOREST_RESIN |
-| **Volatile/trending** | BANANAS | STARFRUIT | KELP, SQUID_INK |
-| **Basket/ETF** | PICNIC_BASKET | GIFT_BASKET | PICNIC_BASKETS |
-| **Options** | — | COCONUT_COUPONS | VOLCANIC_ROCK_VOUCHERS |
-| **Cross-exchange arb** | — | ORCHIDS | MACARONS |
-| **Signal-driven** | BERRIES (seasonal), DIVING_GEAR (dolphins) | — | — |
-| **Bot intelligence (R5)** | Trading history | Trading history | Trader IDs ("Olivia" = insider) |
-
-### The winning playbook
-
-Five strategies cover virtually every round: **(1)** Market-make the fixed-price product at 10,000 ± 1 (consistent easy profit since P1). **(2)** Linear regression or EMA for fair value on trending products. **(3)** Pairs/stat arb on basket vs. components (spread = basket − Σ weighted components). **(4)** Black-Scholes IV mean reversion + delta hedging for options products. **(5)** Copy-trade the informed bot in Round 5 (in P3, "Olivia" was the insider). **Cross-year data reuse** has been a massive alpha source — in P2, P1 price paths predicted P2 prices almost exactly.
-
-### Comprehensive writeup table
-
-| Year | Team | Rank | URL | Key strategies | Key insight |
-|---|---|---|---|---|---|
-| P1 | Stanford Cardinal | 2nd | https://github.com/ShubhamAnandJain/IMC-Prosperity-2023-Stanford-Cardinal | MM at 10k, pairs (coconuts/pina coladas), seasonal berries, basket arb | Data science on berries jumped them from 926th to 60th |
-| P1 | Zahcheesha | 57th | https://github.com/MichalOkon/imc_prosperity | Built custom simulator; datasets included | Versatile sim enabled rapid iteration |
-| P1 | nicolassinott | 91st | https://github.com/nicolassinott/IMC_Prosperity | EMA MM, pairs, z-score spread | Z-score ±1.5 for baskets |
-| P2 | Linear Utility | 2nd | https://github.com/ericcccsliu/imc-prosperity-2 | MM, cross-exchange arb, basket spread, BS IV mean reversion | P1 data = near-exact predictor of P2 prices (R²=0.99) |
-| P2 | jmerle | 9th | https://github.com/jmerle/imc-prosperity-2 | MM, orchid conversion, grid-searched basket thresholds | Built all community tooling during tutorial round |
-| P2 | pe049395 | 13th | https://github.com/pe049395/IMC-Prosperity-2024 | Hidden fair value ≠ midprice; Monte Carlo data augmentation | Maximise expected utility per trade |
-| P2 | gabsens | — | https://github.com/gabsens/IMC-Prosperity-2-Manual | Manual trading mathematical solutions (game theory) | Jupyter notebooks for all 5 manual rounds |
-| P3 | TimoDiehm | 2nd | https://github.com/TimoDiehm/imc-prosperity-3 | MM (fixed/mean-revert/volatile), basket stat arb, BS options, Olivia copy-trading | ~50-page writeup; discovered and reported bot hardcoding exploit |
-| P3 | chrispyroberts | 7th | https://github.com/chrispyroberts/imc-prosperity-3 | Resin MM, Kelp mid from persistent bot, basket model, Olivia YOLO | Manual R1 was BFS currency exchange (cf. Leetcode 3387) |
-| P3 | Alpha Animals | 9th | https://github.com/CarterT27/imc-prosperity-3 | Adapted prior years' open-source strategies | "This year's IMC Prosperity was very similar to the last two years" |
-| P3 | jmerle | 25th | https://github.com/jmerle/imc-prosperity-3 | Full algorithm + writeup | Created optimizer (private) |
-| P3 | AlphaBaguette | Top 1% | https://github.com/Sylvain-Topeza/imc-prosperity-3 | Adaptive MM (OU for Kelp), conversion arb, BS, Olivia flow | Detailed README with strategy rationale |
-| P3 | Martin Oravec | 73rd | https://github.com/MartinOravecSvK/IMC_Prosperity_2025 | Solo player; detailed Medium writeup | Discord was critical resource |
-
-### Essential tooling
-
-- **Backtester (P3):** https://github.com/jmerle/imc-prosperity-3-backtester (`pip install prosperity3bt`)
-- **Visualiser (P3):** https://github.com/jmerle/imc-prosperity-3-visualizer (live: https://jmerle.github.io/imc-prosperity-3-visualizer/)
-- **Leaderboard (P3):** https://github.com/jmerle/imc-prosperity-3-leaderboard
-- **P2 backtester:** https://github.com/jmerle/imc-prosperity-2-backtester (`pip install prosperity2bt`)
-- **P1 simulator:** https://github.com/MichalOkon/imc_prosperity (includes datasets)
-
-### Critical preparation advice
-
-**Tooling first:** Build or install backtester + visualiser *before* the competition starts. Multiple top-10 teams emphasise this. **Study prior writeups exhaustively** — product archetypes repeat. **Join the Discord** — moderator hints and community discussion are decisive. **Watch AWS Lambda memory limits** (~100MB; verbose logging crashes runs). **Keep strategies simple** — P3 winner Anant Consul emphasised simplicity and persistence over complex models.
-
----
-
-## N. Goldman Sachs engineering — SecDB, Slang, and what the job actually is
-
-**Emanuel Derman — *My Life as a Quant* (2004)**
-Memoir · ~$15 · 8–12 hours
-The canonical narrative of how quant finance emerged at Goldman Sachs. Derman co-created the Black-Derman-Toy model and the Derman-Kani local volatility model during his 1985–2002 tenure. Provides irreplaceable cultural context: the evolution of the "strats" role, how quants gained respect on trading floors, Fischer Black as mentor. Nassim Taleb: "I know of no other book that bridges the two cultures." Skim the physics chapters if pressed for time. **Quality: Essential.**
-
-**eFinancialCareers — SecDB deep dive (2017) + Slang MD perspective (2023)**
-Articles · https://www.efinancialcareers.com/news/2017/02/secdb-goldman-sachs-slang + https://www.efinancialcareers.com/news/2023/04/goldman-sachs-slang-84 · Free · 30 min total
-SecDB, created in 1991–93 at J Aron, is GS's proprietary platform for pricing, risk, and trade management. **200M+ lines of Slang code, 160M daily jobs, 13,000 daily users, 300M+ compute hours/week.** Slang (Securities LANGuage) integrates tightly with SecDB's dependency graph for sensitivity analysis — invalidating parameters to get new NPV under different scenarios. GS is migrating to Java/Python but Slang will persist for decades. **Quality: Essential (interview talking points).**
-
-**InfoQ — "From Runtime Efficiency to Carbon Efficiency" (GS Slang VM Redesign)**
-Conference talk · https://www.infoq.com/presentations/slang/ · Free · 45–60 min
-The single most technically detailed public resource on Slang's internals. Reveals: C-based syntax, dynamically typed, case insensitive, no keywords, variables can contain spaces. They're building a new bytecode VM with JIT compilation targeting **135M compute hours/week reduction**. Perfect for a CS audience — this is a compilers talk, not a finance talk. **Quality: Essential for engineering candidates.**
-
-**Xinfeng Zhou — *A Practical Guide to Quantitative Finance Interviews* ("The Green Book", 2nd ed. 2020)**
-Book · ~$27 · 20–40 hours
-200+ real interview questions spanning probability, stochastic processes, linear algebra, and programming with detailed solutions. Widely called "the holy grail of quant finance interview prep." Goodreads 4.7/5. For an engineering role, focus on the probability and programming chapters. The stochastic calculus sections teach real mathematical content.
-**Quality: Essential.**
-
-**What "off-cycle" means:** Unlike standard summer internships (June–August, applied ~1 year ahead), off-cycle placements at GS are **3–12 month programs** available on a rolling basis for penultimate/final-year students or recent graduates. Process: online application → HackerRank OA (2–3 coding problems + math MCQs) → HireVue (6 behavioural questions) → Superday (2 rounds, 45 min each). **Languages valued:** Java (primary for new development), Python (growing, especially strats), C++ (performance-critical), SQL. Check the GS off-cycle page at https://www.goldmansachs.com/careers/students/programs-and-internships/emea/off-cycle-internships and Glassdoor interview reviews for latest question types.
+### bollerslev-patton-quaedvlieg-2018
+- **Title**: Modeling and Forecasting (Un)Reliable Realized Covariances for More Reliable Financial Decisions
+- **Authors**: Bollerslev, Patton, Quaedvlieg
+- **Year**: 2018
+- **Venue**: J. Econometrics 207:71-91
+- **Quality**: essential
+- **Topics**: harq, har-extensions, rv-estimators
+- **PDF**: reference/project-papers/bollerslev-patton-quaedvlieg-2018-unreliable-realized-covariances.pdf
+- **Key finding**: Extends HARQ to multivariate setting, modeling time-varying reliability of realized covariance matrices and improving portfolio allocation decisions.
+- **Relevance**: Extends the measurement-error correction idea to covariances; relevant for multi-asset forecasting.
 
 ---
 
-## O. Course evaluation — the Udemy course is not worth your time
+## C. Rough Volatility
 
-**Udemy "Algorithmic Trading A-Z with Python, ML & AWS" (Alexander Hagmann, revised 2024)**
-~40 hours · ~$15 on sale · 4.5/5 from ~4,000 reviews
-Covers broker APIs (OANDA, IBKR), Python/Pandas, technical indicators, basic ML/DL, backtesting, and AWS deployment. **Verdict for our target reader: weak fit.** The Python basics are redundant for someone with CS background. The ML sections are introductory — nothing a CS person doesn't know. The strategies are commodity technical analysis, not quantitative edge. No microstructure, no rigorous CV methods, no LOB data, no order flow. Primarily retail forex/CFD focused.
-**Quality: Skip for this audience.**
+### gatheral-jaisson-rosenbaum-2018
+- **Title**: Volatility Is Rough
+- **Authors**: Gatheral, Jaisson, Rosenbaum
+- **Year**: 2018
+- **Venue**: Quantitative Finance 18:933-949 (arXiv 1410.3394)
+- **Quality**: essential
+- **Topics**: rough-vol, long-memory, foundational
+- **PDF**: reference/project-papers/gatheral-jaisson-rosenbaum-2018-volatility-is-rough.pdf
+- **Key finding**: Log-volatility of equity indices behaves as fractional Brownian motion with Hurst parameter H ~ 0.1, much rougher than standard diffusion models predict.
+- **Relevance**: Motivates roughness-aware feature engineering; the H estimate is a testable hypothesis on our data.
 
-**Five superior alternatives, in recommended order:**
+### bayer-friz-gatheral-2016
+- **Title**: Pricing Under Rough Volatility
+- **Authors**: Bayer, Friz, Gatheral
+- **Year**: 2016
+- **Venue**: Quantitative Finance 16:887-904
+- **Quality**: recommended
+- **Topics**: rough-vol, options-implied
+- **PDF**: none
+- **Key finding**: The rough Bergomi (rBergomi) model prices SPX options more accurately than standard stochastic vol models by using fractional Brownian motion for the variance process.
+- **Relevance**: If incorporating implied vol features, understanding the pricing model family helps interpret IV surface shape.
 
-- **Stefan Jansen — *Machine Learning for Algorithmic Trading* (2nd ed., 2020):** 800+ pages, 150+ Jupyter notebooks, end-to-end ML trading workflow from data sourcing through deep RL agents. Covers alpha factor research, NLP on SEC filings, alternative data. The most comprehensive ML-for-trading resource available. ~$45. **Quality: Essential.**
-- **QuantConnect Bootcamp:** Free interactive labs on a real production platform with 400TB+ data. Teaches by doing, not lecturing. Good complement but not standalone — teaches the platform, not the theory. **Quality: Recommended.**
-- **Coursera — EDHEC "Investment Management with Python and ML" Specialisation:** Rigorous mathematical foundation (mean-variance, factor models, risk budgeting) with Python. Best Coursera option. ~$49/month for certificate; free to audit. **Quality: Recommended.**
-- **López de Prado — *AFML*:** Already covered in Topic K. Essential methodology but difficult as a first book. Read Jansen first for practical grounding, then López de Prado for methodological rigour. **Quality: Essential.**
-- **López de Prado — *Machine Learning for Asset Managers* (2020, Cambridge Elements):** Shorter, more focused companion (~$20). Covers distance metrics, optimal clustering, signal processing. Better for someone who already understands the concepts. **Quality: Recommended.**
+### cont-das-2024
+- **Title**: Rough Volatility: Fact or Artefact?
+- **Authors**: Cont, Das
+- **Year**: 2024
+- **Venue**: Sankhya B 86:191-223 (arXiv 2203.13820)
+- **Quality**: essential
+- **Topics**: rough-vol, microstructure-noise, rv-estimators
+- **PDF**: reference/project-papers/cont-das-2024-rough-volatility-fact-or-artefact.pdf
+- **Key finding**: Critical re-examination arguing that the apparent roughness (H ~ 0.1) may be an artefact of microstructure noise in the estimation procedure rather than a genuine feature of the volatility process.
+- **Relevance**: Directly challenges rough-vol features; must test whether roughness measures add forecasting value or just capture noise.
+
+### bayer-etal-2023-roughvol-book
+- **Title**: Rough Volatility
+- **Authors**: Bayer, Friz, Gassiat, Gatheral, Horvath, Jacquier (eds.)
+- **Year**: 2023
+- **Venue**: SIAM (book)
+- **Quality**: recommended
+- **Topics**: rough-vol, foundational
+- **PDF**: none
+- **Key finding**: Comprehensive edited volume covering theory, estimation, pricing, and calibration of rough volatility models.
+- **Relevance**: Reference for deep dives into rough vol; not needed for initial exploration.
+
+### boj-rough-vol-survey-2024
+- **Title**: Survey of Rough Volatility
+- **Authors**: Bank of Japan IMES
+- **Year**: 2024
+- **Venue**: Bank of Japan IMES Discussion Paper
+- **Quality**: recommended
+- **Topics**: rough-vol, foundational
+- **PDF**: none
+- **Key finding**: Accessible survey of the rough volatility paradigm covering estimation, pricing implications, and open questions.
+- **Relevance**: Good entry point for understanding the rough vol debate before diving into primary sources.
+
+### rosenbaum-zhang-2022
+- **Title**: On the Universality of the Volatility Formation Process: When Machine Learning and Rough Volatility Agree
+- **Authors**: Rosenbaum, Zhang
+- **Year**: 2022
+- **Venue**: arXiv 2206.14114
+- **Quality**: recommended
+- **Topics**: rough-vol, ml-vol, deep-learning
+- **PDF**: reference/project-papers/rosenbaum-zhang-2022-universality-volatility-formation.pdf
+- **Key finding**: Demonstrates that machine learning models and rough volatility theory converge on similar volatility dynamics, suggesting universal features in the volatility formation process.
+- **Relevance**: Bridges the rough-vol and ML-vol literatures; supports using roughness-related features in ML pipelines.
 
 ---
 
-## Gaps, open questions, and honest uncertainties
+## D. ML for Volatility -- Empirical Studies
 
-**The "which strategy when?" gap is real.** No published resource provides a complete, systematic framework mapping market diagnostics to strategy choice. The knowledge exists inside prop firms but is not public. The best approximation is Chan's CPO + López de Prado's meta-labeling + HMM regime detection, assembled by the reader.
+### christensen-siggaard-veliyev-2023
+- **Title**: A Machine Learning Approach to Volatility Forecasting
+- **Authors**: Christensen, Siggaard, Veliyev
+- **Year**: 2023
+- **Venue**: J. Financial Econometrics 21:1680-1727 (arXiv 2601.13014)
+- **Quality**: essential
+- **Topics**: ml-vol, gradient-boosting, neural-nets, har, evaluation, qlike
+- **PDF**: reference/project-papers/christensen-siggaard-veliyev-2023-ml-volatility-forecasting.pdf
+- **Key finding**: Cleanest demonstration that ML (random forests, gradient boosting, neural nets) beats HAR on DJIA constituents; gains rise with forecast horizon because ML better approximates long memory.
+- **Relevance**: The primary reference for "ML beats HAR" claims; defines the empirical benchmark we target.
 
-**Prosperity 4 is unknown territory.** P4 uses a new currency (XIRECs) and a deep space theme. While product archetypes have repeated across P1–P3, IMC may introduce new mechanics. The "bot hardcoding exploit" discovered in P3 was patched, and the new rule excluding prior top-10 teams from rankings suggests IMC is actively iterating.
+### branco-rubesam-zevallos-2024
+- **Title**: Forecasting Realized Volatility: Does Anything Beat Linear Models?
+- **Authors**: Branco, Rubesam, Zevallos
+- **Year**: 2024
+- **Venue**: J. Empirical Finance 78:101524
+- **Quality**: essential
+- **Topics**: ml-vol, har, evaluation, qlike, mcs
+- **PDF**: none
+- **Key finding**: Across 10 global equity indices, no nonlinear ML model statistically outperforms a properly fitted HAR-X in formal MCS tests, challenging the "ML wins" narrative.
+- **Relevance**: The essential counterpoint; forces honest framing of ML contribution and careful baseline tuning.
 
-**The Goldman Sachs tech stack is moving.** SecDB/Slang will persist but new development is increasingly Java/Python. The relative importance of Slang knowledge for an off-cycle engineering placement in 2026 is uncertain. Understanding the *architecture* (dependency graphs, sensitivity analysis, bi-temporal data) matters more than the language syntax.
+### rahimikia-poon-2020
+- **Title**: Machine Learning for Realised Volatility Forecasting
+- **Authors**: Rahimikia, Poon
+- **Year**: 2020
+- **Venue**: SSRN 3707796
+- **Quality**: essential
+- **Topics**: ml-vol, lob, gradient-boosting, feature-engineering
+- **PDF**: reference/project-papers/rahimikia-poon-2020-ml-rv-forecasting.pdf
+- **Key finding**: ML with LOB features (mid prices, bid/ask means) beats HAR in 90% of out-of-sample days for 23 NASDAQ tickers. LOB features are the dominant information source.
+- **Relevance**: Strongest evidence that richer information sets (not just better models) drive ML gains over HAR.
 
-**Alpha decay is real across all published strategies.** Every specific strategy described in any resource here should be expected to have degraded since publication. Ernest Chan's classic EWA/EWC pairs trade, Avellaneda-Lee's PCA stat arb, and simple TSMOM implementations have all attracted crowding. The value is in learning methodology — the frameworks for discovering new edges, not copying old ones.
+### rahimikia-zohren-poon-2024
+- **Title**: Realised Volatility Forecasting: Machine Learning via Financial Word Embedding
+- **Authors**: Rahimikia, Zohren, Poon
+- **Year**: 2024
+- **Venue**: arXiv 2108.00480
+- **Quality**: recommended
+- **Topics**: ml-vol, sentiment, feature-engineering
+- **PDF**: none
+- **Key finding**: FinText embeddings from financial news improve RV forecasts, with the greatest gains on jump days when text captures event-driven volatility.
+- **Relevance**: Demonstrates value of text features as complement to quantitative inputs, especially for tail events.
 
-**Several canonical texts are showing their age.** Harris (2003), Hasbrouck (2007), and Hull predate the modern HFT era, crypto markets, and T+1 settlement. Bouchaud (2018) and Cartea (2015) are more current but still miss recent developments in DeFi market structure and transformer-based models.
+### reisenhofer-bayer-hautsch-2022
+- **Title**: HARNet: A Convolutional Neural Network for Realized Volatility Forecasting
+- **Authors**: Reisenhofer, Bayer, Hautsch
+- **Year**: 2022
+- **Venue**: arXiv 2205.07719
+- **Quality**: essential
+- **Topics**: ml-vol, cnn-tcn, har, deep-learning
+- **PDF**: none
+- **Key finding**: HARNet embeds the HAR structure inside a CNN, achieving ~11.74% average reduction in median test MAE across SPX, FTSE 100, and DJI vs. OLS-HAR. Code available at github.com/mdsunivie/HARNet.
+- **Relevance**: Best example of HAR-aware neural architecture; the code repo is directly usable.
 
-**Resources not found despite searching:** A comprehensive "arbitrage zoo" tutorial covering all types in one place does not appear to exist. Each arbitrage type (triangular FX, ETF creation/redemption, cash-and-carry, index arb) has isolated explanations but no unified treatment beyond Harris Chapter 17. Similarly, no good free resource exists for walk-forward estimation that goes beyond the conceptual level to provide robust, production-quality Python code with proper purging.
+### moreno-pino-zohren-2022
+- **Title**: DeepVol: Volatility Forecasting from High-Frequency Data with Dilated Causal Convolutions
+- **Authors**: Moreno-Pino, Zohren
+- **Year**: 2022
+- **Venue**: Quantitative Finance (arXiv 2210.04797)
+- **Quality**: recommended
+- **Topics**: ml-vol, cnn-tcn, deep-learning
+- **PDF**: reference/project-papers/moreno-pino-zohren-2022-deepvol.pdf
+- **Key finding**: DeepVol uses dilated causal convolutions on raw intraday returns, bypassing handcrafted realized measures entirely to forecast daily RV.
+- **Relevance**: Demonstrates the "raw data in, forecast out" approach; relevant if exploring end-to-end deep learning.
+
+### souto-moradi-2024
+- **Title**: NBEATSx for Realized Volatility Forecasting
+- **Authors**: Souto, Moradi
+- **Year**: 2024
+- **Venue**: Expert Systems with Applications 122802
+- **Quality**: recommended
+- **Topics**: ml-vol, deep-learning, neural-nets
+- **PDF**: none
+- **Key finding**: NBEATSx adapted for realized volatility forecasting on six stock indices achieves 13% and 8% gains at medium and long horizons respectively over baselines.
+- **Relevance**: Shows time-series foundation architectures (N-BEATS family) transfer well to vol forecasting.
+
+### taneva-angelova-granchev-2025
+- **Title**: Transformer Architectures for Realized Volatility Forecasting
+- **Authors**: Taneva-Angelova, Granchev
+- **Year**: 2025
+- **Venue**: J. Risk Financial Management 18(12):685
+- **Quality**: recommended
+- **Topics**: ml-vol, transformers, deep-learning
+- **PDF**: none
+- **Key finding**: Comprehensive comparison of transformer architectures for volatility forecasting on US equity indices (2000-2025), showing mixed results vs. simpler baselines.
+- **Relevance**: Latest transformer benchmark for vol; useful for understanding where attention mechanisms help.
+
+### zhang-pu-cucuringu-dong-2025
+- **Title**: Realized Volatility Forecasting with Graph Neural Networks
+- **Authors**: Zhang, Pu, Cucuringu, Dong
+- **Year**: 2025
+- **Venue**: Int. J. Forecasting 41:377-397 (arXiv 2308.01419)
+- **Quality**: essential
+- **Topics**: ml-vol, gnn, cross-asset, spillovers, deep-learning
+- **PDF**: none
+- **Key finding**: GNN captures cross-asset volatility spillovers through learned graph structures, outperforming univariate and simple multivariate models on multi-asset RV forecasting.
+- **Relevance**: Primary reference for the cross-asset spillover project direction; demonstrates graph-based approaches for RV.
+
+### brini-toscano-2025
+- **Title**: SpotV2Net: Multivariate Intraday Spot Volatility Forecasting via Vol-of-Vol-Informed Graph Attention Networks
+- **Authors**: Brini, Toscano
+- **Year**: 2025
+- **Venue**: Int. J. Forecasting 41:1093-1111
+- **Quality**: recommended
+- **Topics**: ml-vol, gnn, cross-asset, spillovers, deep-learning
+- **PDF**: reference/project-papers/spotv2net-2024-intraday-vol-gat.pdf
+- **Key finding**: SpotV2Net uses vol-of-vol informed graph attention networks for multivariate intraday spot volatility forecasting, capturing dynamic cross-asset relationships.
+- **Relevance**: Complementary to Zhang et al. GNN; focuses on intraday time scale and attention-based graph learning.
+
+### optiver-kaggle-2021
+- **Title**: Optiver Realized Volatility Prediction (Kaggle Competition)
+- **Authors**: Optiver (competition); top solutions by community
+- **Year**: 2021
+- **Venue**: kaggle.com/competitions/optiver-realized-volatility-prediction
+- **Quality**: recommended
+- **Topics**: ml-vol, gradient-boosting, feature-engineering, lob, data-source
+- **PDF**: none
+- **Key finding**: Top-10 solutions (e.g., 7th place public RMSPE 0.20013) demonstrate that gradient boosting + careful microstructure feature engineering from LOB data is the winning playbook for short-horizon RV prediction.
+- **Relevance**: Feature-engineering goldmine; top writeups document exactly which LOB features matter most.
+
+### bucci-2020
+- **Title**: Realized Volatility Forecasting with Neural Networks
+- **Authors**: Bucci
+- **Year**: 2020
+- **Venue**: J. Financial Econometrics
+- **Quality**: essential
+- **Topics**: ml-vol, neural-nets, deep-learning, har
+- **PDF**: reference/project-papers/bucci-2020-rv-forecasting-neural-networks.pdf
+- **Key finding**: Systematic evaluation of neural network architectures for RV forecasting, showing that feed-forward and recurrent networks can improve on HAR but gains are sensitive to architecture choices.
+- **Relevance**: Early comprehensive neural net benchmark for RV; provides architectural lessons for deep learning approaches.
+
+### fed-2025
+- **Title**: Linear and Nonlinear Econometric Models Against Machine Learning for Realized Volatility Forecasting
+- **Authors**: Federal Reserve (FEDS Working Paper)
+- **Year**: 2025
+- **Venue**: FEDS Working Paper
+- **Quality**: essential
+- **Topics**: ml-vol, har, evaluation, qlike
+- **PDF**: reference/project-papers/fed-2025-linear-nonlinear-rv-forecasting.pdf
+- **Key finding**: Fed staff comparison of econometric and ML models for RV forecasting, providing institutional perspective on the relative merits of each approach.
+- **Relevance**: Authoritative institutional benchmark; useful for framing results in policy-relevant terms.
+
+### foundation-model-rv-2025
+- **Title**: Foundation Time-Series AI Model for Realized Volatility Forecasting
+- **Authors**: (various)
+- **Year**: 2025
+- **Venue**: arXiv 2505.11163
+- **Quality**: essential
+- **Topics**: ml-vol, transformers, deep-learning
+- **PDF**: reference/project-papers/foundation-model-rv-forecasting-2025.pdf
+- **Key finding**: Applies pre-trained time-series foundation models to RV forecasting, testing whether general-purpose temporal representations transfer to financial volatility.
+- **Relevance**: Tests the frontier question of whether foundation models can replace domain-specific feature engineering.
+
+### vision-transformer-rv-2025
+- **Title**: Data-Efficient Realized Volatility Forecasting with Vision Transformers
+- **Authors**: (various)
+- **Year**: 2025
+- **Venue**: arXiv 2511.03046
+- **Quality**: recommended
+- **Topics**: ml-vol, transformers, deep-learning
+- **PDF**: reference/project-papers/vision-transformer-rv-2025.pdf
+- **Key finding**: Encodes time-series data as images and applies vision transformers for data-efficient RV forecasting, showing competitive performance with less training data.
+- **Relevance**: Novel input representation approach; potentially useful for limited-data regimes.
+
+### time-series-foundation-var-2024
+- **Title**: Time-Series Foundation Model for Value-at-Risk
+- **Authors**: (various)
+- **Year**: 2024
+- **Venue**: arXiv 2410.11773
+- **Quality**: recommended
+- **Topics**: ml-vol, transformers, deep-learning
+- **PDF**: reference/project-papers/time-series-foundation-model-var-2024.pdf
+- **Key finding**: Foundation time-series models applied to VaR estimation, demonstrating cross-task transfer from general forecasting to risk measurement.
+- **Relevance**: VaR is a downstream application of RV forecasts; shows how vol models feed into risk management.
+
+### transfer-learning-rv-2025
+- **Title**: Transfer Learning for Realized Volatility of New Issues and Spin-Offs
+- **Authors**: (various)
+- **Year**: 2025
+- **Venue**: arXiv 2503.12648
+- **Quality**: recommended
+- **Topics**: ml-vol, deep-learning
+- **PDF**: reference/project-papers/transfer-learning-rv-new-issues-2025.pdf
+- **Key finding**: Transfer learning enables RV forecasting for newly listed securities with limited history by leveraging patterns learned from mature assets.
+- **Relevance**: Addresses the cold-start problem in vol forecasting; relevant for IPOs and spin-offs.
+
+### chen-robert-2022
+- **Title**: Multivariate Realized Volatility Forecasting with Graph Neural Network
+- **Authors**: Chen, Robert
+- **Year**: 2022
+- **Venue**: ACM ICAIF
+- **Quality**: essential
+- **Topics**: ml-vol, gnn, cross-asset, spillovers
+- **PDF**: reference/project-papers/chen-robert-2022-gnn-multivariate-rv.pdf
+- **Key finding**: Early application of GNNs to multivariate RV forecasting, demonstrating that graph-based representations of cross-asset relationships improve forecast accuracy.
+- **Relevance**: Precursor to Zhang et al. (2025); establishes the GNN-for-RV approach.
 
 ---
 
-## Recommended reading order
+## E. Limit-Order-Book Deep Learning
 
-The following sequence totals approximately **300 hours** and covers all topics, prioritising the areas most relevant to both IMC Prosperity 4 and Goldman Sachs engineering interviews:
+### zhang-zohren-roberts-2019
+- **Title**: DeepLOB: Deep Convolutional Neural Networks for Limit Order Books
+- **Authors**: Zhang, Zohren, Roberts
+- **Year**: 2019
+- **Venue**: IEEE Transactions on Signal Processing (arXiv 1808.03668)
+- **Quality**: recommended
+- **Topics**: lob, deep-learning, cnn-tcn
+- **PDF**: none
+- **Key finding**: CNN architecture for mid-price prediction from raw limit order book data, establishing the deep learning baseline for LOB-based forecasting.
+- **Relevance**: Foundation architecture for LOB feature extraction; relevant if incorporating order book data.
 
-**Week 1–2 (Foundations, ~30 hrs):** Harris *Trading and Exchanges* (skim Parts I, IV) → Pelgrims matching engine tutorial → MIT OCW 18.S096 Lectures 19–21
+### sirignano-cont-2019
+- **Title**: Universal Features of Price Formation in Financial Markets: Perspectives from Deep Learning
+- **Authors**: Sirignano, Cont
+- **Year**: 2019
+- **Venue**: Quantitative Finance
+- **Quality**: recommended
+- **Topics**: lob, deep-learning, foundational
+- **PDF**: none
+- **Key finding**: Deep learning reveals universal features of price formation across different stocks, suggesting that order flow dynamics share common statistical structure.
+- **Relevance**: Supports transferability of LOB-based features across assets; relevant for multi-asset vol models.
 
-**Week 3–5 (Microstructure + Options, ~80 hrs):** Bouchaud *Trades, Quotes and Prices* → Natenberg *Option Volatility and Pricing* → Colin Bennett PDF → Avellaneda-Stoikov paper
+### briola-bartolucci-aste-2025
+- **Title**: LiT: Limit-Order-Book Transformer
+- **Authors**: Briola, Bartolucci, Aste
+- **Year**: 2025
+- **Venue**: PMC
+- **Quality**: recommended
+- **Topics**: lob, transformers, deep-learning
+- **PDF**: none
+- **Key finding**: Transformer architecture specifically designed for limit order book data, leveraging attention mechanisms to capture inter-level dependencies.
+- **Relevance**: Latest LOB architecture; shows where transformers add value over CNNs for order book data.
 
-**Week 6–8 (Strategies, ~60 hrs):** Chan *Algorithmic Trading* → Letian Wang pairs trading code → Avellaneda-Lee paper → Almgren-Chriss paper → Moskowitz TSMOM paper
+### prata-etal-2025
+- **Title**: LOB-Based Deep Learning Models for Stock Price Trend Prediction: A Benchmark Study
+- **Authors**: Prata, Pereira, Moreira, Mendes-Moreira
+- **Year**: 2025
+- **Venue**: Quantitative Finance
+- **Quality**: recommended
+- **Topics**: lob, deep-learning, evaluation
+- **PDF**: none
+- **Key finding**: Sober assessment showing that high classification accuracy on LOB data does not translate directly to tradable signals; the gap between statistical and economic performance is significant.
+- **Relevance**: Important reality check for any LOB-based approach; statistical significance is not economic significance.
 
-**Week 9–10 (ML + Risk, ~50 hrs):** Jansen *ML for Algorithmic Trading* (selected chapters) → López de Prado *AFML* (Chapters 2–7, 12) → Thorp Kelly criterion paper
+---
 
-**Week 11–12 (Competition + Interview Prep, ~40 hrs):** All Prosperity writeups (TimoDiehm's P3 writeup first) → jmerle backtester setup → Green Book (selected chapters) → Derman *My Life as a Quant* → Sinclair *Volatility Trading*
+## F. Variance Risk Premium and Options
 
-**Ongoing:** Moontower blog (vol intuition), Robot Wealth blog (stat arb at scale), r/quant, Discord for Prosperity community.
+### bollerslev-tauchen-zhou-2009
+- **Title**: Expected Stock Returns and Variance Risk Premia
+- **Authors**: Bollerslev, Tauchen, Zhou
+- **Year**: 2009
+- **Venue**: RFS 22:4463-4492
+- **Quality**: essential
+- **Topics**: vrp, options-implied, foundational
+- **PDF**: none
+- **Key finding**: The variance risk premium (VRP = implied variance - expected realized variance) is a strong predictor of future stock returns, with predictive power concentrated at quarterly horizons.
+- **Relevance**: VRP is both a feature for vol models and a direct trading signal; connects RV forecasting to return prediction.
+
+### bekaert-hoerova-2014
+- **Title**: The VIX, the Variance Premium and Stock Market Volatility
+- **Authors**: Bekaert, Hoerova
+- **Year**: 2014
+- **Venue**: J. Econometrics
+- **Quality**: recommended
+- **Topics**: vrp, options-implied
+- **PDF**: none
+- **Key finding**: Decomposes VIX into conditional variance and variance premium components, showing each has distinct forecasting power for returns and volatility.
+- **Relevance**: Refines VRP features; the decomposition may improve feature engineering for vol models.
+
+### carr-wu-2009
+- **Title**: Variance Risk Premiums
+- **Authors**: Carr, Wu
+- **Year**: 2009
+- **Venue**: RFS
+- **Quality**: recommended
+- **Topics**: vrp, options-implied, cross-asset
+- **PDF**: none
+- **Key finding**: Documents VRP across major US stock indices and individual stocks, showing that VRP is consistently negative (investors pay for variance insurance).
+- **Relevance**: Cross-sectional VRP evidence; supports using VRP features across multiple assets.
+
+---
+
+## G. Forecast Evaluation and Validation
+
+### patton-2011
+- **Title**: Volatility Forecast Comparison Using Imperfect Volatility Proxies
+- **Authors**: Patton
+- **Year**: 2011
+- **Venue**: J. Econometrics 160:246-256
+- **Quality**: essential
+- **Topics**: evaluation, qlike, foundational
+- **PDF**: none
+- **Key finding**: QLIKE and MSE loss functions are robust to noise in the volatility proxy (using RV as proxy for true integrated variance) -- other loss functions are not, meaning model rankings are preserved even though RV is measured with error.
+- **Relevance**: Justifies QLIKE as the primary evaluation metric; any other loss function requires additional robustness arguments.
+
+### hansen-lunde-nason-2011
+- **Title**: The Model Confidence Set
+- **Authors**: Hansen, Lunde, Nason
+- **Year**: 2011
+- **Venue**: Econometrica 79:453-497
+- **Quality**: essential
+- **Topics**: evaluation, mcs, foundational
+- **PDF**: none
+- **Key finding**: The Model Confidence Set (MCS) procedure identifies the set of models that are statistically indistinguishable from the best model at a given confidence level, controlling for multiple testing.
+- **Relevance**: The standard method for reporting model comparison results; all papers in this literature use MCS.
+
+### diebold-mariano-1995
+- **Title**: Comparing Predictive Accuracy
+- **Authors**: Diebold, Mariano
+- **Year**: 1995
+- **Venue**: JBES
+- **Quality**: recommended
+- **Topics**: evaluation, foundational
+- **PDF**: none
+- **Key finding**: The Diebold-Mariano test for equal predictive accuracy between two forecasts, applicable under general loss functions and non-nested models.
+- **Relevance**: Pairwise complement to MCS; used for head-to-head model comparisons.
+
+### lopez-de-prado-2018
+- **Title**: Advances in Financial Machine Learning
+- **Authors**: Lopez de Prado
+- **Year**: 2018
+- **Venue**: Wiley (book)
+- **Quality**: essential
+- **Topics**: validation, purged-cv, feature-engineering, foundational
+- **PDF**: none
+- **Key finding**: Introduces purged k-fold cross-validation (eliminating information leakage in time-series CV), fractional differentiation (preserving memory while achieving stationarity), and triple-barrier labeling for financial ML.
+- **Relevance**: Ch. 7 (purged CV) is mandatory for validation methodology; Ch. 5 (fractional differencing) is relevant for feature stationarity.
+
+---
+
+## H. Rashomon Sets and Optimal Sparse Decision Trees
+
+### breiman-2001
+- **Title**: Statistical Modeling: The Two Cultures
+- **Authors**: Breiman
+- **Year**: 2001
+- **Venue**: Statistical Science 16:199-231
+- **Quality**: essential
+- **Topics**: rashomon, ensemble, foundational
+- **PDF**: none
+- **Key finding**: Introduced the Rashomon effect: many very different models can achieve near-identical predictive accuracy, raising fundamental questions about model selection and interpretation.
+- **Relevance**: Theoretical foundation for the Rashomon-set project direction; motivates exploring model multiplicity.
+
+### lin-etal-2020-gosdt
+- **Title**: Generalized and Scalable Optimal Sparse Decision Trees
+- **Authors**: Lin, Zhong, Hu, Rudin, Seltzer
+- **Year**: 2020
+- **Venue**: ICML (arXiv 2006.08690)
+- **Quality**: essential
+- **Topics**: optimal-trees, rashomon
+- **PDF**: none
+- **Key finding**: GOSDT finds provably optimal sparse decision trees using dynamic programming with bounds, making exact tree optimization tractable for moderate-sized datasets.
+- **Relevance**: Foundation algorithm for the interpretable-trees project direction; PyGOSDT package is directly usable.
+
+### aglin-etal-2020-demirovic-2022
+- **Title**: DL8.5 / MurTree: Optimal Decision Trees via Dynamic Programming
+- **Authors**: Aglin, Nijssen, Schaus (DL8.5); Demirovic et al. (MurTree)
+- **Year**: 2020/2022
+- **Venue**: JMLR (MurTree)
+- **Quality**: recommended
+- **Topics**: optimal-trees, rashomon
+- **PDF**: none
+- **Key finding**: Alternative optimal decision tree solvers using different search strategies; MurTree uses branch-and-bound with caching for improved scalability.
+- **Relevance**: Benchmark alternatives to GOSDT; useful for comparing solver performance.
+
+### van-der-linden-etal-2023-streed
+- **Title**: STreeD: Optimal Regression and Classification Trees
+- **Authors**: van der Linden, de Weerdt, Demirovic
+- **Year**: 2023
+- **Venue**: (preprint/proceedings)
+- **Quality**: recommended
+- **Topics**: optimal-trees, rashomon
+- **PDF**: none
+- **Key finding**: Extends optimal tree methods to the regression case, enabling exact optimization of continuous-valued prediction trees.
+- **Relevance**: Directly relevant since RV forecasting is a regression task; extends classification-focused GOSDT.
+
+### xin-etal-2022-treefarms
+- **Title**: Exploring the Whole Rashomon Set of Sparse Decision Trees
+- **Authors**: Xin, Zhong, Chen, Takagi, Seltzer, Rudin
+- **Year**: 2022
+- **Venue**: NeurIPS Oral (arXiv 2209.08040)
+- **Quality**: essential
+- **Topics**: rashomon, optimal-trees
+- **PDF**: none
+- **Key finding**: TreeFARMS enumerates the full set of near-optimal sparse decision trees (the Rashomon set), enabling analysis of model multiplicity and variable importance stability.
+- **Relevance**: Core tool for the Rashomon project direction; produces the set of competing models for analysis.
+
+### babbar-etal-2025-split
+- **Title**: SPLIT: Scalable Enumeration of the Full Rashomon Set of Optimal Decision Trees
+- **Authors**: Babbar, McTavish, Rudin, Seltzer
+- **Year**: 2025
+- **Venue**: ICML Oral (arXiv 2502.15988)
+- **Quality**: essential
+- **Topics**: rashomon, optimal-trees
+- **PDF**: none
+- **Key finding**: SPLIT replaces TreeFARMS with a scalable algorithm for enumerating the full Rashomon set, handling larger datasets and more features. Code at github.com/VarunBabbar/SPLIT-ICML.
+- **Relevance**: Production-ready replacement for TreeFARMS; the tool to use for Rashomon analysis at scale.
+
+### heile-etal-2025-licketyresplit
+- **Title**: LicketyRESPLIT
+- **Authors**: Heile, Babbar, McTavish, Rudin
+- **Year**: 2025
+- **Venue**: (preprint)
+- **Quality**: recommended
+- **Topics**: rashomon, optimal-trees
+- **PDF**: none
+- **Key finding**: Further speed improvements over SPLIT for Rashomon set enumeration.
+- **Relevance**: Performance optimization of SPLIT; use if SPLIT is too slow on target dataset.
+
+### arslan-etal-2025-sorted
+- **Title**: SORTeD: Optimal Decision Trees via Stochastic Optimization
+- **Authors**: Arslan et al.
+- **Year**: 2025
+- **Venue**: NeurIPS Spotlight
+- **Quality**: recommended
+- **Topics**: optimal-trees, rashomon
+- **PDF**: none
+- **Key finding**: Stochastic optimization approach to optimal decision trees, offering an alternative to exact enumeration for larger-scale problems.
+- **Relevance**: Alternative solver if exact methods are intractable at scale.
+
+### semenova-rudin-parr-2022
+- **Title**: A Study in Rashomon Curves and Volumes: A New Perspective on Generalization and Model Simplicity in Machine Learning
+- **Authors**: Semenova, Rudin, Parr
+- **Year**: 2022
+- **Venue**: FAccT (arXiv 1908.01755)
+- **Quality**: essential
+- **Topics**: rashomon, evaluation
+- **PDF**: none
+- **Key finding**: Formalizes the Rashomon ratio (fraction of models in a hypothesis class achieving near-optimal loss), showing that larger Rashomon sets enable finding simpler, more interpretable models.
+- **Relevance**: Theoretical backbone for interpreting Rashomon-set results; guides threshold selection for "near-optimal."
+
+### dong-rudin-2020
+- **Title**: Exploring the Cloud of Variable Importance for the Set of All Good Models
+- **Authors**: Dong, Rudin
+- **Year**: 2020
+- **Venue**: (arXiv 1901.03209)
+- **Quality**: essential
+- **Topics**: rashomon, feature-engineering
+- **PDF**: none
+- **Key finding**: Variable Importance Clouds visualize how feature importance varies across the Rashomon set, revealing which features are robustly important vs. interchangeable.
+- **Relevance**: The key deliverable for the Rashomon project: showing which vol features are genuinely important vs. substitutable.
+
+### rudin-etal-2024-position
+- **Title**: Amazing Things Come from Having Many Good Models
+- **Authors**: Rudin et al.
+- **Year**: 2024
+- **Venue**: ICML position paper (arXiv 2407.04846)
+- **Quality**: recommended
+- **Topics**: rashomon, foundational
+- **PDF**: none
+- **Key finding**: Position paper arguing that the existence of many near-optimal models (Rashomon sets) should fundamentally change how we practice ML, favoring interpretability and fairness analysis.
+- **Relevance**: Motivational framing for the Rashomon project direction; useful for presentation and writeup.
+
+### mctavish-etal-2025
+- **Title**: Predictive Equivalence in Trees
+- **Authors**: McTavish, Boner, Donnelly, Seltzer, Rudin
+- **Year**: 2025
+- **Venue**: ICML (arXiv 2506.14143)
+- **Quality**: recommended
+- **Topics**: rashomon, optimal-trees
+- **PDF**: none
+- **Key finding**: Defines predictive equivalence classes within decision tree Rashomon sets, grouping trees that make identical predictions despite structural differences.
+- **Relevance**: Reduces redundancy in Rashomon set analysis; identifies truly distinct models.
+
+### marx-calmon-ustun-2020
+- **Title**: Predictive Multiplicity in Classification
+- **Authors**: Marx, Calmon, Ustun
+- **Year**: 2020
+- **Venue**: ICML
+- **Quality**: recommended
+- **Topics**: rashomon
+- **PDF**: none
+- **Key finding**: Formalizes predictive multiplicity -- the degree to which competing models disagree on individual predictions -- and proposes metrics to measure it.
+- **Relevance**: Useful for understanding prediction stability across the Rashomon set; complements Variable Importance Clouds.
+
+---
+
+## I. Modern Deep Time-Series Forecasting
+
+### oreshkin-etal-2020-nbeats
+- **Title**: N-BEATS: Neural Basis Expansion Analysis for Interpretable Time Series Forecasting
+- **Authors**: Oreshkin, Carpov, Chapados, Bengio
+- **Year**: 2020
+- **Venue**: ICLR
+- **Quality**: recommended
+- **Topics**: deep-learning, neural-nets
+- **PDF**: none
+- **Key finding**: N-BEATS uses backward and forward residual links with basis expansion for interpretable time-series forecasting, achieving state-of-the-art on M4 competition without domain-specific features.
+- **Relevance**: Base architecture for NBEATSx-vol (Souto & Moradi 2024); available in Nixtla's neuralforecast.
+
+### challu-etal-2023-nhits
+- **Title**: N-HiTS: Neural Hierarchical Interpolation for Time Series Forecasting
+- **Authors**: Challu, Olivares, Oreshkin, Garza, Mergenthaler-Canseco, Dubrawski
+- **Year**: 2023
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: deep-learning, neural-nets
+- **PDF**: none
+- **Key finding**: Hierarchical interpolation with multi-rate sampling improves long-horizon forecasting efficiency over N-BEATS with lower computational cost.
+- **Relevance**: Potentially useful for long-horizon RV forecasting; available in neuralforecast.
+
+### nie-etal-2023-patchtst
+- **Title**: A Time Series is Worth 64 Words: Long-Term Forecasting with Transformers
+- **Authors**: Nie, Nguyen, Siniukov, Kalagnanam
+- **Year**: 2023
+- **Venue**: ICLR
+- **Quality**: recommended
+- **Topics**: transformers, deep-learning
+- **PDF**: none
+- **Key finding**: PatchTST segments time series into patches (like NLP tokens), achieving strong long-horizon forecasting with channel independence and self-supervised pre-training.
+- **Relevance**: Leading transformer architecture for time series; candidate for end-to-end vol forecasting.
+
+### liu-etal-2022-tsmixer
+- **Title**: TSMixer: An All-MLP Architecture for Time Series Forecasting
+- **Authors**: Liu et al.
+- **Year**: 2022
+- **Venue**: (preprint)
+- **Quality**: optional
+- **Topics**: deep-learning, neural-nets
+- **PDF**: none
+- **Key finding**: Simple MLP-based mixing architecture matches or exceeds transformer performance on multivariate time-series benchmarks with lower complexity.
+- **Relevance**: Lightweight alternative to transformers; worth benchmarking for computational efficiency.
+
+### lim-etal-2021-tft
+- **Title**: Temporal Fusion Transformers for Interpretable Multi-Horizon Time Series Forecasting
+- **Authors**: Lim, Arik, Loeff, Pfister
+- **Year**: 2021
+- **Venue**: Int. J. Forecasting
+- **Quality**: optional
+- **Topics**: transformers, deep-learning
+- **PDF**: none
+- **Key finding**: TFT combines variable selection, gating, and temporal attention for interpretable multi-horizon forecasting with static covariate support.
+- **Relevance**: Interpretability features could be useful for understanding which inputs drive vol forecasts.
+
+---
+
+## J. Code Repositories and Data Sources
+
+### sheppard-arch
+- **Title**: arch: ARCH and GARCH Models in Python
+- **Authors**: Sheppard (Kevin)
+- **Year**: ongoing
+- **Venue**: github.com/bashtage/arch
+- **Quality**: essential
+- **Topics**: garch, har, evaluation, mcs, code-repo
+- **PDF**: none
+- **Key finding**: Comprehensive Python package implementing GARCH, HAR, ARCH, bootstrap, MCS, and SPA tests. The standard toolkit for volatility modeling in Python.
+- **Relevance**: Primary implementation tool for baselines and evaluation; MCS implementation is critical.
+
+### boudt-etal-highfrequency
+- **Title**: highfrequency: Tools for Highfrequency Data Analysis
+- **Authors**: Boudt et al.
+- **Year**: ongoing
+- **Venue**: CRAN (R package)
+- **Quality**: recommended
+- **Topics**: rv-estimators, jump-detection, code-repo
+- **PDF**: none
+- **Key finding**: R package implementing all major realized measures (RV, BV, RK, TSRV), jump tests (BNS, Lee-Mykland, ABD), and HEAVY estimation.
+- **Relevance**: Reference implementation for realized measures; useful for cross-validating Python implementations.
+
+### harnet-repo
+- **Title**: HARNet: Convolutional Neural Network for Realized Volatility
+- **Authors**: Reisenhofer, Bayer, Hautsch (mdsunivie)
+- **Year**: 2022
+- **Venue**: github.com/mdsunivie/HARNet
+- **Quality**: essential
+- **Topics**: ml-vol, cnn-tcn, code-repo
+- **PDF**: none
+- **Key finding**: Open-source PyTorch implementation of the HARNet architecture with pre-processing pipelines for RV data.
+- **Relevance**: Directly usable code for HAR-aware neural networks; starting point for model development.
+
+### split-icml-repo
+- **Title**: SPLIT: Scalable Rashomon Set Enumeration
+- **Authors**: Babbar, McTavish, Rudin, Seltzer
+- **Year**: 2025
+- **Venue**: github.com/VarunBabbar/SPLIT-ICML
+- **Quality**: essential
+- **Topics**: rashomon, optimal-trees, code-repo
+- **PDF**: none
+- **Key finding**: Production implementation of the SPLIT algorithm for enumerating the full Rashomon set of optimal decision trees.
+- **Relevance**: Core tool for the Rashomon project direction; replaces TreeFARMS.
+
+### treefarms-gosdt-repo
+- **Title**: TreeFARMS / GOSDT
+- **Authors**: UBC Systopia Lab
+- **Year**: 2020-2022
+- **Venue**: github.com/ubc-systopia/treeFarms; pygosdt
+- **Quality**: essential
+- **Topics**: rashomon, optimal-trees, code-repo
+- **PDF**: none
+- **Key finding**: Original implementations of TreeFARMS (Rashomon set enumeration) and GOSDT (optimal sparse decision trees).
+- **Relevance**: Predecessor to SPLIT; useful for comparison and smaller-scale experiments.
+
+### nixtla-neuralforecast
+- **Title**: NeuralForecast: Neural Forecasting with PyTorch Lightning
+- **Authors**: Nixtla
+- **Year**: ongoing
+- **Venue**: github.com/Nixtla/neuralforecast
+- **Quality**: recommended
+- **Topics**: deep-learning, neural-nets, code-repo
+- **PDF**: none
+- **Key finding**: Unified PyTorch Lightning framework implementing N-BEATS, N-HiTS, PatchTST, TFT, and other neural forecasting architectures.
+- **Relevance**: Ready-to-use implementations of deep forecasting models; reduces engineering overhead for benchmarking.
+
+### tsai-repo
+- **Title**: tsai: State-of-the-Art Time Series Library for Deep Learning
+- **Authors**: (community)
+- **Year**: ongoing
+- **Venue**: github.com/timeseriesAI/tsai
+- **Quality**: optional
+- **Topics**: deep-learning, code-repo
+- **PDF**: none
+- **Key finding**: PyTorch time-series deep learning toolkit with implementations of InceptionTime, ROCKET, and other architectures.
+- **Relevance**: Additional model zoo for benchmarking; lower priority than neuralforecast.
+
+### oxford-man-realized-library
+- **Title**: Oxford-Man Institute Realized Library
+- **Authors**: Oxford-Man Institute
+- **Year**: 2009-2022 (discontinued)
+- **Venue**: realized.oxford-man.ox.ac.uk/data/download
+- **Quality**: essential
+- **Topics**: rv-estimators, data-source
+- **PDF**: none
+- **Key finding**: Daily 5-min RV, BV, RK, and other realized measures for ~25 global equity indices. Discontinued ~2022 but archival data accessible via the `bvhar` R package.
+- **Relevance**: Standard academic dataset for RV forecasting; most benchmark papers use this data.
+
+### lobster-data
+- **Title**: LOBSTER: Limit Order Book System -- The Efficient Reconstructor
+- **Authors**: LOBSTER
+- **Year**: ongoing
+- **Venue**: lobsterdata.com
+- **Quality**: essential
+- **Topics**: lob, data-source
+- **PDF**: none
+- **Key finding**: Academic NASDAQ ITCH-reconstructed L2/L3 limit order book data with free sample datasets and paid academic subscriptions.
+- **Relevance**: Primary data source for any LOB-based feature engineering or deep learning approach.
+
+### fred-cboe-truefx
+- **Title**: FRED / CBOE (VIX, VVIX, MOVE) / TrueFX
+- **Authors**: Federal Reserve, CBOE, TrueFX
+- **Year**: ongoing
+- **Venue**: fred.stlouisfed.org; cboe.com; truefx.com
+- **Quality**: essential
+- **Topics**: data-source, options-implied, cross-asset
+- **PDF**: none
+- **Key finding**: Free macro data (FRED), implied vol indices (VIX/VVIX/MOVE from CBOE), and FX tick data (TrueFX) for cross-asset feature construction.
+- **Relevance**: Essential supplementary data sources for cross-asset and options-implied features.
+
+### optionmetrics-ivydb
+- **Title**: OptionMetrics IvyDB
+- **Authors**: OptionMetrics
+- **Year**: ongoing
+- **Venue**: optionmetrics.com (internal at GS in many cases)
+- **Quality**: recommended
+- **Topics**: options-implied, data-source
+- **PDF**: none
+- **Key finding**: Full implied volatility surface data for US equities and indices; the standard academic source for options-implied features.
+- **Relevance**: IV surface features are among the most promising additions to RV models; may be available internally at GS.
+
+---
+
+## K. Practitioner and Industry Resources
+
+### jpmorgan-quant-research
+- **Title**: Big Data and AI Strategies Reports
+- **Authors**: JP Morgan Quantitative Research
+- **Year**: ongoing
+- **Venue**: JP Morgan internal/client reports
+- **Quality**: recommended
+- **Topics**: ml-vol, feature-engineering
+- **PDF**: none
+- **Key finding**: Regular reports on ML applications in finance including volatility modeling, often with practical implementation details.
+- **Relevance**: Industry benchmarks and feature ideas from a major sell-side desk.
+
+### aqr-working-papers
+- **Title**: AQR Working Papers (Volatility)
+- **Authors**: AQR Capital Management
+- **Year**: ongoing
+- **Venue**: aqr.com/insights
+- **Quality**: recommended
+- **Topics**: vrp, cross-asset
+- **PDF**: none
+- **Key finding**: Frequent working papers on volatility, factor investing, and risk premia from a leading systematic fund.
+- **Relevance**: Practitioner perspective on vol strategies; useful for feature ideas and economic motivation.
+
+### two-sigma-blog
+- **Title**: Two Sigma Blog (ML + Volatility)
+- **Authors**: Two Sigma
+- **Year**: ongoing
+- **Venue**: twosigma.com/articles
+- **Quality**: optional
+- **Topics**: ml-vol
+- **PDF**: none
+- **Key finding**: Occasional pieces on ML applications including volatility modeling from a leading quant fund.
+- **Relevance**: Industry perspective; lower priority than academic papers but useful for practical insights.
+
+### gs-securities-research
+- **Title**: Goldman Sachs Securities Research
+- **Authors**: Goldman Sachs
+- **Year**: ongoing
+- **Venue**: Internal access
+- **Quality**: recommended
+- **Topics**: ml-vol, options-implied, cross-asset
+- **PDF**: none
+- **Key finding**: Proprietary research on volatility, derivatives, and systematic strategies available through internal GS access.
+- **Relevance**: Directly relevant to the internship; check internal portals for vol-specific publications.
+
+### sofie-quantminds-wilmott
+- **Title**: SoFiE / QuantMinds / RiskMinds / Wilmott
+- **Authors**: Various (conferences and forums)
+- **Year**: ongoing
+- **Venue**: SoFiE (Society for Financial Econometrics); QuantMinds/RiskMinds conferences; Wilmott magazine; Quantocracy
+- **Quality**: optional
+- **Topics**: evaluation, ml-vol
+- **PDF**: none
+- **Key finding**: Academic and practitioner conferences/forums covering latest developments in financial econometrics and quantitative finance.
+- **Relevance**: Useful for tracking cutting-edge work and networking; conference papers often precede journal publication.
+
+### bennett-2014
+- **Title**: Trading Volatility: Correlation, Term Structure and Skew
+- **Authors**: Bennett
+- **Year**: 2014
+- **Venue**: Free PDF (trading-volatility.com)
+- **Quality**: essential
+- **Topics**: options-implied, vrp, foundational
+- **PDF**: none
+- **Key finding**: Best single resource on volatility surface mechanics -- smile, skew, term structure, and correlation trading -- written by a former head of quant strategy at Banco Santander.
+- **Relevance**: Essential for building intuition about IV surface features before using them as model inputs.
+
+### cartea-jaimungal-penalva-2015
+- **Title**: Algorithmic and High-Frequency Trading
+- **Authors**: Cartea, Jaimungal, Penalva
+- **Year**: 2015
+- **Venue**: Cambridge University Press (textbook)
+- **Quality**: essential
+- **Topics**: microstructure-noise, lob, foundational
+- **PDF**: none
+- **Key finding**: Graduate textbook unifying microstructure, execution, and market making under a single stochastic control framework. Covers optimal execution, VWAP/POV targeting, and order imbalance with rigorous HJB derivations.
+- **Relevance**: Essential framework for understanding microstructure features and execution context in which vol forecasts are consumed.
+
+---
+
+## Topic Tag Vocabulary
+
+`rv-estimators`, `microstructure-noise`, `jump-detection`, `har`, `harq`, `har-extensions`, `garch`, `realized-garch`, `rough-vol`, `ml-vol`, `gradient-boosting`, `neural-nets`, `deep-learning`, `lstm`, `cnn-tcn`, `transformers`, `gnn`, `ensemble`, `rashomon`, `optimal-trees`, `lob`, `vrp`, `options-implied`, `cross-asset`, `spillovers`, `evaluation`, `qlike`, `mcs`, `validation`, `purged-cv`, `feature-engineering`, `long-memory`, `sentiment`, `regime`, `data-source`, `code-repo`, `foundational`
