@@ -163,7 +163,7 @@ Does NOT include:
 
 - **Engineering principle:** For each base quantity, compute {level, change, z-score}. Trees handle the redundancy via splits.
 - **Data constraint:** L2 depth is E-mini only. For the 30 equities + 4 ETFs, only L1 features (price acceleration, WAP returns, spread dynamics).
-- **Connection to LSTM:** This is the data that feeds the intraday deep learning module (Ch 11). Raw tick sequences are too rich for hand-engineered aggregations alone.
+- **Connection to LSTM:** This is the data that feeds the intraday deep learning module (Ch 10). Raw tick sequences are too rich for hand-engineered aggregations alone.
 
 `warning` box: Lookahead bias. Microstructure features computed on the full day use information up to market close. Features for predicting RV_{t+1} must use only information available at time t. Timestamp alignment is critical.
 
@@ -190,7 +190,7 @@ Does NOT include:
 
 #### Chapter 8: Feature Composition and Selection
 
-~5 pages. The synthesis chapter. Includes Layers 5-7 as a section.
+~6-7 pages. The synthesis chapter. Includes Layers 5-7 as a section, plus the composition/selection framework.
 
 **Section: Calendar, Memory, and Sentiment (Layers 5-7)**
 
@@ -238,7 +238,7 @@ Diagram showing cumulative accuracy by layer:
 
 - **Input:** ~80-120 engineered features from Layers 0-7
 - **Reference config (from Optiver 91st place, well-documented):** lr=0.05, max_leaves=255, min_data_per_leaf=255, 10k estimators, 400 early stopping rounds, DART mode
-- **Loss function:** Train with QLIKE, not MSE. Zhang et al. (2025) confirms this matters substantially. MSE is dominated by extreme vol days.
+- **Loss function:** Train with QLIKE, not MSE. Zhang et al. (2025) confirms this matters substantially. MSE is dominated by extreme vol days. Note: QLIKE is not a built-in LightGBM objective; requires implementing a custom objective and eval function.
 - **Interpretability:** SHAP values for feature importance and interaction effects. Required for GS presentation and model defense.
 - **Feature importance stability:** Single-model importance (gain, permutation, SHAP) is unstable across refits due to feature redundancy (VIX, VVIX, ATM IV, IV-RV spread are near-substitutes). This motivates the Rashomon analysis in Ch 12.
 
@@ -253,10 +253,10 @@ Diagram showing cumulative accuracy by layer:
 - **Architecture:**
   1. Small LSTM or TCN on intraday E-mini sequences
   2. Input: 5-min return bars within each trading day, with LOB snapshot features
-  3. Output: predict next-day RV
-  4. Extract last-layer hidden state as fixed-length "intraday state" embedding
-  5. This embedding feeds into LightGBM as additional features alongside hand-engineered features
-- **Diagram:** E-mini L2 ticks -> 5-min bars + LOB snapshots -> LSTM -> embedding -> LightGBM input
+  3. Output: independent next-day RV forecast
+  4. This forecast is blended with LightGBM's forecast at the prediction level (Ch 11)
+  5. Alternative to test: extract last-layer hidden state as embedding and feed into LightGBM as additional features (feature-level stacking). Competition evidence favors prediction-level blending, but both should be compared on our data.
+- **Diagram:** E-mini L2 ticks -> 5-min bars + LOB snapshots -> LSTM -> next-day RV forecast -> blend with LightGBM
 - **Key difference from Optiver:** Optiver had 10-min windows (short sequences where hand-engineered aggregations captured most info). We have full-day tick sequences for next-day prediction -- much longer, richer sequences.
 
 #### Chapter 11: The Ensemble
@@ -274,7 +274,7 @@ Diagram showing cumulative accuracy by layer:
 
 ~4 pages. The novel contribution.
 
-- **What to build:** Optimal decision trees (STreeD piecewise-linear regressor, depth 4-5, elastic-net leaves, 8-32 leaves) trained on the same feature set as LightGBM
+- **What to build:** Optimal decision trees (`STreeDPiecewiseLinearRegressor`, depth 4-5, elastic-net leaves, 8-32 leaves) trained on the same feature set as LightGBM
 - **Expected accuracy:** ~2-5% higher MSE than tuned LightGBM, but comfortably beats HAR (~10% better). A single inspectable tree.
 - **Rashomon analysis pipeline:**
   1. TreeFARMS/RESPLIT to construct the set of all near-optimal trees (within epsilon=2% MSE of optimum)
@@ -366,9 +366,11 @@ guides/vol-project-ref/
 ## Style Notes
 
 - Reuse vol learning guide preamble (report class, tcolorbox environments)
-- Box types used: `keyidea`, `warning`, `intuition` (sparingly), `workedexample` (for concrete feature computation examples only)
+- Box types used: `keyidea`, `warning`, `workedexample` (for concrete feature computation examples only)
+- `intuition` NOT used (guide assumes existing knowledge; no need for plain-English analogies)
 - `projectconnection` NOT used (everything is already project-specific)
 - `prereq` NOT used (no prerequisites; the guide assumes existing knowledge)
+- **Citations:** Use `\citep{}` and `\citet{}` inline throughout. Include `\bibliography{references}` at the end. Every feature layer and model choice should cite its primary source paper(s). No separate "Key Papers" appendix; citations live where the claim is made.
 - Heavy use of tables for feature reference
 - Diagrams for: high-level pipeline (Ch 1), HARQ mechanism (Ch 3), horizon dependence (Ch 5/8), LSTM pipeline (Ch 10), ensemble architecture (Ch 11), Rashomon pipeline (Ch 12), end-to-end system (Ch 14)
 - No em dashes
