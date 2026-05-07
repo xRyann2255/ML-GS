@@ -1,1 +1,104 @@
-\chapter{Placeholder}
+\chapter{LightGBM for Tabular Volatility}
+\label{ch:lightgbm}
+
+LightGBM \citep{Ke2017} is the primary ML model in the pipeline.
+It ingests the full engineered feature set from Layers~0--7 and optimizes a custom $\QLIKE$ objective.
+
+%% ──────────────────────────────────────────────
+\section{What Goes In}
+\label{sec:lgbm-features}
+%% ──────────────────────────────────────────────
+
+Table~\ref{tab:feature-layers} summarizes the raw feature counts per layer before expansion.
+After applying \{level, change, z-score\} transformations to each base feature, the final input dimensionality is approximately 80--120.
+
+\begin{table}[htbp]
+\centering
+\caption{Feature layers feeding the LightGBM model.}
+\label{tab:feature-layers}
+\small
+\begin{tabular}{@{}clr@{}}
+\toprule
+\textbf{Layer} & \textbf{Features} & \textbf{Count} \\
+\midrule
+0 & $\log \RV$ (d/w/m), RQ, RQ interaction  & 5 \\
+1 & $\RV^+$, $\RV^-$, signed jumps, $C$, $J$ & 6 \\
+2 & ATM IV, $\VRP$, skew, term structure, $\VVIX$, butterfly, IV--RV gap, event IV & 9 \\
+3 & Price acceleration, OBI, spread, VPIN, Kyle $\lambda$ & 9 \\
+4 & Treasury slope, FX vol, credit spread, DY index & 8 \\
+5 & Calendar: FOMC, OpEx, month/weekday dummies & $\sim$15 \\
+6 & Memory: Hurst exponent, fractional $d$, ACF features & $\sim$10 \\
+7 & Sentiment: FinBERT scores, attention proxies & $\sim$15--55 \\
+\midrule
+  & \textbf{Raw total} & $\sim$37--57 \\
+  & \textbf{After \{level, change, z-score\} expansion} & $\sim$\textbf{80--120} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ──────────────────────────────────────────────
+\section{Configuration}
+\label{sec:lgbm-config}
+%% ──────────────────────────────────────────────
+
+Table~\ref{tab:lgbm-config} gives the reference configuration, adapted from the Optiver Kaggle competition (91st-percentile solution).
+
+\begin{table}[htbp]
+\centering
+\caption{LightGBM reference configuration.}
+\label{tab:lgbm-config}
+\small
+\begin{tabular}{@{}llp{5.5cm}@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Notes} \\
+\midrule
+\texttt{learning\_rate}        & 0.05    & \\
+\texttt{num\_leaves}           & 255     & \\
+\texttt{min\_data\_in\_leaf}   & 255     & Prevents overfitting on rare regimes \\
+\texttt{n\_estimators}         & 10{,}000 & With early stopping \\
+\texttt{early\_stopping\_rounds} & 400   & \\
+\texttt{boosting\_type}        & \texttt{dart} & Dropout regularization \\
+\texttt{objective}             & Custom  & $\QLIKE$ loss; not a built-in objective \\
+\texttt{metric}                & Custom  & $\QLIKE$ evaluation for early stopping \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ──────────────────────────────────────────────
+\section{Custom QLIKE Objective}
+\label{sec:qlike-objective}
+%% ──────────────────────────────────────────────
+
+$\QLIKE$ is not a built-in LightGBM loss.
+Training requires a custom objective function that returns the gradient and Hessian of the $\QLIKE$ loss with respect to the predicted value, plus a separate custom evaluation metric for early stopping.
+$\QLIKE$ is robust to noise in the volatility proxy: it ranks forecasts consistently even when $\RV$ is measured with error, unlike MSE \citep{Patton2011}.
+All training and prediction operate in $\log$-$\RV$ space; convert back to levels only for final $\QLIKE$ evaluation.
+
+
+%% ──────────────────────────────────────────────
+\section{SHAP Interpretability}
+\label{sec:shap}
+%% ──────────────────────────────────────────────
+
+$\SHAP$ values \citep{Lundberg2017} provide feature importance and interaction effects for each prediction.
+They are required for the GS presentation and for defending model behavior under scrutiny.
+However, single-model importance measures (gain, permutation, $\SHAP$) are unstable across refits when features are near-substitutes (e.g., VIX, $\VVIX$, ATM IV all proxy for the same latent factor).
+This instability motivates the Rashomon analysis in Chapter~\ref{ch:rashomon}, which quantifies importance across the set of near-optimal models rather than relying on a single fit.
+
+
+%% ──────────────────────────────────────────────
+%% Boxes
+%% ──────────────────────────────────────────────
+
+\begin{warning}[Baseline First]
+The fitting scheme for the $\HAR$ baseline matters more than the choice of ML model \citep{HARdToBeat2024}.
+A properly fitted $\HAR$ using OLS with Newey--West standard errors and an expanding or rolling window is essential before claiming ML improvement.
+Without this baseline, apparent ML gains may reflect a weak benchmark, not genuine forecasting ability.
+\end{warning}
+
+\begin{keyidea}[Why LightGBM]
+Gradient-boosted trees dominate tabular volatility forecasting benchmarks \citep{ChristensenSiggaardVeliyev2023, BrancoRubesamZevallos2024}.
+They handle mixed feature types (continuous RV lags, categorical calendar dummies, ordinal sentiment scores) without preprocessing, capture nonlinear interactions automatically, and train in seconds on datasets of this size ($\sim$5{,}000 rows $\times$ 120 features).
+\end{keyidea}
