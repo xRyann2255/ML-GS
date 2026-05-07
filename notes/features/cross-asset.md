@@ -1,0 +1,32 @@
+# Cross-Asset Features
+
+What we've learned about volatility spillovers and correlations.
+
+## Findings
+
+(To be filled as we explore data)
+
+## Questions to Answer
+
+- How correlated is RV across our 34-symbol universe?
+- Are there clear lead-lag relationships in volatility?
+- Does sector/asset-class structure show up in the correlation matrix?
+- How much does cross-asset information improve single-asset RV forecasts?
+
+## Deep Research Findings (2026-05-06)
+
+**Volatility spillover framework:**
+- Diebold & Yilmaz (2009, 2012, 2014): generalized forecast-error variance decomposition from a VAR of realized vols. Total connectedness index spikes during crises (`diebold-yilmaz-2012` in bibliography)
+- Key cross-asset features: VIX, MOVE (rates vol), CDX/iTraxx credit spreads, USD index vol, gold vol
+
+**GNN cross-asset findings:**
+- Zhang, Pu, Cucuringu & Dong (2025, Int. J. Forecasting): graph attention networks for multivariate RV. Key findings: multi-hop spillovers add little; nonlinear one-hop spillover effects help short-horizon (<=1 week) forecasts; training with QLIKE loss substantially outperforms MSE training (`zhang-pu-cucuringu-dong-2025` in bibliography)
+- SpotV2Net (Brini & Toscano 2025): vol-of-vol-informed graph attention for intraday spot vol (`brini-toscano-2025` in bibliography)
+
+**Factor models for volatility:**
+- Herskovic, Kelly, Lustig & Van Nieuwerburgh (2016, JFE): "common idiosyncratic volatility" -- can decompose realized vol into systematic and idiosyncratic components
+- Andersen, Bollerslev, Diebold & Ebens (2001): factor structure in daily equity vol
+
+**Realized covariance estimation:**
+- BNHLS (2011) multivariate realized kernels; Hayashi-Yoshida (2005) refresh-time sampling for asynchronous assets
+- HEAVY-MV (Noureldin, Shephard & Sheppard 2012) for multivariate realized measures
