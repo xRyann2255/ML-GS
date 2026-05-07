@@ -788,6 +788,611 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Key finding**: Formalizes predictive multiplicity -- the degree to which competing models disagree on individual predictions. Proposes metrics (ambiguity, discrepancy) to measure it. Shows that standard model selection ignores multiplicity, which can be large even when test accuracy is near-identical.
 - **Relevance**: Useful for understanding prediction stability across the Rashomon set; complements Variable Importance Clouds.
 
+### hyafil-rivest-1976
+- **Title**: Constructing Optimal Binary Decision Trees is NP-Complete
+- **Authors**: Hyafil, Rivest
+- **Year**: 1976
+- **Venue**: Information Processing Letters 5(1):15-17
+- **Quality**: essential
+- **Topics**: optimal-trees, np-hardness, foundational
+- **PDF**: none
+- **Key finding**: Proved that constructing the optimal binary decision tree is NP-complete, establishing the theoretical barrier that motivated greedy heuristics (CART, C4.5) and ensembling for decades.
+- **Relevance**: The foundational hardness result that the modern optimal-tree revolution overcomes via practical algorithms with exponential worst-case but tractable average-case behavior.
+
+### breiman-etal-1984-cart
+- **Title**: Classification and Regression Trees
+- **Authors**: Breiman, Friedman, Olshen, Stone
+- **Year**: 1984
+- **Venue**: Wadsworth (book)
+- **Quality**: essential
+- **Topics**: optimal-trees, regression-trees, foundational
+- **PDF**: none
+- **Key finding**: Introduced CART: top-down greedy recursive partitioning with cost-complexity pruning. The structural limitation is myopia -- each split is locally optimal but globally suboptimal.
+- **Relevance**: The greedy baseline that all optimal tree methods improve upon. CART regression trees (mean prediction in leaves) remain the default sklearn implementation.
+
+### quinlan-1993-c45
+- **Title**: C4.5: Programs for Machine Learning
+- **Authors**: Quinlan
+- **Year**: 1993
+- **Venue**: Morgan Kaufmann (book)
+- **Quality**: recommended
+- **Topics**: optimal-trees, foundational
+- **PDF**: none
+- **Key finding**: Extended ID3 with information gain ratio, handling of continuous attributes, missing values, and pruning. Dominant academic tree learner through the 1990s-2000s.
+- **Relevance**: Historical context for understanding what greedy tree learning provides and where it falls short.
+
+### murthy-salzberg-1995
+- **Title**: Lookahead and Pathology in Decision Tree Induction
+- **Authors**: Murthy, Salzberg
+- **Year**: 1995
+- **Venue**: IJCAI [verify venue -- source does not specify]
+- **Quality**: optional
+- **Topics**: optimal-trees, foundational
+- **PDF**: none
+- **Key finding**: Empirically documented that greedy top-down induction is myopic: locally optimal splits at the root can force globally suboptimal subtrees.
+- **Relevance**: Motivates the optimal tree approach; shows empirically where greedy fails.
+
+### bertsimas-dunn-2017
+- **Title**: Optimal Classification Trees
+- **Authors**: Bertsimas, Dunn
+- **Year**: 2017
+- **Venue**: Machine Learning 106(7):1039-1082
+- **Quality**: recommended
+- **Topics**: optimal-trees, np-hardness
+- **PDF**: none
+- **Key finding**: MIP formulation for optimal classification trees with oblique splits. First modern attempt at exact optimization, but limited to depth <= 4 on small datasets due to MIP scaling.
+- **Relevance**: Pioneered the MIP approach; surpassed by DP/BnB methods (GOSDT, MurTree, STreeD) which scale better for axis-aligned trees.
+
+### verwer-zhang-2019
+- **Title**: BinOCT: Learning Optimal Binary Classification Trees
+- **Authors**: Verwer, Zhang
+- **Year**: 2019
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: optimal-trees, np-hardness
+- **PDF**: none
+- **Key finding**: Binary linear program where decision thresholds are encoded via binary search with big-M constraints, making the formulation independent of row count. Best on datasets up to ~5000 rows. Always produces complete binary trees of given depth.
+- **Relevance**: Historical step toward practical optimal trees; superseded by GOSDT/MurTree/STreeD.
+
+### verhaeghe-etal-2020
+- **Title**: Learning Optimal Decision Trees Using Constraint Programming
+- **Authors**: Verhaeghe, Nijssen, Pesant, Quimper, Schaus
+- **Year**: 2020
+- **Venue**: Constraints 25(3-4):226-250
+- **Quality**: optional
+- **Topics**: optimal-trees, np-hardness
+- **PDF**: none
+- **Key finding**: Constraint programming formulation for optimal decision trees; demonstrates CP as a viable alternative to MIP for tree optimization.
+- **Relevance**: Part of the algorithmic pluralism in optimal trees; DP+BnB methods empirically dominate CP for axis-aligned trees.
+
+### narodytska-etal-2018
+- **Title**: Learning Optimal Classification Trees Using a Binary Linear Program Formulation
+- **Authors**: Narodytska, Ignatiev, Pereira, Marques-Silva
+- **Year**: 2018
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: optimal-trees, np-hardness
+- **PDF**: none
+- **Key finding**: MaxSAT-based approach to optimal decision trees; finds minimum-size trees for perfect classification.
+- **Relevance**: Part of the SAT/MaxSAT lineage; limited to perfect-classification objective, superseded by more flexible methods.
+
+### hu-siala-etal-2020
+- **Title**: Learning Optimal Decision Trees with MaxSAT and Its Integration into AdaBoost
+- **Authors**: Hu, Siala, Hebrard, Huguet
+- **Year**: 2020
+- **Venue**: IJCAI
+- **Quality**: optional
+- **Topics**: optimal-trees, np-hardness, ensemble
+- **PDF**: none
+- **Key finding**: MaxSAT variant with AdaBoost integration; extends SAT-based optimal trees to ensemble settings.
+- **Relevance**: Shows SAT-based methods can integrate with boosting; not directly applicable to regression.
+
+### hu-rudin-seltzer-2019-osdt
+- **Title**: Optimal Sparse Decision Trees
+- **Authors**: Hu, Rudin, Seltzer
+- **Year**: 2019
+- **Venue**: NeurIPS
+- **Quality**: essential
+- **Topics**: optimal-trees, rashomon, foundational
+- **PDF**: none
+- **Key finding**: First practical decision-tree-specific optimal algorithm. Minimizes regularized misclassification L(T) + lambda*|leaves(T)| over binary features using analytical bounds (hierarchical objective, leaf permutation, equivalent-points, similar-support) and custom bit-vector library for fast captured-sample updates. The breakthrough paper.
+- **Relevance**: Foundation for the entire GOSDT/TreeFARMS/SPLIT lineage. Binary features only, classification only -- extended by GOSDT.
+
+### mctavish-etal-2022-gosdt-guesses
+- **Title**: Fast Sparse Decision Tree Optimization via Reference Ensembles
+- **Authors**: McTavish, Zhong, Hu, Rudin, Seltzer
+- **Year**: 2022
+- **Venue**: AAAI
+- **Quality**: recommended
+- **Topics**: optimal-trees, distillation, gradient-boosting
+- **PDF**: none
+- **Key finding**: Formalizes GOSDT's threshold guessing: trains a black-box model (LightGBM) to generate candidate split thresholds, then uses them to guide the optimal tree search. Effectively distills an ensemble into an optimal sparse single tree. Turns 80 continuous features into ~200-500 prioritized binary thresholds.
+- **Relevance**: The binarization recipe for applying GOSDT/SPLIT to continuous-feature datasets like the vol panel. Critical preprocessing step.
+
+### demirovic-hebrard-jean-2023-blossom
+- **Title**: Blossom: Anytime Optimal Decision Trees
+- **Authors**: Demirovic, Hebrard, Jean
+- **Year**: 2023
+- **Venue**: ICML
+- **Quality**: recommended
+- **Topics**: optimal-trees
+- **PDF**: none
+- **Key finding**: Depth-first, layer-by-layer node expansion. First solution found is the greedy tree; successive improvements converge monotonically to the optimum. Virtually no overhead vs heuristic methods at start; matches best exact methods at convergence. Anytime: interrupt at any point for best-so-far solution.
+- **Relevance**: Useful when compute budget is uncertain; get a greedy tree immediately, improve toward optimal as time allows.
+
+### mazumder-meng-wang-2022
+- **Title**: Quant-BnB: Branch and Bound on Quantiles for Continuous-Feature Decision Trees
+- **Authors**: Mazumder, Meng, Wang
+- **Year**: 2022
+- **Venue**: ICML
+- **Quality**: optional
+- **Topics**: optimal-trees, regression-trees
+- **PDF**: none
+- **Key finding**: First specialized continuous-feature optimal decision tree via BnB on quantiles. Handles regression natively. Practical limit: depth <= 3.
+- **Relevance**: Depth limit too shallow for vol forecasting (need depth 4-5); use STreeD instead.
+
+### zhang-xin-seltzer-rudin-2023-osrt
+- **Title**: Optimal Sparse Regression Trees
+- **Authors**: Zhang, Xin, Seltzer, Rudin
+- **Year**: 2023
+- **Venue**: AAAI
+- **Quality**: essential
+- **Topics**: optimal-trees, regression-trees
+- **PDF**: none
+- **Key finding**: First fully-optimal sparse regression tree algorithm. GOSDT-style branch-and-bound with a novel lower bound based on 1-D k-means equivalent points. Piecewise-constant predictions in leaves.
+- **Relevance**: Second-priority method for vol forecasting (after STreeD piecewise-linear). Provides the provably optimal piecewise-constant regression baseline.
+
+### zhang-xin-seltzer-rudin-2024-survival
+- **Title**: Optimal Sparse Survival Trees
+- **Authors**: Zhang, Xin, Seltzer, Rudin
+- **Year**: 2024
+- **Venue**: AISTATS
+- **Quality**: optional
+- **Topics**: optimal-trees, survival-trees
+- **PDF**: none
+- **Key finding**: Extends OSRT to survival analysis with concordance-index and IBS objectives. First provably optimal survival tree.
+- **Relevance**: Not directly applicable to vol regression, but demonstrates the generality of the OSDT/GOSDT framework.
+
+### sullivan-tiwari-thrun-2024
+- **Title**: MAPTree: Beating Optimal Decision Trees with Bayesian Decision Trees
+- **Authors**: Sullivan, Tiwari, Thrun
+- **Year**: 2024
+- **Venue**: AAAI
+- **Quality**: recommended
+- **Topics**: optimal-trees
+- **PDF**: none
+- **Key finding**: Bayesian MAP tree via AND/OR search; outperforms or matches GOSDT/MurTree with smaller trees on 16 datasets, with optimality certificate. Note: optimizes a Bayesian MAP objective (BCART prior), not regularized misclassification -- comparisons to GOSDT/MurTree are not strictly apples-to-apples.
+- **Relevance**: Alternative solver producing compact trees; Bayesian framework provides natural uncertainty quantification.
+
+### aghaei-gomez-vayanos-2024
+- **Title**: Strong Optimal Classification Trees
+- **Authors**: Aghaei, Gomez, Vayanos
+- **Year**: 2024
+- **Venue**: Operations Research
+- **Quality**: optional
+- **Topics**: optimal-trees, np-hardness
+- **PDF**: none
+- **Key finding**: Strongest known max-flow MIP formulation for axis-aligned optimal trees. Stronger LP relaxation than OCT (Bertsimas-Dunn).
+- **Relevance**: State-of-the-art MIP approach; but DP+BnB methods (STreeD, GOSDT) remain faster in practice for axis-aligned trees.
+
+### van-der-linden-etal-2025-benchmark
+- **Title**: Necessary and Sufficient Conditions for Optimal Decision Trees using Dynamic Programming [verify title -- may be a different paper than the benchmark; arXiv:2409.12788]
+- **Authors**: van der Linden, Vos, de Weerdt, Verwer, Demirovic
+- **Year**: 2025 (arXiv September 2024, using 2025 as canonical year pending publication)
+- **Venue**: arXiv:2409.12788 (preprint)
+- **Quality**: essential
+- **Topics**: optimal-trees, tabular-ml
+- **PDF**: none
+- **Key finding**: Definitive 180-dataset benchmark. Verbatim: "average improvement of 1.3% and 1.0% of optimal over greedy approaches" at depth 3 and 4. For larger datasets (n>250), optimal vs CART gap is 1.6% +/- 0.2. Training ODTs feasible up to ~250 binary features for 100K instances and ~150 for 1M instances.
+- **Relevance**: The empirical reference for setting expectations on optimal-vs-greedy accuracy gaps and computational scaling limits.
+
+### brita-van-der-linden-demirovic-2025
+- **Title**: ConTree: Optimal Decision Trees on Continuous Features
+- **Authors**: Brita, van der Linden, Demirovic
+- **Year**: 2025
+- **Venue**: AAAI
+- **Quality**: recommended
+- **Topics**: optimal-trees, regression-trees
+- **PDF**: none
+- **Key finding**: Optimal trees directly on continuous features without binarization. Test accuracy averages 5% higher than CART and 0.7% higher than coarse-binarized ODTs. Code: github.com/ConSol-Lab/contree, `pip install pycontree`.
+- **Relevance**: Use for classification framings (vol regime up/flat/down) on continuous features. Avoids the binarization preprocessing step entirely.
+
+### van-den-bos-van-der-linden-demirovic-2024
+- **Title**: STreeD: Piecewise-Linear and Piecewise-Constant Regression Trees
+- **Authors**: van den Bos, van der Linden, Demirovic
+- **Year**: 2024
+- **Venue**: ICML
+- **Quality**: essential
+- **Topics**: optimal-trees, regression-trees
+- **PDF**: none
+- **Key finding**: First provably optimal piecewise-linear regression tree algorithm. Elastic-net leaves with separately tunable lasso/ridge and cost-complexity. Piecewise-simple-linear variant: one univariate regressor per leaf. Depth-2 specialized solver. Scalability improvements of one or more orders of magnitude over OSRT.
+- **Relevance**: Primary recommended method for the vol regression task. Elastic-net leaves capture local linear relationships within tree partitions -- more expressive than piecewise-constant OSRT.
+
+### huisman-van-der-linden-demirovic-2024
+- **Title**: Optimal Survival Trees
+- **Authors**: Huisman, van der Linden, Demirovic
+- **Year**: 2024
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: optimal-trees, survival-trees
+- **PDF**: none
+- **Key finding**: DP-based optimal survival trees via STreeD's separable-objective framework. Demonstrates the generality of the STreeD approach.
+- **Relevance**: Not directly applicable to vol regression; relevant if modeling time-to-event (e.g., time until next vol spike).
+
+### van-der-linden-etal-2022-fair
+- **Title**: Fair and Optimal Decision Trees: A Dynamic Programming Approach
+- **Authors**: van der Linden, de Weerdt, Demirovic
+- **Year**: 2022
+- **Venue**: NeurIPS
+- **Quality**: optional
+- **Topics**: optimal-trees, fairness
+- **PDF**: none
+- **Key finding**: DP-based fair optimal trees computing the full accuracy/fairness Pareto front. Several orders of magnitude faster than MIP-based FairTree.
+- **Relevance**: Not directly needed for vol forecasting, but demonstrates STreeD's ability to optimize with constraints -- relevant if adding monotonicity constraints.
+
+### van-der-linden-etal-2023-policy
+- **Title**: Optimal Prescriptive Trees
+- **Authors**: van der Linden, de Weerdt, Demirovic
+- **Year**: 2023
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: optimal-trees
+- **PDF**: none
+- **Key finding**: Extends STreeD to prescriptive/policy tree optimization for treatment effect estimation.
+- **Relevance**: Tangential; relevant if framing vol forecasting as a treatment-effect problem (e.g., optimal hedging decisions).
+
+### demirovic-stuckey-2021
+- **Title**: Optimal Decision Trees with Cost-Sensitive Objectives
+- **Authors**: Demirovic, Stuckey
+- **Year**: 2021
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: optimal-trees
+- **PDF**: none
+- **Key finding**: DP-based cost-sensitive classification including F1 and Matthews correlation coefficient. Part of the STreeD lineage.
+- **Relevance**: Relevant if framing vol forecasting as classification (vol-up vs vol-down) with asymmetric costs.
+
+### semenova-chen-parr-rudin-2023
+- **Title**: A Path to Simpler Models Starts With Noise
+- **Authors**: Semenova, Chen, Parr, Rudin
+- **Year**: 2023
+- **Venue**: NeurIPS
+- **Quality**: recommended
+- **Topics**: rashomon
+- **PDF**: none
+- **Key finding**: Label noise mechanically inflates the Rashomon ratio, explaining why tabular benchmarks in healthcare, criminal justice, lending, and finance routinely admit large Rashomon sets. Noisier problems = larger Rashomon sets = more room for interpretable models.
+- **Relevance**: Financial time-series targets are inherently noisy -- predicts that the Rashomon set for vol forecasting will be large, favoring the interpretable-tree approach.
+
+### donnelly-katta-rudin-browne-2023
+- **Title**: Rashomon Importance Distributions
+- **Authors**: Donnelly, Katta, Rudin, Browne
+- **Year**: 2023
+- **Venue**: NeurIPS
+- **Quality**: essential
+- **Topics**: rashomon, feature-engineering
+- **PDF**: none
+- **Key finding**: RID: variable importance distribution over (Rashomon set x bootstrap), with consistency theorems and finite-sample error rates. Stably ranks variables when single-model importance fluctuates. More principled than VIC for hypothesis testing on feature importance.
+- **Relevance**: Primary tool for stable feature ranking in the Rashomon project. More rigorous than single-model SHAP/permutation importance. Apply to vol features to identify robustly important vs. interchangeable predictors.
+
+### ning-etal-2022
+- **Title**: Shapley-VIC: Variable Importance Clouds via Shapley Values
+- **Authors**: Ning, Jia, Gao, Seltzer, Rudin
+- **Year**: 2022
+- **Venue**: Patterns
+- **Quality**: recommended
+- **Topics**: rashomon, feature-engineering
+- **PDF**: none
+- **Key finding**: Extends Variable Importance Clouds to SHAP values, computing Shapley importance across every model in the Rashomon set.
+- **Relevance**: If SHAP is preferred over Model Reliance for feature importance, Shapley-VIC provides the Rashomon-aware alternative.
+
+### zhong-etal-2023-gam
+- **Title**: Exploring and Interacting with the Set of Good Sparse Generalized Additive Models
+- **Authors**: Zhong, Liu, Chen, Hu, Rudin
+- **Year**: 2023
+- **Venue**: NeurIPS
+- **Quality**: optional
+- **Topics**: rashomon, interpretability
+- **PDF**: none
+- **Key finding**: Rashomon set enumeration for sparse generalized additive models, extending the Rashomon framework beyond trees.
+- **Relevance**: Shows Rashomon sets are computable for non-tree model classes; relevant if considering GAMs as interpretable alternatives.
+
+### liu-etal-2022-fasterrisk
+- **Title**: FasterRisk: Fast and Accurate Interpretable Risk Scores
+- **Authors**: Liu, Zhong, Seltzer, Rudin
+- **Year**: 2022
+- **Venue**: NeurIPS
+- **Quality**: optional
+- **Topics**: rashomon, interpretability
+- **PDF**: none
+- **Key finding**: Rashomon-set-aware sparse integer risk scores optimized for clinical deployment. Produces near-optimal scoring systems in seconds.
+- **Relevance**: Tangential to vol forecasting; demonstrates Rashomon methodology in a different interpretable model class.
+
+### coker-rudin-king-2021
+- **Title**: A Theory of Statistical Inference for Ensuring the Robustness of Scientific Results
+- **Authors**: Coker, Rudin, King
+- **Year**: 2021
+- **Venue**: Management Science
+- **Quality**: recommended
+- **Topics**: rashomon, interpretability
+- **PDF**: none
+- **Key finding**: Rashomon sets for linear models; cross-Rashomon-set stability tests for scientific claims. Also early work connecting Rashomon sets to causal inference.
+- **Relevance**: Methodological reference for using Rashomon sets to test robustness of findings; applicable to assessing stability of vol feature importance claims.
+
+### donnelly-etal-2025-cvpr
+- **Title**: Rashomon Sets for Prototype-Part Networks
+- **Authors**: Donnelly, Semenova, Rudin, Browne
+- **Year**: 2025
+- **Venue**: CVPR
+- **Quality**: optional
+- **Topics**: rashomon, deep-learning
+- **PDF**: none
+- **Key finding**: Extends Rashomon set computation to prototype-part neural networks, showing the framework is not limited to simple model classes.
+- **Relevance**: Demonstrates breadth of Rashomon framework; not directly applicable to tabular regression.
+
+### hsu-calmon-2022
+- **Title**: Rashomon Capacity: A Metric for Predictive Multiplicity in Classification
+- **Authors**: Hsu, Calmon
+- **Year**: 2022
+- **Venue**: NeurIPS
+- **Quality**: optional
+- **Topics**: rashomon
+- **PDF**: none
+- **Key finding**: Proposes Rashomon Capacity as a metric for predictive multiplicity independent of a specific model class. Complements Marx et al. 2020's ambiguity/discrepancy metrics.
+- **Relevance**: Useful if quantifying prediction disagreement across the Rashomon set for risk reporting.
+
+### chen-guestrin-2016
+- **Title**: XGBoost: A Scalable Tree Boosting System
+- **Authors**: Chen, Guestrin
+- **Year**: 2016
+- **Venue**: KDD
+- **Quality**: essential
+- **Topics**: gradient-boosting, ensemble, tabular-ml
+- **PDF**: none
+- **Key finding**: Exact and approximate quantile-sketch split finding; column-block in-memory layout; cache-aware histogram aggregation; sparsity-aware splits. 28,300 stars on dmlc/xgboost (May 2026). The benchmark ensemble method for tabular data.
+- **Relevance**: Primary ensemble baseline to compare against optimal trees. If optimal tree accuracy is within 2-5% MSE, interpretability justifies the tradeoff.
+
+### ke-etal-2017
+- **Title**: LightGBM: A Highly Efficient Gradient Boosting Decision Tree
+- **Authors**: Ke, Meng, Finley, Wang, Chen, Ma, Ye, Liu
+- **Year**: 2017
+- **Venue**: NeurIPS
+- **Quality**: essential
+- **Topics**: gradient-boosting, ensemble, tabular-ml
+- **PDF**: none
+- **Key finding**: GOSS (Gradient-based One-Side Sampling) keeps large-gradient instances, randomly samples small-gradient ones. EFB (Exclusive Feature Bundling) bundles mutually-exclusive sparse features. Leaf-wise (best-first) growth. Faster training than XGBoost on large datasets.
+- **Relevance**: The ensemble to use for GOSDT-Guesses threshold generation (binarization recipe). Also the primary accuracy benchmark.
+
+### prokhorenkova-etal-2018
+- **Title**: CatBoost: Unbiased Boosting with Categorical Features
+- **Authors**: Prokhorenkova, Gorishniy, Shcherbakov, Filimonov
+- **Year**: 2018
+- **Venue**: NeurIPS
+- **Quality**: recommended
+- **Topics**: gradient-boosting, ensemble, tabular-ml
+- **PDF**: none
+- **Key finding**: Ordered boosting to combat target leakage from prediction-shift. Categorical-feature target encoding via random permutations. Oblivious (symmetric) trees enabling fast inference. 8,800 stars on catboost/catboost (May 2026).
+- **Relevance**: Alternative ensemble baseline; oblivious trees are an interesting intermediate between full trees and optimal trees.
+
+### grinsztajn-oyallon-varoquaux-2022
+- **Title**: Why Do Tree-Based Models Still Outperform Deep Learning on Typical Tabular Data?
+- **Authors**: Grinsztajn, Oyallon, Varoquaux
+- **Year**: 2022
+- **Venue**: NeurIPS Datasets and Benchmarks
+- **Quality**: essential
+- **Topics**: tabular-ml, ensemble, deep-learning
+- **PDF**: none
+- **Key finding**: 48 datasets with tuned hyperparameters. Tree-based models remain state-of-the-art on medium-sized tabular data (~10K samples). Three critical inductive biases: robustness to uninformative features, preservation of feature orientation (no rotational invariance), piecewise-constant targets easier to fit via partition.
+- **Relevance**: Justifies tree-based approaches for the vol panel (tabular, ~5-20K rows, mixed informative/uninformative features). Deep learning not expected to beat trees here.
+
+### carreira-perpinnan-tavallali-2018
+- **Title**: TAO: Tree Alternating Optimization
+- **Authors**: Carreira-Perpinnan, Tavallali
+- **Year**: 2018
+- **Venue**: NeurIPS
+- **Quality**: recommended
+- **Topics**: optimal-trees, distillation
+- **PDF**: none
+- **Key finding**: Alternating optimization with differentiable surrogates for fixed-structure tree optimization. Produces sparser, more accurate single trees and small forests than CART.
+- **Relevance**: Alternative to exact optimal methods; useful if exact optimization is too slow and you want a middle ground between greedy and exact.
+
+### carreira-perpinnan-tavallali-2023-fao
+- **Title**: Forest Alternating Optimization
+- **Authors**: Carreira-Perpinnan, Tavallali
+- **Year**: 2023
+- **Venue**: CVPR
+- **Quality**: optional
+- **Topics**: optimal-trees, ensemble, distillation
+- **PDF**: none
+- **Key finding**: Extends TAO to forest optimization; optimizes each tree in a fixed-structure forest via alternating optimization. Smaller forests with competitive accuracy.
+- **Relevance**: Relevant if building small, interpretable forests rather than single trees.
+
+### rudin-2019
+- **Title**: Stop Explaining Black Box Machine Learning Models for High Stakes Decisions and Use Interpretable Models Instead
+- **Authors**: Rudin
+- **Year**: 2019
+- **Venue**: Nature Machine Intelligence 1:206-215
+- **Quality**: essential
+- **Topics**: interpretability, rashomon, foundational
+- **PDF**: none
+- **Key finding**: The foundational argument: for structured/tabular data, the accuracy-interpretability tradeoff is often illusory. Post-hoc explanations (SHAP, LIME) are unstable, unfaithful, and manipulable. Inherently interpretable models should be preferred for high-stakes decisions.
+- **Relevance**: Motivational framework for the entire Rashomon/optimal-tree project direction. Cite in any writeup.
+
+### rudin-etal-2022-survey
+- **Title**: Interpretable Machine Learning: Fundamental Principles and 10 Grand Challenges
+- **Authors**: Rudin, Chen, Chen, Huang, Semenova, Zhong
+- **Year**: 2022
+- **Venue**: Statistics Surveys 16:1-85
+- **Quality**: recommended
+- **Topics**: interpretability, rashomon
+- **PDF**: none
+- **Key finding**: Comprehensive survey establishing interpretability principles. Trees with <=10 leaves and depth <=5 are reliably human-interpretable; 30+ leaves stretches comprehension.
+- **Relevance**: Sets the interpretability target: depth 4-5, 8-32 leaves for the vol tree. Reference for operationalizing "interpretable" in a financial context.
+
+### costa-pedreira-2023
+- **Title**: Recent Advances in Decision Trees: An Updated Survey
+- **Authors**: Costa, Pedreira
+- **Year**: 2023
+- **Venue**: Information Fusion
+- **Quality**: recommended
+- **Topics**: optimal-trees, interpretability, tabular-ml
+- **PDF**: none
+- **Key finding**: Survey confirming that DP+BnB with specialized depth-2 solvers and analytical bounds dominate for axis-aligned optimal trees. Trees with <=10 leaves are reliably human-interpretable.
+- **Relevance**: Literature survey reference; confirms the STreeD/MurTree lineage as state-of-the-art for axis-aligned trees.
+
+### aghaei-azizi-vayanos-2019
+- **Title**: Fair Classification via Mixed-Integer Programming
+- **Authors**: Aghaei, Azizi, Vayanos
+- **Year**: 2019
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: optimal-trees, fairness
+- **PDF**: none
+- **Key finding**: MIP-based FairTree for statistical parity, predictive equality, equal opportunity, equalized odds. First formal fairness-constrained optimal tree.
+- **Relevance**: Shows optimal trees can incorporate constraints; relevant methodology if adding monotonicity constraints to vol trees.
+
+### jo-etal-2023
+- **Title**: Learning Optimal Fair Classification Trees
+- **Authors**: Jo, Aghaei, Benson, Gomez, Vayanos
+- **Year**: 2023
+- **Venue**: FAccT
+- **Quality**: optional
+- **Topics**: optimal-trees, fairness
+- **PDF**: none
+- **Key finding**: Extends fair optimal trees with stronger MIP formulations.
+- **Relevance**: Tangential; demonstrates the flexibility of constrained tree optimization.
+
+### popov-morozov-babenko-2020
+- **Title**: Neural Oblivious Decision Ensembles for Deep Learning on Tabular Data
+- **Authors**: Popov, Morozov, Babenko
+- **Year**: 2020
+- **Venue**: ICLR
+- **Quality**: recommended
+- **Topics**: deep-learning, ensemble, tabular-ml
+- **PDF**: none
+- **Key finding**: NODE generalizes CatBoost's oblivious decision trees with end-to-end gradient training. Each "tree" uses the same split feature/threshold across all nodes at a given depth, enabling differentiable training.
+- **Relevance**: Neural-tree hybrid baseline; not interpretable but shows how tree structure can be embedded in deep learning. Comparison point for the accuracy-interpretability tradeoff.
+
+### arik-pfister-2021
+- **Title**: TabNet: Attentive Interpretable Tabular Learning
+- **Authors**: Arik, Pfister
+- **Year**: 2021
+- **Venue**: AAAI
+- **Quality**: recommended
+- **Topics**: deep-learning, tabular-ml, interpretability
+- **PDF**: none
+- **Key finding**: Sequential attention-based feature selection; tree-inspired but actually a neural architecture. Claims interpretability via attention masks.
+- **Relevance**: Neural "tree-like" baseline; attention masks provide some interpretability but are not truly inherent like decision tree paths.
+
+### quinlan-1992-m5
+- **Title**: Learning with Continuous Classes
+- **Authors**: Quinlan
+- **Year**: 1992
+- **Venue**: Australian Joint Conference on AI
+- **Quality**: optional
+- **Topics**: regression-trees, foundational
+- **PDF**: none
+- **Key finding**: M5 model trees: greedy trees with linear models in the leaves. Cubist is the refined commercial version. First practical linear-leaf tree algorithm.
+- **Relevance**: Historical predecessor to STreeD piecewise-linear regression. STreeD is the first provably optimal model-tree algorithm.
+
+### meinshausen-2006
+- **Title**: Quantile Regression Forests
+- **Authors**: Meinshausen
+- **Year**: 2006
+- **Venue**: JMLR 7:983-999
+- **Quality**: recommended
+- **Topics**: regression-trees, ensemble, quantile-trees
+- **PDF**: none
+- **Key finding**: Random forests extended to predict conditional quantiles rather than means. Uses the distribution of training observations in each leaf.
+- **Relevance**: Relevant for risk-sensitive vol forecasting (predicting high quantiles of future RV). Non-optimal baseline for quantile prediction.
+
+### lemaire-aglin-nijssen-2024
+- **Title**: Optimal Interpretable Quantile Regression Trees
+- **Authors**: Lemaire, Aglin, Nijssen
+- **Year**: 2024
+- **Venue**: IDA
+- **Quality**: recommended
+- **Topics**: optimal-trees, regression-trees, quantile-trees
+- **PDF**: none
+- **Key finding**: Optimal decision trees for quantile regression. Produces interpretable trees predicting specific quantiles of the conditional distribution.
+- **Relevance**: Directly applicable if predicting tail quantiles of RV (e.g., P(RV > threshold)) rather than mean RV.
+
+### chatterjee-goswami-2021
+- **Title**: Adaptive Estimation of Multivariate Piecewise Polynomials and Bounded Variation Functions by Optimal Decision Trees
+- **Authors**: Chatterjee, Goswami
+- **Year**: 2021
+- **Venue**: Annals of Statistics
+- **Quality**: optional
+- **Topics**: regression-trees, np-hardness
+- **PDF**: none
+- **Key finding**: Theoretical risk bounds for dyadic CART; minimax-optimal rates for piecewise-constant and bounded-variation function classes.
+- **Relevance**: Theoretical justification for regression tree approximation quality; not directly practical.
+
+### donoho-1997
+- **Title**: CART and Best-Ortho-Basis: A Connection
+- **Authors**: Donoho
+- **Year**: 1997
+- **Venue**: Annals of Statistics 25(5):1870-1911
+- **Quality**: optional
+- **Topics**: regression-trees, foundational
+- **PDF**: none
+- **Key finding**: Connects dyadic CART to wavelet bases; theoretical risk bounds for piecewise-constant tree approximation.
+- **Relevance**: Foundational theory for regression tree approximation; not directly applicable to the project.
+
+### nijssen-fromont-2007
+- **Title**: Mining Optimal Decision Trees from Itemset Lattices
+- **Authors**: Nijssen, Fromont
+- **Year**: 2007
+- **Venue**: KDD
+- **Quality**: optional
+- **Topics**: optimal-trees, foundational
+- **PDF**: none
+- **Key finding**: DL8: optimal decision trees via itemset mining. Ancestor of DL8.5; established the connection between frequent itemset mining and optimal tree construction.
+- **Relevance**: Historical context for the DL8.5/MurTree/STreeD lineage.
+
+### komusiewicz-etal-2023
+- **Title**: Optimal Decision Tree Ensembles via Fixed-Parameter Tractability [verify exact title against ICML 2023 proceedings]
+- **Authors**: Komusiewicz, Kunz, Sommer, Sorge
+- **Year**: 2023
+- **Venue**: ICML
+- **Quality**: optional
+- **Topics**: optimal-trees, np-hardness, ensemble
+- **PDF**: none
+- **Key finding**: Optimal tree ensembles computable in O((6*delta*D*S)^S * poly), where S is number of cuts, D largest domain size, delta max feature differences between examples. First FPT result for optimal tree ensembles.
+- **Relevance**: Theoretical foundation for optimal ensemble construction; not yet practical but shows optimal ensembles are tractable in principle.
+
+### ordyniak-szeider-2021
+- **Title**: Parameterized Complexity of Small Decision Tree Learning
+- **Authors**: Ordyniak, Szeider
+- **Year**: 2021
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: optimal-trees, np-hardness
+- **PDF**: none
+- **Key finding**: FPT and W-hardness results for decision tree learning parameterized by tree size, number of features, and other structural parameters.
+- **Relevance**: Theoretical context; confirms that practical tractability depends on specific parameter combinations.
+
+### eiben-etal-2023
+- **Title**: On the Parameterized Complexity of Learning Decision Trees
+- **Authors**: Eiben, Ganian, Koana, Ordyniak, Suchy
+- **Year**: 2023
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: optimal-trees, np-hardness
+- **PDF**: none
+- **Key finding**: Refined parameterized complexity landscape for decision tree learning; establishes tighter FPT/W[1]-hard boundaries.
+- **Relevance**: Theoretical context for understanding which problem parameters make optimal trees tractable.
+
+### gahlawat-zehavi-2024
+- **Title**: On the Parameterized Complexity of Learning Optimal Decision Trees
+- **Authors**: Gahlawat, Zehavi
+- **Year**: 2024
+- **Venue**: AAAI
+- **Quality**: optional
+- **Topics**: optimal-trees, np-hardness
+- **PDF**: none
+- **Key finding**: Additional W-hardness results closing gaps in the parameterized complexity map for optimal decision trees.
+- **Relevance**: Completes the theoretical picture; confirms that depth and feature count are the key complexity drivers.
+
 ---
 
 ## I. Modern Deep Time-Series Forecasting
@@ -1057,4 +1662,4 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 
 ## Topic Tag Vocabulary
 
-`rv-estimators`, `microstructure-noise`, `jump-detection`, `har`, `harq`, `har-extensions`, `garch`, `realized-garch`, `rough-vol`, `ml-vol`, `gradient-boosting`, `neural-nets`, `deep-learning`, `lstm`, `cnn-tcn`, `transformers`, `gnn`, `ensemble`, `rashomon`, `optimal-trees`, `regression-trees`, `survival-trees`, `lob`, `vrp`, `options-implied`, `cross-asset`, `spillovers`, `evaluation`, `qlike`, `mcs`, `validation`, `purged-cv`, `feature-engineering`, `interpretability`, `fairness`, `long-memory`, `sentiment`, `regime`, `data-source`, `code-repo`, `foundational`
+`rv-estimators`, `microstructure-noise`, `jump-detection`, `har`, `harq`, `har-extensions`, `garch`, `realized-garch`, `rough-vol`, `ml-vol`, `gradient-boosting`, `neural-nets`, `deep-learning`, `lstm`, `cnn-tcn`, `transformers`, `gnn`, `ensemble`, `rashomon`, `optimal-trees`, `regression-trees`, `survival-trees`, `lob`, `vrp`, `options-implied`, `cross-asset`, `spillovers`, `evaluation`, `qlike`, `mcs`, `validation`, `purged-cv`, `feature-engineering`, `interpretability`, `fairness`, `long-memory`, `sentiment`, `regime`, `data-source`, `code-repo`, `foundational`, `distillation`, `tabular-ml`, `quantile-trees`, `np-hardness`
