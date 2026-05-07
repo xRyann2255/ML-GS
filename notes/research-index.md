@@ -17,3 +17,13 @@ Tracks deep research outputs: what was run, what was extracted, and where it liv
   - `notes/features/jump-detection.md` -- jump persistence findings, earnings-trigger-jumps
   - `notes/features/optimal-feature-set.md` -- Variable Importance Clouds / Rashomon feature analysis, pitfall warnings
   - `notes/features/calendar-events.md` -- NEW: FOMC, earnings, macro releases
+
+## 2026-05-07: State of the Art in Decision Trees
+
+- **Source prompt**: `notes/deep-research-prompt-decision-trees.md`
+- **Raw output**: `notes/deep-research-decision-trees.md` (trimmed to landscape survey after extraction)
+- **Extracted to**:
+  - `reference/bibliography.md` -- ~50 new entries in category H, 12 existing entries enriched, 8 new topic tags
+  - `notes/project-proposals.md` -- decision tree methodology assessment, implementation roadmap, 10 caveats
+  - `notes/features/optimal-feature-set.md` -- Rashomon pipeline design, feature interchangeability, novelty confirmation
+  - `notes/features/har-components.md` -- accuracy comparison (optimal trees vs HAR vs LightGBM)
