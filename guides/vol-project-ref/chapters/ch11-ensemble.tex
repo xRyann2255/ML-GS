@@ -1,7 +1,7 @@
 \chapter{The Ensemble}
 \label{ch:ensemble}
 
-The pipeline has two model branches: LightGBM (Chapter~\ref{ch:lightgbm}) consuming 80--120 tabular features from Layers~0--7, and an LSTM/TCN (Chapter~10) consuming intraday E-mini L2 sequences.
+The pipeline has two model branches: LightGBM (Chapter~\ref{ch:lightgbm}) consuming 80--120 tabular features from Layers~0--7, and an LSTM/TCN (Chapter~\ref{ch:lstm-intraday}) consuming intraday E-mini L2 sequences.
 Each branch produces an independent $\log \RV_{t+h}$ forecast.
 These forecasts are combined at the prediction level into a single blended output.
 
@@ -28,7 +28,7 @@ Figure~\ref{fig:ensemble-arch} shows the full two-branch architecture converging
   \node[flowblock, minimum width=3cm, fill=green!8, right=4.5cm of tabfeat] (seqfeat)
     {E-mini L2\\5-min Bars + LOB\\(78 steps/day)};
   \node[flowblock, minimum width=2.6cm, fill=green!8, below=of seqfeat] (lstm)
-    {LSTM / TCN\\(Ch.~10)};
+    {LSTM / TCN\\(Ch.~\ref{ch:lstm-intraday})};
   \node[flowblock, minimum width=2.6cm, below=of lstm] (lstmpred)
     {$\hat{y}^{\mathrm{SEQ}}_t$\\$\log \RV$ forecast};
 
