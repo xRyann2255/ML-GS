@@ -26,3 +26,11 @@ What we've learned hands-on about the daily/weekly/monthly RV decomposition.
 - Daily: HARQ + signed semivariances is very hard to beat by more than a few percent QLIKE
 - Weekly/monthly: ML models with long memory start to show meaningful gains per Christensen-Siggaard-Veliyev 2023 (`christensen-siggaard-veliyev-2023` in bibliography)
 - Intraday (10-30 min): ML + LOB features can produce real gains; this is the Optiver-Kaggle / DeepLOB regime
+
+## Deep Research Findings (2026-05-07)
+
+**Accuracy comparison: optimal trees vs HAR vs ensembles (decision tree research):**
+- Christensen, Siggaard & Veliyev (Journal of Financial Econometrics 2023; T=4,257 trading days, 29 Jan 2001 to 31 Dec 2017, 29 DJIA constituents): relative MSE vs HAR=1.000 baseline -- bagging 0.891, gradient boosting 0.958, RF 0.986, NN ensembles 0.954-0.990. With full features (IV, EA, VIX, HSI): RF 0.901, GB 0.962, NN 0.885-0.944, bagging 0.961 (`christensen-siggaard-veliyev-2023` in bibliography)
+- Best estimate for interpretable optimal trees: depth-4-5 STreeD piecewise-linear should achieve ~2-5% higher MSE than a tuned LightGBM, while remaining a single inspectable tree with 8-32 leaves (extrapolated -- not yet measured, must verify on own data)
+- An interpretable optimal tree should comfortably beat HAR: bagging alone beats HAR by ~10% on 5-min RV
+- Van der Linden et al. 2025 (180 datasets): optimal trees ~1-2 percentage points accuracy improvement vs greedy CART at depth 3-4 (`van-der-linden-etal-2025-benchmark` in bibliography)
