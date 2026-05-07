@@ -1,2 +1,189 @@
-\chapter{Placeholder}
+\chapter{Interpretable Trees and Rashomon Analysis}
 \label{ch:rashomon}
+
+LightGBM is a black box.
+For the GS presentation, we need an interpretable model that can be inspected and defended.
+Optimal decision trees provide this, and Rashomon analysis reveals which features are genuinely important across the set of near-optimal models.
+
+%% ──────────────────────────────────────────────
+\section{Optimal Decision Trees}
+\label{sec:optimal-trees}
+%% ──────────────────────────────────────────────
+
+We train a \texttt{STreeDPiecewiseLinearRegressor} from \texttt{pystreed} on the same Layers~0--7 features used by LightGBM (Chapter~\ref{ch:lightgbm}).
+Table~\ref{tab:odt-config} specifies the configuration.
+
+\begin{table}[htbp]
+\centering
+\caption{Optimal decision tree configuration.}
+\label{tab:odt-config}
+\small
+\begin{tabular}{@{}llp{5.5cm}@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Notes} \\
+\midrule
+Solver               & STreeD          & DP with elastic-net leaves \\
+Max depth            & 4--5            & Tuned via purged blocked $k$-fold CV \\
+Leaf count           & 8--32           & Cost-complexity regularization controls this \\
+Leaf model           & Elastic net     & Ridge + lasso per leaf partition \\
+Cost-complexity      & CV-tuned        & Penalizes $|\text{leaves}(T)|$ \\
+Features             & Layers 0--7     & Same panel as LightGBM \\
+Target               & $\log \RV_{t+h}$ & $h \in \{1, 5, 22\}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each leaf fits a local elastic-net regression on the features routed to it, so the tree is piecewise-linear rather than piecewise-constant.
+This gives better accuracy than a constant-leaf tree while remaining fully inspectable: every prediction traces to one root-to-leaf path plus a short linear formula.
+
+Expected accuracy relative to benchmarks:
+\begin{itemize}[nosep]
+  \item $\sim$2--5\% higher MSE than tuned LightGBM (acceptable for interpretability).
+  \item $\sim$10\% lower MSE than $\HAR$ baseline.
+  \item Comfortably inside the Model Confidence Set when evaluated by $\QLIKE$.
+\end{itemize}
+
+\begin{warning}[Binarization Trap]
+GOSDT and the original TreeFARMS require binary features.
+Binarizing continuous vol features (e.g., 50 threshold candidates per feature $\times$ 40 features $= 2{,}000$ binary columns) destroys information and inflates runtime exponentially.
+Use \texttt{STreeDPiecewiseLinearRegressor}, which splits on continuous features natively.
+\end{warning}
+
+
+%% ──────────────────────────────────────────────
+\section{Rashomon Analysis Pipeline}
+\label{sec:rashomon-pipeline}
+%% ──────────────────────────────────────────────
+
+The Rashomon set is the collection of all models whose loss is within $\epsilon$ of the optimum.
+For decision trees, this set can be enumerated exactly \citep{XinEtAl2022}.
+Figure~\ref{fig:rashomon-pipeline} shows the four-step pipeline.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.6cm]
+  % Step 1
+  \node[flowblock, minimum width=6cm] (step1)
+    {\textbf{Step 1: Enumerate Rashomon Set}\\
+     TreeFARMS/RESPLIT: all trees within\\
+     $\epsilon = 2\%$ MSE of optimum};
+
+  % Step 2
+  \node[flowblock, minimum width=6cm, below=of step1] (step2)
+    {\textbf{Step 2: Rashomon Importance Distributions}\\
+     RID \citep{DonnellyEtAl2023}: stable feature\\
+     importance over (Rashomon set $\times$ bootstrap)};
+
+  % Step 3
+  \node[flowblock, minimum width=6cm, below=of step2] (step3)
+    {\textbf{Step 3: Variable Importance Clouds}\\
+     \citet{DongRudin2020}: classify features as\\
+     essential / interchangeable / useless};
+
+  % Step 4
+  \node[flowblock, minimum width=6cm, below=of step3] (step4)
+    {\textbf{Step 4: Regime-Stable Selection}\\
+     Intersect rolling-window Rashomon sets\\
+     across regimes $\to$ robust feature set};
+
+  % Arrows
+  \draw[arrow] (step1) -- (step2);
+  \draw[arrow] (step2) -- (step3);
+  \draw[arrow] (step3) -- (step4);
+\end{tikzpicture}
+\caption{Rashomon analysis pipeline. Each step narrows the set of defensible models and the set of robustly important features.}
+\label{fig:rashomon-pipeline}
+\end{figure}
+
+\textbf{Step 1.}
+TreeFARMS \citep{XinEtAl2022} enumerates every sparse decision tree within $\epsilon = 2\%$ MSE of the optimal tree.
+For the vol feature panel ($\sim$40 base features, $\sim$5{,}000 rows, depth 4--5), expect $10^3$--$10^5$ trees in the Rashomon set.
+RESPLIT (or SPLIT) provides a faster alternative if enumeration is slow.
+
+\textbf{Step 2.}
+RID \citep{DonnellyEtAl2023} computes a stable importance distribution for each feature across the entire Rashomon set, bootstrapped for confidence intervals.
+Unlike single-model $\SHAP$ or permutation importance, RID has consistency theorems and finite-sample error rates.
+
+\textbf{Step 3.}
+Variable Importance Clouds \citep{DongRudin2020} map each feature to its $[\min, \max]$ importance range across the Rashomon set.
+Non-overlapping clouds indicate robustly distinct features; overlapping clouds indicate substitutes.
+
+\textbf{Step 4.}
+Train Rashomon sets on rolling windows (e.g., 5-year training, 1-year step).
+Intersect the sets across windows: features appearing in \emph{every} regime's Rashomon set are regime-stable; features appearing in only one regime are fragile.
+
+
+%% ──────────────────────────────────────────────
+\section{What This Tells Us}
+\label{sec:rashomon-insights}
+%% ──────────────────────────────────────────────
+
+\begin{itemize}[nosep]
+  \item \textbf{Genuine importance vs.\ accidental selection.}
+    Single-model importance (gain, permutation, $\SHAP$) is unstable when features are near-substitutes.
+    RID and VIC identify which features are robustly important across all defensible models.
+
+  \item \textbf{Feature substitution structure.}
+    VIX, $\VVIX$, ATM IV, and the IV--RV spread are near-collinear proxies for the same latent factor.
+    Rashomon analysis reveals which are essential (appear in every near-optimal tree), which are interchangeable (substitutable without accuracy loss), and which are useless (in no near-optimal tree).
+
+  \item \textbf{Prediction multiplicity.}
+    For any input, the range of forecasts across all Rashomon-set trees quantifies prediction uncertainty due to model choice alone.
+    Report the $[5\text{th}, 95\text{th}]$ percentile forecast range alongside the point forecast for risk reporting.
+
+  \item \textbf{Post-hoc constraint satisfaction.}
+    Filter the Rashomon set for trees that satisfy additional constraints (monotone in VIX, exclude flagged features, $\leq 12$ leaves) without retraining.
+    If a compliant tree exists in the set, use it directly.
+\end{itemize}
+
+
+%% ──────────────────────────────────────────────
+\section{Evaluation}
+\label{sec:rashomon-eval}
+%% ──────────────────────────────────────────────
+
+Table~\ref{tab:rashomon-eval} defines the evaluation protocol for the interpretable tree and the Rashomon analysis.
+
+\begin{table}[htbp]
+\centering
+\caption{Evaluation protocol for interpretable trees and Rashomon analysis.}
+\label{tab:rashomon-eval}
+\small
+\begin{tabular}{@{}lp{8cm}@{}}
+\toprule
+\textbf{Component} & \textbf{Protocol} \\
+\midrule
+Accuracy metrics    & Walk-forward MSE, $\QLIKE$, MAE on $\log \RV_{t+1}$ \\
+Baselines           & $\HAR$, HARQ, LightGBM (Chapter~\ref{ch:lightgbm}) \\
+Statistical tests   & Diebold--Mariano \citep{DieboldMariano1995} pairwise tests; Model Confidence Set \\
+Acceptable gap      & Optimal tree within 5\% MSE of LightGBM; must beat $\HAR$ by $\geq$8\% \\
+Regime stress test  & Rashomon prediction range during Mar 2020, Volmageddon (Feb 2018); report $[5, 95]$ percentile spread \\
+Multiplicity audit  & Fraction of test days where Rashomon-set forecast range spans $>$1 $\QLIKE$ unit \\
+Feature stability   & Jaccard similarity of top-10 RID features across rolling windows \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The interpretable tree's accuracy trade-off is acceptable if:
+(1)~it remains in the Model Confidence Set alongside LightGBM, and
+(2)~the Rashomon prediction range narrows after regime-stable feature selection, confirming that the selected features reduce model ambiguity.
+
+
+%% ──────────────────────────────────────────────
+\section{Novelty}
+\label{sec:rashomon-novelty}
+%% ──────────────────────────────────────────────
+
+No published paper has applied Rashomon methods to any financial time-series problem.
+The closest applications are cross-sectional credit risk (FICO HELOC dataset) and criminal justice (COMPAS recidivism).
+Applying Rashomon-set enumeration, RID, and Variable Importance Clouds to realized volatility forecasting is the novel research contribution of this project.
+
+
+%% ──────────────────────────────────────────────
+%% Boxes
+%% ──────────────────────────────────────────────
+
+\begin{keyidea}[The Novel Contribution]
+Rashomon analysis answers: are my features robustly important, or did my model just pick one out of several interchangeable options?
+This is the novel research contribution.
+\end{keyidea}
