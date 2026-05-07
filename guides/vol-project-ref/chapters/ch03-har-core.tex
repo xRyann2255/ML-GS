@@ -1,1 +1,176 @@
-\chapter{Placeholder}
+\chapter{HAR Core and Measurement Quality}
+\label{ch:har-core}
+
+The HAR baseline and its noise-aware extension HARQ form Layer~0 of the feature pipeline.
+Five features, three horizons, one interaction term.
+
+%% ──────────────────────────────────────────────
+\section{The Five Foundation Features}
+\label{sec:foundation-features}
+%% ──────────────────────────────────────────────
+
+\begin{table}[htbp]
+\centering
+\caption{Layer~0 feature set: the five foundation features.}
+\label{tab:foundation-features}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Feature} & \textbf{Definition} & \textbf{Role in Forecast} \\
+\midrule
+$\log \RV_t^{(d)}$ &
+  $\log \RV_t$ &
+  Strongest single predictor; log transform gaussianizes the distribution \\[8pt]
+$\log \RV_t^{(w)}$ &
+  $\log\!\Bigl(\tfrac{1}{5}\sum_{i=0}^{4} \RV_{t-i}\Bigr)$ &
+  Medium-memory component; smooths daily noise \\[8pt]
+$\log \RV_t^{(m)}$ &
+  $\log\!\Bigl(\tfrac{1}{22}\sum_{i=0}^{21} \RV_{t-i}\Bigr)$ &
+  Long-memory regime anchor \\[8pt]
+$\operatorname{RQ}_t$ &
+  $\dfrac{M}{3}\sum_{i=1}^{M} r_{t,i}^4$ &
+  Measures how noisy today's $\RV$ estimate is \\[10pt]
+$\sqrt{\operatorname{RQ}_t} \cdot \RV_t^{(d)}$ &
+  RQ interaction &
+  Shrinks daily weight on noisy days; highest-impact HAR extension \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The baseline HAR model \citep{Corsi2009} regresses future log-RV on three horizons:
+\begin{equation}
+\label{eq:har}
+\log \RV_{t+1} = \beta_0
+  + \beta_d \log \RV_t^{(d)}
+  + \beta_w \log \RV_t^{(w)}
+  + \beta_m \log \RV_t^{(m)}
+  + \varepsilon_{t+1}.
+\end{equation}
+HARQ \citep{BPQ2016} adds the RQ interaction to make the daily coefficient state-dependent:
+\begin{equation}
+\label{eq:harq}
+\log \RV_{t+1} = \beta_0
+  + \bigl(\beta_d + \beta_{dQ}\sqrt{\operatorname{RQ}_t}\bigr)\log \RV_t^{(d)}
+  + \beta_w \log \RV_t^{(w)}
+  + \beta_m \log \RV_t^{(m)}
+  + \varepsilon_{t+1}.
+\end{equation}
+The estimated $\hat{\beta}_{dQ}$ is consistently negative: on noisy days ($\operatorname{RQ}$ high), the effective daily coefficient $\beta_d + \beta_{dQ}\sqrt{\operatorname{RQ}_t}$ shrinks toward zero, shifting forecast weight to the weekly and monthly averages.
+
+
+%% ──────────────────────────────────────────────
+\section{The HARQ Shrinkage Mechanism}
+\label{sec:harq-mechanism}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:harq-shrinkage} illustrates the core idea: $\operatorname{RQ}$ acts as a noise gate on the daily signal.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=1.4cm and 2.2cm,
+  every node/.style={font=\small},
+]
+
+% ── Left panel: Clean day ──
+\node[font=\normalsize\bfseries] (title-clean) {Clean Day (low RQ)};
+
+\node[flowblock, below=0.8cm of title-clean, minimum width=2.4cm]
+  (daily-clean) {$\log \RV_t^{(d)}$};
+\node[flowblock, below=0.5cm of daily-clean, minimum width=2.4cm]
+  (weekly-clean) {$\log \RV_t^{(w)}$};
+\node[flowblock, below=0.5cm of weekly-clean, minimum width=2.4cm]
+  (monthly-clean) {$\log \RV_t^{(m)}$};
+
+\node[decisionblock, right=1.8cm of weekly-clean, minimum width=1.6cm]
+  (gate-clean) {RQ\\low};
+
+\node[flowblock, right=1.8cm of gate-clean, minimum width=2.6cm, fill=green!10]
+  (forecast-clean) {Forecast\\$\log \RV_{t+1}$};
+
+% Arrows with weights
+\draw[arrow, line width=1.6pt] (daily-clean.east) -- ++(0.5,0) |- (gate-clean.west)
+  node[pos=0.25, above, font=\footnotesize] {large $\beta_d$};
+\draw[arrow, line width=0.7pt] (weekly-clean.east) -- (gate-clean.west);
+\draw[arrow, line width=0.7pt] (monthly-clean.east) -- ++(0.5,0) |- (gate-clean.west);
+\draw[arrow, line width=1.2pt] (gate-clean.east) -- (forecast-clean.west);
+
+
+% ── Right panel: Noisy day ──
+\node[font=\normalsize\bfseries, right=8.5cm of title-clean] (title-noisy) {Noisy Day (high RQ)};
+
+\node[flowblock, below=0.8cm of title-noisy, minimum width=2.4cm]
+  (daily-noisy) {$\log \RV_t^{(d)}$};
+\node[flowblock, below=0.5cm of daily-noisy, minimum width=2.4cm]
+  (weekly-noisy) {$\log \RV_t^{(w)}$};
+\node[flowblock, below=0.5cm of weekly-noisy, minimum width=2.4cm]
+  (monthly-noisy) {$\log \RV_t^{(m)}$};
+
+\node[decisionblock, right=1.8cm of weekly-noisy, minimum width=1.6cm]
+  (gate-noisy) {RQ\\high};
+
+\node[flowblock, right=1.8cm of gate-noisy, minimum width=2.6cm, fill=green!10]
+  (forecast-noisy) {Forecast\\$\log \RV_{t+1}$};
+
+% Arrows with weights
+\draw[arrow, line width=0.4pt, dashed] (daily-noisy.east) -- ++(0.5,0) |- (gate-noisy.west)
+  node[pos=0.25, above, font=\footnotesize] {small $\beta_d^{\mathrm{eff}}$};
+\draw[arrow, line width=1.6pt] (weekly-noisy.east) -- (gate-noisy.west);
+\draw[arrow, line width=1.6pt] (monthly-noisy.east) -- ++(0.5,0) |- (gate-noisy.west);
+\draw[arrow, line width=1.2pt] (gate-noisy.east) -- (forecast-noisy.west);
+
+\end{tikzpicture}
+\caption{HARQ shrinkage mechanism. On clean days the daily reading dominates (thick arrow, left). On noisy days the RQ interaction shrinks the daily coefficient, shifting weight to weekly and monthly averages (thick arrows, right).}
+\label{fig:harq-shrinkage}
+\end{figure}
+
+HARQ with five features consistently beats ML models that use dozens of features without noise-awareness \citep{BPQ2016}.
+The mechanism is simple: when the daily RV estimate is unreliable, the model automatically falls back to longer-horizon averages that average out the noise.
+This is the single most robust finding in the HAR literature, replicated across asset classes and sample periods.
+
+
+%% ──────────────────────────────────────────────
+\section{Baseline Performance}
+\label{sec:baseline-performance}
+%% ──────────────────────────────────────────────
+
+These five features alone explain 40--60\% of next-day log-RV variation across typical equity and index series.
+$\operatorname{RQ}$ requires tick-level returns; we have them for all 34 symbols in the universe (Table~\ref{tab:universe}).
+This is the non-negotiable core of the feature pipeline.
+Everything in Chapters~4--7 provides marginal improvement on top of this foundation.
+
+\begin{table}[htbp]
+\centering
+\caption{Expected QLIKE improvement from cumulative feature additions (indicative, based on literature benchmarks).}
+\label{tab:marginal-gains}
+\small
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{Layer} & \textbf{Feature Group} & \textbf{Cumulative QLIKE Gain} \\
+\midrule
+0 & HAR (3 horizons)          & Baseline \\
+0 & $+$ RQ interaction (HARQ) & 5--15\% \\
+1 & $+$ Signed RV, jumps      & 8--20\% \\
+2 & $+$ VRP, IV skew           & 12--25\% \\
+3 & $+$ Microstructure (OBI)   & 15--30\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ──────────────────────────────────────────────
+%% Boxes
+%% ──────────────────────────────────────────────
+
+\begin{warning}[Work in Log-RV Space]
+Raw RV is right-skewed with heavy tails; log-RV is approximately Gaussian \citep{ABDL2001}.
+This affects loss functions, residual diagnostics, and model comparison.
+All features in this guide use log-RV unless stated otherwise.
+When computing QLIKE, convert back to levels: $\widehat{\RV}_{t+1} = \exp\!\bigl(\widehat{\log \RV}_{t+1} + \hat{\sigma}^2/2\bigr)$, where $\hat{\sigma}^2$ is the residual variance (bias correction for the log-normal retransformation).
+\end{warning}
+
+\begin{keyidea}[RQ Interaction: The Single Most Important HAR Extension]
+Adding the RQ interaction term to baseline HAR yields 5--15\% QLIKE improvement from a single feature \citep{BPQ2016}.
+It is the highest-impact extension before adding any external data.
+Any ML model that does not account for measurement noise in daily RV leaves this gain on the table.
+\end{keyidea}
