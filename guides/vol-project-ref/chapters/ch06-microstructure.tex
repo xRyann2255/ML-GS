@@ -1,1 +1,117 @@
-\chapter{Placeholder}
+\chapter{Microstructure Features}
+\label{ch:microstructure}
+
+Layer~3 extracts predictive signal from the limit order book and trade flow.
+These features capture information arrival that daily aggregates cannot see.
+
+%% ──────────────────────────────────────────────
+\section{Features}
+\label{sec:micro-features}
+%% ──────────────────────────────────────────────
+
+\begin{table}[htbp]
+\centering
+\caption{Layer~3 microstructure features.}
+\label{tab:micro-features}
+\small
+\begin{tabular}{@{}p{3.2cm}p{5.8cm}p{4.5cm}@{}}
+\toprule
+\textbf{Feature} & \textbf{What It Is} & \textbf{Evidence} \\
+\midrule
+Price acceleration &
+  $\sum_i (\Delta \log P_i - \Delta \log P_{i-1})^2$ &
+  Single most predictive micro feature (Optiver competition) \\[6pt]
+WAP log returns &
+  Returns computed from volume-weighted average price &
+  Less bid-ask bounce than midprice returns \\[6pt]
+Order-book imbalance (OBI) &
+  $\dfrac{\text{bid\_size} - \text{ask\_size}}{\text{bid\_size} + \text{ask\_size}}$ at L1--L5 &
+  \citep{CarteaJaimungalPenalva2015} \\[6pt]
+Depth ratio &
+  $\sum \text{bid depths}\; / \;\sum \text{ask depths}$ &
+  Structural imbalance across book levels \\[6pt]
+Market urgency &
+  $\text{spread} \times \text{OBI}$ &
+  Wide spread + imbalanced book signals imminent move \\[6pt]
+Spread dynamics &
+  Level, volatility, and momentum of the bid-ask spread &
+  Increasing spread is predictive of near-term vol \\[6pt]
+Signed volume flow &
+  $\text{volume} \times \operatorname{sign}(\text{trade direction})$ &
+  Net buying/selling pressure \\[6pt]
+Sub-window RV ratio &
+  $\RV_{\text{last 5min}}\; / \;\RV_{\text{first 5min}}$ &
+  Within-window acceleration; captures intraday regime shifts \\[6pt]
+VPIN &
+  Volume-synced probability of informed trading &
+  \citep{EasleyLopezOHara2012} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ──────────────────────────────────────────────
+\section{The Optiver Evidence}
+\label{sec:optiver-evidence}
+%% ──────────────────────────────────────────────
+
+The Kaggle Optiver Realized Volatility competition (2021) produced the largest public benchmark for microstructure-driven vol forecasting.
+LightGBM solutions dominated neural networks by roughly 4:1 on the leaderboard.
+Price acceleration was the single highest-importance feature across top solutions, and sub-window aggregations (e.g., last-5-minute vs.\ first-5-minute statistics) consistently outperformed whole-window summaries.
+A representative top-100 solution (91st place) used approximately 600 features, with each base quantity expanded via \{level, change, z-score\} engineering.
+
+
+%% ──────────────────────────────────────────────
+\section{Engineering Principle}
+\label{sec:micro-engineering}
+%% ──────────────────────────────────────────────
+
+For each base quantity in Table~\ref{tab:micro-features}, compute three variants:
+
+\begin{table}[htbp]
+\centering
+\caption{Feature triple expansion.}
+\label{tab:triple-expansion}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Variant} & \textbf{Definition} & \textbf{Purpose} \\
+\midrule
+Level   & $x_t$                              & Current state \\
+Change  & $x_t - x_{t-1}$                    & Directional momentum \\
+Z-score & $(x_t - \bar{x}_{20}) / s_{20}$    & Deviation from recent norm \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This triples the feature count from 9 base quantities to 27.
+Tree-based models handle the resulting redundancy naturally via split selection; no manual decorrelation is needed.
+
+
+%% ──────────────────────────────────────────────
+\section{Data Constraints}
+\label{sec:micro-data-constraints}
+%% ──────────────────────────────────────────────
+
+L2 order-book depth (five levels of bid/ask size) is available only for the E-mini S\&P 500 (ES) via SecDB.
+Equities receive L1 features only: spread, OBI at best bid/ask, and signed volume flow.
+Features requiring multi-level depth (depth ratio, market urgency with L2--L5 OBI) are ES-only.
+
+The raw intraday sequences that produce these features also feed the LSTM module (Ch.~10), which consumes them as time-ordered input rather than daily aggregates.
+
+
+%% ──────────────────────────────────────────────
+%% Boxes
+%% ──────────────────────────────────────────────
+
+\begin{warning}[Lookahead Bias in Microstructure Features]
+Features for $\RV_{t+1}$ must use only information available at the close of period $t$.
+Timestamp alignment is critical: if $\RV_{t+1}$ covers trading day $t+1$, then features must be computed from data up to and including the close of day $t$.
+A single misaligned sub-window statistic will inflate backtest performance and produce unreproducible results in production.
+\end{warning}
+
+\begin{keyidea}[Microstructure Features Add Most Value for Trees]
+Microstructure features are high-cardinality, noisy, and partially redundant.
+LightGBM exploits them effectively via greedy splits; linear models and shallow networks gain less.
+The Optiver evidence confirms this: tree ensembles dominated when the feature set was microstructure-heavy.
+\end{keyidea}
