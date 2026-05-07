@@ -653,30 +653,41 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Quality**: essential
 - **Topics**: optimal-trees, rashomon
 - **PDF**: none
-- **Key finding**: GOSDT finds provably optimal sparse decision trees using dynamic programming with bounds, making exact tree optimization tractable for moderate-sized datasets.
-- **Relevance**: Foundation algorithm for the interpretable-trees project direction; PyGOSDT package is directly usable.
+- **Key finding**: Extends OSDT to continuous features via online threshold guessing (formalized in McTavish et al. AAAI 2022 "GOSDT-Guesses"), non-linear objectives (F1, weighted accuracy, AUC), and black-box guidance. Depth limit added in 2022. Handles tens of thousands of rows and 30-100 binarized features within minutes. Code: `pip install gosdt` (github.com/ubc-systopia/gosdt-guesses, 57 stars).
+- **Relevance**: Foundation algorithm for the interpretable-trees project direction; PyGOSDT package is directly usable. GOSDT-Guesses effectively distills a gradient-boosted ensemble into an optimal sparse single tree.
 
-### aglin-etal-2020-demirovic-2022
-- **Title**: DL8.5 / MurTree: Optimal Decision Trees via Dynamic Programming
-- **Authors**: Aglin, Nijssen, Schaus (DL8.5); Demirovic et al. (MurTree)
-- **Year**: 2020/2022
-- **Venue**: JMLR (MurTree)
+### aglin-etal-2020-dl85
+- **Title**: DL8.5: Optimal Decision Trees with Caching Branch-and-Bound
+- **Authors**: Aglin, Nijssen, Schaus
+- **Year**: 2020
+- **Venue**: AAAI 2020 (PyDL8.5: IJCAI 2020)
 - **Quality**: recommended
 - **Topics**: optimal-trees, rashomon
 - **PDF**: none
-- **Key finding**: Alternative optimal decision tree solvers using different search strategies; MurTree uses branch-and-bound with caching for improved scalability.
-- **Relevance**: Benchmark alternatives to GOSDT; useful for comparing solver performance.
+- **Key finding**: Caching branch-and-bound that stores partial-search results for itemset prefixes, building on DL8 (Nijssen & Fromont, KDD 2007). Outperforms MIP formulations by orders of magnitude. PyDL8.5 at github.com/aia-uclouvain/pydl8.5.
+- **Relevance**: Alternative optimal tree solver to GOSDT; useful for benchmarking solver performance. Sklearn-compatible.
+
+### demirovic-etal-2022-murtree
+- **Title**: MurTree: Optimal Decision Trees via Dynamic Programming and Search
+- **Authors**: Demirovic, Lukina, Hebrard, Chan, Bailey, Leckie, Ramamohanarao, Stuckey
+- **Year**: 2022
+- **Venue**: JMLR
+- **Quality**: recommended
+- **Topics**: optimal-trees, rashomon
+- **PDF**: none
+- **Key finding**: Introduces a specialized depth-2 solver exploiting closed-form optimal depth-two structure, plus similarity and incremental bounds. Established that the greedy-vs-optimal accuracy gap can reach 10 percentage points on certain datasets. State-of-the-art exact solver at time of publication.
+- **Relevance**: Key benchmark; the depth-2 technique is now standard in STreeD/ConTree/SORTeD. pymurtree package available (partial sklearn compat).
 
 ### van-der-linden-etal-2023-streed
-- **Title**: STreeD: Optimal Regression and Classification Trees
+- **Title**: STreeD: Optimal Decision Trees via Separable Objectives
 - **Authors**: van der Linden, de Weerdt, Demirovic
-- **Year**: 2023
-- **Venue**: (preprint/proceedings)
-- **Quality**: recommended
-- **Topics**: optimal-trees, rashomon
+- **Year**: 2023-2024
+- **Venue**: NeurIPS 2023, ICML 2024, AAAI 2025
+- **Quality**: essential
+- **Topics**: optimal-trees, rashomon, regression-trees, fairness, survival-trees
 - **PDF**: none
-- **Key finding**: Extends optimal tree methods to the regression case, enabling exact optimization of continuous-valued prediction trees.
-- **Relevance**: Directly relevant since RV forecasting is a regression task; extends classification-focused GOSDT.
+- **Key finding**: Unifying DP framework proving that any separable objective (independently optimizable for left/right subtrees) admits a DP solution. Subsumes: cost-sensitive classification, F1, group-fairness constraints, prescriptive policy trees, piecewise-constant and piecewise-linear regression (elastic-net leaves), and survival trees. Code: `pip install pystreed` (github.com/AlgTUDelft/pystreed).
+- **Relevance**: Directly relevant: STreeD piecewise-linear regression is the recommended primary method for the vol forecasting regression task. Handles continuous features natively in latest extensions.
 
 ### xin-etal-2022-treefarms
 - **Title**: Exploring the Whole Rashomon Set of Sparse Decision Trees
@@ -686,19 +697,19 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Quality**: essential
 - **Topics**: rashomon, optimal-trees
 - **PDF**: none
-- **Key finding**: TreeFARMS enumerates the full set of near-optimal sparse decision trees (the Rashomon set), enabling analysis of model multiplicity and variable importance stability.
+- **Key finding**: First complete enumeration of the Rashomon set for any non-trivial hypothesis class. Extends GOSDT with a specialized trie ('Trees FAst RashoMon Sets') supporting efficient query and sampling. Finds orders of magnitude more distinct near-optimal trees than BART/MCMC samplers. Applications: variable importance over entire Rashomon set, derived-metric Rashomon sets (balanced accuracy, F1), bootstrap Rashomon sets. Code: `pip install treefarms` (github.com/ubc-systopia/treeFarms, 47 stars).
 - **Relevance**: Core tool for the Rashomon project direction; produces the set of competing models for analysis.
 
 ### babbar-etal-2025-split
 - **Title**: SPLIT: Scalable Enumeration of the Full Rashomon Set of Optimal Decision Trees
 - **Authors**: Babbar, McTavish, Rudin, Seltzer
 - **Year**: 2025
-- **Venue**: ICML Oral (arXiv 2502.15988)
+- **Venue**: ICML 2025 Oral (arXiv 2502.15988)
 - **Quality**: essential
 - **Topics**: rashomon, optimal-trees
 - **PDF**: none
-- **Key finding**: SPLIT replaces TreeFARMS with a scalable algorithm for enumerating the full Rashomon set, handling larger datasets and more features. Code at github.com/VarunBabbar/SPLIT-ICML.
-- **Relevance**: Production-ready replacement for TreeFARMS; the tool to use for Rashomon analysis at scale.
+- **Key finding**: Hybrid lookahead+greedy: optimal near root, greedy near leaves. Provably at least as good as fully greedy (Theorem A.1). Saves O(k^((d-1)/2) * (d/2)!) over fully optimal (Corollary 6.3). There exist distributions where SPLIT achieves 1-epsilon while greedy achieves at most 1/2+epsilon (Theorem 6.5). LicketySPLIT: recursive depth-1 variant in polynomial time O(|R|*n*k^3*d^3). RESPLIT extends to Rashomon-set computation, ~74x faster than TreeFARMS on Bike, ~17x on Spambase. Over 100x faster than GOSDT. Code: github.com/VarunBabbar/SPLIT-ICML.
+- **Relevance**: Fastest near-optimal solver; the tool for rapid iteration during research. RESPLIT is the scalable Rashomon-set alternative to TreeFARMS. Classification only currently.
 
 ### heile-etal-2025-licketyresplit
 - **Title**: LicketyRESPLIT
@@ -708,29 +719,29 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Quality**: recommended
 - **Topics**: rashomon, optimal-trees
 - **PDF**: none
-- **Key finding**: Further speed improvements over SPLIT for Rashomon set enumeration.
+- **Key finding**: Polynomial-time approximation to the Rashomon set, recursively finding near-optimal splits conditioned on easy-to-compute oracles. Orders-of-magnitude runtime and memory improvement over TreeFARMS and RESPLIT. Recovers nearly the full Rashomon set.
 - **Relevance**: Performance optimization of SPLIT; use if SPLIT is too slow on target dataset.
 
 ### arslan-etal-2025-sorted
-- **Title**: SORTeD: Optimal Decision Trees via Stochastic Optimization
-- **Authors**: Arslan et al.
+- **Title**: SORTeD: Anytime Enumeration of Rashomon Trees in Objective Order
+- **Authors**: Arslan, van der Linden, Hoogendoorn, Rinaldi, Demirovic
 - **Year**: 2025
 - **Venue**: NeurIPS Spotlight
 - **Quality**: recommended
 - **Topics**: optimal-trees, rashomon
 - **PDF**: none
-- **Key finding**: Stochastic optimization approach to optimal decision trees, offering an alternative to exact enumeration for larger-scale problems.
+- **Key finding**: Enumerates the Rashomon set in decreasing order of objective value -- best trees first. Anytime termination at any quality threshold. Up to two orders of magnitude speedup over TreeFARMS/RESPLIT. Supports any separable, totally ordered objective (works for regression and survival via STreeD).
 - **Relevance**: Alternative solver if exact methods are intractable at scale.
 
 ### semenova-rudin-parr-2022
-- **Title**: A Study in Rashomon Curves and Volumes: A New Perspective on Generalization and Model Simplicity in Machine Learning
+- **Title**: On the Existence of Simpler Machine Learning Models
 - **Authors**: Semenova, Rudin, Parr
 - **Year**: 2022
-- **Venue**: FAccT (arXiv 1908.01755)
+- **Venue**: FAccT 2022 (arXiv 1908.01755)
 - **Quality**: essential
 - **Topics**: rashomon, evaluation
 - **PDF**: none
-- **Key finding**: Formalizes the Rashomon ratio (fraction of models in a hypothesis class achieving near-optimal loss), showing that larger Rashomon sets enable finding simpler, more interpretable models.
+- **Key finding**: Introduces the Rashomon ratio -- ratio of volume of Rashomon set to hypothesis space volume. When several different ML methods produce near-equal accuracy on a dataset, the Rashomon ratio is large, guaranteeing simpler models exist within the Rashomon set.
 - **Relevance**: Theoretical backbone for interpreting Rashomon-set results; guides threshold selection for "near-optimal."
 
 ### dong-rudin-2020
@@ -741,18 +752,18 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Quality**: essential
 - **Topics**: rashomon, feature-engineering
 - **PDF**: none
-- **Key finding**: Variable Importance Clouds visualize how feature importance varies across the Rashomon set, revealing which features are robustly important vs. interchangeable.
+- **Key finding**: Variable Importance Clouds map every variable to its Model Reliance importance for every good model in the Rashomon set. Used with TreeFARMS, VIC reveals when one variable is interchangeable with another versus uniquely important. Shapley-VIC extension (Ning et al., Patterns 2022) extends to SHAP values across the Rashomon set.
 - **Relevance**: The key deliverable for the Rashomon project: showing which vol features are genuinely important vs. substitutable.
 
 ### rudin-etal-2024-position
 - **Title**: Amazing Things Come from Having Many Good Models
 - **Authors**: Rudin et al.
 - **Year**: 2024
-- **Venue**: ICML position paper (arXiv 2407.04846)
+- **Venue**: ICML 2024 Spotlight (arXiv 2407.04846)
 - **Quality**: recommended
 - **Topics**: rashomon, foundational
 - **PDF**: none
-- **Key finding**: Position paper arguing that the existence of many near-optimal models (Rashomon sets) should fundamentally change how we practice ML, favoring interpretability and fairness analysis.
+- **Key finding**: Position paper consolidating six benefits of computing the Rashomon set: (1) existence of simpler-yet-accurate models, (2) flexibility for fairness/monotonicity constraints, (3) uncertainty quantification, (4) reliable variable importance, (5) algorithm-choice diagnostics, (6) public-policy applications. Argues ML should reframe learning as a feasibility problem ('find all good models') rather than optimization.
 - **Relevance**: Motivational framing for the Rashomon project direction; useful for presentation and writeup.
 
 ### mctavish-etal-2025
@@ -761,9 +772,9 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Year**: 2025
 - **Venue**: ICML (arXiv 2506.14143)
 - **Quality**: recommended
-- **Topics**: rashomon, optimal-trees
+- **Topics**: rashomon, optimal-trees, interpretability
 - **PDF**: none
-- **Key finding**: Defines predictive equivalence classes within decision tree Rashomon sets, grouping trees that make identical predictions despite structural differences.
+- **Key finding**: Defines predictive equivalence classes within decision tree Rashomon sets. Two trees can encode the same decision boundary while differing in evaluation order, affecting variable importance and missing-value handling. Proposes a boolean-logical canonicalization to identify truly distinct models.
 - **Relevance**: Reduces redundancy in Rashomon set analysis; identifies truly distinct models.
 
 ### marx-calmon-ustun-2020
@@ -774,7 +785,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Quality**: recommended
 - **Topics**: rashomon
 - **PDF**: none
-- **Key finding**: Formalizes predictive multiplicity -- the degree to which competing models disagree on individual predictions -- and proposes metrics to measure it.
+- **Key finding**: Formalizes predictive multiplicity -- the degree to which competing models disagree on individual predictions. Proposes metrics (ambiguity, discrepancy) to measure it. Shows that standard model selection ignores multiplicity, which can be large even when test accuracy is near-identical.
 - **Relevance**: Useful for understanding prediction stability across the Rashomon set; complements Variable Importance Clouds.
 
 ---
@@ -1046,4 +1057,4 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 
 ## Topic Tag Vocabulary
 
-`rv-estimators`, `microstructure-noise`, `jump-detection`, `har`, `harq`, `har-extensions`, `garch`, `realized-garch`, `rough-vol`, `ml-vol`, `gradient-boosting`, `neural-nets`, `deep-learning`, `lstm`, `cnn-tcn`, `transformers`, `gnn`, `ensemble`, `rashomon`, `optimal-trees`, `lob`, `vrp`, `options-implied`, `cross-asset`, `spillovers`, `evaluation`, `qlike`, `mcs`, `validation`, `purged-cv`, `feature-engineering`, `long-memory`, `sentiment`, `regime`, `data-source`, `code-repo`, `foundational`
+`rv-estimators`, `microstructure-noise`, `jump-detection`, `har`, `harq`, `har-extensions`, `garch`, `realized-garch`, `rough-vol`, `ml-vol`, `gradient-boosting`, `neural-nets`, `deep-learning`, `lstm`, `cnn-tcn`, `transformers`, `gnn`, `ensemble`, `rashomon`, `optimal-trees`, `regression-trees`, `survival-trees`, `lob`, `vrp`, `options-implied`, `cross-asset`, `spillovers`, `evaluation`, `qlike`, `mcs`, `validation`, `purged-cv`, `feature-engineering`, `interpretability`, `fairness`, `long-memory`, `sentiment`, `regime`, `data-source`, `code-repo`, `foundational`
