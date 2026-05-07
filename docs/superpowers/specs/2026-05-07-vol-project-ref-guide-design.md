@@ -374,3 +374,52 @@ guides/vol-project-ref/
 - Heavy use of tables for feature reference
 - Diagrams for: high-level pipeline (Ch 1), HARQ mechanism (Ch 3), horizon dependence (Ch 5/8), LSTM pipeline (Ch 10), ensemble architecture (Ch 11), Rashomon pipeline (Ch 12), end-to-end system (Ch 14)
 - No em dashes
+
+---
+
+## Per-Chapter Quality Pipeline
+
+Each chapter goes through these checks after drafting. The write-chapter skill's 4-pass pipeline is designed for the teaching-heavy vol learning guide. This guide needs a different pipeline tuned for brevity and visual correctness.
+
+### Pass 1: Write
+
+Main agent writes the chapter following this spec's style rules (tables over prose, decisions not arguments, every sentence project-applicable).
+
+### Pass 2: Brevity Agent (sub-agent)
+
+More aggressive than the write-chapter skill's condenser. Prompt:
+
+> Read the draft chapter at [path]. This is a condensed project reference, not a textbook. Every sentence must be directly applicable to building or defending the vol forecasting project.
+>
+> Flag and suggest cuts for:
+> - **Theory creep:** Any sentence that explains WHY something is true in general, rather than stating the fact and moving on. Example: "The leverage effect arises because firms with declining equity become more leveraged, amplifying..." should be "Negative returns increase future vol (leverage effect)."
+> - **Justification bloat:** Sentences that argue for a decision rather than stating it. Example: "We choose LightGBM because extensive evidence from competitions and academic benchmarks shows that gradient-boosted trees dominate..." should be "We use LightGBM. Trees outperform NNs 4:1 on tabular financial data."
+> - **Redundancy:** Same fact stated twice in different words, or a table entry repeated in prose.
+> - **Hedge words and filler:** "It is worth noting that," "Interestingly," "In particular," "It should be mentioned that," "As previously discussed."
+> - **Scope creep:** Content that is true and interesting but not needed to build THIS project.
+>
+> For each flag, output: location, the offending text, a tightened replacement (or "cut entirely").
+
+### Pass 3: Visual Diagram Check (sub-agent, after LaTeX compilation)
+
+Prompt:
+
+> The chapter at [path] has been compiled to PDF. Read the PDF and inspect every diagram and figure. Check for:
+> - **Overlapping text:** Labels, arrows, or annotations that collide or overlap
+> - **Readability:** Text too small to read comfortably, or cramped spacing
+> - **Missing labels:** Arrows or boxes without labels, or labels that reference undefined terms
+> - **Layout:** Diagrams that are too wide for the page margins, or too tall relative to their information content
+> - **Flow clarity:** For pipeline/flow diagrams, is the direction of data flow unambiguous? Can you trace the path without backtracking?
+> - **Consistency:** Do diagrams use consistent styling (arrow types, box shapes, colors) across the chapter and with other chapters?
+>
+> For each issue, output: figure number/description, what the problem is, suggested fix.
+
+### Pass 4: Cross-referencer (sub-agent, parallel with Pass 2)
+
+Same as the write-chapter skill's Pass 2:
+
+> Read the draft chapter at [path]. Search `reference/project-papers/` and `reference/papers/` for papers relevant to claims in the chapter. For each paper found, suggest the citation command. Flag any factual errors.
+
+### Consolidation
+
+Main agent applies brevity edits, adds citations, recompiles, then runs the visual check. Iterate if visual issues are found.
