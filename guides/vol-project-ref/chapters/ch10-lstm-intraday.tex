@@ -14,13 +14,13 @@ Figure~\ref{fig:lstm-pipeline} shows the data flow from raw ticks to the ensembl
 
 \begin{figure}[ht]
 \centering
-\begin{tikzpicture}[node distance=1.6cm, every node/.style={font=\small}]
+\begin{tikzpicture}[node distance=1.0cm, every node/.style={font=\footnotesize}]
   % Nodes
-  \node[flowblock, minimum width=2.6cm] (ticks) {E-mini L2\\Ticks};
+  \node[flowblock, minimum width=2.2cm] (ticks) {E-mini L2\\Ticks};
   \node[flowblock, minimum width=2.6cm, right=of ticks] (bars) {5-min Bars\\+ LOB Snapshots};
-  \node[flowblock, minimum width=2.4cm, right=of bars] (model) {LSTM / TCN};
-  \node[flowblock, minimum width=2.6cm, right=of model] (pred) {Next-day\\$\log \RV$ Forecast};
-  \node[flowblock, minimum width=2.4cm, right=of pred] (blend) {Ensemble\\Blend (Ch.~11)};
+  \node[flowblock, minimum width=2.0cm, right=of bars] (model) {LSTM / TCN};
+  \node[flowblock, minimum width=2.4cm, right=of model] (pred) {Next-day\\$\log \RV$ Forecast};
+  \node[flowblock, minimum width=2.2cm, right=of pred] (blend) {Ensemble\\Blend (Ch.~11)};
 
   % Arrows
   \draw[arrow] (ticks) -- (bars);

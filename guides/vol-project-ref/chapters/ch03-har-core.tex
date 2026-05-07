@@ -67,59 +67,61 @@ Figure~\ref{fig:harq-shrinkage} illustrates the core idea: $\operatorname{RQ}$ a
 
 \begin{figure}[htbp]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
-  node distance=1.4cm and 2.2cm,
+  node distance=1.2cm and 1.6cm,
   every node/.style={font=\small},
 ]
 
 % ── Left panel: Clean day ──
 \node[font=\normalsize\bfseries] (title-clean) {Clean Day (low RQ)};
 
-\node[flowblock, below=0.8cm of title-clean, minimum width=2.4cm]
+\node[flowblock, below=0.8cm of title-clean, minimum width=2.2cm]
   (daily-clean) {$\log \RV_t^{(d)}$};
-\node[flowblock, below=0.5cm of daily-clean, minimum width=2.4cm]
+\node[flowblock, below=0.5cm of daily-clean, minimum width=2.2cm]
   (weekly-clean) {$\log \RV_t^{(w)}$};
-\node[flowblock, below=0.5cm of weekly-clean, minimum width=2.4cm]
+\node[flowblock, below=0.5cm of weekly-clean, minimum width=2.2cm]
   (monthly-clean) {$\log \RV_t^{(m)}$};
 
-\node[decisionblock, right=1.8cm of weekly-clean, minimum width=1.6cm]
+\node[decisionblock, right=1.4cm of weekly-clean, minimum width=1.4cm]
   (gate-clean) {RQ\\low};
 
-\node[flowblock, right=1.8cm of gate-clean, minimum width=2.6cm, fill=green!10]
+\node[flowblock, right=1.4cm of gate-clean, minimum width=2.2cm, fill=green!10]
   (forecast-clean) {Forecast\\$\log \RV_{t+1}$};
 
 % Arrows with weights
-\draw[arrow, line width=1.6pt] (daily-clean.east) -- ++(0.5,0) |- (gate-clean.west)
+\draw[arrow, line width=1.6pt] (daily-clean.east) -- ++(0.4,0) |- (gate-clean.west)
   node[pos=0.25, above, font=\footnotesize] {large $\beta_d$};
 \draw[arrow, line width=0.7pt] (weekly-clean.east) -- (gate-clean.west);
-\draw[arrow, line width=0.7pt] (monthly-clean.east) -- ++(0.5,0) |- (gate-clean.west);
+\draw[arrow, line width=0.7pt] (monthly-clean.east) -- ++(0.4,0) |- (gate-clean.west);
 \draw[arrow, line width=1.2pt] (gate-clean.east) -- (forecast-clean.west);
 
 
 % ── Right panel: Noisy day ──
-\node[font=\normalsize\bfseries, right=8.5cm of title-clean] (title-noisy) {Noisy Day (high RQ)};
+\node[font=\normalsize\bfseries, right=5.5cm of title-clean] (title-noisy) {Noisy Day (high RQ)};
 
-\node[flowblock, below=0.8cm of title-noisy, minimum width=2.4cm]
+\node[flowblock, below=0.8cm of title-noisy, minimum width=2.2cm]
   (daily-noisy) {$\log \RV_t^{(d)}$};
-\node[flowblock, below=0.5cm of daily-noisy, minimum width=2.4cm]
+\node[flowblock, below=0.5cm of daily-noisy, minimum width=2.2cm]
   (weekly-noisy) {$\log \RV_t^{(w)}$};
-\node[flowblock, below=0.5cm of weekly-noisy, minimum width=2.4cm]
+\node[flowblock, below=0.5cm of weekly-noisy, minimum width=2.2cm]
   (monthly-noisy) {$\log \RV_t^{(m)}$};
 
-\node[decisionblock, right=1.8cm of weekly-noisy, minimum width=1.6cm]
+\node[decisionblock, right=1.4cm of weekly-noisy, minimum width=1.4cm]
   (gate-noisy) {RQ\\high};
 
-\node[flowblock, right=1.8cm of gate-noisy, minimum width=2.6cm, fill=green!10]
+\node[flowblock, right=1.4cm of gate-noisy, minimum width=2.2cm, fill=green!10]
   (forecast-noisy) {Forecast\\$\log \RV_{t+1}$};
 
 % Arrows with weights
-\draw[arrow, line width=0.4pt, dashed] (daily-noisy.east) -- ++(0.5,0) |- (gate-noisy.west)
+\draw[arrow, line width=0.4pt, dashed] (daily-noisy.east) -- ++(0.4,0) |- (gate-noisy.west)
   node[pos=0.25, above, font=\footnotesize] {small $\beta_d^{\mathrm{eff}}$};
 \draw[arrow, line width=1.6pt] (weekly-noisy.east) -- (gate-noisy.west);
-\draw[arrow, line width=1.6pt] (monthly-noisy.east) -- ++(0.5,0) |- (gate-noisy.west);
+\draw[arrow, line width=1.6pt] (monthly-noisy.east) -- ++(0.4,0) |- (gate-noisy.west);
 \draw[arrow, line width=1.2pt] (gate-noisy.east) -- (forecast-noisy.west);
 
-\end{tikzpicture}
+\end{tikzpicture}%
+}
 \caption{HARQ shrinkage mechanism. On clean days the daily reading dominates (thick arrow, left). On noisy days the RQ interaction shrinks the daily coefficient, shifting weight to weekly and monthly averages (thick arrows, right).}
 \label{fig:harq-shrinkage}
 \end{figure}

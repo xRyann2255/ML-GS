@@ -12,6 +12,7 @@ Figure~\ref{fig:full-pipeline} shows every component from raw data to scored for
 
 \begin{figure}[htbp]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
   node distance=0.55cm and 0.35cm,
   >=Stealth,
@@ -61,13 +62,13 @@ Figure~\ref{fig:full-pipeline} shows every component from raw data to scored for
 \draw[arrow] (cross.south) -- (feat4.north);
 
 % ── Row 3: Feature Store ──
-\node[store, below=0.8cm of $(feat01)!0.5!(feat4)$] (fstore) {Feature Store ($\sim$80--120 features)};
+\node[store, below=0.8cm of $(feat01)!0.5!(feat4)$, minimum width=13cm] (fstore) {Feature Store ($\sim$80--120 features)};
 
 % Arrows: computation -> store
-\draw[arrow] (feat01.south) |- (fstore.north -| feat01.south);
+\draw[arrow] (feat01.south) -- (fstore.north -| feat01.south);
 \draw[arrow] (feat3.south) -- (fstore.north -| feat3.south);
-\draw[arrow] (feat2.south) |- (fstore.north -| feat2.south);
-\draw[arrow] (feat4.south) |- (fstore.north -| feat4.south);
+\draw[arrow] (feat2.south) -- (fstore.north -| feat2.south);
+\draw[arrow] (feat4.south) -- (fstore.north -| feat4.south);
 
 % ── Row 4: Three model branches ──
 \node[model, below left=0.9cm and 1.8cm of fstore] (lgbm) {LightGBM\\(Ch.~\ref{ch:lightgbm})};
@@ -101,7 +102,8 @@ Figure~\ref{fig:full-pipeline} shows every component from raw data to scored for
 \node[evalbox, below=0.7cm of forecast] (eval) {Evaluation: $\QLIKE$, DM, MCS (Ch.~\ref{ch:evaluation})};
 \draw[arrow] (forecast.south) -- (eval.north);
 
-\end{tikzpicture}
+\end{tikzpicture}%
+}
 \caption{End-to-end pipeline from raw data to scored forecasts.
 Blue: data sources. Green: feature computation and storage. Orange: models and blending. Red: evaluation.
 Dashed arrow indicates the LSTM also receives raw intraday bar sequences directly.}

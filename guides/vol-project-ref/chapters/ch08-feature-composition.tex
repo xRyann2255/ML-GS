@@ -84,7 +84,7 @@ The remaining 60--100 features add 15\%.
 \begin{tikzpicture}
 \begin{axis}[
   ybar,
-  width=13cm,
+  width=\textwidth,
   height=7.5cm,
   bar width=1.4cm,
   ymin=0, ymax=110,
@@ -117,10 +117,9 @@ The remaining 60--100 features add 15\%.
   ({+L3--4 (40)}, 95)
   ({+L5--7 (80--120)}, 100)
 };
+\draw[dashed, warnred, thick] ({axis cs:{+L2 (20)},85}) -- ({axis cs:{+L5--7 (80--120)},85})
+  node[midway, below=2pt, font=\footnotesize, text=warnred, fill=white, inner sep=1pt] {85\% with 20 features};
 \end{axis}
-% Annotation line at 85%
-\draw[dashed, warnred, thick] (1.0, 4.82) -- (12.3, 4.82)
-  node[right, font=\footnotesize, text=warnred] {85\% with 20 features};
 \end{tikzpicture}
 \caption{Cumulative accuracy by feature layer. Parentheses show total feature count at each stage. The dashed line marks the 85\% threshold achievable with Layers~0--2 and a Ridge regression.}
 \label{fig:diminishing-returns}

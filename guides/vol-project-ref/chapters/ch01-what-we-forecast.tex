@@ -64,15 +64,15 @@ Their forecasts are combined via an ensemble blend (Ch.~11) and evaluated agains
 
 \begin{figure}[ht]
 \centering
-\begin{tikzpicture}[node distance=1.8cm, every node/.style={font=\small}]
+\begin{tikzpicture}[node distance=1.1cm, every node/.style={font=\footnotesize}]
   % Nodes
-  \node[flowblock, minimum width=2.8cm] (data) {Raw Data\\(6 sources)};
-  \node[flowblock, minimum width=2.8cm, right=of data] (feat) {Feature Engineering\\(Layers 0--7)};
-  \node[flowblock, minimum width=2.2cm, above right=0.6cm and 1.8cm of feat] (lgbm) {LightGBM};
-  \node[flowblock, minimum width=2.2cm, below right=0.6cm and 1.8cm of feat] (lstm) {LSTM};
-  \node[flowblock, minimum width=2.8cm, right=2.8cm of feat] (ens) {Ensemble\\Blend};
-  \node[flowblock, minimum width=2.8cm, right=of ens] (out) {Forecast:\\$\log \RV_{t+h}$};
-  \node[flowblock, minimum width=2.2cm, right=of out] (eval) {Evaluation\\(QLIKE)};
+  \node[flowblock, minimum width=2.2cm] (data) {Raw Data\\(6 sources)};
+  \node[flowblock, minimum width=2.4cm, right=of data] (feat) {Feature Eng.\\(Layers 0--7)};
+  \node[flowblock, minimum width=1.8cm, above right=0.5cm and 1.4cm of feat] (lgbm) {LightGBM};
+  \node[flowblock, minimum width=1.8cm, below right=0.5cm and 1.4cm of feat] (lstm) {LSTM};
+  \node[flowblock, minimum width=2.2cm, right=2.2cm of feat] (ens) {Ensemble\\Blend};
+  \node[flowblock, minimum width=2.2cm, right=of ens] (out) {Forecast:\\$\log \RV_{t+h}$};
+  \node[flowblock, minimum width=2.0cm, right=of out] (eval) {Evaluation\\(QLIKE)};
 
   % Arrows
   \draw[arrow] (data) -- (feat);
