@@ -118,3 +118,49 @@ A hybrid HAR-augmented gradient-boosted model with options-implied + LOB + cross
 7. **Single-paper claims are flagged as "suggestive, not settled" throughout this report** (e.g. the Souto-Moradi NBEATSx 13%/8% improvement, the Taneva-Angelova-Granchev Transformer findings). Treat these as motivation for replication on your own data, not as established results. A useful internship deliverable is precisely to test whether a single-paper finding generalises.
 
 8. **The Optiver Kaggle 2021 evaluation metric (RMSPE on 10-min realized vol) is not the same as daily-RV QLIKE forecasting.** The Kaggle competition is closer to an intraday vol *nowcasting* task. The feature-engineering ideas transfer; the evaluation conclusions do not.
+
+---
+
+## Decision Tree Methodology Assessment (2026-05-07)
+
+> Source: decision tree deep research survey
+> Full landscape survey: `notes/deep-research-decision-trees.md`
+> Bibliography: `reference/bibliography.md` (category H)
+
+### Recommended Methods for Vol Regression (5K-20K daily obs x 20-80 features)
+
+In priority:
+1. **STreeD piecewise-linear regression** (`pystreed`, ICML 2024) -- native continuous features, elastic-net leaves, depth-2 specialized solver. Closest fit to the vol task.
+2. **OSRT** (`gosdt` regression mode, AAAI 2023) -- fully provably-optimal piecewise-constant baseline.
+3. **STreeD piecewise-constant** (`pystreed`) -- provably optimal, scalable to >=100K rows.
+4. **ConTree** (`pycontree`, AAAI 2025) -- for classification framings (vol regime, sign-of-return, vol-up/down) on continuous features without binarization.
+5. **SPLIT / LicketySPLIT** (ICML 2025) -- fast iteration during research; classification only currently.
+
+**Avoid**: pure MIP (too slow for 20K rows), pure SAT (perfect-classification only), Quant-BnB beyond depth 3.
+
+**Binarization recipe** (only for GOSDT/SPLIT family): GOSDT-Guesses LightGBM threshold guesser turns 80 continuous features into ~200-500 binary thresholds prioritized by gradient-boosted importance. Cap at ~300 binary features.
+
+### Implementation Roadmap
+
+**Stage 1 (week 1-2): Baseline & feasibility.** Implement HAR / HAR-X / HARQ baselines and a tuned LightGBM regressor. Compute walk-forward MSE/QLIKE. This sets the lower and upper accuracy bounds.
+
+**Stage 2 (week 2-4): Optimal-tree drop-in.** Install `pystreed` and fit `STreeDPiecewiseLinearRegressor` at depths 3, 4, 5 with cost-complexity tuned via purged blocked k-fold CV. Compare to depth-matched CART and to OSRT. Report MSE, QLIKE, and tree size. **Threshold**: if STreeD MSE is within 5% of LightGBM at <=16 leaves, proceed to Stage 3; if it lags by >10%, fall back to GOSDT-Guesses on a binarized representation or accept the LightGBM/explanation pipeline.
+
+**Stage 3 (week 4-8): Rashomon-set analysis.** For a classification framing (volatility-up vs. flat vs. down), enumerate the TreeFARMS or RESPLIT Rashomon set within epsilon=2% of optimum. Compute the Rashomon Importance Distribution. Identify trees that are monotone in VIX and split on at most 8 unique features. Report the prediction range across the Rashomon set during COVID-March-2020 and Volmageddon regime breaks. **Threshold**: if RID is materially more stable than LightGBM SHAP across rolling windows (Spearman rank correlation ≥ 0.8 between adjacent windows for top features), this is paper-worthy material.
+
+**Stage 4 (paper / production).** Draft a paper for ICAIF, NeurIPS Finance Workshop, or Journal of Financial Econometrics showing the interpretable-optimal-tree-with-Rashomon-set methodology beats HAR economically and is robust across regimes.
+
+**Default if research time is constrained:** use STreeD piecewise-linear regression at depth 4 with monotonicity constraints + a TreeFARMS-derived RID for variable importance. This delivers 80% of the value of the full pipeline at <20% of the effort.
+
+### Caveats (Decision Tree Research)
+
+9. **Speculative claims marked**: the 2-5% MSE penalty estimate vs. LightGBM is extrapolated, not measured -- verify on own data.
+10. **No regression-Rashomon library is yet production-ready**: SORTeD's regression extension is anticipated but not released as of May 2026; regression Rashomon-set work requires custom code on top of STreeD.
+11. **Binarization caveat**: GOSDT/SPLIT/MurTree/TreeFARMS require binary features; the threshold-guessing preprocessor introduces a (typically small) optimality gap. ConTree and STreeD piecewise-linear are the only continuous-native optimal methods.
+12. **Time-series leakage**: standard k-fold CV is invalid; use purged blocked k-fold or walk-forward. None of the optimal-tree libraries enforce this -- the user must wrap them.
+13. **GitHub star counts** are May 2026 snapshots: GOSDT (57), TreeFARMS (47), scikit-learn (65,877), XGBoost (28,300), CatBoost (8,800).
+14. **The "no financial-time-series application" finding is a negative result** based on thorough search; publications may appear during the project -- periodic re-check of arXiv cs.LG and SSRN q-fin.ST is advised.
+15. **Grinsztajn-Oyallon-Varoquaux dataset count**: arXiv v1 says 45 datasets; published NeurIPS 2022 says 48. Either is correct depending on version cited.
+16. **Van der Linden et al. (arXiv:2409.12788) is still a preprint** as of May 2026, not yet peer-reviewed, though widely cited.
+17. **MAPTree's claim to "beat optimal trees"** is on Bayesian MAP with a BCART prior -- a different objective than regularized-misclassification, so comparisons to GOSDT/MurTree are not apples-to-apples.
+18. **No GPU acceleration** for any optimal-tree library -- CPU-bound training. For 5-20K rows this is not limiting; at 1M+ rows expect overnight runs at depth 4.
