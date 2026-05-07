@@ -278,3 +278,26 @@ Each step has a clear scientific question and is independently reportable as a r
 - Model in log-RV space: log-RV is near-unit-root; differencing destroys signal. Use fractional differencing or model in log-RV directly
 - Train with QLIKE loss, not MSE: Zhang et al. (2025 GNN paper) report this matters substantially; MSE is dominated by extreme vol days (`zhang-pu-cucuringu-dong-2025` in bibliography)
 - Choice of fitting scheme for HAR matters more than ML model choice per Wilms et al. 2024 "HARd to Beat" (`wilms-etal-2024` in bibliography)
+
+## Deep Research Findings (2026-05-07)
+
+**Rashomon-set value for feature analysis (decision tree deep research):**
+- Feature interchangeability detection: VIX, V2X, VVIX, MOVE, RV lags, ATM IV, IV-RV spread, term-structure slope are all near-substitutes. Single-model importance (gain, permutation, SHAP) is unstable across refits because of this redundancy
+- RID (Donnelly et al. 2023, NeurIPS) delivers a stable importance distribution over (Rashomon set x bootstrap) with consistency theorems and finite-sample error rates (`donnelly-katta-rudin-browne-2023` in bibliography)
+- VIC (Dong & Rudin 2020) visualizes substitution structure directly: features with non-overlapping importance clouds are robustly distinct
+- Regime-stable model selection: train TreeFARMS/RESPLIT on rolling-window data; intersect Rashomon sets across regimes to find trees near-optimal in every regime -- robust to non-stationarity
+- Ex-ante stress testing: prediction multiplicity at any input quantifies the range of predictions across all defensible models -- useful for risk reporting
+- Constraint satisfaction post-hoc: prefer trees in the Rashomon set that are monotone in VIX (VIX up -> RV up), do not split on a flagged feature, or satisfy any other constraint -- without retraining
+
+**Interpretable vol forecasting pipeline (from decision tree applicability assessment):**
+1. Feature engineering: HAR lags, HARQ realized-quarticity, signed semivariances, BNS jumps, VIX/VVIX, volume/spread, macro (ADS, EPU), cross-asset (SPY corr, sector RV)
+2. Binarization (for GOSDT/SPLIT family only): GOSDT-Guesses LightGBM threshold guesser, cap ~300 binary features
+3. Target: log(RV_{t+1}) or RV_{t+1:t+5} for weekly (ML gains larger at longer horizons)
+4. Train: STreeDPiecewiseLinearRegressor depth <=5, elastic-net leaves, cost-complexity tuned via purged blocked k-fold CV
+5. Rashomon analysis: TreeFARMS/RESPLIT within epsilon=2% MSE of optimum; compute RID per feature; filter for monotonicity and sparsity (<=12 leaves)
+6. Evaluate: walk-forward MSE, QLIKE, MAE; DM tests vs HAR/HARQ/LightGBM; Rashomon prediction range during regime breaks (Mar-2020, Volmageddon)
+7. Production: pickle tree + feature pipeline, re-train weekly on rolling 5-yr window, monitor Rashomon-set drift
+
+**Novelty (May 2026):**
+- No peer-reviewed paper, preprint, Kaggle notebook, or industry blog has applied any optimal-tree or Rashomon-set method to realized-volatility forecasting, return prediction, or any financial time-series
+- Closest published applications are to cross-sectional credit risk (FICO HELOC) and criminal justice (COMPAS)
