@@ -1,1 +1,94 @@
-\chapter{Placeholder}
+\chapter{The Ensemble}
+\label{ch:ensemble}
+
+The pipeline has two model branches: LightGBM (Chapter~\ref{ch:lightgbm}) consuming 80--120 tabular features from Layers~0--7, and an LSTM/TCN (Chapter~10) consuming intraday E-mini L2 sequences.
+Each branch produces an independent $\log \RV_{t+h}$ forecast.
+These forecasts are combined at the prediction level into a single blended output.
+
+%% ──────────────────────────────────────────────
+\section{Architecture}
+\label{sec:ensemble-arch}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:ensemble-arch} shows the full two-branch architecture converging into the ensemble blend.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=1.4cm, every node/.style={font=\small}]
+
+  % ── Left branch: LightGBM ──
+  \node[flowblock, minimum width=3cm, fill=blue!8] (tabfeat)
+    {Layers 0--7\\Tabular Features\\(80--120)};
+  \node[flowblock, minimum width=2.6cm, fill=blue!8, below=of tabfeat] (lgbm)
+    {LightGBM\\(Ch.~9)};
+  \node[flowblock, minimum width=2.6cm, below=of lgbm] (lgbmpred)
+    {$\hat{y}^{\mathrm{GBM}}_t$\\$\log \RV$ forecast};
+
+  % ── Right branch: LSTM ──
+  \node[flowblock, minimum width=3cm, fill=green!8, right=4.5cm of tabfeat] (seqfeat)
+    {E-mini L2\\5-min Bars + LOB\\(78 steps/day)};
+  \node[flowblock, minimum width=2.6cm, fill=green!8, below=of seqfeat] (lstm)
+    {LSTM / TCN\\(Ch.~10)};
+  \node[flowblock, minimum width=2.6cm, below=of lstm] (lstmpred)
+    {$\hat{y}^{\mathrm{SEQ}}_t$\\$\log \RV$ forecast};
+
+  % ── Ensemble blend ──
+  \node[flowblock, minimum width=3.2cm, fill=orange!10,
+        below=2cm of $(lgbmpred)!0.5!(lstmpred)$] (blend)
+    {Ensemble Blend\\$\hat{y}_t = w \,\hat{y}^{\mathrm{GBM}}_t + (1-w)\,\hat{y}^{\mathrm{SEQ}}_t$};
+
+  % ── Final output ──
+  \node[flowblock, minimum width=3cm, fill=orange!10, below=of blend] (output)
+    {Forecast $\log \RV_{t+h}$};
+
+  % ── Arrows ──
+  \draw[arrow] (tabfeat) -- (lgbm);
+  \draw[arrow] (lgbm) -- (lgbmpred);
+  \draw[arrow] (seqfeat) -- (lstm);
+  \draw[arrow] (lstm) -- (lstmpred);
+  \draw[arrow] (lgbmpred) -- (blend);
+  \draw[arrow] (lstmpred) -- (blend);
+  \draw[arrow] (blend) -- (output);
+
+  % ── Branch labels ──
+  \node[above=0.1cm of tabfeat, font=\footnotesize\bfseries, text=defblue] {Tabular Branch};
+  \node[above=0.1cm of seqfeat, font=\footnotesize\bfseries, text=intgreen] {Sequential Branch};
+
+\end{tikzpicture}
+\caption{Two-branch ensemble architecture. Each branch independently forecasts $\log \RV_{t+h}$; outputs are blended at the prediction level.}
+\label{fig:ensemble-arch}
+\end{figure}
+
+
+%% ──────────────────────────────────────────────
+\section{Prediction-Level Blending}
+\label{sec:pred-blend}
+%% ──────────────────────────────────────────────
+
+We blend model \emph{outputs}, not internal representations.
+Feature-level stacking (feeding LSTM embeddings as LightGBM inputs) breaks gradient isolation and couples model debugging; top-performing Optiver and AmEx Kaggle solutions consistently found that blending independent predictions outperforms feature-level fusion \citep{Optiver2021}.
+Blend weights can be static (equal weighting, or a fixed ratio tuned to minimize $\QLIKE$ on the validation set) or dynamic (regime-dependent, shifting weight toward the sequential branch during high-microstructure-activity periods).
+Start with simple validation-tuned static weights; add regime conditioning only if it improves out-of-sample $\QLIKE$.
+
+\begin{warning}[Do Not Stack Features]
+Feeding the LSTM's hidden-state embedding into LightGBM as extra columns is tempting but counterproductive.
+LightGBM cannot back-propagate into the LSTM, so the embedding is never optimized for the tabular objective.
+Debugging also becomes harder: a degradation in the blend could originate in either model or in the coupling layer.
+Keep the branches independent.
+\end{warning}
+
+
+%% ──────────────────────────────────────────────
+\section{Why Two Branches}
+\label{sec:why-two}
+%% ──────────────────────────────────────────────
+
+LightGBM dominates tabular volatility benchmarks (Chapters~3--8 features).
+LSTM/TCN captures sequential intraday microstructure that tabular summary statistics cannot represent.
+Giving each model the data format it handles best, then combining, extracts more signal than forcing either model to do both jobs.
+
+
+\begin{keyidea}[Blend Predictions, Not Features]
+Each model gets the data format it handles best: trees for tabular, recurrent/convolutional networks for sequences.
+Combining their independent forecasts at the prediction level outperforms feeding one model's internals into the other.
+\end{keyidea}
