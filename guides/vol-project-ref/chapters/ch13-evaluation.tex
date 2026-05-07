@@ -1,1 +1,163 @@
-\chapter{Placeholder}
+\chapter{Evaluation}
+\label{ch:evaluation}
+
+This chapter defines how forecasts are scored, how models are compared, and what ``better'' means quantitatively.
+
+%% ──────────────────────────────────────────────
+\section{Metrics}
+\label{sec:eval-metrics}
+%% ──────────────────────────────────────────────
+
+Table~\ref{tab:eval-metrics} lists every metric used in the project and its role.
+
+\begin{table}[htbp]
+\centering
+\caption{Forecast evaluation metrics.}
+\label{tab:eval-metrics}
+\small
+\begin{tabular}{@{}lp{5.5cm}l@{}}
+\toprule
+\textbf{Metric} & \textbf{What It Measures} & \textbf{Role} \\
+\midrule
+$\QLIKE$                 & Quasi-likelihood loss; penalizes relative forecast errors  & Primary \\
+MSE                      & Mean squared error on $\log$-$\RV$                        & Secondary \\
+MAE                      & Mean absolute error on $\log$-$\RV$                       & Robustness check \\
+Diebold--Mariano test    & Statistical significance of pairwise forecast differences  & ``Is model A better than B?'' \\
+Model Confidence Set     & Set of models not significantly worse than the best        & ``Which models are top tier?'' \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The primary loss function is $\QLIKE$:
+\begin{equation}
+\label{eq:qlike}
+\QLIKE = \frac{1}{T} \sum_{t=1}^{T} \left( \frac{\hat{\sigma}_t^2}{\sigma_t^2} - \log \frac{\hat{\sigma}_t^2}{\sigma_t^2} - 1 \right)
+\end{equation}
+$\QLIKE$ penalizes relative errors, not absolute ones.
+It ranks forecasters consistently even when $\RV$ is measured with noise, because it belongs to the class of loss functions that are robust to imperfect volatility proxies \citep{Patton2011}.
+
+\begin{keyidea}[$\QLIKE$ Is the Only Loss That Matters for Ranking]
+$\QLIKE$ is the primary metric for all model selection and comparison decisions.
+MSE and MAE serve only as secondary diagnostics.
+The Diebold--Mariano test \citep{DieboldMariano1995} confirms whether a $\QLIKE$ difference is statistically significant; the Model Confidence Set \citep{HansenLundeNason2011} identifies which models belong to the top tier.
+\end{keyidea}
+
+
+%% ──────────────────────────────────────────────
+\section{Validation Protocol}
+\label{sec:validation}
+%% ──────────────────────────────────────────────
+
+
+%% ─── 13.2.1  Purged k-fold CV ───
+\subsection{Purged k-Fold CV with Embargo}
+\label{sec:purged-cv}
+
+Standard cross-validation leaks information in time series because observations near fold boundaries share overlapping feature windows.
+Purged CV removes observations within the purge window on both sides of the train/test boundary.
+An embargo adds a further gap after each test fold to prevent label leakage from multi-day targets \citep{LopezdePrado2018}.
+
+\begin{center}
+\begin{tikzpicture}[
+  xscale=1.0,
+  >=Stealth,
+]
+  % Time axis
+  \draw[arrow] (0,0) -- (14,0) node[right] {time};
+
+  % Train block
+  \fill[blue!25] (0.5,0.3) rectangle (5.0,1.0);
+  \node[font=\small] at (2.75,0.65) {Train};
+
+  % Purge zone
+  \fill[pattern=north east lines, pattern color=red!60] (5.0,0.3) rectangle (6.0,1.0);
+  \node[font=\scriptsize, red!70!black, above] at (5.5,1.0) {Purge};
+
+  % Embargo zone
+  \fill[pattern=north west lines, pattern color=orange!70] (6.0,0.3) rectangle (7.2,1.0);
+  \node[font=\scriptsize, orange!70!black, above] at (6.6,1.0) {Embargo};
+
+  % Test block
+  \fill[green!25] (7.2,0.3) rectangle (11.5,1.0);
+  \node[font=\small] at (9.35,0.65) {Test};
+
+  % Purge zone (post-test)
+  \fill[pattern=north east lines, pattern color=red!60] (11.5,0.3) rectangle (12.5,1.0);
+  \node[font=\scriptsize, red!70!black, above] at (12.0,1.0) {Purge};
+
+  % Brace annotations
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}] (5.0,-0.1) -- (7.2,-0.1)
+    node[midway, below=5pt, font=\scriptsize] {no data used};
+
+\end{tikzpicture}
+\end{center}
+
+We use purged 5-fold CV for hyperparameter tuning.
+Purge window: equal to the longest feature lookback (22 trading days for the monthly HAR component).
+Embargo window: equal to the forecast horizon (1 or 5 days).
+
+
+%% ─── 13.2.2  Walk-forward ───
+\subsection{Walk-Forward Evaluation}
+\label{sec:walk-forward}
+
+Walk-forward is the primary out-of-sample evaluation method.
+Train on a rolling 5-year window, forecast the next period, step forward by one period, and repeat.
+All reported $\QLIKE$ numbers come from this procedure, never from in-sample or CV scores.
+
+\begin{center}
+\begin{tikzpicture}[xscale=0.65, >=Stealth]
+  % Iteration 1
+  \fill[blue!20] (0,2.4) rectangle (10,3.0);
+  \node[font=\scriptsize] at (5,2.7) {Train (5 yr)};
+  \fill[green!30] (10,2.4) rectangle (11,3.0);
+  \node[font=\scriptsize] at (10.5,2.7) {Test};
+
+  % Iteration 2
+  \fill[blue!20] (1,1.2) rectangle (11,1.8);
+  \node[font=\scriptsize] at (6,1.5) {Train (5 yr)};
+  \fill[green!30] (11,1.2) rectangle (12,1.8);
+  \node[font=\scriptsize] at (11.5,1.5) {Test};
+
+  % Iteration 3
+  \fill[blue!20] (2,0.0) rectangle (12,0.6);
+  \node[font=\scriptsize] at (7,0.3) {Train (5 yr)};
+  \fill[green!30] (12,0.0) rectangle (13,0.6);
+  \node[font=\scriptsize] at (12.5,0.3) {Test};
+
+  % Arrow showing roll
+  \draw[arrow, gray] (13.5,3.0) -- (13.5,0.3) node[midway, right, font=\scriptsize] {roll};
+
+  % Time axis
+  \draw[arrow] (0,-0.5) -- (14,-0.5) node[right, font=\scriptsize] {time};
+\end{tikzpicture}
+\end{center}
+
+
+%% ──────────────────────────────────────────────
+\section{Success Target}
+\label{sec:success-target}
+%% ──────────────────────────────────────────────
+
+Three criteria define success:
+
+\begin{enumerate}[nosep]
+  \item \textbf{$\QLIKE$ improvement:} 30--80 bps over the HARQ baseline \citep{BPQ2016}, averaged across the 35-instrument universe.
+  \item \textbf{Statistical significance:} Diebold--Mariano $p < 0.05$ vs.\ each baseline (HAR, HARQ, SHAR, Realized GARCH).
+  \item \textbf{Economic value:} Positive out-of-sample utility gain in a volatility-targeting portfolio \citep{MoreiraMuir2017}.
+\end{enumerate}
+
+
+%% ──────────────────────────────────────────────
+%% Warning box
+%% ──────────────────────────────────────────────
+
+\begin{warning}[Train with $\QLIKE$, Not MSE]
+MSE is dominated by extreme volatility days.
+A single crisis observation can flip MSE rankings.
+$\QLIKE$ penalizes relative forecast errors and ranks models consistently regardless of the volatility regime \citep{Patton2011}.
+
+LightGBM does not provide a built-in $\QLIKE$ loss.
+Training requires a custom objective that returns both the gradient and Hessian of the $\QLIKE$ loss with respect to the predicted value (see Chapter~\ref{ch:lightgbm}, Section~\ref{sec:qlike-objective}).
+If you train with MSE and evaluate with $\QLIKE$, the model optimizes the wrong surface and rankings will not transfer.
+\end{warning}
