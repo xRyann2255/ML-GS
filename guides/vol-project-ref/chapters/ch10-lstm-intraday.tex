@@ -1,1 +1,87 @@
-\chapter{Placeholder}
+\chapter{LSTM for Intraday Sequences}
+
+The second model branch operates on sequential intraday data rather than daily tabular features.
+E-mini S\&P~500 Level~2 tick data ($\sim$4M ticks/day) is compressed into 5-minute (or 1-minute) return bars, each augmented with a limit-order-book snapshot.
+One training sample is one full trading day's bar sequence.
+The model's sole task is to produce an independent next-day $\log \RV$ forecast from this intraday structure.
+
+%% ──────────────────────────────────────────────
+\section{Architecture}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:lstm-pipeline} shows the data flow from raw ticks to the ensemble blend in Ch.~11.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=1.6cm, every node/.style={font=\small}]
+  % Nodes
+  \node[flowblock, minimum width=2.6cm] (ticks) {E-mini L2\\Ticks};
+  \node[flowblock, minimum width=2.6cm, right=of ticks] (bars) {5-min Bars\\+ LOB Snapshots};
+  \node[flowblock, minimum width=2.4cm, right=of bars] (model) {LSTM / TCN};
+  \node[flowblock, minimum width=2.6cm, right=of model] (pred) {Next-day\\$\log \RV$ Forecast};
+  \node[flowblock, minimum width=2.4cm, right=of pred] (blend) {Ensemble\\Blend (Ch.~11)};
+
+  % Arrows
+  \draw[arrow] (ticks) -- (bars);
+  \draw[arrow] (bars) -- (model);
+  \draw[arrow] (model) -- (pred);
+  \draw[arrow] (pred) -- (blend);
+\end{tikzpicture}
+\caption{Intraday sequence model pipeline.}
+\label{fig:lstm-pipeline}
+\end{figure}
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item A small LSTM (or TCN) consumes the intraday E-mini sequence for each trading day.
+  \item Input per time step: 5-min log-return plus LOB snapshot features (bid-ask spread, depth imbalance, trade imbalance, mid-price change).
+  \item Output: a single scalar, the next-day $\log \RV$ forecast, produced from the final hidden state via a linear head.
+  \item This forecast is blended with LightGBM's forecast at the prediction level (Ch.~11).
+\end{enumerate}
+
+\begin{table}[ht]
+\centering
+\caption{Baseline sequence model specifications.}
+\label{tab:lstm-spec}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Component & LSTM variant & TCN variant \\
+\midrule
+Layers         & 2            & 4 dilated causal conv blocks \\
+Hidden dim     & 64--128      & 64 channels \\
+Sequence length & 78 bars (5-min, full day) & 78 bars \\
+Dropout        & 0.2          & 0.2 (spatial) \\
+Loss           & QLIKE on $\log \RV$ & QLIKE on $\log \RV$ \\
+Optimizer      & AdamW, cosine LR & AdamW, cosine LR \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ──────────────────────────────────────────────
+\section{Embedding Alternative}
+%% ──────────────────────────────────────────────
+
+Instead of producing an independent forecast, the LSTM can export its last-layer hidden state as a fixed-length embedding vector and feed it into LightGBM as additional tabular features (feature-level stacking).
+Competition evidence from Optiver \citep{Optiver2021} favors prediction-level blending over feature-level stacking, but both approaches should be compared on our data.
+The embedding path also risks gradient isolation: LightGBM cannot back-propagate into the LSTM, so the embedding is not trained end-to-end for the tabular objective.
+
+%% ──────────────────────────────────────────────
+\section{Why Deep Learning Here}
+%% ──────────────────────────────────────────────
+
+Four million ticks per day is too rich for hand-engineered aggregations alone to capture fully.
+Temporal order within the day carries signal: acceleration patterns in returns, depth shifts preceding volatility spikes, and intraday momentum reversals are sequential phenomena that trees cannot exploit from summary statistics.
+This is the one place in the pipeline where deep learning genuinely adds value over gradient-boosted trees.
+Optiver competitors worked with 10-minute windows (short sequences where hand-crafted features captured most of the information); our full-day sequences are substantially richer and harder to summarize manually.
+
+\begin{warning}[Diminishing Returns]
+The LSTM branch will almost certainly contribute less marginal accuracy than the top 20 tabular features in LightGBM.
+Its value is in capturing residual sequential patterns that tabular aggregations miss, not in replacing the tabular model.
+Invest proportional effort: get the tabular pipeline right first.
+\end{warning}
+
+\begin{keyidea}[DL for Sequences, Trees for Tables]
+The LSTM operates on sequential intraday data where temporal order matters.
+LightGBM operates on tabular daily features.
+Each model gets the data format it handles best.
+They combine at the prediction level (Ch.~11).
+\end{keyidea}
