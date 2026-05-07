@@ -1,1 +1,201 @@
-\chapter{Placeholder}
+\chapter{Feature Composition and Selection}
+\label{ch:feature-composition}
+
+This chapter synthesizes Layers~0--4 (Chapters~3--7), adds the remaining layers (calendar, memory, sentiment), and provides the decision framework for which features to use at each forecast horizon.
+
+%% ──────────────────────────────────────────────
+\section{Calendar, Memory, and Sentiment (Layers 5--7)}
+\label{sec:layers-5-7}
+%% ──────────────────────────────────────────────
+
+Layers~5--7 are individually weak but collectively additive.
+They are the last 5\% of achievable accuracy.
+
+\subsection*{Layer 5: Calendar Features}
+
+\begin{table}[htbp]
+\centering
+\caption{Calendar features and when they matter.}
+\label{tab:calendar-features}
+\small
+\begin{tabular}{@{}p{4.8cm}p{8.5cm}@{}}
+\toprule
+\textbf{Feature} & \textbf{When It Matters} \\
+\midrule
+FOMC indicator ($-1, 0, +1, +2$ days) &
+  Vol compression before announcement, expansion after \\[4pt]
+NFP/CPI indicator &
+  Macro release effect on intraday and next-day vol \\[4pt]
+Options expiry (monthly/quarterly) &
+  Pinning and gamma unwind \\[4pt]
+Quarter-end rebalancing &
+  Last 3 days of quarter; forced portfolio flows \\[4pt]
+Earnings proximity &
+  Days to next earnings release (single names only) \\[4pt]
+Time-of-day &
+  U-shape: open and close have highest vol \\[4pt]
+Day-of-week &
+  Weakening over time but still detectable \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{Layer 6: Memory Features}
+
+\begin{table}[htbp]
+\centering
+\caption{Memory features capturing long-range dependence and regime state.}
+\label{tab:memory-features}
+\small
+\begin{tabular}{@{}p{4.2cm}p{9cm}@{}}
+\toprule
+\textbf{Feature} & \textbf{What It Is} \\
+\midrule
+Fractionally differenced $\RV$ &
+  $(1-L)^d \RV$ with $d \approx 0.35$--$0.45$; preserves long memory while stationary \citep{LopezdePrado2018AFML} \\[4pt]
+Rolling Hurst exponent &
+  $H < 0.15$ = rough/fast mean-reversion; $H > 0.3$ = trending \citep{GJR2018} \\[4pt]
+Vol-of-vol &
+  $\operatorname{std}(\RV)$ over last 22 days; measures instability of the vol process \\[4pt]
+Regime duration &
+  Days since last $2\sigma$ $\RV$ spike; acts as a mean-reversion clock \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{Layer 7: Sentiment}
+
+FinBERT news sentiment and negative news count provide 1--3\% $\QLIKE$ improvement, concentrated in crisis periods \citep{AudrinoSignristBallinari2020}.
+Include these features only if the data pipeline effort is justified by the target asset class.
+For index-level forecasts (SPX, SPY), sentiment adds less value than for single names with idiosyncratic news flow.
+
+
+%% ──────────────────────────────────────────────
+\section{The Diminishing Returns Curve}
+\label{sec:diminishing-returns}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:diminishing-returns} shows the cumulative accuracy contribution by layer.
+The first 20 features (Layers~0--2) achieve 85\% of attainable accuracy.
+The remaining 60--100 features add 15\%.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  ybar,
+  width=13cm,
+  height=7.5cm,
+  bar width=1.4cm,
+  ymin=0, ymax=110,
+  ylabel={Cumulative accuracy (\%)},
+  ylabel style={font=\small},
+  symbolic x coords={
+    {L0 (5)},
+    {+L1 (11)},
+    {+L2 (20)},
+    {+L3--4 (40)},
+    {+L5--7 (80--120)}
+  },
+  xtick=data,
+  xticklabel style={font=\small, align=center},
+  yticklabel style={font=\small},
+  ytick={0,20,40,60,80,100},
+  nodes near coords,
+  nodes near coords style={font=\small\bfseries, anchor=south},
+  every node near coord/.append style={yshift=1pt},
+  enlarge x limits=0.15,
+  axis lines=left,
+  grid=major,
+  grid style={gray!20},
+  major tick length=3pt,
+]
+\addplot[fill=defblue!70, draw=defblue] coordinates {
+  ({L0 (5)}, 55)
+  ({+L1 (11)}, 70)
+  ({+L2 (20)}, 85)
+  ({+L3--4 (40)}, 95)
+  ({+L5--7 (80--120)}, 100)
+};
+\end{axis}
+% Annotation line at 85%
+\draw[dashed, warnred, thick] (1.0, 4.82) -- (12.3, 4.82)
+  node[right, font=\footnotesize, text=warnred] {85\% with 20 features};
+\end{tikzpicture}
+\caption{Cumulative accuracy by feature layer. Parentheses show total feature count at each stage. The dashed line marks the 85\% threshold achievable with Layers~0--2 and a Ridge regression.}
+\label{fig:diminishing-returns}
+\end{figure}
+
+
+%% ──────────────────────────────────────────────
+\section{Feature Priority by Forecast Horizon}
+\label{sec:horizon-priority}
+%% ──────────────────────────────────────────────
+
+\begin{table}[htbp]
+\centering
+\caption{Dominant features and ML value-add by forecast horizon.}
+\label{tab:horizon-priority}
+\small
+\begin{tabular}{@{}p{2.8cm}p{4.8cm}p{5.8cm}@{}}
+\toprule
+\textbf{Horizon} & \textbf{Dominant Features} & \textbf{Where ML Adds Value} \\
+\midrule
+Intraday (10min--1hr) &
+  Microstructure (L3): price acceleration, OBI, spread &
+  Trees with 600+ features \\[6pt]
+1 day &
+  HAR core (L0) + RQ + asymmetry (L1) &
+  HARQ nearly optimal; ML adds ${\sim}5\%$ \\[6pt]
+1 week &
+  Options (L2) + cross-asset (L4) &
+  VRP + skew: 5--10\% over pure RV models \\[6pt]
+1 month &
+  VRP (L2) + macro (L4) + Hurst (L6) &
+  Options have max informational advantage \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{warning}[The 1-Day Horizon Is the Hardest to Beat]
+At the 1-day horizon, HARQ with 5 features is nearly optimal.
+ML models gain ${\sim}5\%$ $\QLIKE$ improvement at best, and much of that comes from the RQ interaction that HARQ already captures.
+The largest ML gains are at intraday and weekly+ horizons where linear models lack the capacity to exploit high-dimensional feature sets.
+\end{warning}
+
+
+%% ──────────────────────────────────────────────
+\section{Feature Engineering Principles}
+\label{sec:engineering-principles}
+%% ──────────────────────────────────────────────
+
+\begin{itemize}[leftmargin=1.5em, itemsep=6pt]
+  \item \textbf{Triple expansion.}
+    For each base quantity, compute \{level, change, $z$-score\} systematically.
+    This triples the feature count and captures state, direction, and unusualness in a single pass.
+
+  \item \textbf{Horizon-dependent selection.}
+    Drop microstructure features at the monthly horizon (noise at that scale).
+    Drop calendar features at intraday (FOMC day is already known by 9:30am).
+    Match the feature set to the prediction target.
+
+  \item \textbf{Trees handle redundancy naturally.}
+    Correlated features split across nodes without the multicollinearity problems that plague linear models.
+    No need to pre-decorrelate or drop correlated pairs before training a gradient-boosted ensemble.
+
+  \item \textbf{Feature importance from a single model is unstable.}
+    When features are redundant, a single LightGBM run produces noisy importance rankings that shift across random seeds.
+    Rashomon analysis (Chapter~12) addresses this by examining the set of near-optimal models rather than one point estimate.
+\end{itemize}
+
+
+%% ──────────────────────────────────────────────
+%% Boxes
+%% ──────────────────────────────────────────────
+
+\begin{keyidea}[Features Over Models]
+The feature set matters more than the model.
+Layers~0--2 achieve 85\% of attainable accuracy with 20 features and a Ridge regression.
+The remaining 15\% requires 60--100 more features and careful model architecture.
+Invest in feature engineering first; optimize the model second.
+\end{keyidea}
