@@ -1,1 +1,94 @@
-\chapter{Placeholder}
+\chapter{What We're Forecasting}
+
+Realized variance on day $t$ is $\RV_t = \sum_{i=1}^{M} r_{t,i}^2$, the sum of $M$ squared intraday returns sampled at 5-minute frequency \citep{ABDL2003}.
+Our target is $\log \RV_{t+h}$ for horizons $h \in \{1, 5, 22\}$ trading days, where multi-day targets aggregate: $\RV_{t+1:t+h} = h^{-1}\sum_{j=1}^{h} \RV_{t+j}$.
+
+%% ──────────────────────────────────────────────
+\section{The Universe}
+%% ──────────────────────────────────────────────
+
+The model is trained and evaluated on 35 instruments over 11.3 years of history (Jan 2012 to Mar 2023).
+
+\begin{table}[ht]
+\centering
+\caption{Forecast universe: 35 instruments.}
+\label{tab:universe}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Category & Count & Examples \\
+\midrule
+Mega-cap US equities & 30 & AAPL, MSFT, JPM, JNJ, XOM, AMZN \\
+Broad-market ETFs    & 4  & SPY, QQQ, IWM, DIA \\
+Equity index futures & 1  & E-mini S\&P 500 (ES) \\
+\midrule
+\textbf{Total}       & \textbf{35} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All RV series are computed from 5-minute returns using the realized kernel estimator of \citet{BNHLS2008}, which corrects for microstructure noise.
+Models are fit per-asset (no pooling across names).
+
+%% ──────────────────────────────────────────────
+\section{Success Criteria}
+%% ──────────────────────────────────────────────
+
+The primary metric is QLIKE, a quasi-likelihood loss that penalizes relative forecast errors and is robust to noisy volatility proxies \citep{Patton2011}.
+The formal definition appears in Chapter~13.
+
+\begin{table}[ht]
+\centering
+\caption{Evaluation criteria.}
+\label{tab:criteria}
+\begin{tabular}{@{}llp{7.5cm}@{}}
+\toprule
+Priority & Metric & Requirement \\
+\midrule
+Primary   & QLIKE & 30--80 bps improvement over HARQ baseline \citep{BPQ2016}, averaged across universe \\
+Secondary & MSE, MAE & Reported alongside QLIKE for robustness \\
+Secondary & Diebold-Mariano test & Statistically significant improvement ($p < 0.05$) vs.\ each baseline \citep{DieboldMariano1995} \\
+Tertiary  & Economic value & Out-of-sample utility gain in a volatility-targeting portfolio \citep{MoreiraMuir2017} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ──────────────────────────────────────────────
+\section{The High-Level Pipeline}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:pipeline} shows the end-to-end forecasting system.
+Raw data from six sources feeds into a layered feature-engineering pipeline (Layers 0--7, detailed in Chapters 3--8).
+Two model families consume the resulting feature matrix: LightGBM (Ch.~9) and an LSTM operating on intraday return sequences (Ch.~10).
+Their forecasts are combined via an ensemble blend (Ch.~11) and evaluated against QLIKE.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=1.8cm, every node/.style={font=\small}]
+  % Nodes
+  \node[flowblock, minimum width=2.8cm] (data) {Raw Data\\(6 sources)};
+  \node[flowblock, minimum width=2.8cm, right=of data] (feat) {Feature Engineering\\(Layers 0--7)};
+  \node[flowblock, minimum width=2.2cm, above right=0.6cm and 1.8cm of feat] (lgbm) {LightGBM};
+  \node[flowblock, minimum width=2.2cm, below right=0.6cm and 1.8cm of feat] (lstm) {LSTM};
+  \node[flowblock, minimum width=2.8cm, right=2.8cm of feat] (ens) {Ensemble\\Blend};
+  \node[flowblock, minimum width=2.8cm, right=of ens] (out) {Forecast:\\$\log \RV_{t+h}$};
+  \node[flowblock, minimum width=2.2cm, right=of out] (eval) {Evaluation\\(QLIKE)};
+
+  % Arrows
+  \draw[arrow] (data) -- (feat);
+  \draw[arrow] (feat) -- (lgbm);
+  \draw[arrow] (feat) -- (lstm);
+  \draw[arrow] (lgbm) -- (ens);
+  \draw[arrow] (lstm) -- (ens);
+  \draw[arrow] (ens) -- (out);
+  \draw[arrow] (out) -- (eval);
+\end{tikzpicture}
+\caption{High-level forecasting pipeline.}
+\label{fig:pipeline}
+\end{figure}
+
+The six raw data sources are: (i) tick-level trade prices, (ii) daily OHLCV, (iii) E-mini S\&P 500 Level~2 order book, (iv) SPX implied volatility surface, (v) cross-asset prices (VIX, bonds, gold, oil, FX), and (vi) earnings and macro event calendars.
+
+\begin{keyidea}[Features Over Models]
+The feature set matters more than the model.
+Layers 0--2 (approximately 20 features covering HAR components, jump decomposition, and signed volatility) achieve 85\% of the forecasting accuracy attainable with the full 120-feature set.
+\end{keyidea}
