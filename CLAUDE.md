@@ -111,19 +111,20 @@ The `docs-only` branch contains only compiled PDFs, deliverables, and markdown n
    cd vol-learning-guide && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && cd ..
    cd guides/ml-finance && pdflatex -interaction=nonstopmode main.tex && cd ../..
    cd guides/quant-trading && pdflatex -interaction=nonstopmode main.tex && cd ../..
+   cd guides/vol-project-ref && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && cd ../..
    ```
 2. Commit any updated PDFs to main.
 3. Switch to docs-only and reset it from main, keeping only the target files:
    ```bash
    git checkout docs-only
-   git checkout main -- vol-learning-guide/main.pdf guides/ml-finance/main.pdf guides/quant-trading/main.pdf deliverables/ notes/
+   git checkout main -- vol-learning-guide/main.pdf guides/ml-finance/main.pdf guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf deliverables/ notes/
    git commit -m "chore: sync compiled PDFs and notes from main"
    git push
    git checkout main
    ```
 
 **What stays on `docs-only`:**
-- `vol-learning-guide/main.pdf`, `guides/ml-finance/main.pdf`, `guides/quant-trading/main.pdf`
+- `vol-learning-guide/main.pdf`, `guides/ml-finance/main.pdf`, `guides/quant-trading/main.pdf`, `guides/vol-project-ref/main.pdf`
 - `deliverables/` (all .md and .html)
 - `notes/` (all .md)
 
