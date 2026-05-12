@@ -32,10 +32,10 @@ Documented 2026-05-06. This is the binding constraint on which project direction
 
 ## 5. Implied Volatility Surfaces
 
-**Source:** Marquee ERDVOL_PERCENT_STANDARD
-**Coverage:** Full SPX vol surface history (tenor x strike grid)
-**Enables:** IV-RV spread (variance risk premium), term structure slope, skew dynamics (25-delta put/call spread), surface-level features
-**Limitation:** SPX only, not individual equity names
+**Source:** Marquee ERDVOL_PERCENT_STANDARD (SPX surface), EDRVOL_PERCENT (single-stock ATM IV)
+**Coverage:** Full SPX vol surface history (tenor x strike grid); single-stock ATM IV for all names via EDRVOL_PERCENT (ric=".AAPL.O" format)
+**Enables:** IV-RV spread (variance risk premium), term structure slope, skew dynamics (25-delta put/call spread), surface-level features, per-name stock VRP
+**Limitation:** Full surface SPX only; single-stock data is ATM IV only (no surface)
 
 ## 6. Cross-Asset Signals
 
