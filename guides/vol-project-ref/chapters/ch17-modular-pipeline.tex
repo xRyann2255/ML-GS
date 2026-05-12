@@ -1,0 +1,188 @@
+\chapter{Modular Pipeline Design}
+\label{ch:modular-pipeline}
+
+Chapter~\ref{ch:complete-pipeline} gives the logical pipeline order.
+Chapter~\ref{ch:architecture} describes the ensemble model architecture.
+This chapter describes the software design: config-driven, registry-based, every experiment defined by one YAML file.
+
+
+%% ──────────────────────────────────────────────
+\section{Pipeline Architecture}
+\label{sec:pipeline-architecture}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:pipeline-plugpoints} shows the four pipeline stages and their plug points.
+\textsc{Train} is the only modular stage; features, models, and CV strategies resolve from registries at runtime.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=0.5cm and 0.8cm,
+  >=Stealth,
+  stage/.style={draw, rounded corners, minimum height=1.4cm, minimum width=2.6cm,
+    align=center, font=\small},
+  config/.style={draw, rounded corners=8pt, minimum height=1.2cm, minimum width=2.0cm,
+    align=center, font=\small, fill=blue!8, line width=0.8pt},
+  trainstage/.style={draw, rounded corners, minimum height=1.6cm, minimum width=3.2cm,
+    align=center, font=\small, fill=orange!10, line width=1.0pt},
+  registry/.style={draw, rounded corners, minimum height=1.6cm, minimum width=3.2cm,
+    align=center, font=\scriptsize, fill=blue!4},
+  arrow/.style={-{Stealth[length=2.5mm]}, thick},
+  plugarrow/.style={-{Stealth[length=2mm]}, thick, defblue},
+  reglabel/.style={font=\scriptsize\bfseries, text=defblue},
+]
+
+% ── Pipeline stages (top row) ──
+\node[config] (cfg) {\textsc{Config}\\[1pt]{\scriptsize(YAML)}};
+\node[stage, fill=green!8, right=1.0cm of cfg] (ingest)
+  {\textsc{Ingest}\\[1pt]{\scriptsize ticks $\to$ bars}\\[-1pt]{\scriptsize $\to$ 18 measures}};
+\node[trainstage, right=0.8cm of ingest] (train)
+  {\textsc{Train}\\[1pt]{\scriptsize features + model}\\[-1pt]{\scriptsize + CV splits}};
+\node[stage, fill=green!8, right=0.8cm of train] (eval)
+  {\textsc{Evaluate}\\[1pt]{\scriptsize $\QLIKE$, MSE, $R^2$}};
+\node[stage, fill=green!5, right=0.8cm of eval, dashed] (compare)
+  {\textsc{Compare}\\[1pt]{\scriptsize DM, MCS}\\[-1pt]{\scriptsize\itshape (future)}};
+
+% ── Main flow arrows ──
+\draw[arrow] (cfg) -- (ingest);
+\draw[arrow] (ingest) -- (train);
+\draw[arrow] (train) -- (eval);
+\draw[arrow, dashed] (eval) -- (compare);
+
+% ── Registry boxes (below TRAIN) ──
+\node[registry, below=1.4cm of train, xshift=-3.8cm] (freg) {%
+  \begin{tabular}{@{}l@{}}
+  {\bfseries\color{defblue}\textsc{Feature\_Registry}}\\[3pt]
+  \texttt{har\_core}\\
+  \texttt{asymmetry}\\
+  \texttt{options}\\
+  \texttt{cross\_asset}\\
+  \texttt{...}
+  \end{tabular}};
+
+\node[registry, below=1.4cm of train] (mreg) {%
+  \begin{tabular}{@{}l@{}}
+  {\bfseries\color{defblue}\textsc{Model\_Registry}}\\[3pt]
+  \texttt{har}\\
+  \texttt{harq}\\
+  \texttt{lightgbm}\\
+  \texttt{shar}\\
+  \texttt{...}
+  \end{tabular}};
+
+\node[registry, below=1.4cm of train, xshift=3.8cm] (creg) {%
+  \begin{tabular}{@{}l@{}}
+  {\bfseries\color{defblue}\textsc{CV Strategies}}\\[3pt]
+  \texttt{expanding\_window}\\
+  \texttt{rolling\_window}\\
+  \texttt{purged\_kfold}\\
+  \texttt{blocked\_kfold}
+  \end{tabular}};
+
+% ── Plug arrows (registries → TRAIN) ──
+\draw[plugarrow] (freg.north) -- ([xshift=-1.4cm]train.south);
+\draw[plugarrow] (mreg.north) -- (train.south);
+\draw[plugarrow] (creg.north) -- ([xshift=1.4cm]train.south);
+
+\end{tikzpicture}%
+}
+\caption{Pipeline architecture with plug points.
+\textsc{Config} parameterises all stages.
+\textsc{Train} resolves features, models, and CV strategies from registries at runtime.
+\textsc{Compare} (dashed) is not yet implemented.}
+\label{fig:pipeline-plugpoints}
+\end{figure}
+
+
+%% ──────────────────────────────────────────────
+\section{Plug Points}
+\label{sec:plug-points}
+%% ──────────────────────────────────────────────
+
+\subsection{Feature Layers}
+
+The \texttt{feature\_layers} list in the config names the layers to compose.
+The pipeline iterates the list, resolves each name from \textsc{Feature\_Registry}, and calls \texttt{.compute()}.
+See Table~\ref{tab:feature-matrix} for the full feature inventory.
+
+\subsection{Models}
+
+The \texttt{model.name} field selects the model class from \textsc{Model\_Registry}.
+All models satisfy the same \texttt{VolModel} protocol: \texttt{.fit(X, y)} and \texttt{.predict(X)}.
+Model-specific hyperparameters go in \texttt{model.params}.
+See Chapter~\ref{ch:lightgbm} for LightGBM configuration.
+
+\subsection{Cross-Validation}
+
+The \texttt{cv.method} field selects the splitter: expanding window, rolling window, purged k-fold, or blocked k-fold.
+Purge gap is set via \texttt{cv.purge\_gap}.
+See Chapter~\ref{ch:evaluation} for evaluation methodology.
+
+
+%% ──────────────────────────────────────────────
+\section{Configuration}
+\label{sec:configuration}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:config-comparison} shows two experiment configs side by side: a HAR baseline and a full LightGBM run.
+
+\begin{figure}[htbp]
+\centering
+\begin{minipage}[t]{0.47\textwidth}
+\centering
+{\small\bfseries HAR baseline}
+\begin{verbatim}
+  name: baseline_har
+  universe: [SPY]
+  horizons: [1, 5, 22]
+  feature_layers: [har_core]
+  model:
+    name: har
+  cv:
+    method: expanding_window
+    purge_gap: 5
+\end{verbatim}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.47\textwidth}
+\centering
+{\small\bfseries LightGBM with options features}
+\begin{verbatim}
+  name: lgbm_full
+  universe: [SPY, AAPL, MSFT, NVDA]
+  horizons: [1, 5, 22]
+  feature_layers:
+    - har_core
+    - asymmetry
+    - options
+    - cross_asset
+  model:
+    name: lightgbm
+    params: {num_leaves: 31}
+  cv:
+    method: purged_kfold
+    purge_gap: 22
+\end{verbatim}
+\end{minipage}
+\caption{Two experiments, same pipeline.
+Left: HAR baseline with one feature layer.
+Right: LightGBM with four feature layers and stricter cross-validation.}
+\label{fig:config-comparison}
+\end{figure}
+
+
+%% ──────────────────────────────────────────────
+%% Boxes
+%% ──────────────────────────────────────────────
+
+\begin{keyidea}[One YAML, One Experiment]
+The entire experiment---universe, horizons, features, model, CV strategy---is defined by a single config file.
+No code changes needed to run a different experiment.
+\end{keyidea}
+
+\begin{warning}[Registries Require Import]
+Feature layers and models register via decorators at import time.
+A new layer or model that is never imported will not appear in the registry.
+The package \texttt{\_\_init\_\_.py} triggers all registration imports.
+\end{warning}
