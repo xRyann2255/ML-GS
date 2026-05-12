@@ -1,0 +1,211 @@
+\chapter{System Architecture}
+\label{ch:architecture}
+
+Chapter~\ref{ch:ensemble} presents prediction blending: two independent model branches combined at the forecast level.
+This chapter presents two alternative ensemble architectures, feature stacking and residual stacking, and compares all three.
+
+
+%% ──────────────────────────────────────────────
+\section{Three Architectures}
+\label{sec:three-architectures}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:architecture-comparison} shows the data and prediction flow for each architecture side by side.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=0.6cm and 0.3cm,
+  >=Stealth,
+  block/.style={draw, rounded corners, minimum height=0.7cm, minimum width=2.2cm,
+    align=center, font=\scriptsize},
+  data/.style={block, fill=blue!8},
+  comp/.style={block, fill=green!8},
+  model/.style={block, fill=orange!8},
+  output/.style={block, fill=orange!12, font=\scriptsize\bfseries},
+  arrow/.style={-{Stealth[length=2mm]}, thick},
+  panellabel/.style={font=\small\bfseries, text=defblue},
+]
+
+% ── Panel A: Feature Stacking ──
+\begin{scope}[xshift=0cm]
+  \node[panellabel] at (1.5,5.2) {(A) Feature Stacking};
+  \node[data] (a-seq) at (0,4) {E-mini L2\\Sequences};
+  \node[model] (a-lstm) at (0,3) {LSTM};
+  \node[comp] (a-emb) at (0,2) {Embedding\\($k$-dim)};
+  \node[data] (a-tab) at (3,4) {Tabular\\Features (L0--7)};
+  \node[comp] (a-concat) at (1.5,1) {Concatenate};
+  \node[model] (a-lgbm) at (1.5,0) {LightGBM};
+  \node[output] (a-out) at (1.5,-1) {Forecast};
+
+  \draw[arrow] (a-seq) -- (a-lstm);
+  \draw[arrow] (a-lstm) -- (a-emb);
+  \draw[arrow] (a-emb) -- (a-concat);
+  \draw[arrow] (a-tab) |- (a-concat);
+  \draw[arrow] (a-concat) -- (a-lgbm);
+  \draw[arrow] (a-lgbm) -- (a-out);
+\end{scope}
+
+% ── Panel B: Residual Stacking ──
+\begin{scope}[xshift=7cm]
+  \node[panellabel] at (1.5,5.2) {(B) Residual Stacking};
+  \node[data] (b-tab) at (1.5,4) {Tabular\\Features};
+  \node[model] (b-har) at (1.5,3) {HAR};
+  \node[comp] (b-res1) at (1.5,2) {Residuals$_1$};
+  \node[model] (b-lgbm) at (1.5,1) {LightGBM};
+  \node[comp] (b-res2) at (1.5,0) {Residuals$_2$};
+  \node[model, dashed] (b-lstm) at (1.5,-1) {LSTM (opt.)};
+  \node[output] (b-out) at (1.5,-2) {$\sum$ Forecasts};
+
+  \draw[arrow] (b-tab) -- (b-har);
+  \draw[arrow] (b-har) -- (b-res1);
+  \draw[arrow] (b-res1) -- (b-lgbm);
+  \draw[arrow] (b-lgbm) -- (b-res2);
+  \draw[arrow, dashed] (b-res2) -- (b-lstm);
+  \draw[arrow] (b-lstm) -- (b-out);
+  \draw[arrow, gray] (b-tab.east) -- ++(0.8,0) |- (b-lgbm.east);
+  % E-mini sequences feed optional LSTM
+  \node[data] (b-seq) at (-0.5,-1) {E-mini\\Sequences};
+  \draw[arrow, dashed] (b-seq) -- (b-lstm);
+\end{scope}
+
+% ── Panel C: Prediction Blending (Ch.11) ──
+\begin{scope}[xshift=13cm]
+  \node[panellabel] at (1.5,5.2) {(C) Prediction Blending};
+  \node[data] (c-tab) at (0,4) {Tabular\\Features};
+  \node[data] (c-seq) at (3,4) {E-mini\\Sequences};
+  \node[model] (c-lgbm) at (0,2.5) {LightGBM};
+  \node[model] (c-lstm) at (3,2.5) {LSTM};
+  \node[comp] (c-blend) at (1.5,1) {Weighted\\Average};
+  \node[output] (c-out) at (1.5,0) {Forecast};
+
+  \draw[arrow] (c-tab) -- (c-lgbm);
+  \draw[arrow] (c-seq) -- (c-lstm);
+  \draw[arrow] (c-lgbm) -- (c-blend);
+  \draw[arrow] (c-lstm) -- (c-blend);
+  \draw[arrow] (c-blend) -- (c-out);
+  \node[font=\tiny, text=gray, anchor=north] at (1.5,-0.5) {(Ch.~\ref{ch:ensemble})};
+\end{scope}
+
+\end{tikzpicture}%
+}
+\caption{Three ensemble architectures.
+(A)~LSTM embedding concatenated with tabular features for a single LightGBM.
+(B)~Each model trains on residuals from the prior stage; final forecast is the sum.
+(C)~Independent models blended at prediction level (Chapter~\ref{ch:ensemble}).}
+\label{fig:architecture-comparison}
+\end{figure}
+
+
+%% ──────────────────────────────────────────────
+\section{Feature Stacking}
+\label{sec:feature-stacking}
+%% ──────────────────────────────────────────────
+
+The LSTM processes E-mini L2 5-min bars and LOB features (78 time steps per day) and produces a $k$-dimensional embedding vector (default $k=32$, or $k=1$ for a scalar forecast).
+This embedding is concatenated with the ${\sim}$80--120 tabular features from Layers~0--7 to form a single expanded feature set.
+LightGBM then trains on the combined input.
+
+The approach has one fundamental problem: LightGBM cannot back-propagate gradients through the LSTM, so the embedding is never optimized for the tree's $\QLIKE$ objective.
+The LSTM learns representations that minimize its own loss, which may not be what the tree needs.
+
+\begin{table}[htbp]
+\centering
+\caption{Feature stacking: pros and cons.}
+\label{tab:feature-stacking}
+\small
+\begin{tabular}{@{}lp{10cm}@{}}
+\toprule
+\textbf{Pros} & Single training pass; LSTM learns representations the tree can exploit \\
+\midrule
+\textbf{Cons} & Gradient isolation (tree cannot backprop into LSTM); embedding not optimized for tree objective; debugging harder; no RV literature demonstrates this beating alternatives \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ──────────────────────────────────────────────
+\section{Residual Stacking}
+\label{sec:residual-stacking}
+%% ──────────────────────────────────────────────
+
+Stage~1: HAR baseline (OLS) produces a forecast and residuals.
+Stage~2: LightGBM trains on Stage~1 residuals with the full tabular feature set.
+Stage~3 (optional): LSTM trains on Stage~2 residuals from E-mini sequences.
+The final forecast is the sum of all stage forecasts.
+
+Each model specializes by construction.
+HAR captures the multi-scale autoregressive structure that dominates at all horizons.
+LightGBM captures nonlinear patterns the HAR misses (regime interactions, jump-asymmetry effects).
+The LSTM, if used, captures whatever sequential dynamics remain in the residuals.
+
+\begin{table}[htbp]
+\centering
+\caption{Residual stacking: pros and cons.}
+\label{tab:residual-stacking}
+\small
+\begin{tabular}{@{}lp{10cm}@{}}
+\toprule
+\textbf{Pros} & Each model has a distinct role; no gradient isolation; clean residual targets; aligns with HARQ-X direction; supported by recent RV literature \\
+\midrule
+\textbf{Cons} & Sequential training (each stage depends on prior); residual signal may be weak at later stages \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ──────────────────────────────────────────────
+\section{Comparison}
+\label{sec:architecture-comparison}
+%% ──────────────────────────────────────────────
+
+\begin{table}[htbp]
+\centering
+\caption{Three-way architecture comparison.}
+\label{tab:architecture-comparison}
+\small
+\begin{tabular}{@{}lp{3.2cm}p{3.2cm}p{3.8cm}@{}}
+\toprule
+\textbf{Dimension} & \textbf{Feature Stacking} & \textbf{Residual Stacking} & \textbf{Pred.\ Blending (Ch.~\ref{ch:ensemble})} \\
+\midrule
+Complexity &
+  High (joint training) &
+  Moderate (sequential) &
+  Low (independent) \\[6pt]
+Gradient flow &
+  Broken (tree cannot backprop into LSTM) &
+  Clean (residual targets) &
+  N/A (independent) \\[6pt]
+Literature &
+  Weak (no RV paper) &
+  Strong (HARQ-X, recent lit.) &
+  Strong \citep{Optiver2021, Bucci2020} \\[6pt]
+Fallback &
+  Must retrain tree without embedding &
+  Drop Stage~3; keep HAR + LightGBM &
+  Drop one model; keep the other \\[6pt]
+Interpretability &
+  Opaque (embedding) &
+  Clear (stage contributions) &
+  Clear (individual forecasts) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ──────────────────────────────────────────────
+%% Boxes
+%% ──────────────────────────────────────────────
+
+\begin{keyidea}[Residual Stacking Gives Each Model a Distinct Role]
+HAR captures multi-scale $\RV$ persistence.
+LightGBM captures nonlinear patterns the HAR misses.
+LSTM (if used) captures whatever regime dynamics remain.
+Each model trains on residuals from the prior stage, so roles are distinct by construction.
+\end{keyidea}
+
+\begin{warning}[No Evidence for Feature Stacking in RV Forecasting]
+No paper in the RV literature demonstrates LSTM-embedding-to-GBDT feature stacking beating prediction blending or residual stacking at any forecast horizon.
+The gradient isolation problem (Chapter~\ref{ch:ensemble}) compounds this: embeddings are never optimized for the tree objective.
+\end{warning}

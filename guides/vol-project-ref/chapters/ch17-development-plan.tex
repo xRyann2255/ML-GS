@@ -1,0 +1,126 @@
+\chapter{The Development Plan}
+\label{ch:development-plan}
+
+Chapter~\ref{ch:complete-pipeline} gives the logical order for layering features and models.
+This chapter gives the actual build order: what to implement first given project priorities and foundation work that must happen before anything else.
+Priority ordering: trading signal $>$ academic rigor $>$ model novelty.
+
+
+%% ──────────────────────────────────────────────
+\section{Milestones}
+\label{sec:milestones}
+%% ──────────────────────────────────────────────
+
+Table~\ref{tab:milestones} defines seven milestones with acceptance criteria and dependencies.
+
+\begin{table}[htbp]
+\centering
+\caption{Development milestones. M1--M5 form the minimum viable deliverable.}
+\label{tab:milestones}
+\small
+\begin{tabular}{@{}clp{4.8cm}p{4.2cm}l@{}}
+\toprule
+\textbf{M\#} & \textbf{Milestone} & \textbf{Acceptance Criteria} & \textbf{Key Tasks} & \textbf{Deps} \\
+\midrule
+1 & Fix Foundation &
+  Purge gap $\geq h$ enforced; $\QLIKE$ sign matches \citet{Patton2011}; context kwarg added; all existing tests pass &
+  CV fix, $\QLIKE$ fix, protocol extension, safe\_log dedup &
+  --- \\[8pt]
+2 & LightGBM &
+  Custom $\QLIKE$ objective converges; Optuna finds improved params; walk-forward OOS predictions for 3 horizons &
+  $\QLIKE$ gradient/hessian, model class, Optuna, walk-forward &
+  M1 \\[8pt]
+3 & Tournament &
+  8 models $\times$ 3 horizons table with DM $p$-values on dev universe &
+  Run baselines, DM test, tournament table &
+  M2 \\[8pt]
+4 & Layer~2 Options &
+  Options features produce daily values with no look-ahead; $\QLIKE$ lift documented &
+  OptionsLayer, IV surface wiring, validation &
+  M1 \\[8pt]
+5 & Signal &
+  IV--RV gap signal; equity curve; positive OOS Sharpe &
+  Signal logic, P\&L backtest, performance metrics &
+  M3, M4 \\[8pt]
+6 & Ensemble &
+  Residual stacking and prediction blending tested; 10-model tournament table &
+  Residual stacking, inverse-$\QLIKE$ blending &
+  M3 \\[8pt]
+7 & Stretch &
+  Ordered by impact: regime $\QLIKE$, MCS, LSTM feature, full universe, figures, Rashomon &
+  Each task independent &
+  M3--M6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ──────────────────────────────────────────────
+\section{Critical Path}
+\label{sec:critical-path}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:critical-path} shows milestone dependencies.
+The critical path (M1 $\to$ M2 $\to$ M3 $\to$ M6 $\to$ M7) is highlighted.
+M4 branches from M1 and runs in parallel with M2--M3.
+M5 and M6 can run in parallel after M3 completes.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=0.8cm and 1.6cm,
+  >=Stealth,
+  milestone/.style={draw, rounded corners, minimum height=0.9cm, minimum width=2.4cm,
+    align=center, font=\small, fill=blue!8},
+  critical/.style={milestone, line width=1.5pt, fill=orange!12},
+  arrow/.style={-{Stealth[length=2.5mm]}, thick},
+  critarrow/.style={arrow, line width=1.5pt, color=defblue},
+]
+  % Critical path
+  \node[critical] (m1) {M1\\Foundation};
+  \node[critical, right=of m1] (m2) {M2\\LightGBM};
+  \node[critical, right=of m2] (m3) {M3\\Tournament};
+  \node[critical, right=of m3] (m6) {M6\\Ensemble};
+  \node[critical, right=of m6] (m7) {M7\\Stretch};
+
+  \draw[critarrow] (m1) -- (m2);
+  \draw[critarrow] (m2) -- (m3);
+  \draw[critarrow] (m3) -- (m6);
+  \draw[critarrow] (m6) -- (m7);
+
+  % Parallel track
+  \node[milestone, below=1.2cm of m2] (m4) {M4\\Options};
+  \node[milestone, below=1.2cm of m6] (m5) {M5\\Signal};
+
+  \draw[arrow] (m1) -- (m4);
+  \draw[arrow] (m4) -| (m5);
+  \draw[arrow] (m3) |- (m5);
+  \draw[arrow] (m5) -| (m7);
+\end{tikzpicture}%
+}
+\caption{Milestone dependencies.
+Bold path: critical path (M1--M2--M3--M6--M7).
+M4 runs in parallel with M2--M3.
+M5 requires both M3 (forecasts) and M4 (options features).
+M7 waits on all prior milestones.}
+\label{fig:critical-path}
+\end{figure}
+
+
+%% ──────────────────────────────────────────────
+%% Boxes
+%% ──────────────────────────────────────────────
+
+\begin{keyidea}[M1--M5 Is the Minimum Viable Deliverable]
+A $\QLIKE$ tournament (7~HAR variants + LightGBM, DM tests) plus a tradeable IV--RV signal with P\&L backtest is a presentable result.
+Everything in M6--M7 is upside.
+If time runs out after M5, the project has a defensible outcome.
+\end{keyidea}
+
+\begin{warning}[M1 Is Non-Negotiable]
+The purge gap bug causes silent data leakage for $h=22$.
+The $\QLIKE$ sign convention determines whether the loss function penalizes over-prediction or under-prediction correctly.
+All results produced before M1 is complete are potentially invalid.
+Do not skip ahead.
+\end{warning}

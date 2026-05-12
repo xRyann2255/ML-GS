@@ -1,0 +1,183 @@
+\chapter{The Data-to-Feature Pipeline}
+\label{ch:pipeline}
+
+Every feature in the model traces back to one of the six raw data sources in Chapter~\ref{ch:our-data}.
+This chapter maps that lineage: source to measure to feature.
+For measure formulas, see Chapters~\ref{ch:har-core}--\ref{ch:cross-asset}.
+For selection rationale, see Chapter~\ref{ch:feature-composition}.
+
+
+%% ──────────────────────────────────────────────
+\section{Data Lineage}
+\label{sec:data-lineage}
+%% ──────────────────────────────────────────────
+
+Figure~\ref{fig:data-funnel} shows how data narrows and expands through the pipeline.
+Six raw sources produce approximately 18 daily scalar measures.
+These measures pass through lagging, rolling-window aggregation, and triple expansion to produce the final 80--120 feature matrix.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=0.4cm and 1.0cm,
+  >=Stealth,
+  stage/.style={draw, rounded corners, minimum height=1.2cm, minimum width=2.6cm,
+    align=center, font=\small},
+  arrow/.style={-{Stealth[length=2.5mm]}, thick},
+  countlabel/.style={font=\small\bfseries, text=defblue},
+]
+  \node[stage, fill=blue!8] (src) {Raw Sources};
+  \node[stage, fill=green!8, right=1.2cm of src] (meas) {Daily Measures};
+  \node[stage, fill=green!8, right=1.2cm of meas] (lag) {Lag \& Window\\d / w / m + shift(1)};
+  \node[stage, fill=orange!8, right=1.2cm of lag] (exp) {Triple Expansion\\level / $\Delta$ / $z$};
+  \node[stage, fill=orange!8, right=1.2cm of exp] (feat) {Feature Matrix};
+
+  \draw[arrow] (src) -- (meas);
+  \draw[arrow] (meas) -- (lag);
+  \draw[arrow] (lag) -- (exp);
+  \draw[arrow] (exp) -- (feat);
+
+  \node[countlabel, above=0.2cm of src] {6};
+  \node[countlabel, above=0.2cm of meas] {$\sim$18};
+  \node[countlabel, above=0.2cm of lag] {$\sim$30--40};
+  \node[countlabel, above=0.2cm of exp] {$\times\,3$};
+  \node[countlabel, above=0.2cm of feat] {80--120};
+\end{tikzpicture}%
+}
+\caption{Data lineage funnel.
+Blue: raw inputs (Ch.~\ref{ch:our-data}).
+Green: intermediate measures (Chs.~\ref{ch:har-core}--\ref{ch:cross-asset}).
+Orange: model-ready features.
+Counts show approximate dimensionality at each stage.}
+\label{fig:data-funnel}
+\end{figure}
+
+
+%% ──────────────────────────────────────────────
+\section{Complete Feature Matrix}
+\label{sec:feature-matrix}
+%% ──────────────────────────────────────────────
+
+Table~\ref{tab:feature-matrix} lists every feature in the planned feature set.
+Read across any row to trace a feature from its source measure through to its final form.
+Features with d/w/m variants share the same derivation pattern and are collapsed into one row.
+
+{\scriptsize
+\begin{longtable}{@{}cl p{2.4cm} p{4.6cm} l@{}}
+\caption{Complete feature matrix with source lineage.
+Features marked d/w/m apply the same derivation at daily, weekly (5d), and monthly (22d) horizons.}
+\label{tab:feature-matrix} \\
+\toprule
+\textbf{Layer} & \textbf{Feature} & \textbf{Source Measure} & \textbf{Derivation} & \textbf{Expansion} \\
+\midrule
+\endfirsthead
+\multicolumn{5}{c}{\small Table~\ref{tab:feature-matrix} (continued)} \\
+\toprule
+\textbf{Layer} & \textbf{Feature} & \textbf{Source Measure} & \textbf{Derivation} & \textbf{Expansion} \\
+\midrule
+\endhead
+\midrule \multicolumn{5}{r}{\small Continued on next page} \\
+\endfoot
+\bottomrule
+\endlastfoot
+
+% ── Layer 0: HAR Core ──
+0 & \texttt{log\_rv\_d/w/m} & rv & $\log$ [+ rolling mean 5d/22d], shift(1) & --- \\
+0 & \texttt{sqrt\_rq\_d} & rq & $\sqrt{\cdot}$, shift(1) & --- \\
+0 & \texttt{rq\_rv\_interaction} & rq, rv & $\sqrt{\text{rq}} \cdot \log(\text{rv})$, shift(1) & --- \\
+0 & \texttt{overnight\_return} & open, close (TSDB) & $\log(\text{open}_t / \text{close}_{t-1})$, shift(1) & --- \\
+\midrule
+
+% ── Layer 1: Asymmetry & Jumps ──
+1 & \texttt{log\_rs\_positive\_d/w/m} & rs\_positive & $\log$ [+ rolling mean 5d/22d], shift(1) & --- \\
+1 & \texttt{log\_rs\_negative\_d/w/m} & rs\_negative & $\log$ [+ rolling mean 5d/22d], shift(1) & --- \\
+1 & \texttt{log\_bpv\_d/w} & bpv & $\log$ [+ rolling mean 5d], shift(1) & --- \\
+1 & \texttt{log\_jump\_variation\_d} & jump\_variation & $\log$, shift(1) & --- \\
+1 & \texttt{log\_continuous\_var\_d/w} & continuous\_variation & $\log$ [+ rolling mean 5d], shift(1) & --- \\
+1 & \texttt{signed\_return\_d} & close (TSDB) & $\log(\text{close}_t / \text{close}_{t-1})$, shift(1) & --- \\
+\midrule
+
+% ── NR: Noise-Robust Estimators ──
+NR & \texttt{log\_rk\_d/w} & rk (tick prices) & $\log$ [+ rolling mean 5d], shift(1) & --- \\
+NR & \texttt{noise\_gap\_d/w} & noise\_gap & [rolling mean 5d], shift(1) & --- \\
+\midrule
+
+% ── Layer 2: Options-Implied ──
+2 & \texttt{atm\_iv\_1m, \_3m} & atm\_iv (Marquee) & shift(1) & lev/$\Delta$/$z$ \\
+2 & \texttt{vrp} & atm\_iv, rv & $\text{IV}^2 - \RV$, shift(1) & lev/$\Delta$/$z$ \\
+2 & \texttt{skew\_1m} & skew (Marquee) & shift(1) & lev/$\Delta$/$z$ \\
+2 & \texttt{term\_slope} & atm\_iv (3m, 1m) & ATM$_{3m}$ $-$ ATM$_{1m}$, shift(1) & lev/$\Delta$/$z$ \\
+2 & \texttt{butterfly\_1m} & skew, atm\_iv & $0.5(\text{IV}_{25\delta P} {+} \text{IV}_{25\delta C}) {-} \text{IV}_{\text{ATM}}$, shift(1) & lev/$\Delta$/$z$ \\
+2 & \texttt{vvix} & VVIX (TSDB) & shift(1) & lev/$\Delta$/$z$ \\
+2 & \texttt{iv\_rv\_gap} & atm\_iv, rv & $\text{IV} - \sqrt{\RV \times 252}$, shift(1) & lev/$\Delta$/$z$ \\
+2 & \texttt{stock\_atm\_iv} & EDRVOL (Marquee) & shift(1) & lev/$\Delta$/$z$ \\
+2 & \texttt{stock\_vrp} & stock\_atm\_iv, rv & stock $\text{IV}^2 - \RV$, shift(1) & lev/$\Delta$/$z$ \\
+\midrule
+
+% ── Layer 3: Microstructure ──
+3 & \texttt{price\_acceleration} & E-mini mid-price & 2nd derivative (win=50), daily agg, shift(1) & lev/$\Delta$/$z$ \\
+3 & \texttt{obi} & E-mini L2 bid/ask & $(\Sigma\text{bid} {-} \Sigma\text{ask})/(\Sigma\text{bid} {+} \Sigma\text{ask})$, daily agg, shift(1) & lev/$\Delta$/$z$ \\
+3 & \texttt{depth\_ratio} & E-mini L2 depth & $\log(\text{bid depth}/\text{ask depth})$, daily agg, shift(1) & lev/$\Delta$/$z$ \\
+3 & \texttt{spread\_mean/std} & E-mini bid/ask & mean/std spread (bps), shift(1) & lev/$\Delta$/$z$ \\
+3 & \texttt{vpin} & E-mini trades & VPIN algorithm, shift(1) & lev/$\Delta$/$z$ \\
+3 & \texttt{kyle\_lambda} & E-mini trades & regress($\Delta$mid, signed vol), shift(1) & lev/$\Delta$/$z$ \\
+\midrule
+
+% ── Layer 4: Cross-Asset ──
+4 & \texttt{treasury\_slope} & 10y, 2y yields & 10y $-$ 2y (bps), shift(1) & lev/$\Delta$/$z$ \\
+4 & \texttt{fx\_vol} & USD/JPY, EUR/USD & annualized rolling RV (22d), shift(1) & lev/$\Delta$/$z$ \\
+4 & \texttt{commodity\_vol} & CL, GC (TSDB) & annualized rolling RV (22d), shift(1) & lev/$\Delta$/$z$ \\
+4 & \texttt{vix\_level} & VIX close (TSDB) & shift(1) & lev/$\Delta$/$z$ \\
+4 & \texttt{vix\_futures\_slope} & VX1, VX2 (TSDB) & VX2 $-$ VX1, shift(1) & lev/$\Delta$/$z$ \\
+4 & \texttt{dy\_spillover} & panel of RVs (35) & DY FEVD ($h{=}10$, $p{=}4$), shift(1) & lev/$\Delta$/$z$ \\
+\midrule
+
+% ── Layer 5: Calendar ──
+5 & \texttt{fomc\_proximity} & FOMC calendar & days to next FOMC, shift(1) & --- \\
+5 & \texttt{nfp\_proximity} & NFP calendar & days to next NFP, shift(1) & --- \\
+5 & \texttt{opex\_proximity} & calendar math & days to next monthly OpEx, shift(1) & --- \\
+5 & \texttt{earnings\_proximity} & earnings calendar & days to next earnings, shift(1) & --- \\
+5 & \texttt{day\_of\_week} & date & categorical encoding & --- \\
+5 & \texttt{month} & date & categorical encoding & --- \\
+\midrule
+
+% ── Layer 6: Memory ──
+6 & \texttt{frac\_diff\_rv} & rv & $(1-L)^d$, $d \approx 0.35$--$0.45$, shift(1) & lev/$\Delta$/$z$ \\
+6 & \texttt{hurst\_exponent} & rv & rolling Hurst (22d), shift(1) & lev/$\Delta$/$z$ \\
+6 & \texttt{vol\_of\_vol} & rv & std($\RV$) over 22d, shift(1) & lev/$\Delta$/$z$ \\
+6 & \texttt{regime\_duration} & rv & days since last $2\sigma$ spike, shift(1) & --- \\
+\midrule
+
+% ── Layer 7: Sentiment ──
+7 & \texttt{finbert\_sentiment} & news text & daily FinBERT score, shift(1) & lev/$\Delta$/$z$ \\
+7 & \texttt{negative\_news\_count} & news text & count of negative articles, shift(1) & --- \\
+
+\end{longtable}
+}
+
+\noindent
+\textbf{Notes.}\enspace
+``NR'' = noise-robust estimators computed from tick-level log prices, not 5-min bars.
+``Expansion'' shows which features receive the \{level, change, $z$-score\} triple expansion for LightGBM (Chapter~\ref{ch:feature-composition}).
+Features marked ``---'' are used as-is.
+Rolling means compute the average in variance space first, then take log \citep{Corsi2009}.
+\texttt{noise\_gap} is a ratio, not log-transformed.
+Deferred features (event-implied vol, sector-mean RV, cross-asset RV rank, WAP log returns, signed volume flow) can be added in later iterations.
+For layer-level summaries and feature counts per model family, see Chapter~\ref{ch:lightgbm} Table~9.1.
+
+
+%% ──────────────────────────────────────────────
+%% Boxes
+%% ──────────────────────────────────────────────
+
+\begin{keyidea}[Every Row Traces Back to Source]
+The feature matrix is the blueprint.
+To understand any feature, read across: the source measure tells you where the data comes from (Chapter~\ref{ch:our-data}), the derivation tells you the transformation chain, and the expansion column tells you what LightGBM sees.
+\end{keyidea}
+
+\begin{warning}[Look-Ahead Lives in the Derivation Column]
+Every derivation must include shift(1) or equivalent.
+Any feature whose derivation does not include an explicit lag uses information from the forecast target period.
+The most subtle violations come from rolling windows that include day $t$ when predicting day $t{+}1$.
+\end{warning}
