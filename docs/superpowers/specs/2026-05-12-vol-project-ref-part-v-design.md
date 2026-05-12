@@ -1,7 +1,7 @@
 # Design Spec: Vol-Project-Ref Part V -- The Build
 
 **Date:** 2026-05-12
-**Status:** Draft
+**Status:** Draft (rev 2 -- post spec review)
 **Scope:** Three new chapters (Part V) for `guides/vol-project-ref/` + a detailed development plan file
 
 ---
@@ -24,10 +24,12 @@ The existing 14-chapter guide covers theory and reference (what everything is, w
 ### Design constraints
 
 - **Zero repetition** with chapters 1-14. No measure definitions (ch03-07), no source descriptions (ch02), no feature selection rationale (ch08), no evaluation methodology (ch13), no logical pipeline ordering (ch14), no model internals (ch09-12), no success criteria (ch01 Table 1.2, ch13), no target variable definition (ch01).
-- **Same style** as existing chapters: terse, table-driven, booktabs tables, TikZ diagrams, exactly 2 boxes per chapter (keyidea + warning only -- no prereq, workedexample, or projectconnection boxes, which are not used in this guide).
+- **Same style** as existing chapters: terse, table-driven, booktabs tables, TikZ diagrams, 1-2 boxes per chapter (keyidea + warning only -- no prereq, workedexample, or projectconnection boxes, which are not used in this guide).
 - **No em dashes** in text.
 - Existing chapters are the source of truth. New content reflects updated understanding from the codebase audit without calling out contradictions.
-- ~100-200 lines per chapter (matching existing chapter lengths).
+- **Known discrepancy:** Ch02 and ch05 say "SPX only; no single-name IV." The codebase audit (May 12) confirmed single-stock IV works via EDRVOL_PERCENT for all 34 symbols. Per the design constraint above, ch02/ch05 stay as-is. New chapters include single-stock IV features without comment -- the reader will discover the capability when they reach the implementation.
+- **Universe count:** Ch01 says "35 instruments" (30 equities + 4 ETFs + 1 E-mini). The codebase consistently says "34 symbols" because E-mini uses a different data path. New chapters use "35" to match ch01.
+- ~100-250 lines per chapter. Ch15 will be the longest due to the feature matrix table (existing chapters range from 95 to 200 lines; a full feature inventory justifies exceeding that range).
 
 ### What each existing chapter covers (overlap guard)
 
@@ -74,94 +76,71 @@ TikZ diagram showing the shape of data at each transformation stage:
 
 Annotated with counts at each stage. Color-coded: blue (sources), green (measures), orange (features). This is a data-level diagram, distinct from ch14's system-level diagram (which shows data sources -> feature computation -> models -> ensemble -> evaluation). This diagram zooms into the "feature computation" block of ch14.
 
-#### Table 15.1: Source-to-Measure Map
+#### Table 15.1: Complete Feature Matrix
 
-Small bridging table (~8 rows). Maps ch02's sources to the daily measures they produce, without re-describing sources.
+The backbone of the chapter. One row per feature in the planned optimal feature set, grouped by layer (0-7). Every row traces back from feature name to raw source. The "Source Measure" column is the bridge between ch02's data sources and the feature -- no separate source-to-measure table is needed because this column already provides the mapping.
 
-| Source | Daily Measures Produced |
-|---|---|
-| L1 ticks (34 symbols) | rv, log_rv, rq, bpv, rs_positive, rs_negative, jump_stat, jump_indicator, continuous_variation, jump_variation, j_positive, j_negative, realized_skewness, realized_kurtosis |
-| L1 tick-level log prices | rk, noise_gap |
-| Daily OHLCV (TSDB) | overnight_return |
-| E-mini L2 depth | price_acceleration, obi, depth_ratio, spread_mean/std, vpin |
-| SPX IV surface (Marquee) | atm_iv (5 tenors), skew (5 tenors), butterfly, term_slope |
-| Single-stock IV (Marquee EDRVOL) | stock_atm_iv, stock_skew |
-| Cross-asset (TSDB) | treasury_slope, fx_vol, commodity_vol, vix_level, vix_futures_slope |
-| Calendar/event sources | fomc_proximity, nfp_proximity, opex_proximity, earnings_proximity, day_of_week, month |
+Columns: Layer | Feature | Source Measure | Derivation | Expansion. The "Layer" column replaces a "Models" column to avoid overlapping ch09 Table 9.1 (which already maps layers to model families). The reader can cross-reference: Layer 0-1 features feed HAR variants (ch09), all features feed LightGBM (ch09).
 
-Columns: Source | Daily Measures Produced. No descriptions, no constraints, no formulas.
+Where d/w/m variants follow the same derivation pattern (log [+ rolling mean], shift(1)), they are collapsed into a single row (e.g., `log_rs_positive_d/w/m`).
 
-#### Table 15.2: Complete Feature Matrix
-
-The backbone of the chapter. One row per feature in the planned optimal feature set, grouped by layer (0-7). Every row traces back from feature name to source.
-
-Columns:
-
-| Feature | Source Measure | Derivation | Expansion | Models |
+| Layer | Feature | Source Measure | Derivation | Expansion |
 |---|---|---|---|---|
-| log_rv_d | rv | log, shift(1) | -- | HAR, SHAR, HARQ, LGB |
-| log_rv_w | rv | log(rolling mean 5d), shift(1) | -- | HAR, SHAR, HARQ, LGB |
-| log_rv_m | rv | log(rolling mean 22d), shift(1) | -- | HAR, SHAR, HARQ, LGB |
-| sqrt_rq_d | rq | sqrt, shift(1) | -- | HARQ, LGB |
-| rq_rv_interaction | rq, rv | sqrt(rq) * log(rv), shift(1) | -- | HARQ, LGB |
-| overnight_return | open, close | log(open_t / close_{t-1}), shift(1) | -- | LGB |
-| log_rs_positive_d | rs_positive | log, shift(1) | -- | SHAR, LGB |
-| log_rs_positive_w | rs_positive | log(rolling mean 5d), shift(1) | -- | SHAR, LGB |
-| log_rs_positive_m | rs_positive | log(rolling mean 22d), shift(1) | -- | SHAR, LGB |
-| log_rs_negative_d | rs_negative | log, shift(1) | -- | SHAR, LGB |
-| log_rs_negative_w | rs_negative | log(rolling mean 5d), shift(1) | -- | SHAR, LGB |
-| log_rs_negative_m | rs_negative | log(rolling mean 22d), shift(1) | -- | SHAR, LGB |
-| log_bpv_d | bpv | log, shift(1) | -- | HAR-CJ, LGB |
-| log_bpv_w | bpv | log(rolling mean 5d), shift(1) | -- | LGB |
-| log_jump_variation_d | jump_variation | log, shift(1) | -- | HAR-J, HAR-CJ, LGB |
-| log_continuous_variation_d | continuous_variation | log, shift(1) | -- | HAR-CJ, LGB |
-| log_continuous_variation_w | continuous_variation | log(rolling mean 5d), shift(1) | -- | LGB |
-| signed_return_d | close prices | log(close_t / close_{t-1}), shift(1) | -- | LGB |
-| log_rk_d | rk | log, shift(1) | -- | LGB |
-| log_rk_w | rk | log(rolling mean 5d), shift(1) | -- | LGB |
-| noise_gap_d | noise_gap | shift(1) | -- | LGB |
-| noise_gap_w | noise_gap | rolling mean 5d, shift(1) | -- | LGB |
-| atm_iv_1m | atm_iv (1m tenor) | shift(1) | level/change/zscore | LGB |
-| atm_iv_3m | atm_iv (3m tenor) | shift(1) | level/change/zscore | LGB |
-| vrp | atm_iv, rv | IV^2 - RV, shift(1) | level/change/zscore | LGB |
-| skew_1m | skew (1m tenor) | shift(1) | level/change/zscore | LGB |
-| term_slope | atm_iv (3m, 1m) | ATM_3m - ATM_1m, shift(1) | level/change/zscore | LGB |
-| butterfly_1m | skew, atm_iv (1m) | 0.5(IV_25dP + IV_25dC) - IV_ATM, shift(1) | level/change/zscore | LGB |
-| iv_rv_gap | atm_iv, rv | IV - sqrt(RV*252), shift(1) | level/change/zscore | LGB |
-| stock_atm_iv | stock IV (EDRVOL) | shift(1) | level/change/zscore | LGB |
-| stock_vrp | stock_atm_iv, rv | stock IV^2 - RV, shift(1) | level/change/zscore | LGB |
-| price_acceleration | E-mini mid-price | 2nd derivative (window=50), daily agg, shift(1) | level/change/zscore | LGB, LSTM |
-| obi | E-mini L2 bid/ask sizes | (sum_bid - sum_ask)/(sum_bid + sum_ask), daily agg, shift(1) | level/change/zscore | LGB, LSTM |
-| depth_ratio | E-mini L2 depth | log(bid_depth/ask_depth), daily agg, shift(1) | level/change/zscore | LGB, LSTM |
-| spread_mean | E-mini bid/ask | mean spread (bps), shift(1) | level/change/zscore | LGB |
-| spread_std | E-mini bid/ask | std of spread (bps), shift(1) | level/change/zscore | LGB |
-| vpin | E-mini trades | VPIN algorithm, shift(1) | level/change/zscore | LGB |
-| treasury_slope | 10y, 2y yields | 10y - 2y (bps), shift(1) | level/change/zscore | LGB |
-| fx_vol | USD/JPY, EUR/USD | annualized rolling RV (22d), shift(1) | level/change/zscore | LGB |
-| commodity_vol | CL, GC | annualized rolling RV (22d), shift(1) | level/change/zscore | LGB |
-| vix_level | VIX close | shift(1) | level/change/zscore | LGB |
-| vix_futures_slope | VX1, VX2 | VX2 - VX1, shift(1) | level/change/zscore | LGB |
-| fomc_proximity | FOMC calendar | days to next FOMC, shift(1) | -- | LGB |
-| nfp_proximity | NFP calendar | days to next NFP, shift(1) | -- | LGB |
-| opex_proximity | calendar math | days to next monthly OpEx, shift(1) | -- | LGB |
-| earnings_proximity | earnings calendar | days to next earnings, shift(1) | -- | LGB (single-name) |
-| day_of_week | date | categorical encoding | -- | LGB |
-| month | date | categorical encoding | -- | LGB |
-| frac_diff_rv | rv | $(1-L)^d$ with d~0.35-0.45, shift(1) | level/change/zscore | LGB |
-| hurst_exponent | rv | rolling Hurst (22d), shift(1) | level/change/zscore | LGB |
-| vol_of_vol | rv | std(RV) over 22d, shift(1) | level/change/zscore | LGB |
-| regime_duration | rv | days since last 2-sigma spike, shift(1) | -- | LGB |
-| finbert_sentiment | news text | daily FinBERT score, shift(1) | level/change/zscore | LGB |
-| negative_news_count | news text | count of negative articles, shift(1) | -- | LGB |
+| 0 | log_rv_d/w/m | rv | log [+ rolling mean 5d/22d], shift(1) | -- |
+| 0 | sqrt_rq_d | rq | sqrt, shift(1) | -- |
+| 0 | rq_rv_interaction | rq, rv | sqrt(rq) * log(rv), shift(1) | -- |
+| 0 | overnight_return | open, close (TSDB) | log(open_t / close_{t-1}), shift(1) | -- |
+| 1 | log_rs_positive_d/w/m | rs_positive | log [+ rolling mean 5d/22d], shift(1) | -- |
+| 1 | log_rs_negative_d/w/m | rs_negative | log [+ rolling mean 5d/22d], shift(1) | -- |
+| 1 | log_bpv_d/w | bpv | log [+ rolling mean 5d], shift(1) | -- |
+| 1 | log_jump_variation_d | jump_variation | log, shift(1) | -- |
+| 1 | log_continuous_variation_d/w | continuous_variation | log [+ rolling mean 5d], shift(1) | -- |
+| 1 | signed_return_d | close prices (TSDB) | log(close_t / close_{t-1}), shift(1) | -- |
+| NR | log_rk_d/w | rk (tick-level log prices) | log [+ rolling mean 5d], shift(1) | -- |
+| NR | noise_gap_d/w | noise_gap | [rolling mean 5d], shift(1) | -- |
+| 2 | atm_iv_1m, atm_iv_3m | atm_iv (Marquee) | shift(1) | level/change/zscore |
+| 2 | vrp | atm_iv, rv | IV^2 - RV, shift(1) | level/change/zscore |
+| 2 | skew_1m | skew (Marquee) | shift(1) | level/change/zscore |
+| 2 | term_slope | atm_iv (3m, 1m) | ATM_3m - ATM_1m, shift(1) | level/change/zscore |
+| 2 | butterfly_1m | skew, atm_iv | 0.5(IV_25dP + IV_25dC) - IV_ATM, shift(1) | level/change/zscore |
+| 2 | vvix | VVIX (TSDB) | shift(1) | level/change/zscore |
+| 2 | iv_rv_gap | atm_iv, rv | IV - sqrt(RV*252), shift(1) | level/change/zscore |
+| 2 | stock_atm_iv | EDRVOL_PERCENT (Marquee) | shift(1) | level/change/zscore |
+| 2 | stock_vrp | stock_atm_iv, rv | stock IV^2 - RV, shift(1) | level/change/zscore |
+| 3 | price_acceleration | E-mini mid-price (L2) | 2nd derivative (window=50), daily agg, shift(1) | level/change/zscore |
+| 3 | obi | E-mini L2 bid/ask sizes | (sum_bid - sum_ask)/(sum_bid + sum_ask), daily agg, shift(1) | level/change/zscore |
+| 3 | depth_ratio | E-mini L2 depth | log(bid_depth/ask_depth), daily agg, shift(1) | level/change/zscore |
+| 3 | spread_mean/std | E-mini bid/ask | mean/std spread (bps), shift(1) | level/change/zscore |
+| 3 | vpin | E-mini trades | VPIN algorithm, shift(1) | level/change/zscore |
+| 3 | kyle_lambda | E-mini trades, mid-price | regression(delta_mid, signed_volume), shift(1) | level/change/zscore |
+| 4 | treasury_slope | 10y, 2y yields (TSDB) | 10y - 2y (bps), shift(1) | level/change/zscore |
+| 4 | fx_vol | USD/JPY, EUR/USD (TSDB) | annualized rolling RV (22d), shift(1) | level/change/zscore |
+| 4 | commodity_vol | CL, GC (TSDB) | annualized rolling RV (22d), shift(1) | level/change/zscore |
+| 4 | vix_level | VIX close (TSDB) | shift(1) | level/change/zscore |
+| 4 | vix_futures_slope | VX1, VX2 (TSDB) | VX2 - VX1, shift(1) | level/change/zscore |
+| 4 | dy_spillover | panel of RVs (35 symbols) | Diebold-Yilmaz FEVD (h=10, p=4), shift(1) | level/change/zscore |
+| 5 | fomc_proximity | FOMC calendar | days to next FOMC, shift(1) | -- |
+| 5 | nfp_proximity | NFP calendar | days to next NFP, shift(1) | -- |
+| 5 | opex_proximity | calendar math | days to next monthly OpEx, shift(1) | -- |
+| 5 | earnings_proximity | earnings calendar | days to next earnings, shift(1) | -- |
+| 5 | day_of_week | date | categorical encoding | -- |
+| 5 | month | date | categorical encoding | -- |
+| 6 | frac_diff_rv | rv | $(1-L)^d$ with d~0.35-0.45, shift(1) | level/change/zscore |
+| 6 | hurst_exponent | rv | rolling Hurst (22d), shift(1) | level/change/zscore |
+| 6 | vol_of_vol | rv | std(RV) over 22d, shift(1) | level/change/zscore |
+| 6 | regime_duration | rv | days since last 2-sigma spike, shift(1) | -- |
+| 7 | finbert_sentiment | news text | daily FinBERT score, shift(1) | level/change/zscore |
+| 7 | negative_news_count | news text | count of negative articles, shift(1) | -- |
 
 **Notes on the table:**
-- "Expansion" column shows which features get the {level, change, zscore} triple expansion for LightGBM. Features marked "--" are used as-is.
-- "Models" column shows which model families use each feature. HAR/SHAR/HARQ/HAR-J/HAR-CJ use specific subsets (defined in ch09 Table 9.1). LGB uses all. LSTM uses E-mini intraday sequences directly (ch10), not these daily features.
+- "NR" = noise-robust estimators (computed from tick-level log prices, not 5-min bars).
+- "Expansion" column shows which features get the {level, change, zscore} triple expansion for LightGBM (see ch08 for the rationale). Features marked "--" are used as-is.
 - The actual feature count depends on which layers are active and how many expansion variants are included. With all layers and triple expansion, the matrix reaches ~80-120 columns.
 - Features with "rolling mean 5d" or "rolling mean 22d" compute the average in variance space first, then take log (per Corsi 2009 convention).
 - noise_gap is a ratio, not log-transformed.
+- **Deferred features** (appear in ch03-07 but excluded from initial feature set): event-implied vol (Layer 2, requires event calendar integration), sector-mean RV and cross-asset RV rank (Layer 4, require cross-symbol computation not yet supported in per-symbol pipeline), WAP log returns and signed volume flow (Layer 3, lower priority than OBI/VPIN). These can be added in later iterations.
 
-**Distinction from ch09 Table 9.1:** Ch09's table shows layer-level summaries (layer name, feature group, count). This table shows individual features with their derivation chain, making every feature traceable back to raw data.
+**Distinction from ch09 Table 9.1:** Ch09's table shows layer-level summaries (layer name, feature group, count). This table shows individual features with their full derivation chain. The Layer column here is lineage information (which data pipeline stage produces the feature), not model configuration.
 
 ### Boxes
 
@@ -273,7 +252,7 @@ Pros/cons as a small table:
 
 1. **keyidea: "Residual Stacking Gives Each Model a Distinct Role"** -- HAR captures multi-scale RV persistence. LightGBM captures nonlinear patterns the HAR misses. LSTM (if used) captures whatever regime dynamics remain. Each model trains on residuals from the prior stage, so roles are distinct by construction.
 
-2. **warning: "Feature Stacking Breaks Gradient Isolation"** -- LightGBM cannot back-propagate into the LSTM. The embedding is never optimized for the tree objective. No paper in the RV literature (2023-2026) demonstrates LSTM-embedding-to-GBDT feature stacking beating prediction blending or residual stacking at any forecast horizon.
+2. **warning: "No Evidence for Feature Stacking in RV Forecasting"** -- No paper in the RV literature (2023-2026) demonstrates LSTM-embedding-to-GBDT feature stacking beating prediction blending or residual stacking at any forecast horizon. The gradient isolation problem (Ch.11 warning) compounds this: embeddings are never optimized for the tree objective.
 
 ### Distinction from ch11 and ch14
 
@@ -310,7 +289,7 @@ Each milestone: one-line description, acceptance criteria (testable), dependenci
 
 **M3: QLIKE Tournament**
 - Run all 7 HAR variants + LightGBM across 3 horizons on dev universe. Implement Diebold-Mariano pairwise tests. Build tournament_table output.
-- Done when: tournament table exists (8 models x 3 horizons) with QLIKE scores and DM p-values. At least one ML model shows statistically significant improvement (p<0.05) over HAR at one horizon.
+- Done when: tournament table exists (8 models x 3 horizons) with QLIKE scores and DM p-values. Evaluated against Ch.13 success criteria.
 - Dependencies: M2.
 
 **M4: Layer 2 Options Features**
@@ -320,13 +299,13 @@ Each milestone: one-line description, acceptance criteria (testable), dependenci
 
 **M5: Tradeable Signal**
 - Implement IV-RV gap signal logic, delta-hedged straddle P&L backtest, vol-targeting P&L, compute Sharpe ratio and max drawdown.
-- Done when: equity curve plot exists, Sharpe > 0 out-of-sample on dev universe, transaction cost sensitivity tested.
+- Done when: equity curve plot exists, positive economic value out-of-sample (per Ch.13 criteria), transaction cost sensitivity tested.
 - Dependencies: M3 (working RV forecasts), M4 (options features for IV-RV gap).
 
 **M6: Ensemble Experiments**
 - Implement residual stacking (HAR -> LightGBM on residuals). Implement prediction blending (inverse-QLIKE weights). Compare both to standalone models on QLIKE. Re-run tournament with ensemble entries.
 - Done when: at least one ensemble strategy matches or beats the best standalone model on QLIKE. If neither beats standalone, document the finding.
-- Dependencies: M3 (tournament baseline), M5 (completed signal).
+- Dependencies: M3 (tournament baseline). Note: M6 does not depend on M5 -- ensemble experiments use model predictions, not the tradeable signal.
 
 **M7: Stretch Goals (ordered by impact-per-effort)**
 1. Regime-conditional QLIKE evaluation (split evaluation by VIX regime)
@@ -343,14 +322,16 @@ TikZ diagram. Critical path highlighted in bold/color:
 
 ```
 M1 (Foundation) ──→ M2 (LightGBM) ──→ M3 (Tournament) ──→ M6 (Ensemble) ──→ M7 (Stretch)
-      │                                       ↑                   ↑
-      └──→ M4 (Layer 2 Options) ──→ M5 (Signal) ──────────────────┘
+      │                                       │
+      └──→ M4 (Layer 2 Options) ──────────────┼──→ M5 (Signal)
+                                              └──────────→
 ```
 
 - Critical path: M1 -> M2 -> M3 -> M6 -> M7 (bold/colored)
-- Parallel track: M4 -> M5 (branches from M1, feeds into M5 which requires both M3 and M4)
-- M4 can start as soon as M1 is done, in parallel with M2
-- M5 requires both M3 and M4
+- Parallel track: M4 branches from M1, runs alongside M2/M3
+- M5 requires both M3 (RV forecasts) and M4 (options features)
+- M6 requires only M3 (not M5) -- ensemble experiments are independent of the signal work
+- M5 and M6 can run in parallel after M3 completes
 
 ### Boxes
 
