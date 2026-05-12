@@ -115,3 +115,33 @@ Each step has a clear scientific question and is independently reportable.
 - The random Gaussian noise column trick from the 91st place solution is clever for detecting overfitting -- consider adding this
 
 ---
+
+## 2026-05-12 -- Ensemble vs. Feature Stacking for Multi-Horizon RV
+
+**Question explored:** Should we use feature stacking (LSTM embeddings fed to LightGBM) or prediction blending at each forecast horizon (h=1, h=5, h=22)?
+
+**What we found:**
+- Cross-referenced every relevant paper in the bibliography + independent web research (2023-2026)
+- Christensen, Siggaard, Veliyev (2023): ML gains over HAR *increase* with forecast horizon. LSTM marginal value lowest at h=1 where tabular features already capture daily autocorrelation
+- No paper demonstrates feature stacking beating prediction blending at h=22 for RV specifically
+- At h=1, model errors are most correlated (all track strong daily autocorrelation), so stacking risks overfitting redundant information
+- At h=22, smallest effective sample size after walk-forward splitting makes stacking's overfitting risk highest
+- The gradient-isolation problem is real: LightGBM cannot back-propagate into the LSTM, so embeddings are never optimized for the tabular objective
+- Optiver top solutions used prediction blending, not feature stacking
+
+**What surprised us:**
+- The doc's "stacking at h=1/h=5, blending at h=22" contradicts Ch. 11 of the vol-project-ref guide, which says "Do Not Stack Features" universally. Three internal sources disagree with each other.
+- The simplest viable approach (LSTM scalar point forecast as one extra LightGBM feature) gets ~80% of any stacking benefit with near-zero implementation cost beyond the LSTM itself. Full embedding extraction (32-64 dim) adds complexity with minimal proven gain.
+- Simple average ensemble is competitive with optimized blending at h=22, where overfitting risk dominates. The more sophisticated the blending method, the more it benefits from large sample sizes (which h=22 doesn't have).
+
+**Recommendation:**
+- Prediction blending at all horizons (inverse-QLIKE weighted at h=1, linear blend at h=5, simple average at h=22)
+- LSTM branch is a stretch goal; minimum viable ensemble is HAR-best + LightGBM blend
+- If LSTM is pursued, use its scalar forecast as one extra LightGBM feature, not high-dimensional embeddings
+
+**Open threads:**
+- Need to verify QLIKE log-space sign convention in actual code (may be reversed vs. Patton 2011)
+- CV purge gap enforcement for h=22 is a correctness bug that must be fixed before any multi-horizon evaluation
+- Does regime-conditional QLIKE evaluation reveal that ensemble benefits are concentrated in crisis periods?
+
+---
