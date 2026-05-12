@@ -32,10 +32,10 @@ E-mini L2 depth &
   L2 (${\sim}$4M ticks/day) &
   OBI, depth ratio, VPIN, LSTM input &
   E-mini only \\[6pt]
-SPX IV surface (Marquee ERDVOL) &
+IV surfaces (Marquee ERDVOL) &
   Full tenor $\times$ strike grid &
   VRP, skew, term structure, butterfly &
-  SPX only; no single-name IV \\[6pt]
+  Full surface SPX only; single-stock ATM IV via EDRVOL\_PERCENT \\[6pt]
 VIX term structure &
   Daily &
   Regime detection, contango/backwardation &
@@ -101,9 +101,11 @@ The tick-level RV, full IV surface, and L2 depth data let us construct features 
 
 L2 depth data covers the E-mini only, so microstructure depth features (OBI at levels 2--5, depth ratio) apply exclusively to the index.
 Equities receive L1 features only.
-The IV surface is likewise SPX only, which means options-derived features (VRP, skew, term structure) function as market-wide regime signals rather than stock-specific predictors.
-These two constraints directly determine which features apply to which assets in the feature engineering pipeline.
+The full IV surface is SPX only, so surface-derived features (skew, term structure, butterfly) function as market-wide regime signals.
+Single-stock ATM IV is available via Marquee EDRVOL\_PERCENT, enabling per-name VRP and IV--RV gap features.
+These constraints determine which features apply to which assets in the feature engineering pipeline.
 
-\begin{warning}[Do not treat depth or IV features as stock-level predictors]
-Both L2 depth and the IV surface are index-level data. Using them as if they vary across individual equities would introduce look-ahead bias or, worse, a constant signal masquerading as stock-specific information.
+\begin{warning}[Do not treat depth or surface features as stock-level predictors]
+L2 depth and the full IV surface are index-level data. Using them as if they vary across individual equities would introduce look-ahead bias or a constant signal masquerading as stock-specific information.
+Single-stock ATM IV is the exception---it is genuinely per-name.
 \end{warning}

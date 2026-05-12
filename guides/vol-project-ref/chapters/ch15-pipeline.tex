@@ -125,12 +125,12 @@ NR & \texttt{noise\_gap\_d/w} & noise\_gap & [rolling mean 5d], shift(1) & --- \
 \midrule
 
 % ── Layer 4: Cross-Asset ──
-4 & \texttt{treasury\_slope} & 10y, 2y yields & 10y $-$ 2y (bps), shift(1) & lev/$\Delta$/$z$ \\
+4 & \texttt{treasury\_slope} & 10y, 2y note prices & 10y $-$ 2y price proxy, shift(1) & lev/$\Delta$/$z$ \\
 4 & \texttt{fx\_vol} & USD/JPY, EUR/USD & annualized rolling RV (22d), shift(1) & lev/$\Delta$/$z$ \\
 4 & \texttt{commodity\_vol} & CL, GC (TSDB) & annualized rolling RV (22d), shift(1) & lev/$\Delta$/$z$ \\
 4 & \texttt{vix\_level} & VIX close (TSDB) & shift(1) & lev/$\Delta$/$z$ \\
 4 & \texttt{vix\_futures\_slope} & VX1, VX2 (TSDB) & VX2 $-$ VX1, shift(1) & lev/$\Delta$/$z$ \\
-4 & \texttt{dy\_spillover} & panel of RVs (35) & DY FEVD ($h{=}10$, $p{=}4$), shift(1) & lev/$\Delta$/$z$ \\
+4 & \texttt{dy\_spillover} & panel of RVs (34) & DY FEVD ($h{=}10$, $p{=}4$), shift(1) & lev/$\Delta$/$z$ \\
 \midrule
 
 % ── Layer 5: Calendar ──
@@ -163,6 +163,9 @@ NR & \texttt{noise\_gap\_d/w} & noise\_gap & [rolling mean 5d], shift(1) & --- \
 Features marked ``---'' are used as-is.
 Rolling means compute the average in variance space first, then take log \citep{Corsi2009}.
 \texttt{noise\_gap} is a ratio, not log-transformed.
+Treasury slope uses note prices (US10YT=RR, US2YT=RR) as a proxy; true yield tickers are not available in TSDB.
+EUR/USD is sourced from Marquee FXIVOL, not TSDB.
+CL and GC require manual front-month contract roll (e.g.\ CLM26, GCM26); generic continuous contracts are not in TSDB.
 Deferred features (event-implied vol, sector-mean RV, cross-asset RV rank, WAP log returns, signed volume flow) can be added in later iterations.
 For layer-level summaries and feature counts per model family, see Chapter~\ref{ch:lightgbm} Table~9.1.
 
