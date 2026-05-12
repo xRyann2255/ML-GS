@@ -167,6 +167,8 @@ Treasury slope uses note prices (US10YT=RR, US2YT=RR) as a proxy; true yield tic
 EUR/USD is sourced from Marquee FXIVOL, not TSDB.
 CL and GC require manual front-month contract roll (e.g.\ CLM26, GCM26); generic continuous contracts are not in TSDB.
 Deferred features (event-implied vol, sector-mean RV, cross-asset RV rank, WAP log returns, signed volume flow) can be added in later iterations.
+Every derivation must include shift(1) or equivalent; any feature whose derivation omits an explicit lag uses information from the forecast target period.
+The most subtle violations come from rolling windows that include day $t$ when predicting day $t{+}1$.
 For layer-level summaries and feature counts per model family, see Chapter~\ref{ch:lightgbm} Table~9.1.
 
 
@@ -179,8 +181,3 @@ The feature matrix is the blueprint.
 To understand any feature, read across: the source measure tells you where the data comes from (Chapter~\ref{ch:our-data}), the derivation tells you the transformation chain, and the expansion column tells you what LightGBM sees.
 \end{keyidea}
 
-\begin{warning}[Look-Ahead Lives in the Derivation Column]
-Every derivation must include shift(1) or equivalent.
-Any feature whose derivation does not include an explicit lag uses information from the forecast target period.
-The most subtle violations come from rolling windows that include day $t$ when predicting day $t{+}1$.
-\end{warning}

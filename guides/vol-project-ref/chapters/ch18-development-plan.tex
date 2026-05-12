@@ -11,48 +11,72 @@ Priority ordering: trading signal $>$ academic rigor $>$ model novelty.
 \label{sec:milestones}
 %% ──────────────────────────────────────────────
 
-Table~\ref{tab:milestones} defines seven milestones with acceptance criteria and dependencies.
+Table~\ref{tab:milestones} defines eleven milestones with acceptance criteria and dependencies.
+M0--M2 cover foundation work already underway; M3--M7 form the minimum viable deliverable; M8--M10 are upside.
 
+\renewcommand{\arraystretch}{1.15}
 \begin{table}[htbp]
 \centering
-\caption{Development milestones. M1--M5 form the minimum viable deliverable.}
+\caption{Development milestones. M3--M7 form the minimum viable deliverable.}
 \label{tab:milestones}
-\small
-\begin{tabular}{@{}clp{4.8cm}p{4.2cm}l@{}}
+\footnotesize
+\begin{tabular}{@{}p{2.5cm}p{5.2cm}p{3.5cm}c@{}}
 \toprule
-\textbf{M\#} & \textbf{Milestone} & \textbf{Acceptance Criteria} & \textbf{Key Tasks} & \textbf{Deps} \\
+\textbf{Milestone} & \textbf{Acceptance Criteria} & \textbf{Key Tasks} & \textbf{Deps} \\
 \midrule
-1 & Fix Foundation &
-  Purge gap $\geq h$ enforced; $\QLIKE$ sign matches \citet{Patton2011}; context kwarg added; all existing tests pass &
-  CV fix, $\QLIKE$ fix, protocol extension, safe\_log dedup &
-  --- \\[8pt]
-2 & LightGBM &
+\multicolumn{4}{@{}l@{}}{\small\itshape Foundation} \\[3pt]
+\textbf{M0} Research \& Scoping &
+  Literature survey (80+ papers); scope defined; feature taxonomy (L0--L5) designed; $\QLIKE$ chosen; LightGBM selected; universe (34 symbols) defined &
+  Paper review, scope definition, metric/model selection &
+  --- \\[6pt]
+\textbf{M1} Data Infrastructure &
+  Tick data via Chunk Store for 34 symbols; daily data from TSDB; IV surface from Marquee; resampling produces 78 bars/day; RV panel outputs 18 measures with parquet caching &
+  Package scaffold, data integrations, resampling, RV panel builder, config system &
+  M0 \\[6pt]
+\textbf{M2} Feature Engine \& Baselines &
+  Layer 0--1 features with no look-ahead; 7 HAR models fit and predict; $\QLIKE$ evaluation operational; purge gap $\geq h$ enforced; $\QLIKE$ sign matches \citet{Patton2011}; end-to-end pipeline runs; 390+ tests pass &
+  HAR/asymmetry/noise-robust features, HAR family, metrics, CV splitters, CLI pipeline, purge gap fix, $\QLIKE$ sign fix &
+  M1 \\
+\midrule
+\multicolumn{4}{@{}l@{}}{\small\itshape MVP} \\[3pt]
+\textbf{M3} LightGBM &
   Custom $\QLIKE$ objective converges; Optuna finds improved params; walk-forward OOS predictions for 3 horizons &
   $\QLIKE$ gradient/hessian, model class, Optuna, walk-forward &
-  M1 \\[8pt]
-3 & Tournament &
-  8 models $\times$ 3 horizons table with DM $p$-values on dev universe &
-  Run baselines, DM test, tournament table &
-  M2 \\[8pt]
-4 & Layer~2 Options &
+  M2 \\[6pt]
+\textbf{M4} Tournament &
+  8 models $\times$ 3 horizons table with DM $p$-values and Mincer--Zarnowitz efficiency tests on dev universe &
+  Run baselines, DM test, MZ regression, tournament table &
+  M3 \\[6pt]
+\textbf{M5} Layer~2 Options &
   Options features produce daily values with no look-ahead; $\QLIKE$ lift documented &
   OptionsLayer, IV surface wiring, validation &
-  M1 \\[8pt]
-5 & Signal &
+  M2 \\[6pt]
+\textbf{M6} Layers 4--5 &
+  Cross-asset and calendar features produce daily values; DY spillover index computed; FOMC/NFP/OPEX proximity indicators operational &
+  Treasury slope, FX/commodity vol, DY spillover, event calendars &
+  M2 \\[6pt]
+\textbf{M7} Signal &
   IV--RV gap signal; equity curve; positive OOS Sharpe &
   Signal logic, P\&L backtest, performance metrics &
-  M3, M4 \\[8pt]
-6 & Ensemble &
+  M4, M5 \\
+\midrule
+\multicolumn{4}{@{}l@{}}{\small\itshape Upside} \\[3pt]
+\textbf{M8} Ensemble &
   Residual stacking and prediction blending tested; 10-model tournament table &
   Residual stacking, inverse-$\QLIKE$ blending &
-  M3 \\[8pt]
-7 & Stretch &
-  Ordered by impact: regime $\QLIKE$, MCS, LSTM feature, full universe, figures, Rashomon &
+  M4 \\[6pt]
+\textbf{M9} Microstructure \& Sequences &
+  Layer~3 E-mini features (OBI, VPIN, depth); LSTM/TCN on intraday bars; scalar forecast as LightGBM feature evaluated &
+  Microstructure layer, LSTM architecture, sequence pipeline &
+  M2 \\[6pt]
+\textbf{M10} Stretch &
+  Ordered by impact: regime $\QLIKE$, MCS, Rashomon (TreeFARMS + RID + VIC), STreeD, Layer 6--7 (memory/sentiment), reporting/visualization, full universe, figures &
   Each task independent &
-  M3--M6 \\
+  M4--M9 \\
 \bottomrule
 \end{tabular}
 \end{table}
+\renewcommand{\arraystretch}{1.0}
 
 
 %% ──────────────────────────────────────────────
@@ -61,49 +85,76 @@ Table~\ref{tab:milestones} defines seven milestones with acceptance criteria and
 %% ──────────────────────────────────────────────
 
 Figure~\ref{fig:critical-path} shows milestone dependencies.
-The critical path (M1 $\to$ M2 $\to$ M3 $\to$ M6 $\to$ M7) is highlighted.
-M4 branches from M1 and runs in parallel with M2--M3.
-M5 and M6 can run in parallel after M3 completes.
+The critical path (M3 $\to$ M4 $\to$ M8 $\to$ M10) is highlighted.
+M5, M6, and M9 branch from M2 and run in parallel with the critical path.
+M7 requires both M4 (forecasts) and M5 (options features).
 
 \begin{figure}[htbp]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
-  node distance=0.8cm and 1.6cm,
   >=Stealth,
-  milestone/.style={draw, rounded corners, minimum height=0.9cm, minimum width=2.4cm,
+  milestone/.style={draw, rounded corners, minimum height=0.9cm, minimum width=2.2cm,
     align=center, font=\small, fill=blue!8},
   critical/.style={milestone, line width=1.5pt, fill=orange!12},
+  foundation/.style={milestone, dashed, fill=gray!8},
   arrow/.style={-{Stealth[length=2.5mm]}, thick},
   critarrow/.style={arrow, line width=1.5pt, color=defblue},
 ]
-  % Critical path
-  \node[critical] (m1) {M1\\Foundation};
-  \node[critical, right=of m1] (m2) {M2\\LightGBM};
-  \node[critical, right=of m2] (m3) {M3\\Tournament};
-  \node[critical, right=of m3] (m6) {M6\\Ensemble};
-  \node[critical, right=of m6] (m7) {M7\\Stretch};
+  % Foundation (dashed nodes)
+  \node[foundation] (m0) at (0,0)   {M0\\Research};
+  \node[foundation] (m1) at (3,0)   {M1\\Data};
+  \node[foundation] (m2) at (6,0)   {M2\\Features};
 
-  \draw[critarrow] (m1) -- (m2);
-  \draw[critarrow] (m2) -- (m3);
-  \draw[critarrow] (m3) -- (m6);
-  \draw[critarrow] (m6) -- (m7);
+  % Critical path (bold nodes)
+  \node[critical] (m3) at (9,0)    {M3\\LightGBM};
+  \node[critical] (m4) at (12,0)   {M4\\Tournament};
+  \node[critical] (m8) at (15,0)   {M8\\Ensemble};
+  \node[critical] (m10) at (18,0)  {M10\\Stretch};
 
-  % Parallel track
-  \node[milestone, below=1.2cm of m2] (m4) {M4\\Options};
-  \node[milestone, below=1.2cm of m6] (m5) {M5\\Signal};
+  % Foundation arrows
+  \draw[arrow] (m0) -- (m1);
+  \draw[arrow] (m1) -- (m2);
+  \draw[arrow] (m2) -- (m3);
 
-  \draw[arrow] (m1.south) |- (m4);
-  \draw[arrow] (m4) -- (m5);
-  \draw[arrow] (m3.south) -- ++(0,-0.5) -| (m5);
-  \draw[arrow] (m5.south) -- ++(0,-0.5) -| (m7.south);
+  % Critical path arrows
+  \draw[critarrow] (m3) -- (m4);
+  \draw[critarrow] (m4) -- (m8);
+  \draw[critarrow] (m8) -- (m10);
+
+  % Parallel track (bottom row): M5, M6, M7, M9
+  \node[milestone] (m5) at (9,-3)   {M5\\Options};
+  \node[milestone] (m6) at (12,-3)  {M6\\Cross-Asset};
+  \node[milestone] (m7) at (15,-3)  {M7\\Signal};
+  \node[milestone] (m9) at (18,-3)  {M9\\Microstructure};
+
+  % M2 fan-out: bus to M5, M6, M9 (all depend on M2)
+  \draw (m2.south) -- ++(0,-1.05) coordinate (branch);
+  \fill (branch) circle (2pt);
+  \draw (branch) -- (branch -| m9.north);
+  \draw[arrow] (branch -| m5.north) -- (m5.north);
+  \draw[arrow] (branch -| m6.north) -- (m6.north);
+  \draw[arrow] (branch -| m9.north) -- (m9.north);
+
+  % M4 -> M7 (M7 depends on M4): route above bus then down
+  \draw[arrow] (m4.south) -- ++(0,-0.65) -| (m7.north);
+
+  % M5 -> M7 (M7 depends on M5): route above M6
+  \draw[arrow] (m5.north east) -- ++(0,0.5) -| (m7.north west);
+
+  % M9 -> M10 (M10 depends on M4--M9): clean vertical
+  \draw[arrow] ([xshift=4mm]m9.north) -- ([xshift=4mm]m10.south);
+
+  % M6 -> M10 (M10 depends on M4--M9): route below bottom row, up through M7/M9 gap
+  \draw[arrow] (m6.south) -- ++(0,-0.5) -- (16.5,-3.95) -- (16.5,-0.45) -- (m10.south);
 \end{tikzpicture}%
 }
 \caption{Milestone dependencies.
-Bold path: critical path (M1--M2--M3--M6--M7).
-M4 runs in parallel with M2--M3.
-M5 requires both M3 (forecasts) and M4 (options features).
-M7 waits on all prior milestones.}
+Dashed nodes (M0--M2): foundation work.
+Bold path: critical path (M3--M4--M8--M10).
+M5, M6, and M9 branch from M2 and run in parallel.
+M7 requires both M4 (forecasts) and M5 (options features).
+M10 waits on all prior milestones.}
 \label{fig:critical-path}
 \end{figure}
 
@@ -112,15 +163,15 @@ M7 waits on all prior milestones.}
 %% Boxes
 %% ──────────────────────────────────────────────
 
-\begin{keyidea}[M1--M5 Is the Minimum Viable Deliverable]
-A $\QLIKE$ tournament (7~HAR variants + LightGBM, DM tests) plus a tradeable IV--RV signal with P\&L backtest is a presentable result.
-Everything in M6--M7 is upside.
-If time runs out after M5, the project has a defensible outcome.
+\begin{keyidea}[M3--M7 Is the Minimum Viable Deliverable]
+A $\QLIKE$ tournament (7~HAR variants + LightGBM, DM tests) plus cross-asset features and a tradeable IV--RV signal with P\&L backtest is a presentable result.
+Everything in M8--M10 is upside.
+If time runs out after M7, the project has a defensible outcome.
 \end{keyidea}
 
-\begin{warning}[M1 Is Non-Negotiable]
+\begin{warning}[M2 Must Be Complete Before M3]
 The purge gap bug causes silent data leakage for $h=22$.
 The $\QLIKE$ sign convention determines whether the loss function penalizes over-prediction or under-prediction correctly.
-All results produced before M1 is complete are potentially invalid.
+All results produced before M2 is complete are potentially invalid.
 Do not skip ahead.
 \end{warning}
