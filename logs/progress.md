@@ -84,3 +84,21 @@
 **Next:** Begin Sprint 1 -- Task 1 (units.py), Task 2 (rv.py), Task 3 (universe.py)
 
 ---
+
+## 2026-05-12
+
+**Focus:** Deep technical review of GS codebase documentation
+
+- Received comprehensive codebase doc from GS machine (notes/ml_vol_forecasting_docs.md, 1988 lines): documents entire volforecast package (v0.2.0, 50 files, ~150 functions, 390 tests)
+- Designed and executed 6-pillar audit via 3 parallel research agents: math correctness, architecture + ML practices, ensemble/stacking research
+- Math verification: checked 16 formulas against papers. Found 6 issues (2 Important: semivariance indicator > vs >=, BNS uses RQ instead of RTQ; 1 Important: QLIKE log-space sign convention may be reversed)
+- Architecture review: discovered 2 Critical issues (FeatureLayer protocol cannot serve Layers 2-5, CV purge gap not enforced for h >= 22)
+- Ensemble research: revised strategy from "stacking at h=1/h=5, blending at h=22" to prediction blending at all horizons, based on cross-referencing Christensen et al. 2023, Bucci 2020, Fed 2025, Optiver evidence
+- Debt triage: re-prioritized 13 items, added 3 new (FeatureLayer context, purge enforcement, SQLite tracking). 5 P0 items total
+- Produced Top 5 Actions roadmap for next 16 weeks, phased timeline, minimum viable deliverable definition
+- Wrote 3 session prompts for upcoming work (review, project ref update, Copilot prompts)
+- Updated memory with two-repo setup (planning repo here, implementation on GS machine)
+
+**Next:** Session 2 -- update vol-project-ref guide with project plan chapter and development roadmap
+
+---
