@@ -35,6 +35,8 @@ Add geometric/graphical TikZ illustrations for important concepts — especially
 
 Do NOT add a diagram for every equation. Use judgment — only when a visual genuinely unlocks understanding.
 
+**After writing any TikZ diagram, invoke the `verify-diagram` skill to visually inspect the rendered output.** The skill compiles the LaTeX, renders the diagram page to a PNG, and checks for arrows going through boxes, overlapping paths, broken routing, and dependency accuracy. Fix any issues found and re-verify until the diagram is clean. Never submit a chapter with an unverified diagram.
+
 ### Worked Examples
 
 Only include worked numerical examples when they serve theory comprehension (e.g., showing WHY a formula produces a surprising result, or building intuition about magnitudes). Do NOT include computation-practice examples.
