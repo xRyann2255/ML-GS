@@ -117,14 +117,15 @@ The `docs-only` branch contains only compiled PDFs, deliverables, and markdown n
 3. Switch to docs-only and reset it from main, keeping only the target files:
    ```bash
    git checkout docs-only
-   git checkout main -- vol-learning-guide/main.pdf guides/ml-finance/main.pdf guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf deliverables/ notes/
-   git commit -m "chore: sync compiled PDFs and notes from main"
+   git checkout main -- vol-learning-guide/main.pdf guides/ml-finance/main.pdf guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/
+   git commit -m "chore: sync compiled PDFs, markdown, and notes from main"
    git push
    git checkout main
    ```
 
 **What stays on `docs-only`:**
 - `vol-learning-guide/main.pdf`, `guides/ml-finance/main.pdf`, `guides/quant-trading/main.pdf`, `guides/vol-project-ref/main.pdf`
+- `guides/vol-project-ref/markdown/` (markdown conversion with Mermaid diagrams, for LLM consumption)
 - `deliverables/` (all .md and .html)
 - `notes/` (all .md)
 

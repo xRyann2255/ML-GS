@@ -12,6 +12,24 @@
             "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -q \"git commit\"; then echo \"[hook] Commit detected -- invoke /progress-log to update the daily log.\"; fi'"
           }
         ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -q \"vol-project-ref/chapters/.*\\.tex\"; then CHFILE=$(echo \"$TOOL_INPUT\" | grep -oP \"ch\\d+-[\\w-]+\\.tex\" | head -1); MDFILE=$(echo \"$CHFILE\" | sed \"s/\\.tex$/.md/\"); echo \"[hook] vol-project-ref chapter source modified ($CHFILE). Update the corresponding markdown file: guides/vol-project-ref/markdown/$MDFILE\"; fi'"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -q \"vol-project-ref/chapters/.*\\.tex\"; then CHFILE=$(echo \"$TOOL_INPUT\" | grep -oP \"ch\\d+-[\\w-]+\\.tex\" | head -1); MDFILE=$(echo \"$CHFILE\" | sed \"s/\\.tex$/.md/\"); echo \"[hook] vol-project-ref chapter source modified ($CHFILE). Update the corresponding markdown file: guides/vol-project-ref/markdown/$MDFILE\"; fi'"
+          }
+        ]
       }
     ]
   }
