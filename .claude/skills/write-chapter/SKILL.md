@@ -1,18 +1,18 @@
 ---
 name: write-chapter
-description: Multi-pass pipeline for writing LaTeX learning guide chapters. 4 passes: write → cross-reference → condense → naive-reader review. Tuned for intuition-first learning.
+description: Multi-pass pipeline for writing LaTeX learning guide chapters. 5 passes: source extraction → write → verify → condense → naive-reader review. Every formula verified against source papers.
 ---
 
 # Write Chapter
 
-Write a complete LaTeX chapter using a 4-pass quality pipeline.
+Write a complete LaTeX chapter using a 5-pass quality pipeline.
 
 ## Input
 
 The user specifies:
 - **Topic**: what the chapter covers
 - **Guide**: which guide it belongs to (`ml-finance`, `quant-trading`, or a new one)
-- **Source papers** (optional): specific papers from `reference/` to draw on
+- **Source papers**: specific papers from `reference/` to read in Pass 0. For each paper, specify which pages/sections to extract (e.g., "Xin et al. 2022 pp.3-7: Rashomon set definition, enumeration algorithm")
 
 ## Learning Style Requirements
 
@@ -48,6 +48,28 @@ Only include worked numerical examples when they serve theory comprehension (e.g
 - Verbose definitions are good — err on the side of over-explaining concepts
 - Before introducing complexity, make sure the simpler version is fully internalized
 
+## Pass 0 -- Source Extraction (runs before Pass 1)
+
+Before writing begins, the agent reads the specified source papers and produces a structured extraction. For each paper:
+
+1. Read only the specific pages/sections relevant to the chapter's topics (not full papers)
+2. For each formula, definition, claim, or threshold found, record:
+
+```
+PAPER: [Author Year] ([short title])
+PAGE: [page number]
+TYPE: FORMULA | DEFINITION | CLAIM | THRESHOLD
+CONTENT: [exact content from paper]
+NOTATION: [symbol definitions as used in the paper]
+GUIDE_NOTATION: [how to adapt notation to match learning guide conventions]
+```
+
+Rules:
+- Every formula must include the exact equation number and page from the source
+- Every quantitative claim (e.g., "5-15% QLIKE improvement") must have a paper source
+- If a claim appears in the spec or vol-project-ref but has no paper backing it, flag it and do not include it in the chapter
+- The extraction stays in the agent's context as ground truth for Pass 1. Do not save it as a file.
+
 ## Pass 1 — Writer (main agent)
 
 Write the full chapter `.tex` file following the guide's conventions:
@@ -63,17 +85,29 @@ Write the full chapter `.tex` file following the guide's conventions:
    - Define every term on first use (bold)
    - Geometric diagrams for key concepts
 4. Save as `guides/<guide>/chapters/<filename>.tex`
+5. **Mid-write paper discovery:** If you encounter a concept that needs a citation or formula not in the Pass 0 extraction:
+   a. Search `reference/project-papers/` and `reference/papers/` for relevant papers
+   b. If found, read the relevant pages and extract the needed material
+   c. If not found in the repo, search the web for the paper (arXiv, open-access proceedings, author websites)
+   d. If available, download it to `reference/project-papers/` and extract the needed material
+   e. If behind a paywall, note it as a gap and write around it -- never guess a formula
 
-## Pass 2 — Cross-referencer (parallel sub-agent)
+## Pass 2 — Verifier (parallel sub-agent)
 
 Dispatch a sub-agent with this prompt:
 
-> Read the draft chapter at [path]. Search `reference/project-papers/` and `reference/papers/` for papers relevant to claims, methods, or concepts in the chapter. For each paper found:
-> - Identify which passage in the chapter it supports
-> - Suggest the citation command (`\citep{}` or `\citet{}`)
-> - Flag any factual errors the paper contradicts
+> Read the draft chapter at [path]. For every `\citep{}` and `\citet{}` command in the chapter:
+> 1. Find the cited paper in `reference/project-papers/` or `reference/papers/`
+> 2. Read the specific pages referenced (or search for the relevant content)
+> 3. Verify that every formula in the chapter matches the source paper (correct signs, terms, notation)
+> 4. Verify that every quantitative claim matches what the paper actually reports
+> 5. Flag any discrepancy as CRITICAL with: [chapter line, what it says, what the paper says, page in paper]
 >
-> Output a numbered list of suggested citations with line locations.
+> Also search for papers NOT yet cited that are relevant to claims in the chapter, and suggest additional citations.
+>
+> Output:
+> - A numbered list of verification results (PASS or CRITICAL for each citation)
+> - A numbered list of suggested additional citations with line locations
 
 ## Pass 3 — Condenser (parallel sub-agent, simultaneous with Pass 2)
 
