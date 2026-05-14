@@ -64,7 +64,7 @@ cd $ROOT && git add vol-learning-guide/main.pdf guides/ml-finance/main.pdf guide
 First stash any uncommitted work so the branch switch doesn't destroy it, then sync and return to main:
 
 ```bash
-cd $ROOT && git stash && git checkout docs-only && git checkout main -- vol-learning-guide/main.pdf guides/ml-finance/main.pdf guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/ && git add -A && git diff --cached --quiet && echo "No changes to sync" || (git commit -m "chore: sync compiled PDFs, markdown, and notes from main" && git push) && git checkout main && git stash pop
+cd $ROOT && git stash && git checkout docs-only && git checkout main -- vol-learning-guide/main.pdf vol-learning-guide/markdown/ guides/ml-finance/main.pdf guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/ && git add -A && git diff --cached --quiet && echo "No changes to sync" || (git commit -m "chore: sync compiled PDFs, markdown, and notes from main" && git push) && git checkout main && git stash pop
 ```
 
 If the stash pop reports conflicts, resolve them — the stashed changes are the user's working copy and take priority.
@@ -79,6 +79,7 @@ Page counts for each compiled PDF + which guides were skipped + confirmation of 
 - `guides/ml-finance/main.pdf` (ML for finance guide)
 - `guides/quant-trading/main.pdf` (quant trading guide)
 - `guides/vol-project-ref/main.pdf` (volatility project reference guide)
+- `vol-learning-guide/markdown/` (markdown conversion of learning guide, with Mermaid diagrams)
 - `guides/vol-project-ref/markdown/` (markdown conversion of vol-project-ref, with Mermaid diagrams)
 - `deliverables/` (pitch presentations, project plans, speaker scripts)
 - `notes/` (volatility.md, glossary, faq, secdb requirements)
