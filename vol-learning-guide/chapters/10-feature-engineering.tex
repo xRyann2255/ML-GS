@@ -92,6 +92,63 @@ Every feature must pass through the temporal alignment gate: it can only use dat
 \end{figure}
 
 % ──────────────────────────────────────────────────────────────
+\section{Triple Expansion: Level, Change, Z-Score}\label{sec:feat-triple}
+% ──────────────────────────────────────────────────────────────
+
+Before cataloging individual features, we introduce a systematic expansion technique that applies to every continuous feature in the catalog.
+For any base quantity $x_t$, construct three variants:
+
+\begin{definition}[Triple Expansion]
+Given a continuous feature $x_t$ and a lookback window $w$ (typically 22 trading days), the \textbf{triple expansion} produces:
+\begin{align}
+x_t^{\text{level}} &= x_t, \label{eq:triple-level}\\
+x_t^{\text{change}} &= x_t - x_{t-k}, \quad k \in \{1, 5\}, \label{eq:triple-change}\\
+x_t^{\text{z-score}} &= \frac{x_t - \bar{x}_{t,w}}{\hat{\sigma}_{x,t,w}}, \label{eq:triple-zscore}
+\end{align}
+where $\bar{x}_{t,w} = \frac{1}{w}\sum_{i=0}^{w-1} x_{t-i}$ is the trailing mean and $\hat{\sigma}_{x,t,w}$ is the trailing standard deviation over the same window.
+\end{definition}
+
+\begin{itemize}[nosep]
+  \item $x_t^{\text{level}}$: the raw value of the feature, capturing the current \textbf{state}.
+  \item $x_t^{\text{change}}$: the first difference over $k$ periods, capturing \textbf{momentum} (is the feature rising or falling?).
+  \item $x_t^{\text{z-score}}$: the standardized deviation from the recent mean, capturing \textbf{anomaly} (is the current value unusual?).
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Consider the bid-ask spread. Its level tells you how wide the spread is right now. Its change tells you whether the spread is widening (deteriorating liquidity) or narrowing (improving liquidity). Its z-score tells you whether today's spread is abnormally wide relative to its own recent history. A spread of 5 cents means very different things for a stock that typically trades at 3 cents (z-score $\approx 2$, alarm) versus one that typically trades at 6 cents (z-score $\approx -1$, calm). Each variant captures genuinely different information.
+\end{intuition}
+
+\textbf{Which features get expanded.}
+The triple expansion applies to \emph{continuous} features: RV, RQ, bid-ask spread, OBI, implied volatility, VRP, volume ratios, and any numeric quantity with a meaningful scale.
+It does \emph{not} apply to categorical or binary features such as FOMC dummies, day-of-week indicators, or earnings announcement flags.
+These are already discrete and cannot be meaningfully z-scored.
+
+\textbf{Multicollinearity: a non-issue for trees.}
+In a linear regression, including level, change, and z-score of the same base feature would introduce severe multicollinearity (the three are highly correlated).
+This would inflate standard errors and produce unstable coefficient estimates.
+For tree-based models (random forests, gradient boosting), multicollinearity is harmless: trees select the most informative split at each node and are unaffected by correlated alternatives.
+Neural networks are also largely robust to correlated inputs, especially with regularization.
+The triple expansion is therefore a ``free'' way to enrich the feature set for non-linear models.
+
+\begin{workedexample}{Triple expansion of bid-ask spread}
+Suppose the time-weighted average bid-ask spread over the observation window is:
+\[
+s_t = 0.08\%, \qquad s_{t-1} = 0.06\%, \qquad \bar{s}_{t,22} = 0.05\%, \qquad \hat{\sigma}_{s,t,22} = 0.015\%.
+\]
+The three expanded features are:
+\begin{itemize}[nosep]
+  \item \textbf{Level:} $s_t^{\text{level}} = 0.08\%$ (spread is 8 bps, moderately wide).
+  \item \textbf{Change:} $s_t^{\text{change}} = 0.08\% - 0.06\% = +0.02\%$ (spread widened by 2 bps overnight -- liquidity is deteriorating).
+  \item \textbf{Z-score:} $s_t^{\text{z-score}} = (0.08 - 0.05)/0.015 = 2.0$ (spread is 2 standard deviations above its 22-day mean -- unusually wide for this stock).
+\end{itemize}
+The level alone says ``moderately wide.'' The change says ``getting worse.'' The z-score says ``abnormally wide for this stock.'' A tree model can split on any of the three depending on which is most informative for the current regime.
+\end{workedexample}
+
+\begin{projectconnection}[Why This Matters]
+Apply the triple expansion systematically to every continuous feature in your pipeline. This multiplies your feature count by roughly $3\times$ but gives tree models three distinct ``views'' of each quantity. In the vol-project-ref feature composition (Chapter~8), the triple expansion is identified as a core engineering principle: it captures state, direction, and unusualness in a single pass, and it is the primary reason feature counts grow from ${\sim}20$ base features to ${\sim}80$ model inputs.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
 \section{Lagged RV Transforms}\label{sec:feat-lagged-rv}
 % ──────────────────────────────────────────────────────────────
 
@@ -429,9 +486,77 @@ Aggregate volume into time buckets (e.g., 2-minute bins within a 10-minute windo
 The ratio of volume in the last bucket to the first captures whether activity is accelerating or decelerating.
 Volume acceleration tends to precede volatility spikes.
 
+\subsection{VPIN and Kyle's Lambda}\label{sec:feat-vpin-kyle}
+
+Two microstructure features capture the intensity of \emph{informed trading} rather than just the state of the order book.
+Both originate from market microstructure theory and measure how much private information is currently flowing into the market.
+
 \textbf{VPIN (Volume-Synchronized Probability of Informed Trading).}
-VPIN buckets trades by volume rather than time, classifies each bucket as buyer- or seller-initiated, and measures the absolute imbalance.
-High VPIN has been associated with flash-crash-like events, though its real-time usefulness remains debated.
+Standard time-based sampling mixes high-activity and low-activity periods.
+\citet{EasleyLopezOHara2012} propose an alternative: partition the trading day into \textbf{volume buckets}, each containing the same total volume $V_{\text{bucket}}$.
+Within each bucket, classify trades as buyer- or seller-initiated (typically using the tick rule or bulk volume classification), and compute the absolute imbalance.
+
+The VPIN algorithm proceeds in three steps.
+First, partition trades into $n$ equal-volume buckets, where each bucket contains exactly $V_{\text{bucket}} = V_{\text{day}} / n$ shares:
+
+\begin{equation}\label{eq:vpin}
+\text{VPIN}_t = \frac{1}{n} \sum_{\tau=1}^{n} \frac{|V_\tau^B - V_\tau^S|}{V_{\text{bucket}}},
+\end{equation}
+\begin{itemize}[nosep]
+  \item $V_\tau^B$: volume classified as buyer-initiated in bucket $\tau$.
+  \item $V_\tau^S$: volume classified as seller-initiated in bucket $\tau$ ($V_\tau^B + V_\tau^S = V_{\text{bucket}}$).
+  \item $n$: number of volume buckets per estimation window (typically 50).
+  \item VPIN ranges from 0 (perfectly balanced flow) to 1 (completely one-sided flow).
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+VPIN asks: ``In each chunk of trading volume, how one-sided was the flow?''
+When informed traders are active, they trade aggressively on one side, creating persistent imbalances.
+Uninformed traders, by contrast, are roughly equally likely to buy or sell, so their flow approximately cancels out.
+High VPIN therefore signals that informed traders are dominating the flow, which tends to precede large price moves and elevated volatility.
+The key innovation is measuring in \emph{volume time} rather than clock time: a bucket fills quickly during high-activity periods and slowly during calm periods, automatically adapting the sampling rate to market conditions.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include VPIN as a feature column if you have trade-level data with directional classification.
+Use $n = 50$ volume buckets per day as a starting point.
+VPIN is most valuable at the intraday and 1-day horizons, where it captures the arrival of informed order flow before it fully resolves into price moves.
+At longer horizons, VPIN's signal decays because the information has already been incorporated into prices.
+\end{projectconnection}
+
+\textbf{Kyle's lambda ($\lambda$): price impact per unit of order flow.}
+\citet{Kyle1985} shows that in a market with a single informed trader and competitive market makers, the equilibrium pricing rule is linear in aggregate order flow.
+The slope of this relationship, \textbf{Kyle's lambda}, measures the market's \textbf{price impact} per unit of signed volume:
+
+\begin{equation}\label{eq:kyle-lambda}
+\Delta p_t = \alpha + \underbrace{\lambda}_{\text{price impact}} \cdot \underbrace{(\text{signed volume})_t}_{\text{buy vol} - \text{sell vol}} + \varepsilon_t.
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\Delta p_t$: change in the midprice over interval $t$.
+  \item $\lambda$: Kyle's lambda, the slope coefficient.  A higher $\lambda$ means each unit of net order flow moves the price more (the market is less liquid or more informationally sensitive).
+  \item Signed volume: the difference between buyer-initiated and seller-initiated volume (positive = net buying).
+\end{itemize}
+
+In practice, estimate $\lambda$ by regressing midprice changes on signed volume over a rolling window (e.g., 60 five-minute intervals):
+
+\begin{equation}\label{eq:kyle-regression}
+\Delta p_{t,i} = \hat{\alpha} + \hat{\lambda}_t \cdot (V_{t,i}^B - V_{t,i}^S) + \hat{\varepsilon}_{t,i}, \qquad i = 1, \ldots, m,
+\end{equation}
+where $m$ is the number of intraday intervals in the rolling window.
+
+\begin{intuition}[In Plain English]
+Kyle's lambda answers: ``How many basis points does the price move for every million dollars of net order flow?''
+When $\lambda$ is high, even modest buying or selling pressure moves prices substantially -- the market is ``thin'' or carrying a lot of private information.
+When $\lambda$ is low, the market can absorb large orders without significant price impact -- it is deep and liquid.
+Rising $\lambda$ predicts higher near-term volatility because it signals that order flow is becoming more informative (or the market is becoming less resilient), both of which lead to larger price swings.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Estimate $\hat{\lambda}_t$ on a rolling 60-interval window using 5-minute data and include it as a feature column.
+$\hat{\lambda}_t$ captures a different dimension of market quality than the bid-ask spread: the spread measures the cost of a small trade, while $\lambda$ measures the cost of a \emph{large} trade.
+During stress periods, $\lambda$ spikes before the spread widens, making it a leading indicator.
+For your project, the triple expansion of Kyle's lambda (level, change, z-score) provides three informative feature columns for tree models.
+\end{projectconnection}
 
 \begin{warning}[Microstructure features are asset-specific]
 Features like OBI and spread depend heavily on the market's microstructure (tick size, maker/taker fees, minimum lot sizes).
@@ -704,6 +829,66 @@ The fractionally differenced series is:
 Unlike $\Delta^1 x_t = x_t - x_{t-1}$, this weighted sum retains some of the level information from $x_t$ while achieving stationarity.
 \end{workedexample}
 
+\subsection{Vol-of-Vol and Regime Duration}\label{sec:feat-vov-regime}
+
+Fractional differencing captures long memory through the autocorrelation structure of the RV series itself.
+Two complementary features capture different aspects of memory: the \emph{stability} of the volatility process and the \emph{time elapsed} since the last regime change.
+
+\textbf{Vol-of-vol.}
+The \textbf{volatility of volatility} measures how much the volatility process itself is fluctuating.
+It is computed as the rolling standard deviation of daily RV over a 22-day window:
+
+\begin{equation}\label{eq:vol-of-vol}
+\text{VoV}_t = \sqrt{\frac{1}{21}\sum_{i=0}^{21} \bigl(\RV_{t-i} - \bar{\RV}_{t,22}\bigr)^2},
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\bar{\RV}_{t,22} = \frac{1}{22}\sum_{i=0}^{21} \RV_{t-i}$: the trailing 22-day mean of daily RV.
+  \item $\text{VoV}_t$: standard deviation of daily RV over the past month, capturing how ``unstable'' the volatility regime is.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Vol-of-vol tells you whether volatility has been roughly constant over the past month or swinging wildly.
+During the 2020 COVID crash, both RV and vol-of-vol were extremely high.
+But in some regimes, RV is elevated but stable (a sustained high-vol period like mid-2022), meaning vol-of-vol is moderate even though RV is high.
+The distinction matters for forecasting: when vol-of-vol is high, your model should have wider prediction intervals because the volatility process is itself unpredictable.
+When vol-of-vol is low, volatility is clustered tightly around its current level, and the forecast is more reliable.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include $\text{VoV}_t$ as a feature column.
+It complements fractional differencing by capturing the \emph{dispersion} of the vol process rather than its \emph{persistence}.
+Tree models can use VoV as a split variable to identify regimes where the standard HAR-style forecast (based on mean persistence) is less reliable.
+If the VVIX index is available (it is for SPX), it provides a forward-looking analog of VoV; when both are available, include both and let the model choose.
+\end{projectconnection}
+
+\textbf{Regime duration.}
+The \textbf{regime duration} feature counts the number of trading days since the last ``volatility event,'' defined as a day where RV exceeded its trailing mean by more than 2 standard deviations:
+
+\begin{equation}\label{eq:regime-duration}
+D_t = t - \max\bigl\{\tau \leq t : \RV_\tau > \bar{\RV}_{\tau,66} + 2\,\hat{\sigma}_{\RV,\tau,66}\bigr\},
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\bar{\RV}_{\tau,66}$: the trailing 66-day (3-month) mean of daily RV at time $\tau$.
+  \item $\hat{\sigma}_{\RV,\tau,66}$: the trailing 66-day standard deviation of daily RV.
+  \item $D_t$: number of trading days since the last 2-sigma RV spike.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Regime duration acts as a \textbf{mean-reversion clock}.
+After a volatility spike, there is typically a decay period where RV gradually returns to its long-run mean.
+The duration feature tells the model how far along this decay process we are.
+When $D_t$ is small (say, 3 days since the last spike), mean reversion is still in progress and the forecast should remain elevated.
+When $D_t$ is large (say, 45 days since the last spike), the market has been calm for a while, and the probability of a new spike is rising (vol clustering means calm periods do not last forever).
+Trees can learn this non-monotonic relationship: short durations predict high vol (mean-reversion tail), and very long durations predict moderately elevated vol (the calm-before-the-storm effect).
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include $D_t$ and $\log(1 + D_t)$ as feature columns.
+The log transform compresses large duration values, which makes the feature more useful for tree splits at the short end (where the action is).
+Regime duration captures time-varying dynamics that neither fractional differencing nor the rolling Hurst exponent can express: the \emph{position within a volatility cycle} rather than the cycle's statistical properties.
+It is especially valuable at the 1-week horizon, where mean-reversion dynamics are most pronounced.
+\end{projectconnection}
+
 % ──────────────────────────────────────────────────────────────
 \section{Calendar and Event Features}\label{sec:feat-calendar}
 % ──────────────────────────────────────────────────────────────
@@ -767,6 +952,56 @@ Use these ratios as multiplicative adjustments to your baseline forecast on even
 \textbf{Days-to-next-event features.}
 Rather than a binary ``is today an event,'' encode continuous distance: $\text{days\_to\_FOMC}$, $\text{days\_since\_FOMC}$, $\text{days\_to\_earnings}$.
 This lets the model learn the anticipation buildup and post-event decay.
+
+\subsection{Calendar Proximity Measures}\label{sec:feat-proximity}
+
+The binary dummies above answer a yes/no question: ``Is today an FOMC day?''
+But volatility does not jump from zero to one on event day.
+It ramps up gradually in the days before and decays gradually in the days after.
+\textbf{Continuous proximity measures} capture this ramp by encoding the distance to the next event as a real-valued feature.
+
+\begin{definition}[Calendar Proximity Feature]
+For a scheduled event of type $e$ (FOMC, NFP, earnings, options expiry), define the \textbf{proximity measure}:
+\begin{equation}\label{eq:proximity}
+\text{prox}_{e,t} = \max\!\bigl(0,\; W_e - |t - t_e^{\text{next}}|\bigr),
+\end{equation}
+where $t_e^{\text{next}}$ is the date of the next occurrence of event $e$, and $W_e$ is a window parameter (e.g., $W_e = 5$ trading days for FOMC, $W_e = 3$ for NFP).
+\end{definition}
+
+\begin{itemize}[nosep]
+  \item $t_e^{\text{next}}$: the next scheduled occurrence of event $e$ after date $t$.
+  \item $W_e$: the anticipation window in trading days.
+  \item $\text{prox}_{e,t}$: a triangular function that ramps from 0 to $W_e$ as the event approaches and falls back to 0 afterward.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+A binary dummy says ``FOMC is today'' or ``FOMC is not today.''
+A proximity measure says ``FOMC is 3 days away'' -- and the model can learn that volatility starts compressing 2--3 days before FOMC (the ``pre-FOMC drift'') and then expands sharply on announcement day.
+This anticipation ramp is invisible to binary dummies: 5 days before FOMC looks identical to 50 days before FOMC in a binary encoding, but the market's behavior is measurably different.
+The continuous encoding lets tree models learn the full shape of the event response, not just the on/off state.
+\end{intuition}
+
+\textbf{FOMC compression and expansion.}
+Equity index volatility shows a well-documented pattern around FOMC meetings: RV is suppressed 1--3 days before the announcement as traders reduce risk ahead of the decision, then spikes on the announcement day and the following session.
+A proximity feature centered on the FOMC date captures both the compression phase (positive proximity, negative vol effect) and the expansion phase (event day, positive vol effect).
+Tree models can split on $\text{prox}_{\text{FOMC},t}$ to learn this asymmetric pattern.
+
+\textbf{Options expiry and gamma unwind.}
+Monthly options expiry (third Friday) and quarterly triple-witching dates create mechanical volatility through \textbf{gamma exposure unwind}.
+As options approach expiry, delta-hedging activity by market makers intensifies, compressing intraday volatility when gamma is positive and amplifying it when gamma is negative.
+The proximity-to-expiry feature lets the model learn that the 2--3 days before expiry have distinct vol dynamics driven by hedging flows rather than information arrival.
+
+\textbf{Earnings proximity (single names).}
+For individual stocks, earnings announcements dominate all other calendar effects.
+The proximity feature $\text{prox}_{\text{earn},t}$ captures the well-known pre-earnings volatility buildup, which begins roughly 5 trading days before the announcement as implied vol rises and option volume spikes.
+Post-earnings, the ``volatility crush'' typically resolves within 1--2 days.
+
+\begin{projectconnection}[Why This Matters]
+Replace raw binary event dummies with continuous proximity measures in your feature pipeline.
+For each event type, compute $\text{prox}_{e,t}$ with an appropriate window: $W = 5$ for FOMC, $W = 3$ for NFP/CPI, $W = 5$ for earnings (single names), $W = 3$ for options expiry.
+Also include the raw $\text{days\_to\_event}$ as a separate feature (without the triangular window) so the model can learn longer-range anticipation effects.
+Proximity features provide 1--2\% incremental QLIKE improvement over binary dummies alone at the 1-day horizon, with the gain concentrated around event days where the baseline forecast has the largest errors.
+\end{projectconnection}
 
 \begin{figure}[ht]
 \centering
@@ -980,6 +1215,143 @@ Unstable rankings are a warning sign, not a failure: they tell you the signal is
 
 \begin{projectconnection}[Why This Matters]
 Follow this exact protocol for your internship project. Run MDA across your 5 purged CV folds and report the stability of the top-10 feature rankings. If $\log \RV_t^{(d)}$ and $\sqrt{\operatorname{RQ}_t}$ consistently rank in the top 5, you have confirmation that your ML model has learned the HARQ insight from data. Present the stability table and ALE plots in your final report; they are more convincing evidence of model quality than a single QLIKE number.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{The Diminishing Returns Curve}\label{sec:feat-diminishing}
+% ──────────────────────────────────────────────────────────────
+
+You have now seen seven layers of features: lagged RV transforms, noise-awareness features (RQ), signed and asymmetric measures, options-implied quantities, microstructure signals, cross-asset spillovers, calendar/event features, and long-memory/regime features.
+The natural question is: \emph{How much does each layer actually contribute?}
+
+The answer follows a characteristic \textbf{diminishing returns curve}: the first few feature families provide the vast majority of forecasting accuracy, and each subsequent layer adds progressively less.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=12cm, height=7cm,
+  xlabel={Cumulative feature layers},
+  ylabel={Cumulative QLIKE accuracy (\%)},
+  ymin=0, ymax=110,
+  xmin=0.5, xmax=7.5,
+  xtick={1,2,3,4,5,6,7},
+  xticklabels={
+    {L0\\HAR core},
+    {+L1\\RQ, asym.},
+    {+L2\\Options},
+    {+L3\\Micro.},
+    {+L4\\Cross-asset},
+    {+L5\\Calendar},
+    {+L6--7\\Memory,\\Sent.}
+  },
+  xticklabel style={font=\scriptsize, align=center},
+  ytick={0,20,40,55,60,70,80,85,90,95,100},
+  yticklabel style={font=\small},
+  axis lines=left,
+  grid=major,
+  grid style={gray!20},
+  thick,
+  every node near coord/.append style={font=\small\bfseries, anchor=south},
+]
+% Staircase bars
+\addplot[ybar, bar width=0.7cm, fill=defblue!60, draw=defblue!80] coordinates {
+  (1, 55)
+  (2, 70)
+  (3, 85)
+  (4, 90)
+  (5, 95)
+  (6, 97)
+  (7, 100)
+};
+
+% Annotations
+\node[font=\scriptsize, defblue] at (axis cs:1, 58) {55\%};
+\node[font=\scriptsize, defblue] at (axis cs:2, 73) {70\%};
+\node[font=\scriptsize, defblue] at (axis cs:3, 88) {85\%};
+\node[font=\scriptsize, defblue] at (axis cs:4, 93) {90\%};
+\node[font=\scriptsize, defblue] at (axis cs:5, 98) {95\%};
+\node[font=\scriptsize, defblue] at (axis cs:6, 100) {97\%};
+\node[font=\scriptsize, defblue] at (axis cs:7, 103) {100\%};
+
+% Diminishing returns annotation
+\draw[dashed, warnred, thick] (axis cs:3.5,85) -- (axis cs:7.5,85);
+\node[warnred, font=\scriptsize, fill=white, inner sep=1pt] at (axis cs:5.5,82) {85\% with 3 layers (${\sim}20$ features)};
+
+% Marginal gain annotations
+\draw[<->, keyorange, thick] (axis cs:1.3, 0) -- (axis cs:1.3, 55);
+\node[keyorange, font=\tiny, rotate=90, anchor=south] at (axis cs:1.45, 27) {+55 pp};
+\draw[<->, keyorange, thick] (axis cs:2.3, 55) -- (axis cs:2.3, 70);
+\node[keyorange, font=\tiny, rotate=90, anchor=south] at (axis cs:2.45, 62) {+15 pp};
+\draw[<->, keyorange, thick] (axis cs:3.3, 70) -- (axis cs:3.3, 85);
+\node[keyorange, font=\tiny, rotate=90, anchor=south] at (axis cs:3.45, 77) {+15 pp};
+
+\end{axis}
+\end{tikzpicture}
+\caption{Diminishing returns staircase for volatility forecasting features. Each bar shows the cumulative QLIKE accuracy (normalized so the full feature set achieves 100\%) when adding one more feature layer. The first three layers (HAR core, noise/asymmetry, options) achieve 85\% of attainable accuracy with roughly 20 features. The remaining four layers add the final 15\% with 60--100 additional features. Exact percentages are illustrative and based on findings in \citet{ChristensenSiggaardVeliyev2023} and the vol-project-ref feature composition analysis.}
+\label{fig:diminishing-returns-ch10}
+\end{figure}
+
+\textbf{Interpreting the staircase.}
+The staircase in Figure~\ref{fig:diminishing-returns-ch10} shows approximate cumulative accuracy contributions, normalized so that the full feature set achieves 100\%.
+
+\begin{itemize}[nosep]
+  \item \textbf{Layer 0 (HAR core):} $\RV_t^{(d)}$, $\RV_t^{(w)}$, $\RV_t^{(m)}$ alone achieve roughly 55\% of attainable accuracy.
+    This is the single most important result in volatility forecasting: three simple features explain more than half the variation.
+  \item \textbf{Layer 1 (Noise + Asymmetry):} Adding $\sqrt{\operatorname{RQ}_t}$, $\RV_t^-$, $\RV_t^+$, and jump components pushes accuracy to roughly 70\%.
+    The HARQ and SHAR improvements are captured here.
+  \item \textbf{Layer 2 (Options):} ATM IV, skew, VRP, and term structure slope bring the total to roughly 85\%.
+    These forward-looking features represent the single largest marginal gain beyond the core RV features.
+  \item \textbf{Layers 3--7 (Microstructure, Cross-asset, Calendar, Memory, Sentiment):} The remaining five layers collectively contribute the final 15\%, with each individual layer adding 2--5 percentage points.
+\end{itemize}
+
+\textbf{The curve shifts with forecast horizon.}
+The diminishing returns curve is not fixed; it depends heavily on the forecast horizon.
+Table~\ref{tab:horizon-dominant} summarizes which features dominate at each horizon.
+
+\begin{table}[ht]
+\centering
+\caption{Feature dominance by forecast horizon. The ``dominant'' column lists the feature families that contribute the most marginal accuracy at each horizon. Based on findings in \citet{ChristensenSiggaardVeliyev2023} and \citet{HARdToBeat2024}.}
+\label{tab:horizon-dominant}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Horizon} & \textbf{Dominant features} & \textbf{ML vs.\ linear gap} & \textbf{Key insight} \\
+\midrule
+$h = 1$ day & Lagged RV, RQ, $\RV^-$ & Small (${\sim}5\%$) & HARQ nearly optimal \\
+$h = 5$ days & Options (VRP, skew) + lagged RV & Moderate (${\sim}10\%$) & VRP begins to matter \\
+$h = 22$ days & VRP, term structure, Hurst & Large (${\sim}15\%$) & Options have max advantage \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At the 1-day horizon, the HAR core dominates and ML adds relatively little.
+\citet{HARdToBeat2024} demonstrate that a properly fitted HAR model with daily re-estimation and a 630-day training window is ``hard to beat'' even with gradient-boosted trees and neural networks, when the feature set is restricted to lagged RV and VIX.
+The implication is stark: if your ML model does not beat a well-tuned HAR at $h=1$, the issue is likely the baseline, not the model.
+
+At the 1-week and 1-month horizons, the picture changes.
+\citet{ChristensenSiggaardVeliyev2023} show that ML models gain the most from additional features at longer horizons, where the informational advantage of options-implied and macroeconomic variables over lagged RV is greatest.
+At $h = 22$, ML models with the full feature set ($\mathcal{M}_{\text{ALL}}$) consistently outperform all HAR variants, and the Diebold-Mariano test frequently rejects equal predictive accuracy.
+
+\begin{keyidea}[Perfect L0--L2 Before Chasing Marginal Features]
+The diminishing returns curve delivers a clear engineering message: invest your effort in getting Layers~0--2 right before adding Layers~3--7.
+Specifically:
+\begin{enumerate}[nosep]
+  \item Get the HAR baseline correct: daily re-estimation, 500--800 day training window, log-RV target \citep{HARdToBeat2024}.
+  \item Add $\sqrt{\operatorname{RQ}_t}$, $\RV^-$, $\RV^+$, and jump components. This gives you HARQ/SHAR-level performance.
+  \item Add options features (ATM IV, VRP, skew, term structure slope) if available. This is the largest single-layer gain.
+  \item Only then consider microstructure, cross-asset, calendar proximity, and sentiment features. Each adds 2--5\% marginal improvement.
+\end{enumerate}
+Chasing Layer~5--7 features when your Layer~0 baseline is poorly calibrated (wrong training window, wrong re-estimation frequency, wrong target transform) is optimizing the wrong thing.
+\end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+The diminishing returns curve is the punchline of this entire chapter.
+For your internship project, it means:
+(1) your first model should use only Layers~0--2 (${\sim}15$--20 features) and should beat a well-tuned HAR before you declare victory;
+(2) if you have options data, adding VRP and skew should be your first extension, not microstructure features;
+(3) the QLIKE improvement target of 30--80 bps is achievable primarily through Layers~0--2 plus proper model tuning, not through feature quantity.
+Present the diminishing returns curve in your final report to explain why you prioritized feature quality over feature quantity.
 \end{projectconnection}
 
 % ══════════════════════════════════════════════════════════════
