@@ -146,13 +146,12 @@ GRUs have fewer parameters and train faster; in practice, performance difference
 
 \subsection{LSTMs for Realized Volatility}
 
-\citet{Bucci2020} provides the cleanest comparison.
-He tests LSTM and NARX (nonlinear autoregressive with exogenous inputs) networks against HAR for daily $\RV$ forecasting across multiple assets.
+\citet{Bucci2020} provides an early comparison.
+He tests LSTM and NARX (nonlinear autoregressive with exogenous inputs) networks against ARFIMA and other econometric models for monthly $\RV$ forecasting of the S\&P~500.
 
-\begin{keyresult}[Bucci (2020): LSTM for Daily RV]
-LSTM networks are competitive with HAR for daily $\RV$ forecasting, but they do not consistently dominate.
-Gains are asset-dependent and sensitive to hyperparameter tuning.
-The LSTM's advantage appears mainly during volatile periods when the relationship between past and future $\RV$ is nonlinear.
+\begin{keyresult}[Bucci (2020): LSTM for Monthly RV]
+Recurrent neural networks (LSTM, NARX) outperform traditional long-memory econometric models (ARFIMA, LSTAR) for monthly $\RV$ forecasting, particularly in terms of robust accuracy measures.
+The LSTM's advantage is clearest during volatile periods (the 2007--2009 crisis subsample), when the relationship between past and future $\RV$ is nonlinear.
 \end{keyresult}
 
 This result is consistent with the lesson from Chapter~\ref{ch:trees}: on daily $\RV$ with only lagged $\RV$ as inputs, simple models are hard to beat.
@@ -704,7 +703,7 @@ A normalizing flow transforms a simple base distribution $\bz \sim \N(\mathbf{0}
 \end{equation}
 The log-density of the output is computed via the change-of-variables formula:
 \begin{equation}\label{eq:nflow-density}
-  \log p(\bx) = \log p(\bz) - \sum_{k=1}^{K} \log \left| \det \frac{\partial T_k}{\partial T_{k-1}} \right|
+  \log p(\bx) = \log p(\bz) - \sum_{k=1}^{K} \log \left| \det \frac{\partial T_k}{\partial \bx_{k-1}} \right|
 \end{equation}
 where:
 \begin{itemize}[nosep]
@@ -778,9 +777,9 @@ Here is the evidence, scenario by scenario:
 
 \begin{enumerate}[nosep]
   \item \textbf{Daily horizon, RV lags only.}
-    HAR often matches deep learning \citep{Bucci2020}.
+    HAR often matches deep learning \citep{ChristensenSiggaardVeliyev2023}.
     Trees are slightly better than DL due to less overfitting on small datasets (Chapter~\ref{ch:trees}).
-    Do not use a 50,000-parameter LSTM when three coefficients suffice.
+    Do not use a 50,000-parameter LSTM when four parameters suffice.
 
   \item \textbf{Daily horizon, rich tabular features.}
     Trees still usually win.
@@ -833,7 +832,7 @@ Always compare against the HAR baseline on identical data.
   \item LSTMs and GRUs are the default sequential architecture for volatility.
     They use gates (forget, input, output) and a cell state to maintain long-range memory.
 
-  \item On daily $\RV$ with only lagged $\RV$ inputs, LSTMs are competitive with but do not consistently beat HAR \citep{Bucci2020}.
+  \item On monthly S\&P~500 $\RV$, LSTMs and NARX networks outperform traditional long-memory models, especially during crises \citep{Bucci2020}.
     The value of LSTMs comes from feeding them raw sequences, not pre-computed features.
 
   \item Cross-asset pooling is a genuine advantage of neural networks.
@@ -868,8 +867,8 @@ Always compare against the HAR baseline on identical data.
 \midrule
 \citet{Bucci2020}
   & LSTM, NARX
-  & Competitive with HAR, not dominant
-  & Daily RV baseline \\[3pt]
+  & Outperforms ARFIMA; gains in crises
+  & Monthly RV baseline \\[3pt]
 \citet{SirignanoCont2019}
   & Universal LSTM
   & Pooling across assets improves forecasts

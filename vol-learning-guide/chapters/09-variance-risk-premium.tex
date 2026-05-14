@@ -208,11 +208,11 @@ When VRP is low, the market is complacent, and expected returns are lower.
 \citet{BTZ2009} regress future quarterly S\&P~500 excess returns on the ex-ante VRP and find:
 \begin{itemize}[nosep]
   \item The VRP coefficient is positive and statistically significant: higher VRP today predicts higher equity returns over the next quarter.
-  \item A one-standard-deviation increase in VRP predicts approximately 3--4\% higher quarterly excess returns.
-  \item The $R^2$ for quarterly return prediction is 5--10\%, substantially exceeding the dividend yield (the previous best-known predictor at the quarterly horizon).
-  \item The predictability is concentrated at the 1--6 month horizon and fades at longer horizons.
+  \item A one-standard-deviation increase in VRP predicts higher quarterly excess returns.
+  \item Using simple backward-looking RV, the $R^2$ for quarterly return prediction is about 4\%; using a HAR-based expected variance proxy, $R^2$ exceeds 15\%, substantially exceeding the dividend yield and other popular predictors at the quarterly horizon.
+  \item The predictability is concentrated at the quarterly (3--6 month) horizon and fades at longer horizons.
 \end{itemize}
-They operationalize VRP as $\text{VIX}^2_t - \RV_{t-22,t}$, using backward-looking monthly RV as the $\mathbb{P}$-measure proxy.
+They operationalize VRP in two ways: a simple version using $\text{VIX}^2_t - \RV_{t-22,t}$ (backward-looking monthly RV), and an expected variance premium using a HAR-RV forecast as the $\mathbb{P}$-measure proxy.
 \end{keyresult}
 
 \begin{workedexample}{VRP as a Return Predictor}
@@ -237,7 +237,7 @@ The BTZ framework would predict very high future returns, and indeed the S\&P~50
 
 \begin{warning}[VRP Is Not a Timing Tool]
 VRP predicts returns in a statistical, population-average sense.
-The $R^2$ of 5--10\% means that 90--95\% of quarterly return variation is unexplained.
+Even the best specification ($R^2 \approx 15\%$) leaves 85\% of quarterly return variation unexplained.
 A high VRP does \emph{not} guarantee positive returns in any single quarter.
 Furthermore, VRP is highest during crises, precisely when portfolio constraints and drawdown pain are most severe.
 Trading on VRP requires the ability and willingness to take risk when it feels worst.
@@ -509,20 +509,20 @@ Each day, compute the log-return $r_t = \ln(S_t / S_{t-1})$, the squared return 
 \toprule
 Day & $S_t$ & $r_t$ (\%) & $r_t^2 \;(\times 10^{-4})$ & $\sigma_i^2\Delta t \;(\times 10^{-4})$ & Gamma P\&L (\$) \\
 \midrule
-1 & 101.2 & $+1.19$ & 1.423 & 1.286 & $+0.028$ \\
-2 & 99.8  & $-1.39$ & 1.941 & 1.286 & $+0.130$ \\
-3 & 100.5 & $+0.70$ & 0.489 & 1.286 & $-0.161$ \\
-4 & 102.1 & $+1.58$ & 2.495 & 1.286 & $+0.252$ \\
-5 & 101.0 & $-1.08$ & 1.173 & 1.286 & $-0.023$ \\
+1 & 101.2 & $+1.19$ & 1.423 & 1.286 & $+0.003$ \\
+2 & 99.8  & $-1.39$ & 1.941 & 1.286 & $+0.013$ \\
+3 & 100.5 & $+0.70$ & 0.489 & 1.286 & $-0.016$ \\
+4 & 102.1 & $+1.58$ & 2.495 & 1.286 & $+0.025$ \\
+5 & 101.0 & $-1.08$ & 1.173 & 1.286 & $-0.002$ \\
 \midrule
-\multicolumn{5}{@{}l}{Cumulative (5 days)} & $+0.227$ \\
+\multicolumn{5}{@{}l}{Cumulative (5 days)} & $+0.023$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \textbf{Interpretation.}
 The annualized realized volatility over these 5 days was approximately $19.5\%$, above the $18\%$ implied vol we paid.
-The cumulative gamma P\&L is positive (\$0.227 per share, or \$22.70 per standard 100-share contract).
+The cumulative gamma P\&L is positive (\$0.023 per share, or \$2.30 per standard 100-share contract).
 On days where the squared return exceeded $\sigma_i^2 \Delta t$ (days 1, 2, 4), we profited; on quiet days (days 3, 5), we lost to theta.
 \end{workedexample}
 
@@ -836,7 +836,7 @@ ML-based regime detection (Chapter~\ref{ch:features}) and position sizing are es
 
   \item \textbf{VRP exists} because of risk aversion, demand for crash protection, and equilibrium pricing of uncertainty about future growth \citep{DrechslerYaron2011}.
 
-  \item \textbf{VRP predicts returns}: \citet{BTZ2009} show that VRP predicts quarterly equity excess returns with $R^2$ of 5--10\%, beating the dividend yield as a return predictor.
+  \item \textbf{VRP predicts returns}: \citet{BTZ2009} show that VRP predicts quarterly equity excess returns with $R^2$ of 4--15\% (depending on the $\mathbb{P}$-measure proxy), beating the dividend yield as a return predictor.
 
   \item \textbf{VRP predicts volatility}: high VRP signals that realized vol will likely rise toward implied vol through mean reversion.
 
@@ -872,7 +872,7 @@ ML-based regime detection (Chapter~\ref{ch:features}) and position sizing are es
 \textbf{Paper} & \textbf{Result} & \textbf{Relevance} \\
 \midrule
 \citet{BTZ2009} &
-VRP predicts quarterly equity excess returns with $R^2$ of 5--10\%, beating the dividend yield. &
+VRP predicts quarterly equity excess returns with $R^2$ of 4--15\% (depending on $\mathbb{P}$-proxy), beating the dividend yield. &
 Establishes VRP as a top return predictor; motivates its use as an ML feature. \\[6pt]
 
 \citet{DrechslerYaron2011} &

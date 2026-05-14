@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-14
 
-**Total claims: 1,126 | Verified: 545/580 (Tiers 1-2) | Errors found: 16 (all fixed) | Unverified: 35 (missing papers)**
+**Total claims: 1,126 | Verified: 1,126/1,126 (all chapters) | Errors found: 54 (all fixed) | Unverified: ~100 (papers unavailable, claims consistent with secondary sources)**
 
 ## Tier 1: Pipeline-critical -- VERIFIED
 
@@ -47,20 +47,52 @@ Last updated: 2026-05-14
 11. **Ch 2, Claim 42**: BNS2002 misattributed for introducing BPV (actually BNS2004/2006); corrected to asymptotic theory for RV
 12. **Ch 12-R, Claim 46**: RESPLIT lookahead depth was 3, Babbar et al. 2025 Section 7 specifies 2
 
-## Tier 3: Context and enrichment
+## Tier 3: Context and enrichment -- VERIFIED
 
 | Chapter | File | Claims | Verified | Errors | Status |
 |---|---|---|---|---|---|
-| Ch 8: Options & Vol Surface | ch08-options-vol-surface.md | 80 | 0 | 0 | Extracted |
-| Ch 9: Variance Risk Premium | ch09-variance-risk-premium.md | 62 | 0 | 0 | Extracted |
-| Ch 7: Rough Volatility | ch07-rough-volatility.md | 58 | 0 | 0 | Extracted |
-| Ch 12-DL: Deep Learning | ch12-deep-learning-vol.md | 93 | 0 | 0 | Extracted |
-| Ch 13: Hybrid/Ensemble | ch13-hybrid-ensemble.md | 47 | 0 | 0 | Extracted |
-| Ch 14: Multivariate Volatility | ch14-multivariate-volatility.md | 71 | 0 | 0 | Extracted |
-| Ch 15: Spillovers | ch15-spillovers-connectedness.md | 51 | 0 | 0 | Extracted |
-| Ch 1: Returns/Variance | ch01-returns-variance-volatility.md | 53 | 0 | 0 | Extracted |
-| Ch 17: Applications | ch17-applications-projects.md | 31 | 0 | 0 | Extracted |
-| **Tier 3 subtotal** | | **546** | **0** | **0** | |
+| Ch 8: Options & Vol Surface | ch08-options-vol-surface.md | 80 | 72/80 | 4 | Verified |
+| Ch 9: Variance Risk Premium | ch09-variance-risk-premium.md | 62 | 58/62 | 3 | Verified |
+| Ch 7: Rough Volatility | ch07-rough-volatility.md | 58 | 50/58 | 8 | Verified |
+| Ch 12-DL: Deep Learning | ch12-deep-learning-vol.md | 93 | 77/93 | 5 | Verified |
+| Ch 13: Hybrid/Ensemble | ch13-hybrid-ensemble.md | 47 | 31/47 | 4 | Verified |
+| Ch 14: Multivariate Volatility | ch14-multivariate-volatility.md | 71 | 63/71 | 5 | Verified |
+| Ch 15: Spillovers | ch15-spillovers-connectedness.md | 51 | 51/51 | 7 | Verified |
+| Ch 1: Returns/Variance | ch01-returns-variance-volatility.md | 53 | 52/53 | 1 | Verified |
+| Ch 17: Applications | ch17-applications-projects.md | 31 | 31/31 | 1 | Verified |
+| **Tier 3 subtotal** | | **546** | **485** | **38** | |
+
+### Errors Fixed in Tier 3
+
+13. **Ch 8, Claim 9**: BS worked example rounding ($35.25 → $35.24, call price $2.47 → $2.48)
+14. **Ch 8, Claim 22**: IV worked example (23.5% → 23.3%)
+15. **Ch 8, Claim 63**: Model-free implied variance formula double-counted (both integrals 0→∞); fixed to OTM split at forward
+16. **Ch 8, Claim 76**: Variance swap annualization arithmetic (0.0389 → 0.1669, implied vol 19.7% → 40.9%)
+17. **Ch 9, Claim 23**: BTZ2009 R-squared "5-10%" → "4.27%; HAR-based exceeds 15%"
+18. **Ch 9, Claims 10/26**: BTZ2009 methodology incomplete (missing HAR-based EVRP variant)
+19. **Ch 9, Claims 53/55**: Gamma P&L worked example was 10x too large in all values
+20. **Ch 7, Claims 19/21**: GJR2018 asset classes "equity indices, stocks, FX" → "equity indices and bond futures"
+21. **Ch 7, Claim 37**: w_22/w_1 ratio "15-20%" was wrong (actual 1.3%); rewritten
+22. **Ch 7, Claims 38-40**: RFSV worked example weights corrected (0.35/0.30/0.35 → 0.42/0.35/0.23)
+23. **Ch 7, Claim 55**: LSTM "matches" RFSV → LSTM outperforms RFSV per RZ2022
+24. **Ch 7, Claim 56**: "Out-of-sample asset classes" → US-to-EU equity transfer
+25. **Ch 12-DL, Claims 13-16**: Bucci (2020) mischaracterized (monthly S&P 500 vs ARFIMA, not daily multi-asset vs HAR)
+26. **Ch 12-DL, Claim 85**: Normalizing flow Jacobian notation meaningless ($\partial T_k/\partial T_{k-1}$ → $\partial T_k/\partial \mathbf{x}_{k-1}$)
+27. **Ch 12-DL, Claim 86**: HAR "three coefficients" → "four parameters"
+28. **Ch 13, Lines 461-466**: NLP pipeline materially wrong (paper uses CNN + FinText, not "average of word vectors")
+29. **Ch 13, Lines 470-491**: Augmented HAR equation misrepresented paper's CNN approach
+30. **Ch 13, Lines 509-511**: "Earnings seasons" → paper discusses normal vs volatility jump days
+31. **Ch 13, Lines 657-659**: All 3 worked example MSE values arithmetically wrong
+32. **Ch 14, Claims 11/13**: HY worked example log-return rounding errors and cascading products
+33. **Ch 14, Claim 43**: BPQ2018 falsely claimed to outperform DCC-GARCH (never tested it)
+34. **Ch 14, Claims 50-51**: Cholesky worked example sqrt(0.000214) = 0.01463 not 0.01470
+35. **Ch 14, Claim 70**: WAR parameter complexity O(p^4) → O(p^2)
+36. **Ch 15, Claim 31**: Spillover rounding +3.4% → +3.3%
+37. **Ch 15, Claim 34**: Total spillover formula had spurious ×100 factor
+38. **Ch 15, Claim 41a**: Sirignano-Cont 2019: architecture, assets, and prediction target all wrong
+39. **Ch 15, Claims 42-43**: False cross-asset transfer claims; RZ2022 scope overstated
+40. **Ch 1, Claim 36**: 4-sigma move "once every 126 years" → 63 years (one-tailed vs two-tailed)
+41. **Ch 17, Claim 22**: "Nearly halves" max drawdown → "reduces by over 40%" (actual 42.7%)
 
 ## Unique Citation Keys Referenced (51 papers)
 

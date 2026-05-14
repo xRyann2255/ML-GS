@@ -302,16 +302,16 @@ divided by $N$:
 
 \textbf{Step 3: Net spillover.}
 \begin{align*}
-  S_{\text{Equity}}^{\text{net}} &= 16.7 - 13.3 = +3.4\% \quad \text{(net transmitter)}, \\
+  S_{\text{Equity}}^{\text{net}} &= 16.7 - 13.3 = +3.3\% \quad \text{(net transmitter)}, \\
   S_{\text{Bonds}}^{\text{net}}  &= 11.7 - 15.0 = -3.3\% \quad \text{(net receiver)}, \\
   S_{\text{FX}}^{\text{net}}     &= 10.0 - 10.0 = \phantom{+}0.0\% \quad \text{(neutral)}.
 \end{align*}
 
-\textbf{Step 4: Total spillover index.}  Average of all off-diagonal entries,
-divided by $N$:
+\textbf{Step 4: Total spillover index.}  Sum of all off-diagonal entries,
+divided by $N$ (since each row already sums to 100):
 \[
-  S^{(10)} = \frac{25 + 15 + 30 + 15 + 20 + 10}{3 \times 3} \times 100
-           = \frac{115}{9} \times 100 \approx 38.3\%.
+  S^{(10)} = \frac{25 + 15 + 30 + 15 + 20 + 10}{3}
+           = \frac{115}{3} \approx 38.3\%.
 \]
 
 Interpretation: about 38\% of the total forecast-error variance in this system comes
@@ -626,23 +626,25 @@ The high cross-sector connectedness during crises hints at something deeper: may
 volatility dynamics are not just correlated but fundamentally \emph{similar} across
 asset classes.  Two recent papers make this case precisely.
 
-\citet{SirignanoCont2019} train a single feedforward network to predict returns and
-volatility by pooling data across all assets (stocks, currencies, commodities).
-The pooled (``universal'') model performs comparably to individual asset-specific
-models, implying that the features driving volatility are largely shared.
+\citet{SirignanoCont2019} train a single deep network (LSTM layers followed by a
+fully-connected layer) to predict the direction of the next price move by pooling
+high-frequency data across hundreds of US equities.
+The pooled (``universal'') model outperforms individual asset-specific
+models, implying that the features driving price formation are largely shared.
 
-\begin{keyresult}[Universal Volatility Features]
-\citet{SirignanoCont2019} show that a model trained on one asset class transfers
-well to others with minimal fine-tuning.  This ``universality'' holds for features
-based on returns, realized volatility, and order-flow imbalance.  The implication:
+\begin{keyresult}[Universal Price Formation Features]
+\citet{SirignanoCont2019} show that a model trained on pooled equity data generalizes
+to out-of-sample stocks not seen during training.  This ``universality'' holds for
+features based on order-flow history (queue imbalances, trade arrivals).  The implication:
 spillover networks may reflect common factor exposures rather than direct causal
 transmission.
 \end{keyresult}
 
-\citet{RosenbaumZhang2022} push universality further by estimating the Hurst
-exponent $H$ across assets using a universal LSTM.  Their key finding:
-$H \approx 0.1$ everywhere (equities, FX, rates, commodities), consistent with the
-rough volatility theory from Chapter~\ref{ch:rough}.
+\citet{RosenbaumZhang2022} push universality further by training a universal LSTM
+on pooled data from hundreds of liquid stocks to forecast daily realized volatility.
+Their key finding: the LSTM's predictions are matched by a parsimonious rough
+volatility model with $H \approx 0.1$, consistent with the rough volatility theory
+from Chapter~\ref{ch:rough}.
 
 \begin{intuition}[Why universality matters for spillovers]
 If volatility dynamics really are ``universal'' (same roughness, same feature
@@ -755,12 +757,13 @@ A practical recipe for incorporating spillover features:
         network of banks and sovereigns, confirming the calm-to-crisis structural
         shift at institution level.
 
-  \item \citet{SirignanoCont2019} demonstrate ``universal'' volatility features: a
-        pooled model trained across asset classes performs comparably to
+  \item \citet{SirignanoCont2019} demonstrate ``universal'' price formation features:
+        a pooled deep learning model trained across US equities outperforms
         asset-specific models, suggesting common underlying dynamics.
 
-  \item \citet{RosenbaumZhang2022} estimate $H \approx 0.1$ universally across
-        assets using an LSTM, connecting spillover phenomena to rough volatility
+  \item \citet{RosenbaumZhang2022} train a universal LSTM on pooled equity data
+        whose predictions are matched by a rough volatility model with
+        $H \approx 0.1$, connecting spillover phenomena to rough volatility
         theory (Chapter~\ref{ch:rough}).
 
   \item Spillover indices are useful as ML features for medium-horizon forecasting:

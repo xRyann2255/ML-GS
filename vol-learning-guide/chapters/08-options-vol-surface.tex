@@ -240,11 +240,11 @@ The risk-free rate is $r = 5\%$ per year and volatility is $\sigma = 20\%$ per y
 \begin{align*}
   C &= 100 \times 0.3772 - 105\,e^{-0.05 \times 0.25} \times 0.3398 \\
     &= 37.72 - 105 \times 0.9876 \times 0.3398 \\
-    &= 37.72 - 35.25 \\
-    &= \$2.47
+    &= 37.72 - 35.24 \\
+    &= \$2.48
 \end{align*}
 
-The call is out-of-the-money ($S < K$), so the premium is modest: \$2.47 on a \$100 underlying.
+The call is out-of-the-money ($S < K$), so the premium is modest: \$2.48 on a \$100 underlying.
 You are paying for the \emph{possibility} that the index rises above 105 within three months.
 \end{workedexample}
 
@@ -390,12 +390,12 @@ IV is also one of the strongest single features for predicting future realized v
 
 \begin{workedexample}{Backing Out Implied Volatility}
 Continuing the example from Section~\ref{sec:black-scholes}: $S = 100$, $K = 105$, $r = 5\%$, $T = 0.25$.
-Suppose the market price of the call is $C_{\text{mkt}} = \$3.10$ (higher than the \$2.47 we computed with $\sigma = 20\%$).
+Suppose the market price of the call is $C_{\text{mkt}} = \$3.10$ (higher than the \$2.48 we computed with $\sigma = 20\%$).
 
 Since the market price exceeds our 20\%-vol price, the market is pricing in higher volatility.
-Using numerical root-finding on $C_{\text{BS}}(S, K, r, T, \sigma) = 3.10$, you would find $\sigma_{\text{imp}} \approx 23.5\%$.
+Using numerical root-finding on $C_{\text{BS}}(S, K, r, T, \sigma) = 3.10$, you would find $\sigma_{\text{imp}} \approx 23.3\%$.
 
-The market is telling you: the uncertainty priced into this option corresponds to roughly 23.5\% annualized volatility, not the 20\% we assumed.
+The market is telling you: the uncertainty priced into this option corresponds to roughly 23.3\% annualized volatility, not the 20\% we assumed.
 \end{workedexample}
 
 \subsubsection*{Computing IV: The Newton-Raphson Method}
@@ -1046,8 +1046,8 @@ Expectations under $\mathbb{Q}$ incorporate risk premia: they overweight bad out
 The risk-neutral expected integrated variance over horizon $[0, T]$ equals:
 \begin{equation}
   \E^{\mathbb{Q}}\!\left[\int_0^T \sigma_t^2\,dt\right]
-  = \frac{2}{T}\int_0^{\infty} \frac{C(K,T)}{K^2}\,dK
-  + \frac{2}{T}\int_0^{\infty} \frac{P(K,T)}{K^2}\,dK
+  = \frac{2}{T}\!\left[\int_0^{F} \frac{P(K,T)}{K^2}\,dK
+  + \int_{F}^{\infty} \frac{C(K,T)}{K^2}\,dK\right]
   \label{eq:model-free-var}
 \end{equation}
 where:
@@ -1055,10 +1055,10 @@ where:
   \item $\E^{\mathbb{Q}}[\cdot]$ = expectation under the risk-neutral probability measure.
   \item $\sigma_t^2$ = instantaneous variance of the underlying at time $t$.
   \item $\int_0^T \sigma_t^2\,dt$ = integrated variance over the period (the object that realized volatility estimates; see Chapter~\ref{ch:rv}).
-  \item $C(K,T)$ = price of a European call with strike $K$ and maturity $T$.
-  \item $P(K,T)$ = price of a European put with strike $K$ and maturity $T$.
-  \item The integration spans all possible strikes from zero to infinity.
-  \item The $1/K^2$ weighting gives proportionally more weight to OTM options at lower strikes.
+  \item $F$ = forward price of the underlying.
+  \item $P(K,T)$ = price of a European put with strike $K$ and maturity $T$ (used for $K < F$, i.e., OTM puts).
+  \item $C(K,T)$ = price of a European call with strike $K$ and maturity $T$ (used for $K > F$, i.e., OTM calls).
+  \item The $1/K^2$ weighting gives proportionally more weight to lower-strike options.
 \end{itemize}
 The key insight: by integrating option prices across all strikes, the dependence on any particular volatility model cancels out.
 \end{keyresult}
@@ -1261,17 +1261,17 @@ $K$ & Type & Price $Q_i$ & $\Delta K$ & Weight $w_i$ & Contribution $w_i \times 
 
 Annualizing over $T = 30/365 \approx 0.08219$ years:
 \[
-  K_{\text{var}}^{\text{ann}} = \frac{K_{\text{var}}}{T} = \frac{0.01372}{0.08219} \approx 0.0389
+  K_{\text{var}}^{\text{ann}} = \frac{K_{\text{var}}}{T} = \frac{0.01372}{0.08219} \approx 0.1669
 \]
 
 \textbf{Step 4: Convert to implied vol.}
 \[
-  \sqrt{K_{\text{var}}^{\text{ann}}} = \sqrt{0.0389} \approx 19.7\%
+  \sqrt{K_{\text{var}}^{\text{ann}}} = \sqrt{0.1669} \approx 40.9\%
 \]
 
-If VIX $= 20$, then $\text{VIX}^2/10{,}000 = 0.0400$.
-Our discrete approximation gives 0.0389.
-The gap is truncation error from missing strikes below 80 and above 120, where additional OTM options would contribute small but positive increments to the sum.
+This high implied vol reflects the elevated option prices in our stylized example.
+For context, if the S\&P~500 traded with a vol surface consistent with VIX $= 40$, then $\text{VIX}^2/10{,}000 = 0.1600$, close to our 0.1669.
+The small gap is truncation error from the limited strike range (80--120); additional OTM options below 80 and above 120 would add positive increments to the sum.
 \end{workedexample}
 
 \begin{intuition}[Trading Your Vol Forecast Directly]

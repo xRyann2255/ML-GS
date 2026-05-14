@@ -247,11 +247,11 @@ prices $\{50, 50.5, 49.8, 50.2\}$.
 \textbf{Step 1: compute returns.}
 \begin{align*}
   r_1^A &= \ln(101/100) \approx 0.00995, &\quad &\text{interval } [0,2), \\
-  r_2^A &= \ln(99/101) \approx -0.02005, &\quad &\text{interval } [2,5), \\
-  r_3^A &= \ln(100.5/99) \approx 0.01511, &\quad &\text{interval } [5,8). \\[4pt]
+  r_2^A &= \ln(99/101) \approx -0.02000, &\quad &\text{interval } [2,5), \\
+  r_3^A &= \ln(100.5/99) \approx 0.01504, &\quad &\text{interval } [5,8). \\[4pt]
   r_1^B &= \ln(50.5/50) \approx 0.00995, &\quad &\text{interval } [0,3), \\
-  r_2^B &= \ln(49.8/50.5) \approx -0.01399, &\quad &\text{interval } [3,6), \\
-  r_3^B &= \ln(50.2/49.8) \approx 0.00802, &\quad &\text{interval } [6,8).
+  r_2^B &= \ln(49.8/50.5) \approx -0.01396, &\quad &\text{interval } [3,6), \\
+  r_3^B &= \ln(50.2/49.8) \approx 0.00800, &\quad &\text{interval } [6,8).
 \end{align*}
 
 \textbf{Step 2: identify overlapping pairs.}
@@ -273,12 +273,12 @@ $[5,8)$ & $[6,8)$ & Yes \\
 \textbf{Step 3: sum products of overlapping pairs.}
 \begin{align*}
   \widehat{\sigma}_{AB}^{\mathrm{HY}}
-  &= (0.00995)(0.00995) + (-0.02005)(0.00995) \\
-  &\quad + (-0.02005)(-0.01399) + (0.01511)(-0.01399) \\
-  &\quad + (0.01511)(0.00802) \\
-  &= 9.90 \times 10^{-5} - 1.99 \times 10^{-4} + 2.81 \times 10^{-4}
-     - 2.11 \times 10^{-4} + 1.21 \times 10^{-4} \\
-  &\approx 9.1 \times 10^{-5}.
+  &= (0.00995)(0.00995) + (-0.02000)(0.00995) \\
+  &\quad + (-0.02000)(-0.01396) + (0.01504)(-0.01396) \\
+  &\quad + (0.01504)(0.00800) \\
+  &= 9.90 \times 10^{-5} - 1.99 \times 10^{-4} + 2.79 \times 10^{-4}
+     - 2.10 \times 10^{-4} + 1.20 \times 10^{-4} \\
+  &\approx 9.0 \times 10^{-5}.
 \end{align*}
 The positive value indicates slight positive comovement. Note: no observations
 were discarded.
@@ -615,12 +615,12 @@ variances.
 \end{projectconnection}
 
 \begin{keyresult}[Separate Modeling Beats Joint]
-\citet{BollerslevPattonQuaedvlieg2018} show that the DRD decomposition, where
-variances and correlations are modeled with separate HAR regressions,
-significantly outperforms both (a) direct vech-HAR on all elements jointly and
-(b) DCC-GARCH. The HARQ variant (adding $\sqrt{\operatorname{RQ}}$ interactions
-from Chapter~\ref{ch:har}) further improves the variance forecasts, especially
-on high-noise days.
+\citet{BollerslevPattonQuaedvlieg2018} show that the HARQ-DRD model, where
+variances and correlations are modeled with separate HAR regressions and
+measurement-error attenuation, significantly outperforms the direct vech-HAR
+on all elements jointly. The HARQ variant (adding $\sqrt{\operatorname{RQ}}$
+interactions from Chapter~\ref{ch:har}) further improves the variance
+forecasts, especially on high-noise days.
 \end{keyresult}
 
 \begin{workedexample}{HAR-DRD for 2 Assets}
@@ -693,14 +693,14 @@ Using the same $\mathbf{RC}_t$ from the DRD example:
 
 \textbf{Step 1: Cholesky decomposition.}
 \[
-  L_t = \begin{pmatrix} 0.02000 & 0 \\ 0.00600 & 0.01470 \end{pmatrix}.
+  L_t = \begin{pmatrix} 0.02000 & 0 \\ 0.00600 & 0.01463 \end{pmatrix}.
 \]
 Check: $l_{11} = \sqrt{0.00040} = 0.02$,\;
 $l_{21} = 0.00012 / 0.02 = 0.006$,\;
-$l_{22} = \sqrt{0.00025 - 0.006^2} = \sqrt{0.000214} \approx 0.01470$.
+$l_{22} = \sqrt{0.00025 - 0.006^2} = \sqrt{0.000214} \approx 0.01463$.
 
 \textbf{Step 2: transform.}
-Log-transform diagonal: $(\ln 0.02, \ln 0.01470) \approx (-3.912, -4.220)$.
+Log-transform diagonal: $(\ln 0.02, \ln 0.01463) \approx (-3.912, -4.225)$.
 Off-diagonal left as-is: $0.006$.
 
 \textbf{Step 3: fit HAR to each of the 3 elements} (daily, weekly, monthly
@@ -1126,7 +1126,7 @@ Key takeaways from this chapter:
 \textbf{Method} & \textbf{Data Input} & \textbf{Key Advantage} & \textbf{Key Limitation} \\
 \midrule
 DCC-GARCH & Daily returns & Scales to large $p$; PSD guaranteed & Single correlation dynamic; ignores HF data \\
-WAR & Realized covariance & Theoretically clean matrix AR & $O(p^4)$ parameters \\
+WAR & Realized covariance & Theoretically clean matrix AR & $O(p^2)$ parameters \\
 HAR-DRD & Realized covariance & Best accuracy (BPQ 2018); flexible & PSD not guaranteed \\
 Cholesky-HAR & Realized covariance & PSD by construction & Cholesky ordering arbitrary \\
 Graph-HAR / GNN & RV + graph & Models spillovers & Graph construction is a design choice \\

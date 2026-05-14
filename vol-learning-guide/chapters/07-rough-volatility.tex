@@ -288,17 +288,17 @@ The gap between 0.1 and 0.5 is the motivation for the entire rough volatility pr
 
 With the concept of roughness in hand, the central empirical claim of the rough volatility literature can be stated precisely.
 
-\citet{GJR2018} studied the time series of $\log \RV_t$ (5-minute realized variance, as defined in Chapter~\ref{ch:rv}) across a wide range of assets: equity indices, individual stocks, and foreign exchange.
+\citet{GJR2018} studied the time series of $\log \RV_t$ (5-minute realized variance, as defined in Chapter~\ref{ch:rv}) across a range of equity indices and bond futures, including the DAX, Bund, S\&P~500, and NASDAQ, as well as roughly twenty other indices from the Oxford-Man realized library.
 For each asset, they estimated the Hurst exponent $H$ of the $\log \RV$ series.
 The finding was striking.
 
 \begin{keyresult}[\citet{GJR2018}: Volatility Is Rough]
-Across equity indices, individual stocks, and FX, the Hurst exponent of $\log \RV_t$ is consistently around $H \approx 0.1$, far below the $H = 0.5$ of standard Brownian motion.
+Across equity indices and bond futures, the Hurst exponent of $\log \RV_t$ is consistently around $H \approx 0.1$ (ranging from roughly $0.06$ to $0.2$ depending on the asset), far below the $H = 0.5$ of standard Brownian motion.
 This means that log-volatility paths are much rougher (more jagged, more rapidly oscillating) than any standard diffusion model would predict.
 \end{keyresult}
 
 To put $H = 0.1$ in context: standard stochastic volatility models (Heston, SABR) assume that the volatility process is driven by a standard Brownian motion, which has $H = 0.5$.
-An $H$ of $0.1$ means the volatility path reverses direction roughly five times more frequently than a standard diffusion would.
+An $H$ of $0.1$ means the volatility path is far more jagged than a standard diffusion: it reverses direction much more frequently, creating the rapidly oscillating pattern visible in the top-left panel of Figure~\ref{fig:hurst-paths}.
 
 \subsection{How to Estimate $H$: The Variogram Method}
 
@@ -502,7 +502,7 @@ Consider two forecasting extremes.
 If $H = 0.5$ (standard BM), increments are independent and only the most recent observation matters; the weights drop to zero immediately.
 If $H = 0.01$ (extremely rough), the process is so anti-persistent that every past reversal carries information about the current level; the weights decay very slowly.
 At $H = 0.1$, you are close to the second extreme.
-The weight on an observation from 22 days ago (one month) is still roughly 15--20\% of the weight on yesterday's observation.
+The unnormalized weight on an observation from 22 days ago is $22^{-1.4} \approx 1.3\%$ of the weight on yesterday's observation, but because the weights are normalized to sum to one and lag~1 dominates, the lag-22 group (lags~6--22) collectively receives roughly a quarter of the total weight.
 This is why HAR's monthly component ($\RV^{(m)}$) carries a large coefficient in Chapter~\ref{ch:har}: it is picking up the long tail of the RFSV weight function.
 \end{intuition}
 
@@ -524,9 +524,9 @@ Normalizing so they sum to 1:
 \toprule
 \textbf{Lag group} & \textbf{Sum of RFSV weights} & \textbf{HAR analog} \\
 \midrule
-Lag 1 (yesterday)     & $\approx 0.35$ & $\beta_d \approx 0.36$ \\
-Lags 2--5 (rest of week)  & $\approx 0.30$ & Embedded in $\beta_w \approx 0.28$ \\
-Lags 6--22 (rest of month) & $\approx 0.35$ & Embedded in $\beta_m \approx 0.28$ \\
+Lag 1 (yesterday)     & $\approx 0.42$ & $\beta_d \approx 0.36$ \\
+Lags 2--5 (rest of week)  & $\approx 0.35$ & Embedded in $\beta_w \approx 0.28$ \\
+Lags 6--22 (rest of month) & $\approx 0.23$ & Embedded in $\beta_m \approx 0.28$ \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -671,7 +671,7 @@ Applying the variogram estimator to the red series yields $\hat{H} \approx 0.1$,
 The \citet{ContDas2024} argument proceeds in three steps:
 
 \begin{enumerate}[nosep]
-  \item \textbf{Noise adds independent errors.} Each day's $\RV_t$ differs from the true $\IVol_t$ by an estimation error $\eta_t$ (Chapter~\ref{ch:rv}, Equation~\ref{eq:rv-clt}). These errors are approximately independent across days.
+  \item \textbf{Noise adds estimation errors.} Each day's $\RV_t$ differs from the true $\IVol_t$ by an estimation error $\eta_t$ (Chapter~\ref{ch:rv}, Equation~\ref{eq:rv-clt}). Under certain models (e.g., the Ornstein--Uhlenbeck stochastic volatility model), these log-estimation errors are approximately i.i.d.\ Gaussian across days.
 
   \item \textbf{Independent errors create anti-persistence.} If you add i.i.d.\ noise to a smooth signal, the increments of the noisy series are negatively autocorrelated. An unusually high noise draw today will be followed (on average) by a smaller one tomorrow, creating artificial ``reversals'' in the series.
 
@@ -702,7 +702,8 @@ Cont--Das argue that $\RV_t$ is the error-contaminated record and $\sigma^2_t$ i
 % ═══════════════════════════════════════════════════
 
 \citet{RosenbaumZhang2022} train a single LSTM (Long Short-Term Memory neural network) on hundreds of individual stocks simultaneously.
-The trained network, which they call the ``universal LSTM,'' matches the forecasting performance of the RFSV model and the Quadratic Rough Heston parametric forecaster.
+The trained network, which they call the ``universal LSTM,'' consistently outperforms asset-specific RFSV models.
+However, a combined RFSV + Quadratic Rough Heston parametric forecaster with fixed (non-asset-specific) parameters matches the LSTM's performance, suggesting both capture the same underlying regularity.
 
 \begin{prereq}[LSTM (Brief)]
 An LSTM is a type of recurrent neural network designed to learn sequential patterns.
@@ -728,13 +729,13 @@ The practical forecasting value is the same either way.
 The debate about the nature of the spot process is theoretically important but does not affect your forecast accuracy.
 \end{keyidea}
 
-\citet{RosenbaumZhang2022} also document a ``universality'' property: the LSTM trained on a broad cross-section of stocks transfers well to assets it has never seen, including out-of-sample asset classes.
+\citet{RosenbaumZhang2022} also document a ``universality'' property: the LSTM trained on US equities transfers well to European equities it has never seen, without degradation in performance.
 This is consistent with the cross-asset universality of $H \approx 0.1$ documented by \citet{BLP2022}.
 
-\begin{keyresult}[\citet{RosenbaumZhang2022}: Universal LSTM Matches RFSV]
-A single LSTM trained on hundreds of stocks achieves the same forecasting performance as the RFSV parametric model.
-Both produce forecasts that are competitive with HAR.
-The universal LSTM also transfers to out-of-sample assets, suggesting that the learned kernel is asset-independent, just as the Hurst exponent $H \approx 0.1$ is.
+\begin{keyresult}[\citet{RosenbaumZhang2022}: Universal LSTM]
+A single LSTM trained on hundreds of stocks consistently outperforms asset-specific RFSV models.
+A combined RFSV + QRH parametric forecaster with fixed parameters matches the LSTM, and both outperform HAR.
+The universal LSTM also transfers from US equities to European equities without degradation, suggesting that the learned kernel is market-independent.
 \end{keyresult}
 
 The connection to the rest of this guide is direct.
@@ -754,7 +755,7 @@ If the former, you need to demonstrate the improvement with a proper out-of-samp
 
   \item \textbf{Fractional Brownian motion} (fBM) generalizes standard BM by allowing correlated increments: negatively correlated when $H < 0.5$ (anti-persistent), positively correlated when $H > 0.5$ (persistent).
 
-  \item \citet{GJR2018} showed that $\log \RV_t$ behaves like fBM with $H \approx 0.1$ across equity indices, individual stocks, and FX. This is the ``volatility is rough'' result.
+  \item \citet{GJR2018} showed that $\log \RV_t$ behaves like fBM with $H \approx 0.1$ across equity indices and bond futures. This is the ``volatility is rough'' result.
 
   \item $H$ can be estimated from data using the \textbf{variogram method}: regress $\log m(q,h)$ on $\log h$ and divide the slope by $q$.
 
@@ -770,7 +771,7 @@ If the former, you need to demonstrate the improvement with a proper out-of-samp
 
   \item The practical implication: $H \approx 0.1$ from $\log \RV_t$ is a useful forecasting input but does not prove that the true spot volatility $\sigma^2_t$ is rough.
 
-  \item \citet{RosenbaumZhang2022} show that a \textbf{universal LSTM} trained on hundreds of stocks matches RFSV and transfers to unseen assets. Both approaches likely learn the same statistical kernel.
+  \item \citet{RosenbaumZhang2022} show that a \textbf{universal LSTM} trained on hundreds of stocks outperforms asset-specific RFSV models and transfers to unseen equities in other markets. A combined RFSV + QRH parametric forecaster matches the LSTM, suggesting both capture the same statistical kernel.
 
   \item Whether spot vol is truly rough or the roughness is a noise artefact, the \textbf{forecasting value is identical}. The distinction matters for pricing-model calibration and theory, not for forecasting accuracy.
 
@@ -792,7 +793,7 @@ If the former, you need to demonstrate the improvement with a proper out-of-samp
 Volatility is rough
   & \citet{GJR2018}
   & $\log \RV_t$ behaves like fBM with $H \approx 0.1$ across equity
-    indices, stocks, and FX; far below $H = 0.5$ of standard models \\[4pt]
+    indices and bond futures; far below $H = 0.5$ of standard models \\[4pt]
 Cross-asset universality
   & \citet{BLP2022}
   & $H \approx 0.1$ is universal across asset classes, geographies,
@@ -807,8 +808,8 @@ Roughness as artefact
     $\hat{H} \approx 0.1$ may not reflect true spot-vol dynamics \\[4pt]
 Universal LSTM
   & \citet{RosenbaumZhang2022}
-  & Single LSTM trained on hundreds of stocks matches RFSV;
-    both learn the same universal forecasting kernel \\
+  & Single LSTM trained on hundreds of stocks outperforms RFSV;
+    RFSV + QRH parametric combination matches LSTM performance \\
 \bottomrule
 \end{tabular}
 \end{center}

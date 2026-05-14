@@ -458,14 +458,18 @@ and conditionally.
 The procedure has three stages:
 
 \begin{enumerate}
-  \item \textbf{Text embedding.}  Collect financial news articles
-        (e.g., from Reuters or Bloomberg) for each trading day.  Train
-        or load a Word2Vec model on a financial corpus.  Represent each
-        article as the average of its word vectors, then aggregate to a
-        daily sentiment score $s_t$ via a shallow classifier
-        trained on labeled sentiment data~\citep{RahimikiaZohrenPoon2021NLP}.
-  \item \textbf{Augmented HAR.}  Append the sentiment score to the
-        standard HAR specification:
+  \item \textbf{Text embedding.}  Collect financial news headlines
+        (e.g., from Dow Jones Newswires) for each trading day.  Train
+        a Word2Vec skip-gram model on a financial corpus to obtain
+        300-dimensional word vectors (\emph{FinText}).  Arrange each
+        day's tokens into a $500 \times 300$ sentence matrix (padding
+        shorter sequences), then feed it through a convolutional neural
+        network (CNN) with multiple filter sizes that learns to map
+        the text directly to a volatility
+        forecast~\citep{RahimikiaZohrenPoon2021NLP}.
+  \item \textbf{Augmented HAR (simplified view).}  The simplest way to
+        incorporate a text signal is to append a summary sentiment score
+        $s_t$ to the standard HAR regression:
         \begin{equation}\label{eq:har-nlp}
           \RV_{t+1} = \beta_0 + \beta_d\,\RV_t
             + \beta_w\,\RV_t^{(w)} + \beta_m\,\RV_t^{(m)}
@@ -473,30 +477,35 @@ The procedure has three stages:
         \end{equation}
         where:
         \begin{itemize}
-          \item $s_t$ --- the daily sentiment score (negative values
+          \item $s_t$ --- the daily text-derived signal (negative values
                 indicate bearish tone),
-          \item $\gamma$ --- the sentiment loading; if news carries
+          \item $\gamma$ --- the text loading; if news carries
                 incremental information beyond lagged $\RV$, then
                 $\gamma \neq 0$.
         \end{itemize}
+        In practice, \citet{RahimikiaZohrenPoon2021NLP} go further:
+        their NLP-ML model feeds the $500 \times 300$ sentence matrix
+        directly into the CNN, bypassing the sentiment-score bottleneck.
+        The linear augmented-HAR equation above is a useful pedagogical
+        simplification that captures the same core idea: text provides
+        an exogenous signal beyond lagged~$\RV$.
 
         \begin{intuition}[In Plain English]
-        This is just HAR with one extra input: a daily sentiment score
-        derived from financial news.  If yesterday's news was unusually
-        negative ($s_t < 0$), the model predicts higher volatility
-        tomorrow, over and above what lagged RV already implies.  The
-        coefficient $\gamma$ measures how much incremental information
-        news text carries after controlling for the standard RV lags.
+        The key insight is that news text can carry information about
+        tomorrow's volatility that lagged RV alone does not capture.
+        Whether you inject that signal as a single sentiment score in
+        a linear regression or let a CNN learn a richer representation,
+        the principle is the same: combine text with the HAR baseline.
         \end{intuition}
 
         \begin{projectconnection}[Why This Matters]
         At Goldman Sachs you may have access to proprietary news feeds
-        or internal research sentiment.  Even though public NLP signals
-        add only 1--3\% QLIKE improvement, a curated internal signal
-        could do better.  More importantly, this equation shows the
-        general template for augmenting HAR with any exogenous feature:
-        just add it as an extra regressor and test whether $\gamma
-        \neq 0$.
+        or internal research sentiment.  Public NLP signals show modest
+        and conditional improvements---primarily on volatility jump
+        days---but a curated internal signal could do better.  More
+        importantly, this equation shows the general template for
+        augmenting HAR with any exogenous feature: just add it as an
+        extra regressor and test whether $\gamma \neq 0$.
         \end{projectconnection}
 
   \item \textbf{Evaluation.}  Compare $\QLIKE$ loss of HAR vs.\
@@ -506,11 +515,13 @@ The procedure has three stages:
 
 \subsection{What the Literature Finds}
 
-\citet{RahimikiaZohrenPoon2021NLP} report 1--3\% improvement in $\QLIKE$
-on average, with gains concentrated during financial crises and
-earnings seasons.  During calm markets, the sentiment signal adds
+\citet{RahimikiaZohrenPoon2021NLP} find that NLP-ML models
+strongly outperform HAR-family models on \emph{volatility jump days}
+(roughly the top 10\% of RV observations) but underperform on normal
+volatility days.  During calm markets, the text signal adds
 negligible information because lagged $\RV$ already captures the
-low-volatility regime.
+low-volatility regime; the gains are concentrated in high-volatility
+episodes where news carries incremental content.
 
 \begin{warning}[NLP Gains Are Small and Fragile]
 A 1--3\% $\QLIKE$ improvement is economically meaningful only if you
@@ -654,9 +665,9 @@ to 1 when an intercept is included).  For day~4, the stacked forecast is
   \hat{y}_5 = \hat{\alpha}_0 + 0.45 \times 25.4 + 0.58 \times 22.8
   = \hat{\alpha}_0 + 24.65.
 \]
-Compare the component MSEs: HAR alone achieves MSE $= 2.06$, LightGBM
-alone achieves MSE $= 0.89$, and the stacked combination achieves
-MSE $= 0.52$.  The ensemble reduces error beyond what either base model
+Compare the component MSEs: HAR alone achieves MSE $= 1.33$, LightGBM
+alone achieves MSE $= 0.35$, and the stacked combination achieves
+MSE $= 0.27$.  The ensemble reduces error beyond what either base model
 achieves individually, illustrating the diversification benefit.
 
 \end{workedexample}
