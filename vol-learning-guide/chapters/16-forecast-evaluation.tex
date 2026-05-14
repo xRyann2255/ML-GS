@@ -221,6 +221,104 @@ The asymmetry is critical: QLIKE penalizes you more for underestimating vol than
 Target a 30--80 bps QLIKE improvement over HAR to claim a meaningful result.
 \end{projectconnection}
 
+
+% ══════════════════════════════════════════════════════════════
+\subsection{Retransformation Bias}
+\label{sec:eval-retransformation}
+% ══════════════════════════════════════════════════════════════
+
+Many volatility models forecast in log space because $\log \RV_t$ is more Gaussian, more homoskedastic, and better behaved for regression than raw $\RV_t$.
+The HAR-log model, for example, regresses $\log \RV_{t+1}$ on lagged log realized variances.
+But when you need a level-space forecast (e.g., for portfolio variance targeting or VaR computation), you must exponentiate the log forecast back to levels.
+This innocent-looking step introduces a systematic downward bias known as \textbf{retransformation bias}.
+
+\subsubsection{The Problem: Jensen's Inequality}
+
+The root cause is \textbf{Jensen's inequality}: for any convex function $g$ and non-degenerate random variable $X$,
+\begin{equation}
+\label{eq:jensen}
+\E\bigl[g(X)\bigr] > g\bigl(\E[X]\bigr).
+\end{equation}
+The exponential function is convex, so $\E[\exp(X)] > \exp(\E[X])$.
+
+Suppose your log-space model produces a point forecast $\widehat{\log \RV}_{t+1}$.
+The naive level-space forecast is:
+\[
+\widehat{\RV}^{\text{naive}}_{t+1} = \exp\!\bigl(\widehat{\log \RV}_{t+1}\bigr).
+\]
+But because the log-space forecast has estimation error, the true conditional expectation of $\RV_{t+1}$ is \emph{larger} than this.
+Exponentiating the conditional mean of the log gives you something systematically below the conditional mean of the level.
+Every single forecast is biased low.
+
+\begin{intuition}[In Plain English]
+Think of it this way.
+Your log-space model says ``the average of $\log \RV$ tomorrow is 0.5.''
+But the average of $\RV$ tomorrow is not $\exp(0.5) = 1.65$.
+It is higher, because the distribution of $\log \RV$ has spread around 0.5, and the exponential function amplifies high values more than it shrinks low values.
+The more uncertain your log-space forecast (wider error distribution), the larger the gap between $\exp(\E[\log \RV])$ and $\E[\RV]$.
+\end{intuition}
+
+\subsubsection{The Correction Formula}
+
+If log-space forecast errors are approximately Gaussian with variance $\hat{\sigma}^2_\varepsilon$, the bias-corrected level-space forecast is:
+\begin{equation}
+\label{eq:retransform}
+\widehat{\RV}_{t+1} = \exp\!\left(\widehat{\log \RV}_{t+1} + \frac{\hat{\sigma}^2_\varepsilon}{2}\right)
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $\widehat{\log \RV}_{t+1}$ is the log-space point forecast,
+  \item $\hat{\sigma}^2_\varepsilon$ is the estimated variance of the log-space forecast errors $\varepsilon_t = \log \RV_t - \widehat{\log \RV}_t$,
+  \item the $\hat{\sigma}^2_\varepsilon / 2$ term is the correction that offsets Jensen's inequality.
+\end{itemize}
+
+This formula comes from the moment generating function of a Gaussian: if $\varepsilon \sim \N(0, \sigma^2_\varepsilon)$, then $\E[\exp(\varepsilon)] = \exp(\sigma^2_\varepsilon / 2)$.
+The corrected forecast multiplies the naive exponential by this factor.
+
+\begin{intuition}[In Plain English]
+The correction adds half the forecast error variance back before exponentiating.
+It says: ``My best guess for $\log \RV$ is $\hat{y}$, but there is uncertainty of $\hat{\sigma}^2_\varepsilon$ around that guess.
+Because exponentiation amplifies upside errors more than downside errors, I need to nudge my forecast upward by $\hat{\sigma}^2_\varepsilon / 2$ to get the right average in level space.''
+When forecast errors are small ($\hat{\sigma}^2_\varepsilon \approx 0$), the correction is negligible.
+When they are large, as in long-horizon forecasts or during volatile regimes, it can be substantial.
+\end{intuition}
+
+\subsubsection{How Large Is the Bias?}
+
+\begin{workedexample}{Retransformation Bias Magnitude}
+Suppose your HAR-log model has log-space forecast error variance $\hat{\sigma}^2_\varepsilon = 0.20$ (a realistic value for 5-day-ahead forecasts of log daily $\RV$ on equity indices).
+
+\textbf{Correction factor:}
+\[
+\exp\!\left(\frac{0.20}{2}\right) = \exp(0.10) \approx 1.105
+\]
+
+This means the naive forecast underestimates the true conditional mean by about 10.5\%.
+On a day where $\widehat{\log \RV}_{t+1} = -4.0$ (corresponding to annualized vol of about 14\%), the naive forecast is $\exp(-4.0) = 0.0183$, while the corrected forecast is $0.0183 \times 1.105 = 0.0202$.
+
+For 1-day-ahead forecasts with $\hat{\sigma}^2_\varepsilon \approx 0.08$, the correction factor is $\exp(0.04) \approx 1.04$, a 4\% adjustment.
+For 22-day-ahead forecasts with $\hat{\sigma}^2_\varepsilon \approx 0.35$, it reaches $\exp(0.175) \approx 1.19$, nearly a 20\% adjustment.
+\end{workedexample}
+
+\begin{warning}[Without Correction, Every Forecast Is Biased Low]
+If you forecast in log space and naively exponentiate, your Mincer--Zarnowitz regression (Section~\ref{sec:eval-mz}) will show $a > 0$ (systematic under-prediction) and the bias grows with forecast uncertainty.
+During high-volatility regimes, when $\hat{\sigma}^2_\varepsilon$ is largest, the bias is at its worst, precisely when accurate forecasts matter most for risk management.
+\end{warning}
+
+\begin{keyidea}[Estimating the Correction Variance]
+The correction requires $\hat{\sigma}^2_\varepsilon$, the variance of log-space forecast errors.
+In practice, estimate this from the training sample or from a rolling window of recent out-of-sample errors.
+Using a rolling window (e.g., the trailing 60 trading days) allows the correction to adapt to regime changes: during calm markets $\hat{\sigma}^2_\varepsilon$ is small and the correction is minor; during crises it grows, appropriately increasing the level-space forecast.
+\end{keyidea}
+
+\begin{projectconnection}[Why This Matters]
+Your project forecasts $\log \RV_{t+1}$ (because log realized variance is better behaved for HAR and LightGBM regressions), but $\QLIKE$ evaluation and downstream applications (volatility targeting, VaR) require level-space forecasts.
+Apply the retransformation correction from Equation~\eqref{eq:retransform} whenever you convert back to levels.
+Without it, you introduce a systematic negative bias that inflates $\QLIKE$ loss and makes your MZ regression show $a > 0$.
+The correction is trivially cheap to compute, so there is no reason to skip it \citep{Patton2011}.
+\end{projectconnection}
+
+
 % ── Diagram: QLIKE vs MSE Penalty Asymmetry ──
 \begin{figure}[ht]
 \centering
@@ -859,6 +957,151 @@ This section catalogs the wrong ones, so you can recognize them in other people'
 
 
 % ══════════════════════════════════════════════════════════════
+\subsection{Lookahead Bias: A Taxonomy of Four Sources}
+\label{sec:eval-lookahead-taxonomy}
+% ══════════════════════════════════════════════════════════════
+
+Item 4 in the list above (look-ahead in feature construction) deserves a full subsection because lookahead bias is the single most destructive error in financial ML.
+A contaminated model shows excellent in-sample performance that vanishes out of sample, wasting weeks of development time before the bug is identified.
+
+Lookahead bias occurs whenever a feature used at prediction time contains information that would not have been available at the moment the forecast was made.
+In volatility forecasting, there are four distinct sources, each with its own failure mode.
+Understanding them concretely, with specific examples of how each one can leak future information into your features, is essential for building a trustworthy pipeline.
+
+
+% ── Source 1: Realized Measures ──
+\subsubsection{Source 1: Realized Measures}
+
+\textbf{Realized variance} (Chapter~\ref{ch:rv}) is computed from intraday returns over a trading day.
+The danger is that the boundary between ``today'' and ``tomorrow'' is not always clean.
+
+\begin{warning}[Realized Measure Leakage]
+Suppose you forecast $\RV_{t+1}$ (tomorrow's realized variance) using features that include $\RV_t$ (today's realized variance).
+If you compute $\RV_t$ using returns from 9:30 AM to 4:00 PM, but the last intraday return spans 3:55--4:00 PM, that return reflects information that overlaps with the overnight period leading into day $t+1$.
+In tick-level data, the problem is worse: the last trade might occur at 4:00:02 PM, technically after the close.
+Even a few seconds of overlap contaminates the feature with forward-looking information.
+\end{warning}
+
+\begin{keyidea}[Prevention: Strict Temporal Cutoff]
+All features for forecasting $\RV_{t+1}$ must use data from day $t$ or earlier.
+Define $\RV_t$ using a fixed, consistent intraday window (e.g., 9:30 AM to 3:59 PM) and apply this cutoff uniformly across all realized measures: $\RV$, realized quarticity ($\text{RQ}$), bipower variation ($\text{BV}$), and signed components ($\RV^+$, $\RV^-$).
+Timestamp every data point and assert programmatically that no feature for $\RV_{t+1}$ uses data with timestamp $> t$ close.
+When in doubt, lag by one full day.
+\end{keyidea}
+
+
+% ── Source 2: Microstructure ──
+\subsubsection{Source 2: Microstructure Features}
+
+\textbf{Microstructure features} (Chapter~\ref{ch:noise}) are derived from limit order book (LOB) data, trade-and-quote streams, and intraday volume profiles.
+They are particularly vulnerable to lookahead because they are computed over intraday windows whose boundaries must be carefully aligned with the forecast target.
+
+\begin{warning}[LOB Feature Leakage]
+Suppose you compute the \textbf{Volume-Synchronized Probability of Informed Trading (VPIN)} over the full trading day from 9:30 AM to 4:00 PM and use it as a feature for forecasting $\RV_{t+1}$.
+The last hour of VPIN reflects order flow patterns driven by information that will affect the overnight return and the opening of day $t+1$.
+For example, a large informed seller at 3:45 PM depresses the close and widens the spread; this information is not ``known'' to a forecaster who must act at 3:00 PM.
+Full-day microstructure features effectively let you ``see'' information that accumulates between your forecast time and the close.
+\end{warning}
+
+\begin{keyidea}[Prevention: Truncate LOB Features Before Close]
+Truncate all intraday microstructure features at a fixed cutoff before the market close.
+A common choice is 3:00 PM (one hour before close) or even 2:00 PM for conservative pipelines.
+Apply this cutoff uniformly to VPIN, Kyle's lambda, Amihud illiquidity, bid-ask spread averages, and depth imbalance measures.
+Document the cutoff time as a pipeline parameter, not a magic number buried in preprocessing code.
+\end{keyidea}
+
+
+% ── Source 3: Options Surface ──
+\subsubsection{Source 3: Options Surface}
+
+\textbf{Implied volatility} from the options surface (Chapters~\ref{ch:garch} and~\ref{ch:applications}) is a forward-looking feature by design: it encodes the market's expectation of future volatility.
+This makes it powerful but also dangerous, because the surface updates throughout the day in response to new information.
+
+\begin{warning}[Implied Volatility Leakage]
+Suppose you use the 3:30 PM VIX level as a feature for forecasting next-day $\RV$.
+If a company announces earnings at 4:05 PM, the options market will begin pricing in the expected earnings move before the announcement: implied volatility rises during the last hour of trading.
+The 3:30 PM VIX already reflects this anticipation.
+A forecaster using this feature has access to information about the expected earnings-day volatility spike that is not ``available'' in the sense of a genuine real-time forecast made at, say, the previous close.
+More subtly, the SPX implied volatility surface at 3:30 PM reflects the full day's information flow, including any macro data releases, Fed communications, or geopolitical events that occurred during the day.
+\end{warning}
+
+\begin{keyidea}[Prevention: Use Previous-Day Close or Morning Snapshot]
+Use the end-of-day implied volatility surface from day $t-1$ (the previous close) or a fixed morning snapshot (e.g., 10:00 AM) as features for forecasting $\RV_{t+1}$.
+Never use same-day afternoon implied volatility for next-day forecasts.
+For VIX and VIX term structure features, the same rule applies: use the previous close, not the intraday value.
+If you need intraday IV features for same-day forecasting (e.g., predicting afternoon $\RV$ from morning data), use a morning-only window and document it explicitly.
+\end{keyidea}
+
+
+% ── Source 4: Cross-Asset ──
+\subsubsection{Source 4: Cross-Asset Features}
+
+\textbf{Cross-asset features} (Chapter~\ref{ch:applications}) use data from other markets (e.g., European equities, commodities, currencies, Treasuries) to predict volatility in the target asset (e.g., SPX).
+The complication is that these markets operate on different schedules, creating timestamp misalignment that can hide lookahead bias.
+
+\begin{warning}[Cross-Asset Timing Leakage]
+Suppose you use the EURO STOXX 50 realized variance as a feature for predicting SPX $\RV_{t+1}$.
+European markets close at 4:30 PM CET (10:30 AM ET).
+If you label the European close as ``day $t$'' data, it is available before the US close on day $t$ at 4:00 PM ET, which is fine.
+But if the European data is labeled ``day $t$'' and the US target is also ``day $t$,'' you may inadvertently use European close data that overlaps with the US target window.
+Worse, some cross-asset data sources (e.g., Asian markets) close well before the US open; using ``day $t$'' Asian close data for a US ``day $t{+}1$'' forecast is correct, but using it for a US ``day $t$'' forecast means the Asian data is stale and the time alignment is ambiguous.
+\end{warning}
+
+\begin{keyidea}[Prevention: Align to a Single Information Cutoff]
+Define a single, global \textbf{information cutoff time} for each forecast date (e.g., previous-day US close at 4:00 PM ET).
+All cross-asset features must use data from before this cutoff.
+For European data, this means using the European close from the same calendar day (since it precedes the US close).
+For Asian data, use the Asian close from the same calendar day (which precedes the US open).
+Build an explicit timezone-aware timestamp column for every data source and assert that all feature timestamps precede the cutoff.
+\end{keyidea}
+
+
+% ── Summary Table ──
+\subsubsection{Summary}
+
+Table~\ref{tab:lookahead-taxonomy} collects all four sources with their specific pitfalls and prevention rules.
+
+\begin{table}[ht]
+\centering
+\caption{Lookahead bias taxonomy for volatility forecasting pipelines.
+Each source represents a distinct mechanism by which future information can leak into features.}
+\label{tab:lookahead-taxonomy}
+\small
+\begin{tabular}{@{}p{2.2cm}p{5.0cm}p{5.5cm}@{}}
+\toprule
+\textbf{Source} & \textbf{Pitfall} & \textbf{Prevention Rule} \\
+\midrule
+Realized measures
+  & Target-day intraday returns leak into features via boundary overlap
+  & Features use data only up to day $t$ close; enforce with programmatic timestamp assertions \\
+\addlinespace
+Microstructure
+  & Full-day LOB features (VPIN, spreads) include close-period information
+  & Truncate all LOB features at a fixed cutoff (e.g., 3:00 PM) before close \\
+\addlinespace
+Options surface
+  & Intraday IV changes reflect target-day information (e.g., earnings anticipation)
+  & Use previous-day close IV or a fixed morning snapshot only \\
+\addlinespace
+Cross-asset
+  & Mixed frequencies and timezone misalignment hide temporal overlap
+  & Align all cross-asset features to a single information cutoff (previous-day US close) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{projectconnection}[Why This Matters]
+Your pipeline ingests data from at least four different source types (tick data, LOB depth, options surface, cross-asset indices), each with its own timestamp conventions.
+Build the lookahead prevention into your data pipeline as hard constraints, not as documentation that you hope developers will follow.
+Specifically:
+(1) add a \texttt{max\_timestamp} column to every feature table and assert it precedes the forecast cutoff;
+(2) run a nightly integration test that checks no feature for $\RV_{t+1}$ uses data with timestamp $> t$ close;
+(3) when adding new features, require the contributor to specify the information cutoff in the feature registry.
+A single lookahead bug can invalidate months of work and is almost impossible to detect from $\QLIKE$ numbers alone: the contaminated model simply looks ``better than it should.''
+\end{projectconnection}
+
+
+% ══════════════════════════════════════════════════════════════
 \section{Putting It All Together: An Evaluation Workflow}
 \label{sec:eval-workflow}
 % ══════════════════════════════════════════════════════════════
@@ -926,6 +1169,8 @@ Skip any step and a careful reader can dismiss your results.
 
   \item \textbf{QLIKE and MSE are the only two robust losses.} Other common losses (MAE, HMSE) can reverse model rankings when the volatility proxy is noisy (Section~\ref{sec:eval-qlike}).
 
+  \item \textbf{Retransformation bias} arises when exponentiating log-space forecasts back to levels. Apply the correction $\exp(\hat{y} + \hat{\sigma}^2_\varepsilon/2)$ to avoid systematic under-prediction that grows with forecast uncertainty \citep{Patton2011} (Section~\ref{sec:eval-retransformation}).
+
   \item \textbf{Mincer--Zarnowitz regressions} diagnose bias ($a \neq 0$) and inefficiency ($b \neq 1$) in forecasts. Use HAC standard errors (Section~\ref{sec:eval-mz}).
 
   \item \textbf{The Diebold--Mariano test} determines whether the difference in loss between two models is statistically significant, accounting for serial correlation via HAC standard errors \citep{DieboldMariano1995} (Section~\ref{sec:eval-dm}).
@@ -941,6 +1186,8 @@ Skip any step and a careful reader can dismiss your results.
   \item \textbf{Log every experiment.} You cannot compute an honest DSR without knowing $N$ (Section~\ref{sec:eval-dsr}).
 
   \item \textbf{Statistical significance is necessary but not sufficient.} Pair DM tests with economic significance: does the improvement survive transaction costs? (Section~\ref{sec:eval-pitfalls}).
+
+  \item \textbf{Lookahead bias has four sources} in volatility pipelines: realized measures, microstructure features, options surface, and cross-asset data. Each requires a specific prevention rule; build these as hard constraints in your pipeline, not as documentation (Section~\ref{sec:eval-lookahead-taxonomy}).
 
   \item \textbf{Follow the full workflow} (Figure~\ref{fig:eval-workflow}): reserve holdout, log experiments, purged CV, QLIKE, MZ, DM, MCS, DSR.
 \end{itemize}
