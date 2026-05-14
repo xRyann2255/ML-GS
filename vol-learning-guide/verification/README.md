@@ -33,4 +33,4 @@ Last updated: 2026-05-14
 | Ch 14: Multivariate Volatility | ch14-multivariate-volatility.md | -- | -- | -- | Pending |
 | Ch 15: Spillovers | ch15-spillovers-connectedness.md | -- | -- | -- | Pending |
 | Ch 1: Returns/Variance | ch01-returns-variance-volatility.md | -- | -- | -- | Pending |
-| Ch 17: Applications | ch17-applications-projects.md | -- | -- | -- | Pending |
+| Ch 17: Applications | ch17-applications-projects.md | 31 | 0 | 0 | Extracted |
