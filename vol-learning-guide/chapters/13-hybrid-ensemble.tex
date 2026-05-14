@@ -712,7 +712,391 @@ a ridge meta-learner learns the optimal combination.}
 
 
 %% ============================================================
-%% SECTION 7 — When to Use What
+%% SECTION 7 — Comparing Ensemble Architectures
+%% ============================================================
+\section{Comparing Ensemble Architectures}\label{sec:hybrid:architectures}
+
+So far this chapter has presented two combination strategies for HAR and
+LightGBM: a fixed weighted average
+(Equation~\eqref{eq:weighted-avg}) and a ridge meta-learner on OOS
+predictions (Equation~\eqref{eq:stacking}).  Both are instances of a
+broader design choice: how do you wire multiple models together?  Three
+architectures dominate the ensemble literature, and each answers that
+question differently.  Understanding their tradeoffs is essential before
+committing to one for a production volatility pipeline.
+
+
+\subsection{Architecture A: Feature Stacking}\label{sec:hybrid:feat-stack}
+
+\textbf{Feature stacking} concatenates the internal representation of one
+model with the input features of another, training a single downstream
+model on the combined feature set.  In the volatility context, this
+typically means training an LSTM on intraday sequences (e.g., 5-minute
+E-mini bars) to produce a $k$-dimensional \textbf{embedding vector},
+then appending that embedding to the tabular feature matrix before
+training LightGBM.
+
+The combined feature vector fed to LightGBM becomes:
+\begin{equation}\label{eq:feat-stack}
+  \tilde{\bX}_t = \bigl[\,\bX_t^{\text{tab}} \;\|\;
+    \bh_t^{\text{LSTM}}\,\bigr],
+\end{equation}
+where each term is:
+\begin{itemize}
+  \item $\bX_t^{\text{tab}}$ --- the tabular feature matrix (RV lags,
+        jump indicators, leverage, microstructure proxies, cross-asset
+        signals) from Chapter~\ref{ch:features},
+  \item $\bh_t^{\text{LSTM}}$ --- the $k$-dimensional embedding vector
+        extracted from the LSTM's final hidden state after processing the
+        intraday sequence,
+  \item $\|$ --- concatenation along the feature axis.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Think of the LSTM as a feature extractor: it reads a day's worth of
+5-minute bars and compresses them into a short summary vector.
+LightGBM then treats that summary as additional columns alongside the
+usual tabular features.  The hope is that the LSTM captures intraday
+dynamics (order flow imbalances, microstructure noise patterns) that
+tabular statistics miss, and the tree can exploit those dynamics
+alongside everything else.
+\end{intuition}
+
+\subsubsection{The Gradient Isolation Problem}
+
+Feature stacking has a fundamental flaw: \textbf{gradient isolation}.
+LightGBM is a tree-based model, so it cannot compute gradients with
+respect to its inputs.  This means the LSTM embedding
+$\bh_t^{\text{LSTM}}$ is never optimized for the tree's $\QLIKE$
+objective.  The LSTM learns representations that minimize its own loss
+function (typically MSE on log-RV), and the tree uses that
+representation as-is, whether or not it is what the tree needs.
+
+Contrast this with an end-to-end neural architecture where you could
+backpropagate from the final loss through both components.  In feature
+stacking, the two models live in separate optimization worlds:
+
+\begin{enumerate}
+  \item The LSTM is trained to minimize $\loss_{\text{LSTM}}$ on
+        intraday sequences.
+  \item The embedding $\bh_t$ is frozen and appended to $\bX_t$.
+  \item LightGBM is trained to minimize $\loss_{\text{GBM}}$ on
+        $\tilde{\bX}_t$, treating $\bh_t$ as fixed columns.
+\end{enumerate}
+
+If the embedding encodes information in a format that tree splits
+cannot exploit efficiently (e.g., information spread across multiple
+embedding dimensions in a way that requires linear combinations),
+LightGBM will underuse it.  Worse, you cannot tell from the final
+forecast error whether a bad prediction came from a bad embedding or
+bad tree splits.
+
+\begin{warning}[Gradient Isolation Breaks Joint Optimization]
+Because LightGBM cannot backpropagate into the LSTM, the embedding is
+optimized for the wrong objective.  The LSTM minimizes its own loss;
+the tree minimizes a different loss on fixed embeddings.  There is no
+mechanism to align the two.  This is not a theoretical concern: it
+means the LSTM may learn to encode information that is useful for its
+own predictions but redundant or inaccessible to the tree.
+\end{warning}
+
+
+\subsection{Architecture B: Residual Stacking (Three-Stage Pipeline)}
+\label{sec:hybrid:resid-stack-3}
+
+Section~\ref{sec:hybrid:har-svr} introduced the two-stage residual
+hybrid: HAR first, then SVR on the residuals.  \textbf{Residual
+stacking} generalizes this to three or more stages, where each model
+trains on the residuals left by all prior stages.  The canonical
+three-stage pipeline for volatility forecasting is:
+
+\begin{enumerate}
+  \item \textbf{Stage 1 --- HAR (linear baseline).}  Fit HAR on the
+        training set exactly as in
+        Equation~\eqref{eq:har-fit-hybrid}.  HAR captures the dominant
+        multi-scale autoregressive structure of realized volatility.
+        Compute residuals: $e_t^{(1)} = \RV_{t+1} -
+        \widehat{\HAR}_t$.
+  \item \textbf{Stage 2 --- LightGBM (nonlinear interactions).}  Train
+        LightGBM on Stage~1 residuals $e_t^{(1)}$ using the full
+        tabular feature set.  The tree captures nonlinear patterns that
+        HAR misses: regime interactions, jump-asymmetry effects,
+        cross-asset spillovers.  Compute residuals:
+        $e_t^{(2)} = e_t^{(1)} - \widehat{\text{GBM}}(e_t^{(1)},
+        \bX_t)$.
+  \item \textbf{Stage 3 --- LSTM (sequential dynamics).}  Train an
+        LSTM on Stage~2 residuals $e_t^{(2)}$ using intraday sequences.
+        If any temporal structure remains after the tree has operated,
+        the recurrent network can capture it.  This stage is optional:
+        if Stage~2 residuals are indistinguishable from white noise, the
+        LSTM adds nothing and should be dropped.
+\end{enumerate}
+
+The final forecast sums all stage contributions:
+\begin{equation}\label{eq:resid-stack-3}
+  \hat{y}_{t+1} = \widehat{\HAR}_t
+    + \widehat{\text{GBM}}(\bX_t)
+    + \widehat{\text{LSTM}}(\bX_t^{\text{seq}}),
+\end{equation}
+where each term is:
+\begin{itemize}
+  \item $\widehat{\HAR}_t$ --- the HAR baseline forecast
+        (Equation~\eqref{eq:har-fit-hybrid}),
+  \item $\widehat{\text{GBM}}(\bX_t)$ --- the LightGBM correction
+        trained on HAR residuals with tabular features,
+  \item $\widehat{\text{LSTM}}(\bX_t^{\text{seq}})$ --- the LSTM
+        correction trained on Stage~2 residuals with intraday
+        sequences (set to zero if Stage~3 is dropped).
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Residual stacking is like a relay race.  HAR runs the first leg and
+explains everything it can with three coefficients.  LightGBM picks up
+what HAR dropped --- the nonlinear, interaction-driven patterns in the
+leftover signal.  If there is still structure remaining (temporal
+dependencies in the second-stage residuals), an LSTM runs the final
+leg.  Each runner is specialized by construction: you never ask a model
+to redo work that a prior stage already handled.  This is the
+three-stage extension of the HAR-SVR pipeline from
+Section~\ref{sec:hybrid:har-svr}, replacing SVR with LightGBM and
+adding an optional LSTM stage.
+\end{intuition}
+
+\begin{projectconnection}[Residual Stacking Is Your Default Architecture]
+This three-stage pipeline maps directly onto the HARQ-X + ML residual
+direction.  HARQ-X replaces plain HAR in Stage~1, giving even cleaner
+residuals because measurement-error adaptation removes a source of
+variation before the tree ever sees the data.  Stage~2 (LightGBM on
+residuals) is where most of the incremental $\QLIKE$ improvement will
+come from.  Stage~3 (LSTM on intraday sequences) is the optional
+upgrade path: add it only if you have evidence that Stage~2 residuals
+contain exploitable temporal structure.
+\end{projectconnection}
+
+Why does residual stacking avoid the gradient isolation problem?
+Because each model trains directly on a well-defined target (the
+residuals from the prior stage), using a loss function that is directly
+aligned with that target.  There are no frozen embeddings, no
+cross-model feature coupling.  If Stage~2 performs poorly, you know it
+is because LightGBM cannot explain the HAR residuals, not because some
+upstream embedding was misaligned.
+
+
+\subsection{Architecture C: Prediction Blending}
+\label{sec:hybrid:pred-blend}
+
+\textbf{Prediction blending} is the simplest ensemble architecture:
+train each model independently, then combine their final predictions
+with a weighted average.  This is what
+Section~\ref{sec:hybrid:ensemble} already covers with the fixed 70/30
+blend and the ridge meta-learner.  The key distinction from the other
+architectures is that models never share information during training.
+Each model sees the original target $\RV_{t+1}$ (not a residual) and
+the features best suited to its architecture.
+
+The general blending formula for $K$ models is:
+\begin{equation}\label{eq:pred-blend-general}
+  \hat{y}_{t+1} = \sum_{k=1}^{K} w_k\,\hat{y}_{t+1}^{(k)},
+  \qquad \sum_{k=1}^{K} w_k = 1,
+\end{equation}
+where each term is:
+\begin{itemize}
+  \item $\hat{y}_{t+1}^{(k)}$ --- the independent forecast from model $k$,
+  \item $w_k$ --- the blend weight for model $k$, constrained to sum
+        to one (though a ridge meta-learner as in
+        Equation~\eqref{eq:stacking} relaxes this constraint).
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Prediction blending is forecast-level diversification.  Each model
+makes its best guess independently, and you take a weighted average.
+No model sees what the others are doing during training.  This is the
+ensemble equivalent of portfolio diversification: even if individual
+forecasters are noisy, their weighted average has lower variance as
+long as errors are imperfectly correlated.
+\end{intuition}
+
+\subsubsection{Weight Schemes}
+
+Two approaches to setting blend weights:
+
+\paragraph{Static weights.}
+Choose weights once on a validation set and hold them fixed.  The
+simplest principled choice is \textbf{inverse-$\QLIKE$ weighting}:
+
+\begin{equation}\label{eq:inv-qlike-weights}
+  w_k = \frac{\QLIKE_k^{-1}}{\sum_{j=1}^{K}\QLIKE_j^{-1}},
+\end{equation}
+where each term is:
+\begin{itemize}
+  \item $\QLIKE_k$ --- the $\QLIKE$ loss of model $k$ on the
+        validation set,
+  \item $\QLIKE_k^{-1}$ --- the inverse loss; models with lower
+        (better) $\QLIKE$ receive higher weight.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Inverse-$\QLIKE$ weighting says: ``Trust each model in proportion to
+how well it performed on validation data.''  A model with half the
+$\QLIKE$ loss of another gets twice the weight.  This is a one-line
+formula that requires no optimization and aligns directly with the
+project's primary evaluation metric.
+\end{intuition}
+
+\paragraph{Regime-dependent weights.}
+Use different blend weights in different volatility regimes.  For
+example, give more weight to LightGBM during high-volatility periods
+(where nonlinear effects dominate) and more weight to HAR during calm
+periods (where the linear structure is sufficient).
+Section~\ref{sec:hybrid:regime-weights} discusses when this helps and
+when it does not.
+
+\subsubsection{Competition Evidence}
+
+Top-performing solutions in the Optiver Realized Volatility
+competition~\citep{Optiver2021} consistently chose prediction blending
+over feature stacking.  Winners trained LightGBM and neural network
+branches independently, then combined outputs with simple weighted
+averages.  The rationale: prediction blending is easier to debug
+(each branch can be evaluated in isolation), easier to iterate on
+(swap one branch without retraining others), and provides a natural
+fallback strategy (if one branch degrades, drop it and reweight).
+
+\begin{keyidea}[Prediction Blending: Simplest and Often Best]
+Prediction blending requires no cross-model coupling, no shared
+training, and no sequential dependencies.  Each model can be
+developed, validated, and debugged in isolation.  Despite its
+simplicity, competition evidence from Optiver~\citep{Optiver2021}
+shows it matches or outperforms more complex architectures.  It should
+be the default ensemble strategy unless you have specific evidence that
+residual stacking improves $\QLIKE$.
+\end{keyidea}
+
+
+\subsection{Architecture Comparison}\label{sec:hybrid:arch-compare}
+
+Table~\ref{tab:arch-comparison} summarizes the tradeoffs across the
+three architectures on five dimensions that matter for a production
+volatility pipeline.
+
+\begin{table}[htbp]
+\centering
+\caption{Three-way ensemble architecture comparison for volatility
+  forecasting.}
+\label{tab:arch-comparison}
+\small
+\begin{tabular}{@{}p{2.4cm}p{3.0cm}p{3.0cm}p{3.5cm}@{}}
+\toprule
+\textbf{Dimension}
+  & \textbf{Feature Stacking}
+  & \textbf{Residual Stacking}
+  & \textbf{Prediction Blending} \\
+\midrule
+Complexity
+  & High (joint training, embedding pipeline)
+  & Moderate (sequential stages)
+  & Low (independent models) \\
+\addlinespace
+Gradient flow
+  & Broken (tree cannot backprop into LSTM)
+  & Clean (each stage has its own target)
+  & N/A (no cross-model coupling) \\
+\addlinespace
+Interpretability
+  & Opaque (embedding dimensions lack semantics)
+  & Clear (each stage's contribution is additive and measurable)
+  & Clear (individual model forecasts are directly comparable) \\
+\addlinespace
+Fallback strategy
+  & Must retrain tree without embedding
+  & Drop later stages; keep HAR + LightGBM
+  & Drop one model; reweight the rest \\
+\addlinespace
+Literature support
+  & Weak (no RV paper demonstrates gains)
+  & Strong (HARQ-X residual literature)
+  & Strong \citep{Optiver2021}; Kaggle competition evidence \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{intuition}[Reading the Comparison Table]
+The table reveals a clear pattern: moving from left to right (feature
+stacking $\to$ residual stacking $\to$ prediction blending), complexity
+decreases, debuggability increases, and literature support strengthens.
+Feature stacking sounds appealing in theory --- richer input to the
+tree --- but gradient isolation undermines the premise.  Residual
+stacking gives each model a distinct role by construction.  Prediction
+blending is the simplest and most robust, requiring no architectural
+coupling between models at all.
+\end{intuition}
+
+
+\subsection{Static vs.\ Regime-Dependent Weights}
+\label{sec:hybrid:regime-weights}
+
+Static blend weights assume that the relative accuracy of each model is
+stable over time.  This is often a good approximation for realized
+volatility: HAR's linear structure captures most of the signal in calm
+and turbulent markets alike.  But there are situations where model
+performance varies systematically across regimes, and regime-dependent
+weights can help.
+
+\textbf{Regime-dependent weighting} assigns different blend weights
+depending on the current volatility regime:
+\begin{equation}\label{eq:regime-weights}
+  w_k(t) =
+  \begin{cases}
+    w_k^{\text{low}} & \text{if } \RV_t^{(w)} < \tau, \\
+    w_k^{\text{high}} & \text{if } \RV_t^{(w)} \geq \tau,
+  \end{cases}
+\end{equation}
+where each term is:
+\begin{itemize}
+  \item $\RV_t^{(w)}$ --- the weekly realized volatility, used as a
+        regime indicator,
+  \item $\tau$ --- the regime threshold (e.g., the 75th percentile
+        of the training-set $\RV^{(w)}$ distribution),
+  \item $w_k^{\text{low}}, w_k^{\text{high}}$ --- separate blend
+        weights for the low-volatility and high-volatility regimes,
+        each calibrated on the corresponding subset of the validation
+        data.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+If LightGBM consistently outperforms HAR during high-volatility weeks
+but underperforms during calm weeks, it makes sense to shift weight
+toward LightGBM when volatility is elevated and toward HAR when
+markets are quiet.  Regime-dependent weights let you exploit this
+pattern.  But the key word is ``consistently'' --- if the performance
+difference across regimes is noisy or unstable, regime conditioning
+adds complexity without improving accuracy.
+\end{intuition}
+
+\begin{warning}[Regime Weights Require Stable Performance Differences]
+Regime-dependent weights help only when model accuracy varies
+\emph{systematically} across regimes, not just randomly.  If the
+performance gap between HAR and LightGBM in high-vol vs.\ low-vol
+periods is unstable across rolling windows, regime conditioning will
+overfit to historical patterns that do not persist out of sample.
+Test for systematic variation before adding this complexity: compute
+model $\QLIKE$ separately in each regime on multiple validation folds
+and check whether the ranking is consistent.
+\end{warning}
+
+\begin{projectconnection}[Start Static, Upgrade If Justified]
+For the internship project, begin with static inverse-$\QLIKE$
+weights.  After establishing the baseline blend performance, split the
+validation set by volatility regime and compare per-regime $\QLIKE$ for
+each model.  If you find that LightGBM's advantage over HARQ-X is
+concentrated in high-volatility weeks (as the leverage-effect
+literature suggests it should be), regime-dependent weights are a
+justified upgrade.  Document the per-regime performance gap as evidence.
+\end{projectconnection}
+
+
+%% ============================================================
+%% SECTION 8 — When to Use What (was Section 7)
 %% ============================================================
 \section{When to Use Pure ML vs.\ Hybrid}\label{sec:hybrid:decision}
 
@@ -846,7 +1230,7 @@ on the residual, reducing both model complexity and overfitting risk.}
 
 
 %% ============================================================
-%% SECTION 8 — Summary
+%% SECTION 9 — Summary
 %% ============================================================
 \section{Summary}\label{sec:hybrid:summary}
 
@@ -875,6 +1259,22 @@ on the residual, reducing both model complexity and overfitting risk.}
   \item Stacking via a ridge meta-learner on OOS predictions adapts the
         combination weights to the data while guarding against overfitting
         at the meta-level.
+  \item Three ensemble architectures offer increasing simplicity:
+        feature stacking (coupling via embeddings, broken gradient flow),
+        residual stacking (sequential stages with distinct roles), and
+        prediction blending (fully independent models, weighted average).
+  \item Feature stacking suffers from gradient isolation: LightGBM cannot
+        backpropagate into the LSTM, so the embedding is never optimized
+        for the tree's objective.
+  \item Residual stacking (HAR $\to$ LightGBM $\to$ LSTM) gives each
+        model a specialized role by construction and avoids
+        cross-model coupling.
+  \item Prediction blending is the simplest, most debuggable architecture
+        and is supported by Optiver competition
+        evidence~\citep{Optiver2021}.
+  \item Static blend weights (e.g., inverse-$\QLIKE$ weighting) are the
+        default; regime-dependent weights help only when model performance
+        varies systematically across volatility regimes.
   \item Pure ML (trees or deep learning) earns its place only when you
         have large samples, rich features, and evidence that the linear
         baseline leaves exploitable structure in residuals.
@@ -911,6 +1311,12 @@ NLP + HAR
   & HAR/LightGBM weighted average: simple, robust, hard to beat \\
 Stacking
   & Ridge meta-learner on OOS predictions adapts weights safely \\
+Architecture comparison
+  & Feature stacking $<$ residual stacking $<$ prediction blending
+    in simplicity and debuggability \\
+Regime weights
+  & Upgrade from static only with evidence of systematic per-regime
+    performance differences \\
 Default rule
   & Start hybrid; earn the right to go pure ML with evidence \\
 \bottomrule
