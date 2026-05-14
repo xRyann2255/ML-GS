@@ -567,6 +567,86 @@ The spread between short-dated and long-dated ATM IV is itself a useful feature 
 \label{fig:iv-term-structure}
 \end{figure}
 
+\subsection{The Butterfly Spread}
+\label{sec:butterfly-spread}
+
+The skew tells you about the \emph{asymmetry} of the market's fear -- how much more expensive downside protection is relative to upside.
+But it says nothing about whether \emph{both} tails are being bid up simultaneously.
+The \textbf{butterfly spread} fills that gap.
+
+When portfolio managers buy both OTM puts (crash protection) and OTM calls (upside participation or short-squeeze hedging) at the same time, IV rises on both wings relative to ATM.
+This symmetric fattening of the tails is invisible to a skew measure, which only captures the \emph{difference} between the two wings.
+The butterfly captures the \emph{average} elevation of both wings above the center.
+
+The butterfly spread is constructed from three implied volatilities at a fixed maturity: the 25-delta put, the 25-delta call, and the ATM (50-delta) volatility.
+
+\begin{definition}[Butterfly Spread]
+\label{def:butterfly}
+The \textbf{butterfly spread} (or \textbf{butterfly}) is defined as:
+\begin{equation}
+  \mathrm{BF}_t = \frac{1}{2}\bigl(\sigma_{25\Delta P} + \sigma_{25\Delta C}\bigr) - \sigma_{\mathrm{ATM}}
+  \label{eq:butterfly}
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $\sigma_{25\Delta P}$ = implied volatility of the 25-delta put (an OTM put whose Black-Scholes delta is $-0.25$).
+  \item $\sigma_{25\Delta C}$ = implied volatility of the 25-delta call (an OTM call whose Black-Scholes delta is $+0.25$).
+  \item $\sigma_{\mathrm{ATM}}$ = at-the-money implied volatility (50-delta).
+  \item $\mathrm{BF}_t$ = the butterfly spread on day $t$, measured in volatility points.
+\end{itemize}
+The butterfly is always non-negative in a no-arbitrage market (a negative value would imply the smile is concave, which violates convexity constraints on the implied volatility curve).
+\end{definition}
+
+\begin{intuition}[In Plain English]
+The butterfly measures how much higher the average wing volatility is compared to the center of the smile.
+Think of it as the ``curvature'' or ``U-shape'' of the smile at a fixed maturity.
+A large butterfly means traders are paying up for protection on \emph{both} sides of the distribution -- they expect fat tails, regardless of direction.
+A small butterfly means the smile is relatively flat and the market sees tail risk as modest.
+\end{intuition}
+
+To see why the butterfly and skew are complementary rather than redundant, note that they decompose the two wing volatilities into orthogonal components.
+The \textbf{risk reversal} (skew) is the difference between the wings:
+\[
+  \mathrm{RR}_t = \sigma_{25\Delta C} - \sigma_{25\Delta P}
+\]
+while the butterfly is their average elevation above ATM.
+Together, the two reconstruct the full wing structure:
+\begin{align}
+  \sigma_{25\Delta P} &= \sigma_{\mathrm{ATM}} + \mathrm{BF}_t - \tfrac{1}{2}\,\mathrm{RR}_t \label{eq:wing-put} \\
+  \sigma_{25\Delta C} &= \sigma_{\mathrm{ATM}} + \mathrm{BF}_t + \tfrac{1}{2}\,\mathrm{RR}_t \label{eq:wing-call}
+\end{align}
+The risk reversal captures \textbf{directional asymmetry} (skewness demand); the butterfly captures \textbf{symmetric tail thickness} (kurtosis demand).
+One measures the tilt of the smile; the other measures its curvature.
+
+\begin{keyidea}[Skew vs.\ Butterfly: What Each Captures]
+\begin{itemize}[nosep]
+  \item \textbf{Risk reversal (skew)}: dominated by demand for downside protection relative to upside. In equities, the risk reversal is persistently negative (OTM puts are more expensive than OTM calls). It tracks \emph{skewness} in the risk-neutral distribution.
+  \item \textbf{Butterfly}: dominated by demand for \emph{both} tails simultaneously. It tracks \emph{excess kurtosis} in the risk-neutral distribution -- the market's pricing of large moves in either direction beyond what ATM vol implies.
+\end{itemize}
+You can have a steep skew with a low butterfly (the left tail is fat, but the right tail is not), or a mild skew with a high butterfly (both tails are fat, roughly equally).
+The two dimensions are largely independent.
+\end{keyidea}
+
+\subsubsection*{Crisis Behavior}
+
+During crises, the butterfly typically spikes alongside VIX, but with a distinctive pattern.
+Portfolio insurance programs bid up OTM puts (the dominant effect in the skew), and at the same time, short-covering and tail-risk hedging bid up OTM calls.
+When \emph{both} wings are elevated, the butterfly rises sharply.
+
+A rising butterfly with a steepening skew is the signature of a broad-based panic: the market is pricing extreme moves in both directions, not just a directional crash.
+In contrast, a rising skew with a \emph{stable} butterfly signals targeted downside hedging without generalized tail fear.
+
+This distinction matters because realized volatility behaves differently in the two regimes.
+Symmetric tail pricing (high butterfly) tends to precede periods of elevated but two-sided choppiness, while pure skew spikes often precede sharp, directional sell-offs that resolve more quickly.
+
+\begin{projectconnection}[Why This Matters]
+The butterfly spread is one of nine options-implied features in the project's feature pipeline (Chapter~\ref{ch:features}).
+It provides information that the risk reversal (skew) cannot: whether the market prices \emph{symmetric} tail risk, not just directional fear.
+Empirically, the butterfly is most useful as a crisis-detection signal.
+Spikes in the butterfly predict periods of elevated realized volatility at weekly and monthly horizons, especially when combined nonlinearly with VIX and the term structure slope in tree-based models.
+Because the butterfly captures kurtosis demand rather than directional skewness, it adds orthogonal information to the risk reversal and helps the model distinguish between one-sided drawdowns and regime shifts into sustained high-volatility environments.
+\end{projectconnection}
+
 \subsection{The Full Surface}
 \label{sec:full-surface}
 
@@ -1118,6 +1198,7 @@ The volatility surface provides a rich set of features for realized volatility f
   \item \textbf{VIX level}: the single most common implied-vol feature. Often the strongest univariate predictor of future realized vol \citep{Gu2020}.
   \item \textbf{VVIX} (the ``vol of vol''): implied volatility of VIX options; captures uncertainty about uncertainty.
   \item \textbf{Skew slope}: the difference in IV between OTM puts and ATM options; a proxy for tail-risk pricing.
+  \item \textbf{Butterfly spread} (Section~\ref{sec:butterfly-spread}): average wing IV minus ATM IV; captures symmetric tail thickness (kurtosis demand), orthogonal to skew.
   \item \textbf{Term spread}: the difference between long-dated and short-dated ATM IV; signals mean-reversion expectations.
   \item \textbf{PCA scores} (Section~\ref{sec:pca-iv-surface}): three-number summary of the entire surface.
   \item \textbf{Variance risk premium}: VIX$^2$ minus recent realized variance; the subject of Chapter~\ref{ch:vrp}.
@@ -1139,11 +1220,12 @@ The volatility surface provides a rich set of features for realized volatility f
   It is not a forecast; it is the market's price of uncertainty, contaminated by risk premia and model error.
   \item The IV surface $\sigma_{\text{imp}}(K, T)$ varies across strikes and maturities.
   Skew (higher IV for low strikes) reflects crash-risk pricing; smile (U-shape) reflects fat-tail pricing.
+  \item The butterfly spread $\mathrm{BF}_t = \frac{1}{2}(\sigma_{25\Delta P} + \sigma_{25\Delta C}) - \sigma_{\mathrm{ATM}}$ measures symmetric tail thickness (kurtosis demand), complementing the skew's measure of directional asymmetry. It spikes during crises when both wings are bid up.
   \item PCA of the IV surface \citep{Cont2002} yields three dominant factors (level, slope, curvature) explaining $\sim$95\% of daily variation.
   \item Model-free implied variance \citep{BrittenJones2000} extracts expected future variance from the cross-section of option prices without assuming any pricing model.
   \item VIX implements model-free implied variance for S\&P~500 options over 30 days.
   VIX systematically overestimates future realized vol; the gap is the variance risk premium (Chapter~\ref{ch:vrp}).
-  \item VIX, skew, term structure, PCA scores, and VRP are all feature candidates for ML volatility models (Chapter~\ref{ch:features}).
+  \item VIX, skew, butterfly, term structure, PCA scores, and VRP are all feature candidates for ML volatility models (Chapter~\ref{ch:features}).
   \item The IV surface is observed daily, forward-looking, and market-priced, making it a uniquely valuable complement to backward-looking realized volatility measures.
 \end{itemize}
 
@@ -1162,6 +1244,8 @@ Black-Scholes & $C = S\Phi(d_1) - Ke^{-rT}\Phi(d_2)$ & Defines the common langua
 Implied volatility & Solve $C_{\text{mkt}} = C_{\text{BS}}(\sigma_{\text{imp}})$ & Market-priced, forward-looking measure of uncertainty \\
 \addlinespace
 IV surface shape & Skew, smile, term structure & Reveals crash-risk pricing, fat-tail beliefs, and mean-reversion expectations \\
+\addlinespace
+Butterfly spread & $\mathrm{BF}_t = \frac{1}{2}(\sigma_{25\Delta P} + \sigma_{25\Delta C}) - \sigma_{\mathrm{ATM}}$ & Symmetric tail thickness; orthogonal to skew; crisis-detection signal \\
 \addlinespace
 PCA of IV surface & 3 factors $\approx$ 95\% of variance & Level, slope, curvature; compress the surface for feature engineering \\
 \addlinespace
