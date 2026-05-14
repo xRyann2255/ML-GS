@@ -83,14 +83,14 @@ In addition to suggesting citations, the cross-referencer now:
 
 1. **Opening** -- Motivate with SHAP instability: VIX vs ATM IV as "most important" feature across refits
 2. **Prerequisites box** -- Ch.11 (tree methods), SHAP basics, feature importance concepts
-3. **The Problem with Single-Model Explanations** -- Why SHAP importance is unreliable with near-substitute features
+3. **The Problem with Single-Model Explanations** -- Why SHAP importance is unreliable with near-substitute features. This naturally leads to: "what if we looked at ALL good models instead of just one?"
 4. **The Rashomon Set** -- Definition, epsilon tolerance, "near-optimal" concept. Worked example: two small trees, different features, same accuracy
-5. **Optimal Sparse Decision Trees (STreeD)** -- Piecewise-linear leaves vs piecewise-constant. Provably optimal. Depth/leaf tradeoffs. Interpretability advantage over ensemble of 10,000 trees
-6. **Enumerating the Rashomon Set** -- TreeFARMS algorithm. SPLIT/RESPLIT speedups. LicketyRESPLIT approximation. Expected set sizes for vol data
-7. **Rashomon Importance Distributions (RID)** -- Stable importance across entire set. Confidence intervals. Contrast with bootstrapped SHAP
-8. **Variable Importance Clouds (VIC)** -- [min, max] importance range per feature. Non-overlapping = robustly distinct. Overlapping = substitutes. Worked example: VIX/VVIX/ATM IV
-9. **Application to Volatility Forecasting** -- Regime-stable feature selection. Prediction multiplicity. Novelty: no published financial time-series application
-10. **Project Connection** -- GS defensibility, feature stability, model-choice uncertainty quantification
+5. **Optimal Sparse Decision Trees (STreeD)** -- How to find ONE provably optimal tree. Piecewise-linear leaves (not piecewise-constant). Depth/leaf tradeoffs. Interpretability: every prediction traces to a root-to-leaf path + short linear formula
+6. **Enumerating the Rashomon Set** -- Now find ALL near-optimal trees. TreeFARMS exact enumeration. SPLIT/RESPLIT speedups. LicketyRESPLIT approximation for large-scale problems. Expected set sizes for vol data (~10^3-10^5 trees)
+7. **What the Rashomon Set Reveals** -- Two analysis tools that answer different questions:
+   - **RID (Rashomon Importance Distributions)** -- Stable feature importance across the entire set. Confidence intervals. Why this is fundamentally different from bootstrapped SHAP (which resamples data, not models)
+   - **VIC (Variable Importance Clouds)** -- [min, max] importance range per feature. Non-overlapping clouds = robustly distinct. Overlapping = substitutes. Worked example: VIX/VVIX/ATM IV as near-substitutes
+8. **Rashomon Analysis for Volatility Forecasting** -- Regime-stable feature selection (rolling-window Rashomon sets, intersect across regimes). Prediction multiplicity (range of forecasts quantifies model-choice uncertainty). Novelty: no published financial time-series application. Why this gives defensible presentations at GS -- feature stability is provable, not anecdotal
 
 ### Bib Entries to Add
 
@@ -123,43 +123,48 @@ In addition to suggesting citations, the cross-referencer now:
 - Formula: $BF_t = \frac{1}{2}(\sigma_{25\Delta P} + \sigma_{25\Delta C}) - \sigma_{ATM}$
 - What it captures vs skew: symmetric tail thickness (kurtosis demand) vs directional asymmetry
 - Crisis detection: both wings bid up by portfolio insurance
+- Forward reference to Ch.10 where butterfly is used as a forecasting feature
 - Source: verify formula against Rebonato 2004 (in repo)
 - Insert after existing smile/skew discussion
 - Do NOT duplicate skew content already present
 
 ### Ch.10 (Feature Engineering) -- 5 additions
 
-**1. Diminishing Returns Curve** (new section after feature catalog)
-- 55% -> 70% -> 85% -> 95% -> 100% staircase across layers L0-L7
-- Horizon-dependent table: what dominates at h=1, h=5, h=22
-- Key implication: perfect L0-L2 before chasing marginal features
-- Sources: HARdToBeat2024 (in repo), ChristensenSiggaardVeliyev2023 (in repo)
-- Do NOT repeat individual feature descriptions already in Ch.10
+Reading order matters here. These are listed in the order they should appear in the chapter:
 
-**2. Triple Expansion {level, change, z-score}** (new section in feature construction area)
+**1. Triple Expansion {level, change, z-score}** (new section early, in feature construction area, BEFORE feature families)
+- Teach this construction technique first so the reader knows what {level, change, z-score} means when they encounter expanded features in later sections
 - Why each variant captures different info: state, momentum, anomaly
 - Which features get expanded (continuous) vs not (categorical)
 - Tree interaction: no multicollinearity concern
 - Worked example: spread -> 3 variants
 - Do NOT duplicate any existing feature transforms in Ch.10
 
-**3. VPIN Construction + Kyle's Lambda** (expand existing microstructure subsection)
+**2. VPIN Construction + Kyle's Lambda** (expand existing microstructure subsection)
 - VPIN: volume-bucketing algorithm, buyer/seller classification, imbalance
 - Kyle's lambda: regress mid-price change on signed volume, slope = price impact
 - Sources: Easley et al. 2012 (in repo), Kyle 1985 (in repo)
 - Do NOT duplicate price acceleration coverage (already thorough)
 - Do NOT duplicate VPIN brief mention -- replace it with thorough treatment
 
-**4. Vol-of-Vol + Regime Duration** (expand existing memory subsection)
+**3. Vol-of-Vol + Regime Duration** (expand existing memory subsection)
 - Vol-of-vol: std(RV) over 22 days
 - Regime duration: days since last 2-sigma spike, mean-reversion clock
 - Complement existing fractional differencing coverage
 - Do NOT repeat fractional differencing (d ~ 0.35-0.45 already covered thoroughly)
 
-**5. Calendar Proximity Measures** (expand existing calendar subsection)
+**4. Calendar Proximity Measures** (expand existing calendar subsection)
 - Continuous proximity (days-to-event) vs binary dummies
 - FOMC compression/expansion, OpEx gamma unwind, earnings proximity
 - Do NOT repeat existing calendar skeleton -- extend it
+
+**5. Diminishing Returns Curve** (new CAPSTONE section at the END of the chapter, after ALL feature families)
+- This only makes sense after the reader has seen all 7 layers
+- 55% -> 70% -> 85% -> 95% -> 100% staircase across layers L0-L7
+- Horizon-dependent table: what dominates at h=1, h=5, h=22
+- Key implication: perfect L0-L2 before chasing marginal features -- the punchline of the entire chapter
+- Sources: HARdToBeat2024 (in repo), ChristensenSiggaardVeliyev2023 (in repo)
+- Do NOT repeat individual feature descriptions already in Ch.10
 
 ### Ch.11 (Tree Methods) -- 1 new subsection
 
