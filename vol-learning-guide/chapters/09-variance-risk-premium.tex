@@ -577,6 +577,50 @@ $\VVIX$ is the model-free implied volatility of VIX, computed from VIX options u
 \end{itemize}
 \end{definition}
 
+The definition above says ``same methodology as VIX,'' but what does that mean concretely?
+Recall from Chapter~\ref{ch:volsurface} that the VIX formula extracts model-free implied variance from a strip of out-of-the-money options.
+VVIX applies this identical formula to \emph{VIX options} rather than S\&P~500 options.
+
+To compute VVIX, you need two expiries of VIX options that bracket a 30-day horizon.
+For each expiry $j \in \{1, 2\}$, compute the single-term implied variance:
+\begin{equation}\label{eq:vvix-single-term}
+\sigma_j^2 \;=\; \frac{2}{T_j}\sum_{i}\frac{\Delta K_i}{K_i^2}\,e^{R_j T_j}\,Q_j(K_i)
+  \;-\; \frac{1}{T_j}\!\left(\frac{F_j}{K_{0,j}} - 1\right)^{\!2},
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $T_j$: time to expiration of the $j$-th VIX option series (in years).
+  \item $K_i$: strike price of the $i$-th out-of-the-money VIX option (calls for $K_i > K_{0,j}$, puts for $K_i < K_{0,j}$, both at $K_{0,j}$).
+  \item $\Delta K_i$: half the distance between the strikes on either side of $K_i$.
+  \item $Q_j(K_i)$: midpoint of the bid-ask spread of the VIX option at strike $K_i$.
+  \item $F_j$: forward VIX level implied by put-call parity: $F_j = K_{\text{ATM}} + e^{R_j T_j}(C_{\text{ATM}} - P_{\text{ATM}})$.
+  \item $K_{0,j}$: first strike at or below $F_j$.
+  \item $R_j$: risk-free rate to expiry $j$.
+\end{itemize}
+
+Then interpolate to a constant 30-day maturity:
+\begin{equation}\label{eq:vvix-interp}
+\text{VVIX} = 100 \times \sqrt{\left[
+  T_1\,\sigma_1^2\,\frac{N_{T_2} - N_{30}}{N_{T_2} - N_{T_1}}
+  + T_2\,\sigma_2^2\,\frac{N_{30} - N_{T_1}}{N_{T_2} - N_{T_1}}
+\right] \times \frac{N_{365}}{N_{30}}},
+\end{equation}
+where $N_{T_j}$ is the number of minutes to expiry $j$, $N_{30} = 43{,}200$ (minutes in 30 days), and $N_{365} = 525{,}600$ (minutes in 365 days).
+
+\begin{intuition}[In Plain English]
+The VVIX formula is \emph{exactly} the VIX formula with one substitution: instead of feeding in S\&P~500 option prices, you feed in VIX option prices.
+The first term in Equation~\eqref{eq:vvix-single-term} sums up the prices of all out-of-the-money VIX options, weighted inversely by the square of their strikes, to extract the market's expectation of VIX's variance.
+The subtraction term corrects for the fact that the at-the-money strike $K_{0,j}$ may not exactly equal the forward $F_j$.
+The interpolation in Equation~\eqref{eq:vvix-interp} blends the near-term and next-term results to produce a constant 30-day measure, ensuring VVIX is always comparable across dates regardless of the options expiry calendar.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+You do not need to compute VVIX yourself -- Cboe publishes it daily.
+But understanding the formula matters because it reveals what VVIX captures: the cost of insuring against VIX moves, aggregated across all strikes.
+When VVIX is high, the market expects VIX to swing violently, which predicts fatter tails in realized volatility changes.
+Include VVIX as a feature column for RV forecasting at horizons of 1--5 days, where its predictive power is strongest.
+\end{projectconnection}
+
 \subsection{Realized Vol-of-Vol}
 
 You can also compute a backward-looking measure: the realized volatility of the VIX time series itself.

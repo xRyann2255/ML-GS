@@ -398,6 +398,55 @@ Using numerical root-finding on $C_{\text{BS}}(S, K, r, T, \sigma) = 3.10$, you 
 The market is telling you: the uncertainty priced into this option corresponds to roughly 23.5\% annualized volatility, not the 20\% we assumed.
 \end{workedexample}
 
+\subsubsection*{Computing IV: The Newton-Raphson Method}
+
+The definition above says IV must be found ``numerically.''
+The standard method is \textbf{Newton-Raphson iteration}, which exploits the fact that vega (the derivative of option price with respect to $\sigma$) is available in closed form.
+
+Starting from an initial guess $\sigma_0$, the iteration refines the estimate:
+\begin{equation}\label{eq:newton-raphson-iv}
+\sigma_{n+1} = \sigma_n - \frac{C_{\text{BS}}(\sigma_n) - C_{\text{mkt}}}{\mathcal{V}(\sigma_n)},
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $C_{\text{BS}}(\sigma_n)$: the Black-Scholes price evaluated at the current volatility guess $\sigma_n$.
+  \item $C_{\text{mkt}}$: the observed market price of the option.
+  \item $\mathcal{V}(\sigma_n) = S\sqrt{T}\,N'(d_1)$: the Black-Scholes vega, with $N'(x) = \frac{1}{\sqrt{2\pi}}e^{-x^2/2}$ the standard normal density.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Newton-Raphson asks: ``Given my current guess $\sigma_n$, the BS formula gives price $C_{\text{BS}}(\sigma_n)$.
+The market price is $C_{\text{mkt}}$.
+How much should I adjust $\sigma$ to close the gap?''
+The answer is to divide the price error by the sensitivity of the price to $\sigma$ (vega).
+If vega is 12 cents per vol point and the price error is 60 cents, adjust $\sigma$ by $60/12 = 5$ vol points.
+The method converges quadratically -- each iteration roughly doubles the number of correct digits -- so 3--5 iterations typically suffice.
+\end{intuition}
+
+\textbf{Initial guess.}
+\citet{BrennerSubrahmanyam1988} provide a simple closed-form approximation for ATM options:
+\begin{equation}\label{eq:bs-approx}
+\sigma_0 \approx \sqrt{\frac{2\pi}{T}} \cdot \frac{C_{\text{mkt}}}{S}.
+\end{equation}
+This approximation exploits the fact that the ATM Black-Scholes call price is approximately $C \approx S\sigma\sqrt{T/(2\pi)}$.
+For options far from the money, use $\sigma_0 = 0.20$ (20\%) as a robust starting point.
+
+\begin{warning}[When Newton-Raphson Fails]
+Vega approaches zero for deep in-the-money and deep out-of-the-money options (where the option price is insensitive to volatility changes).
+Dividing by near-zero vega produces enormous, erratic steps.
+Two safeguards:
+(1) bound each step: $|\sigma_{n+1} - \sigma_n| \leq 0.25$;
+(2) if vega drops below a threshold (e.g., $10^{-8}$), fall back to bisection, which is slower (linear convergence) but unconditionally stable.
+In practice, a hybrid Newton-Raphson/bisection algorithm handles the entire strike range reliably.
+\end{warning}
+
+\begin{projectconnection}[Why This Matters]
+If your project uses options data (SPX IV surface from Marquee), you will not receive pre-computed implied volatilities for every strike and maturity.
+You will often need to invert the Black-Scholes formula yourself to convert option prices into IV.
+Implement Newton-Raphson with the Brenner-Subrahmanyam initial guess and bisection fallback.
+The entire IV surface construction pipeline -- from raw option prices to smooth SVI-fitted IV -- starts with this inversion at each individual $(K, T)$ point.
+\end{projectconnection}
+
 A critical point: implied volatility is \emph{not} a single number for a given underlying.
 Every (strike, maturity) pair has its own IV.
 This leads directly to the next section.
@@ -710,6 +759,69 @@ The shape of the IV surface encodes the market's collective view on:
 \end{itemize}
 Each of these shapes changes over time, and tracking those changes is a source of features for volatility forecasting.
 \end{keyidea}
+
+\subsection{Fitting the Surface: The SVI Parametrization}\label{sec:svi}
+
+The IV surface is a collection of discrete points (one per traded option).
+To use it as a continuous object -- for interpolation, extrapolation, or computing smooth Greeks -- you need a parametric model that fits through those points.
+The \textbf{Stochastic Volatility Inspired (SVI)} parametrization \citep{GatheralJacquier2014} is the industry standard for equity index surfaces.
+
+\begin{definition}[Raw SVI Parametrization]
+\label{def:svi}
+For log-moneyness $k = \ln(K/F)$ (where $F$ is the forward price), the \textbf{total implied variance} $w(k) = \sigma_{\text{imp}}^2(k) \cdot T$ of a single maturity slice is:
+\begin{equation}\label{eq:svi-raw}
+w(k) \;=\; a \;+\; b\!\left\{\rho\,(k - m) + \sqrt{(k-m)^2 + \sigma^2}\right\},
+\end{equation}
+with five parameters $\{a, b, \rho, m, \sigma\}$ satisfying:
+\begin{itemize}[nosep]
+  \item $a \in \mathbb{R}$: vertical level of the smile (shifts total variance up or down).
+  \item $b \geq 0$: controls the slope of both wings (larger $b$ = steeper wings).
+  \item $|\rho| < 1$: controls the tilt (negative $\rho$ steepens the left/put wing, flattens the right/call wing).
+  \item $m \in \mathbb{R}$: horizontal translation (shifts the smile's center left or right along log-moneyness).
+  \item $\sigma > 0$: controls the curvature at the money (smaller $\sigma$ = sharper ATM bend).
+\end{itemize}
+The non-negativity constraint $a + b\sigma\sqrt{1 - \rho^2} \geq 0$ ensures $w(k) \geq 0$ for all $k$.
+\end{definition}
+
+\begin{intuition}[In Plain English]
+The SVI formula says: total implied variance is a shifted, tilted hyperbola in log-moneyness.
+The square root $\sqrt{(k-m)^2 + \sigma^2}$ creates the ``smile'' shape -- it curves upward for strikes far from the center $m$.
+The $\rho(k-m)$ term tilts the smile: for equities, $\rho < 0$, making the left wing (OTM puts) steeper than the right wing (OTM calls).
+The parameter $a$ shifts the whole curve vertically, and $b$ scales the wings.
+The five parameters give enough flexibility to fit real market smiles accurately while producing smooth, well-behaved extrapolations into the tails.
+\end{intuition}
+
+\textbf{Why SVI?}
+Two properties make SVI theoretically well-motivated, not just a convenient curve fit \citep{GatheralJacquier2014}:
+\begin{enumerate}[nosep]
+  \item As $|k| \to \infty$, $w(k)$ becomes linear in $k$, matching \textbf{Roger Lee's moment formula} -- the theoretical constraint that total variance must grow at most linearly in extreme log-moneyness.
+  \item The large-maturity limit of the \textbf{Heston} stochastic volatility model's implied variance is exactly SVI. The parametrization is not arbitrary.
+\end{enumerate}
+
+\textbf{What each parameter controls.}
+When calibrating to market data, you can think of the five parameters as knobs:
+\begin{itemize}[nosep]
+  \item Raise $a$: the entire smile shifts up (higher overall variance).
+  \item Raise $b$: both wings get steeper (more extreme strike vol increases).
+  \item Lower $\rho$ (more negative): the put wing steepens, the call wing flattens (stronger skew).
+  \item Shift $m$ right: the smile's center moves to higher moneyness.
+  \item Lower $\sigma$: the ATM region becomes more ``V-shaped'' (sharper curvature at the money).
+\end{itemize}
+
+\begin{projectconnection}[Why This Matters]
+SVI is how practitioners interpolate and extrapolate the IV surface.
+For your project, SVI matters in two ways:
+(1) if you compute surface-derived features (skew, butterfly, term structure slope) from raw option prices, SVI gives you a smooth surface to read those features from, avoiding the noise of individual option quotes;
+(2) the SVI parameters themselves -- especially $b$ (wing steepness) and $\rho$ (skew) -- can serve as features for vol forecasting, since they summarize the entire smile shape in five numbers.
+Fit SVI slice-by-slice (one set of parameters per maturity), then track how $\rho$ and $b$ change over time.
+\end{projectconnection}
+
+\begin{warning}[No-Arbitrage Requires Care]
+A naive SVI fit can produce \textbf{calendar spread arbitrage}: total variance that decreases with maturity at some strikes.
+\citet{GatheralJacquier2014} provide sufficient conditions for arbitrage-free SVI surfaces.
+For a surface (not just a single slice), use the \textbf{SSVI} extension, which parametrizes the entire surface jointly and guarantees no static arbitrage under simple parameter constraints.
+Always verify $\partial_T w(k,T) \geq 0$ for all $k$ after calibration.
+\end{warning}
 
 
 % ═══════════════════════════════════════════════════════

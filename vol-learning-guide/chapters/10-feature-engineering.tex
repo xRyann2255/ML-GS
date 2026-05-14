@@ -564,6 +564,42 @@ A feature that works for liquid US equities may be meaningless for an illiquid c
 Always recalibrate when switching asset classes.
 \end{warning}
 
+\subsection{Amihud Illiquidity Ratio}\label{sec:feat-amihud}
+
+The features above (OBI, spread, WAP) require tick-level or LOB data.
+The \textbf{Amihud illiquidity ratio} \citep{Amihud2002} provides a liquidity measure that requires only daily returns and dollar volume -- data available for any traded asset.
+
+\begin{definition}[Amihud Illiquidity]
+\label{def:amihud}
+For stock $i$ on day $d$, the daily illiquidity ratio is the absolute return per dollar of trading volume:
+\begin{equation}\label{eq:amihud}
+\text{ILLIQ}_{i,t} = \frac{1}{D_t}\sum_{d=1}^{D_t} \frac{|r_{i,d}|}{\text{DVOL}_{i,d}} \times 10^6,
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $r_{i,d}$: the return of stock $i$ on day $d$.
+  \item $\text{DVOL}_{i,d}$: the dollar trading volume on day $d$ (price $\times$ shares traded).
+  \item $D_t$: the number of trading days in the averaging window (e.g., 22 for monthly).
+  \item The $10^6$ scaling factor prevents the ratio from being extremely small (returns of order $10^{-2}$ divided by volume of order $10^{6}$--$10^{9}$).
+\end{itemize}
+\end{definition}
+
+\begin{intuition}[In Plain English]
+The Amihud ratio answers a simple question: ``How much does the price move per dollar of trading activity?''
+A liquid stock can absorb millions of dollars in trading with barely a price ripple (low ILLIQ).
+An illiquid stock moves substantially even on modest dollar volume (high ILLIQ).
+This is exactly \citeauthor{Kyle1985}'s concept of market depth, but measured with data available for any publicly traded asset -- no tick data, no LOB snapshots, just daily returns and volume.
+When ILLIQ spikes, the market is having trouble absorbing order flow, which reliably precedes periods of elevated realized volatility.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include $\log(1 + \text{ILLIQ}_{i,t})$ as a feature column for single-stock vol forecasting.
+The log transform compresses the heavy right tail (ILLIQ is highly skewed).
+For the E-mini, ILLIQ is less informative since the contract is extremely liquid, but for the 30 mega-cap equities in your panel, cross-sectional variation in ILLIQ captures stock-specific liquidity regimes that predict idiosyncratic vol.
+Apply the triple expansion (level, change, z-score) as with any continuous feature.
+A rising Amihud ratio (increasing illiquidity) is a leading indicator of higher near-term volatility, especially for mid-cap stocks where liquidity can deteriorate rapidly.
+\end{projectconnection}
+
 \subsection{Microprice and Volume Features}\label{sec:feat-microprice}
 
 The simple midprice $(P_{\text{bid}} + P_{\text{ask}})/2$ assigns equal weight to both sides of the book regardless of depth.
@@ -603,6 +639,86 @@ Include at least one volume feature in any feature set.
 
 \begin{projectconnection}[Why This Matters]
 Add $\log(\text{volume}/\text{MA}_{20}\text{volume})$ as a feature column. It is easy to compute, available for any traded asset, and provides incremental predictive power beyond lagged RV. For microstructure-level projects, also include volume acceleration and the microprice-midprice deviation. These volume-based features are most valuable in the 1--2 day forecasting horizon where information arrival is actively resolving into price moves.
+\end{projectconnection}
+
+\subsection{Order Flow Imbalance and Depth Features}\label{sec:feat-ofi}
+
+The features above (OBI, spread, VPIN) treat the order book as a static snapshot.
+\textbf{Order flow imbalance (OFI)} \citep{ContKukanovStoikov2014} instead tracks how the book \emph{changes} over time, capturing the dynamic pressure of order arrivals and cancellations.
+
+\textbf{Event-level contribution.}
+Between any two consecutive order book observations $n-1$ and $n$, exactly one thing happens: demand increases, demand decreases, supply increases, or supply decreases.
+The contribution of event $n$ to order flow is:
+\begin{equation}\label{eq:ofi-event}
+e_n = \underbrace{\mathbf{1}_{P_n^B \geq P_{n-1}^B}\,q_n^B - \mathbf{1}_{P_n^B \leq P_{n-1}^B}\,q_{n-1}^B}_{\text{bid-side change}}
+    - \underbrace{\mathbf{1}_{P_n^A \leq P_{n-1}^A}\,q_n^A + \mathbf{1}_{P_n^A \geq P_{n-1}^A}\,q_{n-1}^A}_{\text{ask-side change \ (negated)}},
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $P_n^B, P_n^A$: best bid and ask prices at observation $n$.
+  \item $q_n^B, q_n^A$: queue sizes (shares) at the best bid and ask.
+  \item $\mathbf{1}_{\{\cdot\}}$: indicator function.
+  \item A market sell and a cancel-buy of the same size produce the same $e_n$, because both reduce the bid queue identically.
+\end{itemize}
+
+\textbf{Interval-level OFI.}
+Aggregate the event contributions over a time interval $[t_{k-1}, t_k]$:
+\begin{equation}\label{eq:ofi}
+\text{OFI}_k = \sum_{n \,\in\, [t_{k-1},\, t_k]} e_n.
+\end{equation}
+
+\textbf{The price impact regression.}
+\citet{ContKukanovStoikov2014} show that mid-price changes are linear in OFI:
+\begin{equation}\label{eq:ofi-regression}
+\Delta P_k = \beta \cdot \text{OFI}_k + \varepsilon_k,
+\end{equation}
+where $\beta$ is the \textbf{price impact coefficient} (basis points per unit of order flow) and $\varepsilon_k$ is residual noise from deeper book levels.
+Estimated on 10-second intervals for 50 US equities, this simple regression achieves $R^2 \approx 65\%$ -- far higher than trade-based measures ($R^2 \approx 32\%$ for signed trade imbalance).
+When both OFI and trade imbalance are included, trade imbalance becomes insignificant: OFI subsumes its information.
+
+\begin{intuition}[In Plain English]
+OBI (Section~\ref{sec:feat-micro}) asks ``what does the book look like right now?''
+OFI asks ``how is the book changing?''
+The distinction matters: a balanced book that is rapidly losing bid volume (market sells arriving, or limit buys being cancelled) has low OBI but strongly negative OFI.
+OFI captures the \emph{flow} of information into the market, not just the \emph{state} of the book, which is why it explains 65\% of short-term price variation.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+For the E-mini L2 data, compute OFI over 10-second or 1-minute intervals and aggregate to your forecasting window (e.g., standard deviation or sum of squared OFI values over the observation window).
+The aggregated OFI variability is a volatility feature: days with large swings in order flow produce higher near-term RV.
+The price impact coefficient $\hat{\beta}$ itself is also a feature -- it is inversely proportional to market depth, so rising $\hat{\beta}$ signals deteriorating liquidity and predicts higher volatility.
+\end{projectconnection}
+
+\textbf{Depth ratio.}
+When multi-level LOB data is available (as with E-mini L2), you can look beyond the best quotes.
+The \textbf{depth ratio} aggregates volume across multiple price levels:
+\begin{equation}\label{eq:depth-ratio}
+\text{DR}_t^{(L)} = \frac{\sum_{\ell=1}^{L} V_t^{\text{bid},\ell}}{\sum_{\ell=1}^{L} V_t^{\text{ask},\ell}},
+\end{equation}
+where $V_t^{\text{bid},\ell}$ and $V_t^{\text{ask},\ell}$ are the resting volumes at the $\ell$-th best bid and ask levels, and $L$ is the number of levels included (typically 5 or 10).
+
+Unlike OBI (which uses only the best quote), the depth ratio captures \textbf{structural imbalance} deeper in the book.
+A depth ratio far from 1 at levels 2--5 can signal informed positioning that has not yet reached the best quote, providing lead time over L1-only features.
+
+\textbf{Market urgency.}
+The \textbf{market urgency} composite combines spread and imbalance into a single feature:
+\begin{equation}\label{eq:market-urgency}
+\text{Urgency}_t = s_t \times |\text{OBI}_t|,
+\end{equation}
+where $s_t$ is the bid-ask spread and $|\text{OBI}_t|$ is the absolute order book imbalance.
+
+\begin{intuition}[In Plain English]
+Market urgency captures when \emph{both} conditions for a large price move are present simultaneously: a wide spread (the market is thin and vulnerable) and a strong imbalance (one side is dominating).
+Either condition alone is weaker: a wide spread with balanced flow just means low liquidity, and strong imbalance with a tight spread means the market can absorb the pressure.
+When both align, the next price move is likely to be large and fast.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include all three features -- OFI variability, depth ratio, and market urgency -- in your microstructure feature set.
+OFI captures dynamic flow, the depth ratio captures static structural imbalance, and market urgency captures the interaction of spread and imbalance.
+Together they provide three orthogonal views of market quality.
+For the E-mini L2 data, use $L = 5$ for the depth ratio.
+For the 30 equities (L1 only), you can compute OBI and market urgency but not the multi-level depth ratio.
 \end{projectconnection}
 
 % ──────────────────────────────────────────────────────────────
@@ -675,6 +791,49 @@ VRP is one of the strongest features for medium-horizon (1-week to 1-month) vol 
 The VIX itself is a feature for equity volatility.
 The $\VVIX$ (vol-of-vol, Chapter~\ref{ch:vrp}) captures uncertainty about volatility.
 High VVIX predicts fatter tails in the distribution of future RV changes.
+
+\textbf{VIX futures term structure.}
+VIX futures trade at multiple maturities.
+The ratio of a far-dated VIX future to spot VIX is a powerful regime indicator:
+\begin{equation}\label{eq:vix-ts-ratio}
+\text{VTS}_t = \frac{F_t^{(3\text{m})}(\text{VIX})}{\text{VIX}_t},
+\end{equation}
+where $F_t^{(3\text{m})}(\text{VIX})$ is the 3-month VIX future and $\text{VIX}_t$ is the spot VIX.
+
+When $\text{VTS}_t > 1$ (\textbf{contango}), far-dated futures trade above spot VIX.
+This is the normal state: volatility mean-reverts, so the market anchors the far future closer to the long-run average than the current (lower) spot level.
+When $\text{VTS}_t < 1$ (\textbf{backwardation}), spot VIX exceeds the far future.
+This signals a crisis: the market has spiked in the near term but expects the spike to be temporary.
+
+The economic mechanism is mean reversion.
+As \citet{Bennett2014} documents, the front-month VIX future has roughly 90\% sensitivity (delta) to spot VIX, while the 6-month future has only 55\%.
+When VIX spikes above 40, the 6-month future barely moves because the market does not expect the high-volatility environment to persist that long.
+
+\textbf{Forward implied volatility.}
+The \emph{additive variance rule} lets you extract the market's expectation for volatility between two future dates.
+Given ATM implied volatilities $\sigma_1, \sigma_2$ at maturities $T_1 < T_2$, the \textbf{forward volatility} from $T_1$ to $T_2$ is:
+\begin{equation}\label{eq:forward-vol}
+\sigma_{T_1 \to T_2} = \sqrt{\frac{\sigma_2^2\,T_2 - \sigma_1^2\,T_1}{T_2 - T_1}}.
+\end{equation}
+\begin{itemize}[nosep]
+  \item $\sigma_1, \sigma_2$: ATM implied volatilities for maturities $T_1$ and $T_2$.
+  \item $\sigma_1^2 T_1$ and $\sigma_2^2 T_2$: total implied variances (accumulated variance to each maturity).
+  \item $\sigma_{T_1 \to T_2}$: the implied volatility for the \emph{forward period} between $T_1$ and $T_2$ only.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Total implied variance accumulates like distance: the total variance to 6 months equals the variance to 3 months plus the variance from 3 to 6 months.
+The forward vol formula ``subtracts out'' the near-term variance to isolate what the market expects for the later period.
+If 3-month IV is much higher than forward 3-to-6-month vol, the market is pricing a near-term event (FOMC, earnings) that will resolve before the forward period begins.
+This is a more refined feature than the raw term structure slope because it directly answers: ``What does the market expect for each specific future window?''
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Include VTS (the VIX futures ratio) as a regime indicator feature.
+Values below 0.9 strongly predict elevated near-term RV, while values above 1.1 signal calm.
+Also compute forward volatility at matched horizons (e.g., 1-to-3 month forward vol for predicting 1-month-ahead RV) and include it alongside the raw term structure slope.
+Forward vol provides a cleaner signal than the slope because it removes the contaminating effect of near-term event pricing.
+\end{projectconnection}
 
 \begin{keyidea}[Options features are forward-looking]
 Every price-based feature (RV, RQ, signed jumps) is backward-looking: it summarizes what has already happened.
