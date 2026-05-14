@@ -418,7 +418,7 @@ The BNS test standardizes the difference by its sampling variability.
   \item $Z_{\text{BNS},t}$: the test statistic for day $t$
   \item $\RV_t - \BPV_t$: the estimated jump component (the difference between realized variance and bipower variation)
   \item $\vartheta = (\pi^2/4) + \pi - 5 \approx 0.6090$: a constant from the asymptotic theory
-  \item $\operatorname{RQ}_t = n\frac{\pi^2}{4}\frac{1}{3}\sum_{i=3}^{n}|r_{t,i}|\,|r_{t,i-1}|\,|r_{t,i-2}|$: realized quarticity, a consistent estimator of integrated quarticity $\int\sigma^4_s\,ds$, needed to scale the variance of the numerator
+  \item $\operatorname{RQ}_t = \frac{n}{3}\sum_{i=1}^{n}r_{t,i}^4$: realized quarticity, a consistent estimator of integrated quarticity $\int\sigma^4_s\,ds$ under the null of no jumps, needed to scale the variance of the numerator.  A jump-robust alternative is the tripower quarticity $\operatorname{TPQ}_t = n\,\mu_{4/3}^{-3}\sum_{i=3}^{n}|r_{t,i}|^{4/3}\,|r_{t,i-1}|^{4/3}\,|r_{t,i-2}|^{4/3}$, where $\mu_{4/3} = \E[|Z|^{4/3}]$; in practice either estimator is used
   \item $n$: number of intraday returns
   \item $\max(\cdot,\;10^{-10})$: a numerical safeguard to prevent division by zero
   \item Under the null hypothesis of no jumps, $Z_{\text{BNS},t} \xrightarrow{d} \N(0,1)$ as $n \to \infty$
@@ -452,7 +452,7 @@ Just as variance is the integral of $\sigma^2$, \emph{quarticity} is the integra
 \]
 This quantity controls the variance of the $\RV_t - \BPV_t$ difference.
 You never need to compute it by hand.
-The realized quarticity estimator $\operatorname{RQ}_t$ does it for you using products of three consecutive absolute returns, analogous to how $\BPV$ uses products of two.
+The realized quarticity estimator $\operatorname{RQ}_t = \frac{n}{3}\sum r_{t,i}^4$ does it for you using fourth powers of returns.  A jump-robust alternative (tripower quarticity) uses products of three consecutive absolute returns raised to the $4/3$ power, analogous to how $\BPV$ uses products of two absolute returns.
 \end{prereq}
 
 \begin{workedexample}{Applying the BNS Jump Test}

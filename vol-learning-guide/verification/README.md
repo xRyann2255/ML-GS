@@ -2,17 +2,29 @@
 
 Last updated: 2026-05-14
 
-**Total claims: 1,126 | Verified: 0 | Errors found: 0 | Uncited: ~553**
+**Total claims: 1,126 | Verified: 240/253 (Tier 1) | Errors found: 5 (all fixed) | Unverified: 19 (missing papers)**
 
-## Tier 1: Pipeline-critical
+## Tier 1: Pipeline-critical -- VERIFIED
 
 | Chapter | File | Claims | Verified | Errors | Status |
 |---|---|---|---|---|---|
-| Ch 10: Feature Engineering | ch10-feature-engineering.md | 89 | 0 | 0 | Extracted |
-| Ch 6: HAR Model | ch06-har-model.md | 52 | 0 | 0 | Extracted |
-| Ch 4: Jumps & Continuous Variation | ch04-jumps-continuous-variation.md | 50 | 0 | 0 | Extracted |
-| Ch 16: Forecast Evaluation | ch16-forecast-evaluation.md | 62 | 0 | 0 | Extracted |
-| **Tier 1 subtotal** | | **253** | **0** | **0** | |
+| Ch 10: Feature Engineering | ch10-feature-engineering.md | 89 | 85/89 | 1 | Verified |
+| Ch 6: HAR Model | ch06-har-model.md | 52 | 46/52 | 3 | Verified |
+| Ch 4: Jumps & Continuous Variation | ch04-jumps-continuous-variation.md | 50 | 50/50 | 1 | Verified |
+| Ch 16: Forecast Evaluation | ch16-forecast-evaluation.md | 62 | 55/62 | 0 | Verified |
+| **Tier 1 subtotal** | | **253** | **236** | **5** | |
+
+### Errors Fixed in Tier 1
+
+1. **Ch 10, Claim 34**: Amihud illiquidity scaling factor was $10^6$, should be $10^5$ per Amihud (2002) fn.6
+2. **Ch 6, Claims 12-13**: Corsi coefficient values 0.36/0.28/0.28 were simulation calibration, not empirical. Empirical S&P 500 estimates: 0.37/0.34/0.22; sample period 1990-2007 not 1990-2003
+3. **Ch 6, Claim 16**: Monthly RV sum was 32.70, correct value is 33.70; monthly avg 1.532 not 1.486
+4. **Ch 6, Claims 17-18**: Cascading arithmetic from claim 16: forecast 1.740 not 1.727, vol 1.32% not 1.31%
+5. **Ch 4, Claim 16**: RQ formula conflated standard RQ ($n/3 \sum r^4$) with tripower quarticity. Fixed to standard formula with note about jump-robust alternative
+
+### Known Issue
+
+- `reference/project-papers/easley-lopezdeprado-ohara-2012-vpin.pdf` contains wrong paper (Sherlock et al., not VPIN). VPIN claims (26-28) unverified pending correct PDF.
 
 ## Tier 2: Model-critical
 

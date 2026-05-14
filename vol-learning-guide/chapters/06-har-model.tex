@@ -200,7 +200,7 @@ Throughout this chapter, all equations are written in levels for clarity; in pra
 \subsection{Typical Coefficient Values}
 
 What do the coefficients look like on real data?
-\citet{Corsi2009} estimates HAR on S\&P~500 5-minute $\RV$ (1990--2003) and reports approximate values of $\beta_d \approx 0.36$, $\beta_w \approx 0.28$, $\beta_m \approx 0.28$.
+\citet{Corsi2009} calibrates the HAR simulation with $\beta_d = 0.36$, $\beta_w = 0.28$, $\beta_m = 0.28$, values chosen to produce realistic dynamics; the empirical estimates on S\&P~500 futures (1990--2007) are $\beta_d \approx 0.37$, $\beta_w \approx 0.34$, $\beta_m \approx 0.22$.
 All three components contribute meaningfully.
 The monthly term's coefficient is similar to the daily term's, confirming that long-horizon persistence matters.
 
@@ -243,22 +243,22 @@ $\RV_{22} = 1.90$
 \textbf{Step 3: Compute the monthly average.}
 \[
   \RV^{(m)}_{22} = \frac{1}{22}\sum_{i=1}^{22} \RV_i
-  = \frac{0.80 + 0.90 + \cdots + 1.90}{22} = \frac{32.70}{22} = 1.486
+  = \frac{0.80 + 0.90 + \cdots + 1.90}{22} = \frac{33.70}{22} = 1.532
 \]
 
 \textbf{Step 4: Apply pre-fitted coefficients.}
 Using $\beta_0 = 0.05$, $\beta_d = 0.36$, $\beta_w = 0.28$, $\beta_m = 0.28$ (all in $10^{-4}$ units):
 \begin{align*}
-  \widehat{\RV}_{23} &= 0.05 + 0.36 \times 1.90 + 0.28 \times 2.06 + 0.28 \times 1.486 \\
-                      &= 0.05 + 0.684 + 0.577 + 0.416 \\
-                      &= 1.727
+  \widehat{\RV}_{23} &= 0.05 + 0.36 \times 1.90 + 0.28 \times 2.06 + 0.28 \times 1.532 \\
+                      &= 0.05 + 0.684 + 0.577 + 0.429 \\
+                      &= 1.740
 \end{align*}
 
-The forecast for day 23 is $1.727 \times 10^{-4}$, or equivalently a daily volatility of $\sqrt{1.727 \times 10^{-4}} = 1.31\%$.
+The forecast for day 23 is $1.740 \times 10^{-4}$, or equivalently a daily volatility of $\sqrt{1.740 \times 10^{-4}} = 1.32\%$.
 
 Notice how the forecast blends three time scales.
 The daily term ($\RV_{22} = 1.90$) pulls the forecast toward recent conditions.
-The weekly average ($2.06$) is higher than the monthly average ($1.486$) because the last five days were volatile, so the weekly term pulls the forecast up.
+The weekly average ($2.06$) is higher than the monthly average ($1.532$) because the last five days were volatile, so the weekly term pulls the forecast up.
 The monthly average anchors the forecast closer to the longer-run level.
 \end{workedexample}
 
