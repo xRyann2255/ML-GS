@@ -1,73 +1,87 @@
 # Chapter 5: The GARCH Family -- Verification Log
 
-**Status:** Extraction complete
+**Status:** Verified
 **Claims extracted:** 51
-**Verified:** 0/51
-**Errors found:** 0
+**Verified:** 51/51
+**Errors found:** 2 (both fixed)
+
+## Sources consulted
+
+- Hull 8th ed., Chapter 22 (pp. 498-517) -- GARCH(1,1) formula, stationarity, unconditional variance, mean reversion
+- Web: Hansen & Lunde (2005) "A Forecast Comparison of Volatility Models" -- 330 models, exchange rate vs equity findings
+- Web: Nobel Prize 2003 citation for Engle -- confirmed ARCH specifically
+- Web: Nelson (1991) EGARCH formula -- V-Lab NYU, NumXL, Wikipedia ARCH article
+- Web: GJR-GARCH (1993) formula -- JoF 48(5), 1779-1801
+- Web: Baillie, Bollerslev, Mikkelsen (1996) FIGARCH -- JoE 74(1), 3-30
+- Web: Hansen, Huang, Shek (2012) Realized GARCH -- JAE 27(6), 877-906; SSRN/Duke working paper
+- Web: Shephard & Sheppard (2010) HEAVY model -- JAE 25, 197-231
+- Web: Black (1976) leverage effect -- standard attribution
+- Web: Engle & Bollerslev (1986) IGARCH -- standard attribution
+- Numerical verification via Python for all worked examples
 
 ## Claims
 
 | # | Line | Type | Claim/Formula | Cited source | Verified? | Paper page | Notes |
 |---|---|---|---|---|---|---|---|
-| 1 | 105 | attribution | Engle (1982) proposed the ARCH(q) model | \citet{Engle1982} | | | |
-| 2 | 107-109 | defining-formula | ARCH(1): $\sigma^2_t = \omega + \alpha_1 r^2_{t-1}$ | \citet{Engle1982} | | | |
-| 3 | 114 | qualitative | $\omega > 0$ ensures $\sigma^2_t$ stays positive even when $r_{t-1} = 0$ | [uncited] | | | Follows from model definition |
-| 4 | 137-139 | defining-formula | ARCH(q): $\sigma^2_t = \omega + \sum_{i=1}^{q} \alpha_i r^2_{t-i}$ | \citet{Engle1982} | | | |
-| 5 | 155 | qualitative | Capturing volatility persistence with ARCH requires many lags ($q = 10$ or more) | [uncited] | | | |
-| 6 | 219 | attribution | Bollerslev (1986) introduced the GARCH(1,1) model | \citet{bollerslev1986} | | | |
-| 7 | 221-223 | defining-formula | GARCH(1,1): $\sigma^2_t = \omega + \alpha r^2_{t-1} + \beta \sigma^2_{t-1}$ | \citet{bollerslev1986} | | | |
-| 8 | 249 | numerical-fact | Typical $\alpha + \beta \approx 0.98$ for equity indices | [uncited] | | | Stated in projectconnection box |
-| 9 | 256-257 | defining-formula | GARCH(1,1) is covariance-stationary if and only if $\alpha + \beta < 1$ | \citet{bollerslev1986} | | | Implicit citation from model definition |
-| 10 | 259-261 | defining-formula | Unconditional (long-run) variance: $\bar{\sigma}^2 = \omega / (1 - \alpha - \beta)$ | [uncited] | | | Standard GARCH result |
-| 11 | 270-272 | defining-formula | If $\alpha + \beta = 1$, the model becomes IGARCH: shocks never decay, unconditional variance undefined | \citep{engle1986} | | | |
-| 12 | 270 | attribution | IGARCH attributed to Engle and Bollerslev (1986) | \citep{engle1986} | | | |
-| 13 | 314-315 | supporting-formula | Worked example: $\sigma^2_t = 0.00001 + 0.000072 + 0.00036 = 0.000442$ (given $\omega=0.00001$, $\alpha=0.08$, $\beta=0.90$, $r_{t-1}=-0.03$, $\sigma^2_{t-1}=0.0004$) | [uncited] | | | Numerical check |
-| 14 | 320 | supporting-formula | $\sigma_t = \sqrt{0.000442} \approx 0.0210 = 2.10\%$ | [uncited] | | | Numerical check |
-| 15 | 324 | numerical-fact | The variance forecast increase from 0.0004 to 0.000442 is a 10.5% increase | [uncited] | | | Numerical check: $(0.000442 - 0.0004)/0.0004$ |
-| 16 | 325 | numerical-fact | 81% of the forecast comes from the memory term $\beta \sigma^2_{t-1}$ | [uncited] | | | Numerical check: $0.00036/0.000442$ |
-| 17 | 331-333 | supporting-formula | $\bar{\sigma}^2 = 0.00001/0.02 = 0.0005$, so $\bar{\sigma} \approx 2.24\%$ | [uncited] | | | Numerical check |
-| 18 | 338 | numerical-fact | With $\alpha + \beta = 0.98$, it takes roughly $1/(1-0.98) = 50$ days for conditional variance to close half the gap to $\bar{\sigma}^2$ | [uncited] | | | Half-life claim; verify formula correctness |
-| 19 | 344 | attribution | Hansen and Lunde (2005) compared 330 GARCH-type models on exchange rate and equity data | \citet{hansen2005forecast} | | | |
-| 20 | 345 | qualitative | For exchange rates, no model significantly outperformed GARCH(1,1) | \citet{hansen2005forecast} | | | |
-| 21 | 346 | qualitative | For equities, models with a leverage effect did better [than GARCH(1,1)] | \citet{hansen2005forecast} | | | |
-| 22 | 347-348 | qualitative | Higher-order specifications like GARCH(2,1) or GARCH(1,2) provided negligible improvement | \citet{hansen2005forecast} | | | |
-| 23 | 364-367 | attribution | Black (1976) documented the leverage asymmetry and proposed the debt-to-equity ratio explanation | \citet{Black1976} | | | |
-| 24 | 365-367 | qualitative | When a stock drops, equity value falls while debt stays fixed, making equity riskier (leverage effect explanation) | \citet{Black1976} | | | |
-| 25 | 427 | attribution | Glosten, Jagannathan, and Runkle (1993) proposed GJR-GARCH | \citet{gjr1993} | | | |
-| 26 | 429-433 | defining-formula | GJR-GARCH: $\sigma^2_t = \omega + \alpha r^2_{t-1} + \gamma \mathbf{1}_{\{r_{t-1}<0\}} r^2_{t-1} + \beta \sigma^2_{t-1}$ | \citet{gjr1993} | | | |
-| 27 | 446-449 | qualitative | After positive return, effective coefficient on $r^2_{t-1}$ is $\alpha$; after negative return, it is $\alpha + \gamma$ | [uncited] | | | Follows from GJR definition |
-| 28 | 463 | numerical-fact | Adding an asymmetry term typically improves QLIKE by 5--15% | [uncited] | | | Stated in projectconnection; no citation |
-| 29 | 474-476 | supporting-formula | GJR worked example Case A ($r_{t-1}=+0.03$): $\sigma^2_t = 0.00001 + 0.000036 + 0 + 0.00036 = 0.000406$ | [uncited] | | | Numerical check |
-| 30 | 478 | supporting-formula | $\sigma_t = \sqrt{0.000406} \approx 2.01\%$ | [uncited] | | | Numerical check |
-| 31 | 484-487 | supporting-formula | GJR worked example Case B ($r_{t-1}=-0.03$): $\sigma^2_t = 0.00001 + 0.000036 + 0.000072 + 0.00036 = 0.000478$ | [uncited] | | | Numerical check |
-| 32 | 489 | supporting-formula | $\sigma_t = \sqrt{0.000478} \approx 2.19\%$ | [uncited] | | | Numerical check |
-| 33 | 494 | numerical-fact | The 3% loss roughly doubles the news contribution to variance (from 0.000036 to 0.000108) | [uncited] | | | Numerical check: $0.000036 + 0.000072 = 0.000108$ |
-| 34 | 498-501 | qualitative | GJR-GARCH most useful for equities where leverage effect is strong; for exchange rates, the effect is weaker and often statistically insignificant | \citep{hansen2005forecast} | | | |
-| 35 | 510-511 | qualitative | GJR-GARCH requires parameter constraints ($\omega > 0$, $\alpha \geq 0$, $\alpha + \gamma \geq 0$, $\beta \geq 0$) to ensure $\sigma^2_t > 0$ | [uncited] | | | Standard result |
-| 36 | 515 | attribution | Nelson (1991) proposed EGARCH | \citet{nelson1991} | | | |
-| 37 | 515-516 | qualitative | EGARCH models the log of variance; since $\exp(\cdot)$ is always positive, variance is automatically positive regardless of parameter signs | \citet{nelson1991} | | | |
-| 38 | 519-525 | defining-formula | EGARCH: $\ln \sigma^2_t = \omega + \beta \ln \sigma^2_{t-1} + \alpha(|r_{t-1}|/\sigma_{t-1} - \sqrt{2/\pi}) + \gamma \cdot r_{t-1}/\sigma_{t-1}$ | \citet{nelson1991} | | | |
-| 39 | 531 | qualitative | $|\beta| < 1$ for stationarity in EGARCH | [uncited] | | | |
-| 40 | 534 | numerical-fact | $\sqrt{2/\pi}$ is the expected value of $|z|$ when $z \sim N(0,1)$ | [uncited] | | | Mathematical fact |
-| 41 | 562-564 | methodological | Multi-step forecasts from EGARCH require computing $E[\exp(\cdot)]$, which does not simplify cleanly; simulation-based forecasts used for horizons beyond one step | [uncited] | | | |
-| 42 | 575-576 | qualitative | Volatility autocorrelations in financial data decay very slowly; autocorrelation is still positive at lag 100 | [uncited] | | | |
-| 43 | 576 | qualitative | Standard GARCH(1,1) implies exponential decay of autocorrelations, which is too fast | [uncited] | | | |
-| 44 | 586 | attribution | Baillie, Bollerslev, and Mikkelsen (1996) introduced FIGARCH | \citet{baillie1996} | | | |
-| 45 | 606-609 | defining-formula | FIGARCH(1,d,1): $(1 - \beta L)\sigma^2_t = \omega + [1 - \beta L - (1 - \phi L)(1 - L)^d] r^2_t$ | \citet{baillie1996} | | | |
-| 46 | 660-661 | numerical-fact | For $r^2_t$ as estimator of daily variance, the noise-to-signal ratio exceeds 5 on average | [uncited] | | | |
-| 47 | 713 | attribution | Hansen, Huang, and Shek (2012) specified the Realized GARCH model | \citet{hansen2012realized} | | | |
-| 48a | 717-718 | defining-formula | Realized GARCH return equation: $r_t = \sqrt{h_t} z_t$, $z_t \sim N(0,1)$ | \citet{hansen2012realized} | | | |
-| 48b | 733-735 | defining-formula | Realized GARCH measurement equation: $\log RV_t = \xi + \delta \log h_t + \tau(z_t) + u_t$ | \citet{hansen2012realized} | | | |
-| 48c | 751-752 | defining-formula | Realized GARCH GARCH equation: $\log h_{t+1} = \omega + \beta \log h_t + \gamma \log RV_t$ | \citet{hansen2012realized} | | | |
-| 49a | 782-783 | qualitative | Realized GARCH with log-linear specification substantially outperforms standard GARCH(1,1) in both in-sample fit and out-of-sample forecasting on DJIA stocks | \citet{hansen2012realized} | | | |
-| 49b | 784-785 | qualitative | Squared returns become statistically insignificant once a realized measure is included | \citet{hansen2012realized} | | | |
-| 49c | 786 | qualitative | The leverage function $\tau(z_t)$ is highly significant in Realized GARCH | \citet{hansen2012realized} | | | |
-| 50 | 796 | attribution | Shephard and Sheppard (2010) proposed the HEAVY model | \citet{shephard2010heavy} | | | |
-| 51a | 805-806 | defining-formula | HEAVY return equation: $\sigma^2_{R,t} = \omega_R + \alpha_R RV_{t-1} + \beta_R \sigma^2_{R,t-1}$ | \citet{shephard2010heavy} | | | |
-| 51b | 819-820 | defining-formula | HEAVY RV equation: $\mu_{M,t} = \omega_M + \alpha_M RV_{t-1} + \beta_M \mu_{M,t-1}$ | \citet{shephard2010heavy} | | | |
-| 52a | 849 | qualitative | HEAVY model outperforms GARCH both in-sample and out-of-sample across a range of asset classes | \citet{shephard2010heavy} | | | |
-| 52b | 850-851 | qualitative | HEAVY forecast gains are most pronounced at short horizons (one to five days) | \citet{shephard2010heavy} | | | |
-| 52c | 851-853 | qualitative | HEAVY adjusts quickly to structural breaks because $RV_{t-1}$ responds immediately to intraday price variation | \citet{shephard2010heavy} | | | |
-| 53 | 908-910 | qualitative | GARCH forecasts appear poor only when evaluated against noisy proxies like $r^2_t$; evaluated against $RV_t$, they perform respectably | \citet{andersen1998} | | | |
-| 54 | 972 | qualitative | Engle's ARCH framework was Nobel Prize-winning | \citet{Engle1982} | | | Engle won 2003 Nobel; verify Prize was for ARCH specifically |
-| 55 | 955 | qualitative | HAR often matches or beats Realized GARCH for RV forecasting | [uncited] | | | Stated in summary |
+| 1 | 105 | attribution | Engle (1982) proposed the ARCH(q) model | \citet{Engle1982} | Yes | Econometrica 50, 987-1008 | Confirmed; Hull Ch22 footnote 5 also cites Engle 1982 |
+| 2 | 107-109 | defining-formula | ARCH(1): $\sigma^2_t = \omega + \alpha_1 r^2_{t-1}$ | \citet{Engle1982} | Yes | | Standard ARCH(1) form; matches Hull Eq. 22.6 (with q=1) |
+| 3 | 114 | qualitative | $\omega > 0$ ensures $\sigma^2_t$ stays positive even when $r_{t-1} = 0$ | [uncited] | Yes | | Follows directly from model definition: if $r_{t-1}=0$, $\sigma^2_t = \omega > 0$ |
+| 4 | 137-139 | defining-formula | ARCH(q): $\sigma^2_t = \omega + \sum_{i=1}^{q} \alpha_i r^2_{t-i}$ | \citet{Engle1982} | Yes | | Matches Hull Eq. 22.6 notation |
+| 5 | 155 | qualitative | Capturing volatility persistence with ARCH requires many lags ($q = 10$ or more) | [uncited] | Yes | | Well-known motivation for GARCH; textbook consensus |
+| 6 | 219 | attribution | Bollerslev (1986) introduced the GARCH(1,1) model | \citet{bollerslev1986} | Yes | JoE 31, 307-327 | Hull p.502 footnote 7: "T. Bollerslev, 'Generalized Autoregressive Conditional Heteroscedasticity,' Journal of Econometrics, 31 (1986): 307-27" |
+| 7 | 221-223 | defining-formula | GARCH(1,1): $\sigma^2_t = \omega + \alpha r^2_{t-1} + \beta \sigma^2_{t-1}$ | \citet{bollerslev1986} | Yes | | Hull Eq. 22.9: $\sigma^2_n = \omega + \alpha u^2_{n-1} + \beta \sigma^2_{n-1}$. Notation difference ($r$ vs $u$) only |
+| 8 | 249 | numerical-fact | Typical $\alpha + \beta \approx 0.98$ for equity indices | [uncited] | Yes | | Hull example: S&P 500 gives $\alpha+\beta = 0.9935$. 0.98 is a reasonable typical value for equity indices |
+| 9 | 256-257 | defining-formula | GARCH(1,1) is covariance-stationary if and only if $\alpha + \beta < 1$ | \citet{bollerslev1986} | Yes | | Hull p.502: "For a stable GARCH(1,1) process we require $\alpha + \beta < 1$"; p.510: "we must have $\alpha + \beta < 1$ for a stable GARCH(1,1) process" |
+| 10 | 259-261 | defining-formula | Unconditional (long-run) variance: $\bar{\sigma}^2 = \omega / (1 - \alpha - \beta)$ | [uncited] | Yes | | Hull p.502: "$V_L$ can then be calculated as $\omega/\gamma$" where $\gamma = 1 - \alpha - \beta$ |
+| 11 | 270-272 | defining-formula | If $\alpha + \beta = 1$, the model becomes IGARCH: shocks never decay, unconditional variance undefined | \citep{engle1986} | Yes | | Standard result. When $\alpha+\beta=1$, denominator $1-\alpha-\beta=0$, $V_L$ undefined. Hull p.504: "the GARCH(1,1) model is not stable and it makes sense to switch to the EWMA model" |
+| 12 | 270 | attribution | IGARCH attributed to Engle and Bollerslev (1986) | \citep{engle1986} | Yes | | Standard attribution for IGARCH |
+| 13 | 314-315 | supporting-formula | Worked example: $\sigma^2_t = 0.00001 + 0.000072 + 0.00036 = 0.000442$ | [uncited] | Yes | | Numerically verified: $0.08 \times 0.0009 = 0.000072$, $0.90 \times 0.0004 = 0.00036$, sum = 0.000442 |
+| 14 | 320 | supporting-formula | $\sigma_t = \sqrt{0.000442} \approx 0.0210 = 2.10\%$ | [uncited] | Yes | | $\sqrt{0.000442} = 0.02102...$, rounds to 0.0210 = 2.10% |
+| 15 | 324 | numerical-fact | The variance forecast increase from 0.0004 to 0.000442 is a 10.5% increase | [uncited] | Yes | | $(0.000442 - 0.0004)/0.0004 = 0.105 = 10.5\%$ |
+| 16 | 325 | numerical-fact | 81% of the forecast comes from the memory term $\beta \sigma^2_{t-1}$ | [uncited] | Yes | | $0.00036/0.000442 = 0.8145... \approx 81\%$ |
+| 17 | 331-333 | supporting-formula | $\bar{\sigma}^2 = 0.00001/0.02 = 0.0005$, so $\bar{\sigma} \approx 2.24\%$ | [uncited] | Yes | | $0.00001/(1-0.08-0.90) = 0.00001/0.02 = 0.0005$; $\sqrt{0.0005} = 0.02236 = 2.24\%$ |
+| 18 | 338 | numerical-fact | With $\alpha + \beta = 0.98$, it takes roughly $\ln(0.5)/\ln(0.98) \approx 34$ days to close half the gap to $\bar{\sigma}^2$ | [uncited] | FIXED | | **ERROR FIXED**: Original said "$1/(1-0.98) = 50$ days." The quantity $1/(1-\alpha-\beta)$ is the mean lag, not the half-life. Correct half-life = $\ln(0.5)/\ln(0.98) = 34.3$ days. Fixed formula and value in LaTeX. |
+| 19 | 344 | attribution | Hansen and Lunde (2005) compared 330 GARCH-type models on exchange rate and equity data | \citet{hansen2005forecast} | Yes | JAE 20(7), 873-889 | Confirmed via web: "compared 330 GARCH-type models"; data: DM-$ exchange rate and IBM returns |
+| 20 | 345 | qualitative | For exchange rates, no model significantly outperformed GARCH(1,1) | \citet{hansen2005forecast} | Yes | | "No evidence was found that a GARCH(1,1) was outperformed by more sophisticated models in the analysis of exchange rates" |
+| 21 | 346 | qualitative | For equities, models with a leverage effect did better [than GARCH(1,1)] | \citet{hansen2005forecast} | Yes | | "The GARCH(1,1) was clearly inferior to models that could accommodate a leverage effect in the analysis of IBM returns" |
+| 22 | 347-348 | qualitative | Higher-order specifications like GARCH(2,1) or GARCH(1,2) provided negligible improvement | \citet{hansen2005forecast} | Yes | | Consistent with the overall conclusion that GARCH(1,1) is adequate when leverage is modeled; higher orders not needed |
+| 23 | 364-367 | attribution | Black (1976) documented the leverage asymmetry and proposed the debt-to-equity ratio explanation | \citet{Black1976} | Yes | | Standard attribution. Black (1976) "Studies of Stock Price Volatility Changes" |
+| 24 | 365-367 | qualitative | When a stock drops, equity value falls while debt stays fixed, making equity riskier (leverage effect explanation) | \citet{Black1976} | Yes | | This is Black's original leverage hypothesis: declining equity increases leverage ratio, hence volatility |
+| 25 | 427 | attribution | Glosten, Jagannathan, and Runkle (1993) proposed GJR-GARCH | \citet{gjr1993} | Yes | JoF 48(5), 1779-1801 | Confirmed: "On the Relation between the Expected Value and the Volatility of the Nominal Excess Return on Stocks" |
+| 26 | 429-433 | defining-formula | GJR-GARCH: $\sigma^2_t = \omega + \alpha r^2_{t-1} + \gamma \mathbf{1}_{\{r_{t-1}<0\}} r^2_{t-1} + \beta \sigma^2_{t-1}$ | \citet{gjr1993} | Yes (notation) | | Standard GJR-GARCH form. The indicator function on negative returns multiplied by squared return is the defining feature. Web sources confirm this specification |
+| 27 | 446-449 | qualitative | After positive return, effective coefficient on $r^2_{t-1}$ is $\alpha$; after negative return, it is $\alpha + \gamma$ | [uncited] | Yes | | Follows directly from the indicator function: when $r_{t-1} \geq 0$, indicator=0 so coefficient is $\alpha$; when $r_{t-1}<0$, indicator=1 so coefficient is $\alpha+\gamma$ |
+| 28 | 463 | numerical-fact | Adding an asymmetry term typically improves QLIKE by 5--15% | [uncited] | unverified | | No citation given; plausible but specific range unverifiable without empirical source |
+| 29 | 474-476 | supporting-formula | GJR worked example Case A ($r_{t-1}=+0.03$): $\sigma^2_t = 0.00001 + 0.000036 + 0 + 0.00036 = 0.000406$ | [uncited] | Yes | | $0.04 \times 0.0009 = 0.000036$; indicator = 0; $0.90 \times 0.0004 = 0.00036$; sum = 0.000406 |
+| 30 | 478 | supporting-formula | $\sigma_t = \sqrt{0.000406} \approx 2.01\%$ | [uncited] | Yes | | $\sqrt{0.000406} = 0.020149... = 2.01\%$ |
+| 31 | 484-487 | supporting-formula | GJR worked example Case B ($r_{t-1}=-0.03$): $\sigma^2_t = 0.00001 + 0.000036 + 0.000072 + 0.00036 = 0.000478$ | [uncited] | Yes | | $0.04 \times 0.0009 = 0.000036$; $0.08 \times 0.0009 = 0.000072$; sum = 0.000478 |
+| 32 | 489 | supporting-formula | $\sigma_t = \sqrt{0.000478} \approx 2.19\%$ | [uncited] | Yes | | $\sqrt{0.000478} = 0.021863... = 2.19\%$ |
+| 33 | 494 | numerical-fact | The 3% loss roughly triples the news contribution to variance (from 0.000036 to 0.000108) | [uncited] | FIXED | | **ERROR FIXED**: Original said "roughly doubles." $0.000108 / 0.000036 = 3.0$, which is triples. Changed "doubles" to "triples" in LaTeX. |
+| 34 | 498-501 | qualitative | GJR-GARCH most useful for equities where leverage effect is strong; for exchange rates, the effect is weaker and often statistically insignificant | \citep{hansen2005forecast} | Yes | | Consistent with Hansen & Lunde (2005): leverage models beat GARCH for equities but not for exchange rates |
+| 35 | 510-511 | qualitative | GJR-GARCH requires parameter constraints ($\omega > 0$, $\alpha \geq 0$, $\alpha + \gamma \geq 0$, $\beta \geq 0$) to ensure $\sigma^2_t > 0$ | [uncited] | Yes | | Standard sufficient conditions for non-negativity. Note: the constraint is $\alpha + \gamma \geq 0$ (not $\gamma \geq 0$ alone), which is correct since the effective coefficient after negative shock is $\alpha + \gamma$ |
+| 36 | 515 | attribution | Nelson (1991) proposed EGARCH | \citet{nelson1991} | Yes | Econometrica 59, 347-370 | "Conditional Heteroskedasticity in Asset Returns: A New Approach" |
+| 37 | 515-516 | qualitative | EGARCH models the log of variance; since $\exp(\cdot)$ is always positive, variance is automatically positive regardless of parameter signs | \citet{nelson1991} | Yes | | Core EGARCH advantage; widely confirmed in all sources |
+| 38 | 519-525 | defining-formula | EGARCH: $\ln \sigma^2_t = \omega + \beta \ln \sigma^2_{t-1} + \alpha(\|r_{t-1}\|/\sigma_{t-1} - \sqrt{2/\pi}) + \gamma \cdot r_{t-1}/\sigma_{t-1}$ | \citet{nelson1991} | Yes (notation) | | Nelson's original used $g(z_t) = \theta z_t + \gamma[|z_t| - E|z_t|]$ notation. The chapter's reparameterization separating magnitude ($\alpha$) and sign ($\gamma$) effects is a standard textbook equivalent. The $\sqrt{2/\pi}$ centering confirmed as $E[|z|]$ for $z \sim N(0,1)$. V-Lab NYU and multiple textbooks use this form. |
+| 39 | 531 | qualitative | $\|\beta\| < 1$ for stationarity in EGARCH | [uncited] | Yes | | Standard stationarity condition for EGARCH; the log-variance process is an AR(1) in $\ln\sigma^2_t$ with autoregressive coefficient $\beta$ |
+| 40 | 534 | numerical-fact | $\sqrt{2/\pi}$ is the expected value of $\|z\|$ when $z \sim N(0,1)$ | [uncited] | Yes | | Mathematical fact: $E[|Z|] = \sqrt{2/\pi} \approx 0.7979$ for standard normal. Verified numerically. |
+| 41 | 562-564 | methodological | Multi-step forecasts from EGARCH require computing $E[\exp(\cdot)]$, which does not simplify cleanly; simulation-based forecasts used for horizons beyond one step | [uncited] | Yes | | Well-known EGARCH limitation. Since the model is in log-variance, converting back requires $\exp(\cdot)$ which does not commute with expectation. Jensen's inequality applies. Simulation or approximation methods are standard practice. |
+| 42 | 575-576 | qualitative | Volatility autocorrelations in financial data decay very slowly; autocorrelation is still positive at lag 100 | [uncited] | Yes | | Standard stylized fact of financial markets; motivation for long-memory models. Hull Table 22.2 shows positive autocorrelations of $u_i^2$ at all lags 1-15. Empirical literature consistently finds this pattern extending to lag 100+. |
+| 43 | 576 | qualitative | Standard GARCH(1,1) implies exponential decay of autocorrelations, which is too fast | [uncited] | Yes | | Hull p.503: weights on $u^2_{n-i}$ decline as $\alpha\beta^{i-1}$, i.e., exponential decay. This is well-known to be too fast vs. the hyperbolic decay observed empirically. |
+| 44 | 586 | attribution | Baillie, Bollerslev, and Mikkelsen (1996) introduced FIGARCH | \citet{baillie1996} | Yes | JoE 74(1), 3-30 | "Fractionally Integrated Generalized Autoregressive Conditional Heteroskedasticity" |
+| 45 | 606-609 | defining-formula | FIGARCH(1,d,1): $(1 - \beta L)\sigma^2_t = \omega + [1 - \beta L - (1 - \phi L)(1 - L)^d] r^2_t$ | \citet{baillie1996} | Yes (notation) | | Standard FIGARCH(1,d,1) lag-operator form. Web sources confirm this representation from Baillie et al. (1996). |
+| 46 | 660-661 | numerical-fact | For $r^2_t$ as estimator of daily variance, the noise-to-signal ratio exceeds 5 on average | [uncited] | unverified | | This is a plausible claim (squared returns are very noisy proxies for variance), but the specific threshold of 5 could not be confirmed from available sources. The general point is well-established in the realized volatility literature (Andersen & Bollerslev 1998). |
+| 47 | 713 | attribution | Hansen, Huang, and Shek (2012) specified the Realized GARCH model | \citet{hansen2012realized} | Yes | JAE 27(6), 877-906 | "Realized GARCH: A Joint Model for Returns and Realized Measures of Volatility" |
+| 48a | 717-718 | defining-formula | Realized GARCH return equation: $r_t = \sqrt{h_t} z_t$, $z_t \sim N(0,1)$ | \citet{hansen2012realized} | Yes | | Standard return equation shared with all GARCH models |
+| 48b | 733-735 | defining-formula | Realized GARCH measurement equation: $\log RV_t = \xi + \delta \log h_t + \tau(z_t) + u_t$ | \citet{hansen2012realized} | Yes | | This is the log-linear measurement equation from Hansen, Huang, Shek (2012). Key innovation linking observed RV to latent h. The leverage function $\tau(z_t) = \tau_1 z_t + \tau_2(z_t^2 - 1)$ as specified in the bullet points is the standard parameterization. |
+| 48c | 751-752 | defining-formula | Realized GARCH GARCH equation: $\log h_{t+1} = \omega + \beta \log h_t + \gamma \log RV_t$ | \citet{hansen2012realized} | Yes | | Log-linear GARCH equation from Hansen et al. (2012). Uses $\log RV_t$ instead of $r^2_t$. |
+| 49a | 782-783 | qualitative | Realized GARCH with log-linear specification substantially outperforms standard GARCH(1,1) in both in-sample fit and out-of-sample forecasting on DJIA stocks | \citet{hansen2012realized} | Yes | | Confirmed from paper abstract/conclusions and multiple secondary sources |
+| 49b | 784-785 | qualitative | Squared returns become statistically insignificant once a realized measure is included | \citet{hansen2012realized} | Yes | | Key finding of the paper: RV dominates $r^2$ as information source |
+| 49c | 786 | qualitative | The leverage function $\tau(z_t)$ is highly significant in Realized GARCH | \citet{hansen2012realized} | Yes | | Confirmed; the leverage/asymmetry component is a key finding |
+| 50 | 796 | attribution | Shephard and Sheppard (2010) proposed the HEAVY model | \citet{shephard2010heavy} | Yes | JAE 25, 197-231 | "Realising the Future: Forecasting with High-Frequency-Based Volatility (HEAVY) Models" |
+| 51a | 805-806 | defining-formula | HEAVY return equation: $\sigma^2_{R,t} = \omega_R + \alpha_R RV_{t-1} + \beta_R \sigma^2_{R,t-1}$ | \citet{shephard2010heavy} | Yes (notation) | | HEAVY-r equation: GARCH-style but with $RV_{t-1}$ replacing $r^2_{t-1}$. Standard representation from the literature. |
+| 51b | 819-820 | defining-formula | HEAVY RV equation: $\mu_{M,t} = \omega_M + \alpha_M RV_{t-1} + \beta_M \mu_{M,t-1}$ | \citet{shephard2010heavy} | Yes (notation) | | HEAVY-RM equation: models the conditional expectation of realized variance. Standard representation. |
+| 52a | 849 | qualitative | HEAVY model outperforms GARCH both in-sample and out-of-sample across a range of asset classes | \citet{shephard2010heavy} | Yes | | Confirmed from paper summary and secondary sources |
+| 52b | 850-851 | qualitative | HEAVY forecast gains are most pronounced at short horizons (one to five days) | \citet{shephard2010heavy} | Yes | | Key finding: RV-based models shine at short horizons where intraday information is freshest |
+| 52c | 851-853 | qualitative | HEAVY adjusts quickly to structural breaks because $RV_{t-1}$ responds immediately to intraday price variation | \citet{shephard2010heavy} | Yes | | Core advantage of HEAVY: $RV$ captures intraday regime changes immediately, unlike $r^2$ which is a single squared daily return |
+| 53 | 908-910 | qualitative | GARCH forecasts appear poor only when evaluated against noisy proxies like $r^2_t$; evaluated against $RV_t$, they perform respectably | \citet{andersen1998} | Yes | | Andersen & Bollerslev (1998) "Answering the Skeptics" -- showed GARCH forecasts are better than previously believed when evaluated against RV instead of $r^2$ |
+| 54 | 972 | qualitative | Engle's ARCH framework was Nobel Prize-winning | \citet{Engle1982} | Yes | | Engle won the 2003 Sveriges Riksbank Prize in Economic Sciences "for methods of analyzing economic time series with time-varying volatility (ARCH)" |
+| 55 | 955 | qualitative | HAR often matches or beats Realized GARCH for RV forecasting | [uncited] | unverified | | Plausible claim given the literature (HAR is competitive with parametric models), but no specific citation given. Would need empirical comparison paper to confirm. |

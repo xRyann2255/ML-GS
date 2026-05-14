@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-14
 
-**Total claims: 1,126 | Verified: 240/253 (Tier 1) | Errors found: 5 (all fixed) | Unverified: 19 (missing papers)**
+**Total claims: 1,126 | Verified: 545/580 (Tiers 1-2) | Errors found: 16 (all fixed) | Unverified: 35 (missing papers)**
 
 ## Tier 1: Pipeline-critical -- VERIFIED
 
@@ -26,16 +26,26 @@ Last updated: 2026-05-14
 
 - `reference/project-papers/easley-lopezdeprado-ohara-2012-vpin.pdf` contains wrong paper (Sherlock et al., not VPIN). VPIN claims (26-28) unverified pending correct PDF.
 
-## Tier 2: Model-critical
+## Tier 2: Model-critical -- VERIFIED
 
 | Chapter | File | Claims | Verified | Errors | Status |
 |---|---|---|---|---|---|
-| Ch 3: Microstructure Noise | ch03-microstructure-noise.md | 74 | 0 | 0 | Extracted |
-| Ch 5: GARCH Family | ch05-garch-family.md | 62 | 0 | 0 | Extracted |
-| Ch 11: Tree Methods | ch11-tree-methods-vol.md | 62 | 0 | 0 | Extracted |
-| Ch 2: Realized Volatility | ch02-realized-volatility.md | 42 | 0 | 0 | Extracted |
-| Ch 12-R: Rashomon Trees | ch12r-rashomon-interpretable-trees.md | 87 | 0 | 0 | Extracted |
-| **Tier 2 subtotal** | | **327** | **0** | **0** | |
+| Ch 3: Microstructure Noise | ch03-microstructure-noise.md | 74 | 72/74 | 2 | Verified |
+| Ch 5: GARCH Family | ch05-garch-family.md | 62 | 59/62 | 2 | Verified |
+| Ch 11: Tree Methods | ch11-tree-methods-vol.md | 62 | 62/62 | 5 | Verified |
+| Ch 2: Realized Volatility | ch02-realized-volatility.md | 42 | 37/42 | 1 | Verified |
+| Ch 12-R: Rashomon Trees | ch12r-rashomon-interpretable-trees.md | 87 | 79/87 | 1 | Verified |
+| **Tier 2 subtotal** | | **327** | **309** | **11** | |
+
+### Errors Fixed in Tier 2
+
+6. **Ch 3, Claim 7-8**: Roll (1984) misattributed to Kyle (1985) for bid-ask autocovariance formula $\text{Cov}(\Delta p_t, \Delta p_{t+1}) = -s^2/4$
+7. **Ch 3, Claim 52**: Arithmetic $23{,}400^{3/5} \approx 400$ corrected to $\approx 418$
+8. **Ch 5, Claim (half-life)**: Mean lag $1/(1-0.98) = 50$ confused with half-life $\ln(0.5)/\ln(0.98) \approx 34$ days
+9. **Ch 5, Claim (leverage)**: 3% loss "roughly doubles" news contribution corrected to "triples" ($0.000108/0.000036 = 3.0$)
+10. **Ch 11, Claims (CSV2023)**: 5 corrections to CSV2023 characterization: feature set, horizons (added monthly), 5-15% QLIKE → 4-10% MSE, XGBoost → gradient-boosted trees, rolling-window → 70/10/20 split
+11. **Ch 2, Claim 42**: BNS2002 misattributed for introducing BPV (actually BNS2004/2006); corrected to asymptotic theory for RV
+12. **Ch 12-R, Claim 46**: RESPLIT lookahead depth was 3, Babbar et al. 2025 Section 7 specifies 2
 
 ## Tier 3: Context and enrichment
 

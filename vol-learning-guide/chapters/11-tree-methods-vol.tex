@@ -415,25 +415,26 @@ set is contaminated by lookahead.
 
 The most comprehensive academic horse-race of ML methods for realized
 volatility forecasting is \citet{ChristensenSiggaardVeliyev2023}.  Their
-setup: 29 DJIA stocks, daily and weekly RV forecasting, with a feature set
-spanning RV lags, jumps, leverage effects, volume, and options-implied
-volatility.
+setup: 29 DJIA stocks, daily, weekly, and monthly RV forecasting, with a
+feature set spanning RV lags, implied volatility, VIX, momentum, volume,
+earnings announcements, and macroeconomic indicators.
 
 \begin{keyresult}[Christensen, Siggaard, and Veliyev (2023)]
-Gradient-boosted trees (XGBoost) are among the top-performing models for
+Gradient-boosted trees are among the top-performing models for
 daily RV forecasting across 29 DJIA stocks.  Three findings matter most:
 
 \begin{enumerate}[leftmargin=1.8em]
 \item \textbf{Rich features amplify the ML advantage.}
   When the feature set includes only RV lags (what HAR uses), trees offer
-  minimal improvement.  When the feature set expands to include jumps,
-  leverage, volume, and implied volatility, trees pull ahead by 5--15\% in
-  $\QLIKE$.
+  minimal improvement.  When the feature set expands to include implied
+  volatility, VIX, volume, and macroeconomic indicators, trees pull ahead
+  by 4--10\% in MSE at the daily horizon, and by substantially more at
+  longer horizons.
 
 \item \textbf{Longer horizons favor ML.}
-  The gap between tree models and HAR is larger for weekly RV prediction
-  than for daily.  At longer horizons, nonlinear feature interactions
-  matter more because the direct autoregressive signal decays.
+  The gap between tree models and HAR is larger for weekly and monthly RV
+  prediction than for daily.  At longer horizons, nonlinear feature
+  interactions matter more because the direct autoregressive signal decays.
 
 \item \textbf{Accumulated Local Effects (ALE) plots reveal drivers.}
   ALE plots (a model-agnostic alternative to partial dependence) show that
@@ -444,11 +445,10 @@ daily RV forecasting across 29 DJIA stocks.  Three findings matter most:
 \end{enumerate}
 \end{keyresult}
 
-The study uses rolling-window evaluation (not purged CV), which is the
-standard in the volatility forecasting literature.  Features are constructed
-at each window using only past data; the model is re-estimated monthly.
-The out-of-sample period spans several years, covering both calm and crisis
-regimes.
+The study uses a static 70/10/20 train-validation-test split for the ML
+models, while the non-regularized HAR benchmarks use a rolling-window
+scheme.  The out-of-sample test period spans several years, covering both
+calm and crisis regimes.
 
 
 % ──────────────────────────────────────────────────────────────
