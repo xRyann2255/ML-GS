@@ -249,7 +249,7 @@ find \emph{one} provably optimal tree.  This is the foundation.
 
 \subsection{Why Not Just Use CART?}
 
-CART \citep{XinEtAl2022} and other greedy algorithms build trees top-down,
+CART \citep{Breiman1984} and other greedy algorithms build trees top-down,
 choosing the best split at each node independently.  This is fast ---
 $O(npd)$ for $n$ samples, $p$ features, depth $d$ --- but greedy splits can
 be suboptimal.  \citet{BabbarEtAl2025} show that greedy methods exhibit
@@ -271,7 +271,7 @@ problem exactly:
 \end{equation}
 
 \noindent where $L(T, D, \lambda) = \frac{1}{N}\sum_{i=1}^{N}
-\bigl(\ell(T(\bx_i), y_i) + \lambda\,S(T)\bigr)$ is the regularized loss and
+\ell(T(\bx_i), y_i) + \lambda\,S(T)$ is the regularized loss and
 $S(T)$ is the number of leaves \citep{BabbarEtAl2025}.
 
 The key insight behind branch-and-bound is that the optimal solution for
@@ -323,6 +323,110 @@ root-to-leaf path, making it trivial to explain: ``the model forecasts high
 volatility because yesterday's RV was above the 90th percentile AND the VIX
 term structure is in backwardation.''  This transparency is valuable for
 presentations and for building trust with portfolio managers.
+\end{projectconnection}
+
+\subsection{STreeD: Piecewise-Linear Regression Trees}
+\label{sec:rashomon:streed}
+
+The optimal tree methods discussed so far assume each leaf predicts a
+\emph{constant} --- the mean of the training labels that fall into that leaf.
+This creates a staircase-shaped prediction function: the forecast jumps
+from one flat value to another at each split boundary.
+\citet{VanDenBosEtAl2024} introduce \textbf{STreeD} (STreeD Regression
+Trees), a dynamic-programming framework that extends optimal regression
+trees to \textbf{piecewise-linear} leaf models.  They develop three methods
+of increasing expressiveness:
+
+\begin{enumerate}[leftmargin=1.8em]
+  \item \textbf{SRT-C} (piecewise-constant): An improved DP algorithm for
+    constant-leaf regression trees with a specialized depth-two solver that
+    achieves orders-of-magnitude speedups over previous optimal methods
+    (e.g., 18$\times$ faster than OSRT on average).
+
+  \item \textbf{SRT-SL} (simple linear regression): The \emph{first optimal
+    method} for piecewise simple linear regression trees.  Each leaf fits a
+    one-variable linear model $y = \hat{\beta}_0 + \hat{\beta}_j x_j$,
+    selecting the single best feature $j$ for that leaf.  Ridge
+    regularization prevents overfitting in small leaves.
+
+  \item \textbf{SRT-L} (multiple linear regression): The \emph{first optimal
+    method} for piecewise multiple linear regression trees.  Each leaf fits
+    a full linear model with elastic net regularization ($\ell_1 + \ell_2$
+    penalty), solved via coordinate descent.
+\end{enumerate}
+
+The key idea behind SRT-SL is that each leaf selects \emph{one} continuous
+feature and fits a simple linear regression with ridge regularization.  The
+leaf-level objective for a leaf containing data subset $\mathcal{D}$ is:
+
+\begin{equation}\label{eq:streed-sl}
+  \min_{j,\,\hat{\beta}_0,\,\hat{\beta}_j}
+    \sum_{(x,\,b,\,y) \in \mathcal{D}}
+    (y - \hat{\beta}_0 - x_j\,\hat{\beta}_j)^2
+    + \gamma\,\hat{\beta}_j^2,
+\end{equation}
+
+\noindent where:
+\begin{itemize}[leftmargin=1.8em]
+  \item $j$ is the index of the continuous feature selected for this leaf
+  \item $\hat{\beta}_0$ is the intercept,
+    $\hat{\beta}_j$ is the slope on feature $x_j$
+  \item $\gamma > 0$ is the ridge regularization parameter
+  \item The leaf selects whichever feature $j$ yields the smallest
+    regularized SSE
+\end{itemize}
+
+The closed-form solutions for the optimal coefficients are:
+\begin{align}
+  \hat{\beta}_j &= \frac{n\sum x_j y - \sum y \sum x_j}
+    {n\sum x_j^2 - (\sum x_j)^2 + n\gamma},
+    \label{eq:streed-slope}\\
+  \hat{\beta}_0 &= \frac{\sum y}{n}
+    - \hat{\beta}_j\,\frac{\sum x_j}{n},
+    \label{eq:streed-intercept}
+\end{align}
+
+\noindent where all sums run over the instances in the leaf and
+$n = |\mathcal{D}|$.
+
+\begin{intuition}[Why Piecewise-Linear Leaves Matter]
+A constant-leaf tree predicts $\bar{y}$ in each partition --- it creates a
+staircase function.  A linear-leaf tree fits a slope within each
+partition --- it captures \emph{local trends}.  For volatility, this means a
+leaf can express ``RV increases linearly with VIX within this regime''
+rather than just ``RV is high in this regime.''  The tree handles the
+nonlinear regime boundaries (splits), and the linear models handle the
+smooth within-regime relationships.
+\end{intuition}
+
+\textbf{Scalability.}  The depth-two algorithm from
+\citet{VanDenBosEtAl2024} is the key to STreeD's performance advantage.
+By precomputing per-instance costs --- the sums $\sum y$, $\sum y^2$,
+$\sum x_j$, $\sum x_j^2$, and $\sum x_j y$ for every feature $j$ and
+every data subset defined by pairs of binary splits --- the depth-two
+solver avoids redundant traversals of the data.  Remarkably, fitting
+a simple linear regression model per leaf (SRT-SL) costs almost nothing
+extra compared to fitting a constant (SRT-C), because the additional
+statistics ($\sum x_j$, $\sum x_j^2$, $\sum x_j y$) can be accumulated
+in the same pass.
+
+\textbf{Interpretability.}  Every SRT-SL prediction decomposes into two
+transparent components: (1) a root-to-leaf path of binary splits that
+determines which regime the input falls into, and (2) a one-variable
+linear formula in the leaf that produces the forecast.  This is what the
+interpretability literature calls a \textbf{short linear formula} --- the
+entire model is human-readable and can be written on a single page.
+
+\begin{projectconnection}[STreeD for Volatility Forecasting]
+SRT-SL is particularly appealing for our project.  Imagine a depth-3 tree
+that splits on lagged-$\RV$ quintile at the root, then on a VIX threshold,
+creating 4--8 leaves.  Within each leaf, a simple linear regression on one
+feature (e.g., $\RV_{t-1}$ or the VIX level) captures the local
+relationship.  The result is an interpretable model that can express
+statements like: ``In the high-vol, backwardated-VIX regime, tomorrow's RV
+increases by 0.15 for each unit increase in today's RV.''  This is far more
+informative than a constant prediction per regime, and every coefficient
+has a clear economic interpretation.
 \end{projectconnection}
 
 
@@ -665,39 +769,168 @@ is the stability of your explanations, not the variability of your data.
 \subsection{Rashomon Importance Distributions (RID)}
 \label{sec:rashomon:rid}
 
+MCR and VIC answer the question ``what is the range of importances across
+all near-optimal models \emph{for this dataset}?''  But this answer is
+fragile: the Rashomon set itself changes when the dataset is perturbed.
+\citet{DonnellyEtAl2023} show that both the Rashomon set size and the MCR
+range can vary wildly across bootstrap resamples of the \emph{same} data,
+making MCR and VIC unstable summaries of feature importance.
+
 The \textbf{Rashomon Importance Distribution (RID)} proposed by
-\citet{DonnellyEtAl2023} goes beyond the min-max range of MCR by
-computing the full \emph{distribution} of each feature's importance across
-the Rashomon set.  For each feature $j$, we collect
-$\{mr_j(f) : f \in \mathcal{R}\}$ and examine its distribution --- median,
-interquartile range, and tails.
+\citet{DonnellyEtAl2023} addresses this by combining bootstrap resampling
+\emph{with} Rashomon set analysis in a two-level procedure that captures
+both sources of uncertainty simultaneously.
 
-The RID provides confidence intervals for feature importance that are
-fundamentally different from those produced by bootstrapping:
+\textbf{The five-step RID pipeline} (illustrated in Figure~2 of
+\citealt{DonnellyEtAl2023}):
 
+\begin{enumerate}[leftmargin=1.8em]
+  \item \textbf{Bootstrap.}  Draw $B$ bootstrap datasets
+    $\mathcal{D}_1^{(n)}, \ldots, \mathcal{D}_B^{(n)}$ from the original
+    data $\mathcal{D}^{(n)}$ (sampling $n$ observations with replacement).
+  \item \textbf{Find Rashomon set.}  For each bootstrap dataset
+    $\mathcal{D}_b^{(n)}$, compute the Rashomon set
+    $\mathcal{R}_{\mathcal{D}_b}^{\varepsilon}$ --- all models in
+    $\mathcal{F}$ whose loss is within $\varepsilon$ of the best model
+    \emph{on that bootstrap sample}.
+  \item \textbf{Find importances.}  For each model $f$ in each Rashomon
+    set, compute the variable importance $\phi_j(f, \mathcal{D}_b^{(n)})$
+    using any importance metric (permutation importance, SHAP, model
+    reliance, etc.).
+  \item \textbf{Find CDF.}  For each bootstrap $b$, compute the
+    empirical CDF of importances across the Rashomon set for that bootstrap.
+  \item \textbf{Find PDF.}  Average the CDFs across all $B$ bootstraps to
+    obtain the RID, then differentiate to get the marginal density.
+\end{enumerate}
+
+Formally, RID is defined as a cumulative distribution function.  For
+feature $j$, the RID at threshold $k$ measures the expected fraction of
+near-optimal models whose importance for feature $j$ is at most $k$,
+where the expectation is over the data distribution:
+
+\begin{equation}\label{eq:rid-formal}
+  \text{RID}_j(k)
+    = \E_{\mathcal{D}_b^{(n)} \sim \mathcal{P}_n}\!\left[
+      \frac{|\{f \in \mathcal{R}_{\mathcal{D}_b}^{\varepsilon}
+        : \phi_j(f, \mathcal{D}_b^{(n)}) \leq k\}|}
+        {|\mathcal{R}_{\mathcal{D}_b}^{\varepsilon}|}
+    \right],
+\end{equation}
+
+\noindent where:
 \begin{itemize}[leftmargin=1.8em]
-  \item \textbf{Bootstrap CI:}  ``If we drew a new dataset from the same
-    population, feature $j$'s importance in the best model would lie in this
-    interval with 95\% probability.''  This is data uncertainty.
-  \item \textbf{RID CI:}  ``Given \emph{this} dataset, feature $j$'s
-    importance ranges from $a$ to $b$ across all near-optimal models.''
-    This is model-choice uncertainty.
+  \item $\mathcal{P}_n$ is the empirical distribution of the data (i.e.,
+    the bootstrap distribution)
+  \item $\mathcal{R}_{\mathcal{D}_b}^{\varepsilon}$ is the Rashomon set
+    for bootstrap sample $\mathcal{D}_b^{(n)}$
+  \item $\phi_j(f, \mathcal{D}_b^{(n)})$ is the importance of feature $j$
+    for model $f$ evaluated on $\mathcal{D}_b^{(n)}$
+  \item $k$ ranges over $[\phi_{\min}, \phi_{\max}]$, the support of the
+    importance metric
 \end{itemize}
 
-\citet{BabbarEtAl2025} demonstrate that RID computed from the
-RESPLIT-approximated Rashomon set is nearly identical to RID from the full
-set, with Pearson correlations above 0.93 across all tested datasets.  This
-means the fast approximate methods are reliable enough for practical RID
-computation.
+In practice, we estimate RID by replacing the expectation with a sample
+average over $B$ bootstrap replicates:
+
+\begin{equation}\label{eq:rid-empirical}
+  \widehat{\text{RID}}_j(k)
+    = \frac{1}{B}\sum_{b=1}^{B}
+      \frac{|\{f \in \mathcal{R}_{\mathcal{D}_b}^{\varepsilon}
+        : \phi_j(f, \mathcal{D}_b^{(n)}) \leq k\}|}
+        {|\mathcal{R}_{\mathcal{D}_b}^{\varepsilon}|}.
+\end{equation}
+
+\begin{intuition}[In Plain English]
+RID asks: ``If I drew a new dataset from the same population, computed all
+near-optimal models on it, and measured feature $j$'s importance in each of
+those models, what distribution of importances would I see?''  The bootstrap
+handles the ``new dataset'' part; the Rashomon set handles the ``all
+near-optimal models'' part.  The result is a CDF that captures \emph{both}
+data uncertainty and model-choice uncertainty in a single object.
+\end{intuition}
+
+\begin{warning}[Additive vs.\ Multiplicative Rashomon Threshold]
+\citet{DonnellyEtAl2023} define the Rashomon set using an
+\textbf{additive} threshold: $\mathcal{R}^{\varepsilon} = \{f \in
+\mathcal{F} : \ell(f) \leq \min_{f'}\ell(f') + \varepsilon\}$.  This
+contrasts with the \textbf{multiplicative} threshold used by
+\citet{XinEtAl2022} earlier in this chapter: $L(f) \leq (1 + \epsilon)
+L(f^*)$.  The two formulations are equivalent when rescaled appropriately,
+but be careful not to mix them: an additive $\varepsilon = 0.05$ and a
+multiplicative $\epsilon = 0.05$ define different sets.
+\end{warning}
+
+\textbf{Why not just bootstrap?}  A natural alternative is naive bootstrap
+importance: draw $B$ bootstrap samples, fit the best model on each, and
+collect the importances.  This captures data uncertainty but uses only
+\emph{one} model per resample --- the best one --- ignoring the many
+near-optimal alternatives.  RID considers \emph{all} near-optimal models
+per resample, capturing model-choice uncertainty that naive bootstrapping
+misses entirely.
+
+\textbf{Why not just MCR/VIC?}  MCR and VIC analyze the Rashomon set of a
+\emph{single} dataset.  They capture model-choice uncertainty but are
+blind to data uncertainty.  \citet{DonnellyEtAl2023} demonstrate that MCR
+ranges are unstable across bootstrap resamples: for one variable on the
+Monk~3 dataset, the MCR range is $[-0.1, 0.33]$ on one resample and
+$[0.33, 0.36]$ on another --- contradictory conclusions from the same
+underlying data.
+
+\begin{keyidea}[RID = Bootstrap $\times$ Rashomon]
+RID is the only method that captures \emph{both} sources of uncertainty
+simultaneously:
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Data uncertainty} & \textbf{Model uncertainty}
+  & \textbf{Stable?} \\
+\midrule
+Single-model SHAP & No  & No  & No \\
+Bootstrap importance & Yes & No  & Partially \\
+MCR / VIC            & No  & Yes & No \\
+\textbf{RID}         & \textbf{Yes} & \textbf{Yes} & \textbf{Yes} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{keyidea}
+
+\textbf{Finite-sample guarantees.}  \citet{DonnellyEtAl2023} prove
+(Theorem~2) that the estimated $\widehat{\text{RID}}_j$ converges to the
+true $\text{RID}_j$ at a rate controlled by the number of bootstraps:
+with probability at least $1 - \delta$,
+\[
+  \bigl|\widehat{\text{RID}}_j(k) - \text{RID}_j(k)\bigr| \leq t
+  \quad \text{for all } k,
+  \quad \text{when } B \geq \frac{1}{2t^2}\ln\frac{2}{\delta}.
+\]
+For example, $B = 471$ bootstraps guarantees that the estimated RID is
+within $t = 0.075$ of the true value with 90\% confidence.  This is a
+practical guarantee: a few hundred bootstraps suffice for reliable results.
+
+\textbf{Metric-agnostic.}  RID works with any variable importance metric
+$\phi_j$ --- permutation importance, SHAP, model reliance, conditional
+model reliance, or any other metric with a bounded range.  The framework
+treats $\phi_j$ as a black box, making it immediately compatible with
+existing importance tools.
+
+\textbf{Empirical stability.}  On four synthetic data-generating
+processes, \citet{DonnellyEtAl2023} find that RID achieves a median
+Jaccard similarity of 0.69 across independently generated datasets,
+compared to below 0.55 for both MCR and VIC.  RID is the only method
+whose importance intervals consistently overlap across independent
+datasets drawn from the same distribution.
 
 \begin{projectconnection}[RID for Volatility Feature Selection]
-For our project, RID would answer questions like:  ``Is the VIX term structure
-slope a robustly important feature, or does its apparent importance depend on
-which model we happen to pick?''  If the RID for a feature is concentrated
-near 1.0 (no importance), we can safely drop it.  If it is spread from 1.0
-to 1.4, the feature is a substitute --- useful in some models but not all.
-If it is concentrated above 1.2, the feature is robustly important and should
-always be included.
+For our project, RID would answer questions that neither SHAP nor MCR can:
+``Across bootstrap resamples of the training data \emph{and} across all
+near-optimal models within each resample, what is the distribution of
+VIX's importance?''  If the RID CDF for VIX rises steeply near zero, VIX
+is unimportant in most models across most resamples --- we can drop it.
+If the CDF rises steeply above 0.2, VIX is robustly important.  If the
+CDF rises gradually from 0 to 0.4, VIX is a substitute: sometimes
+important, sometimes not, depending on both the data sample and the model
+chosen.  Unlike MCR, this conclusion is \emph{stable} --- it will not
+flip if we add one more month of data.
 \end{projectconnection}
 
 
