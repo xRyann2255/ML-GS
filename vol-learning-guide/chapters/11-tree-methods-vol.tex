@@ -723,6 +723,174 @@ principle behind portfolio diversification.
 
 
 % ──────────────────────────────────────────────────────────────
+\section{DART: Dropout Regularization for Boosted Trees}\label{sec:trees:dart}
+% ──────────────────────────────────────────────────────────────
+
+Section~\ref{sec:trees:hyperparams} covered the standard regularization
+toolkit for gradient boosting: shallow trees, subsampling, and slow learning
+rates.  There is one more technique worth understanding, and it addresses a
+subtle failure mode that the standard controls do not.
+
+\subsection*{The over-specialization problem}
+
+Recall from Equation~\ref{eq:trees:ensemble} that standard gradient boosting
+shrinks every tree's contribution by the same learning rate $\eta$.  Early
+trees see large residuals (the raw signal), so they learn the dominant
+pattern: the strong autoregressive relationship between lagged $\RV$ and
+future $\RV$.  Later trees see only the leftover residuals after those early
+trees have already captured the bulk of the variance.  Shrinkage treats every
+tree identically, so the early trees permanently dominate the ensemble's
+output.
+
+This creates a problem called \textbf{over-specialization}: later trees
+become highly specialized to the narrow residual signal left by the first
+few trees.  If those early trees overfit to noise in the training data, every
+subsequent tree inherits that bias.  The ensemble's predictions become overly
+dependent on a small number of early trees.
+
+\begin{intuition}[In Plain English]
+Imagine a group project where one person does most of the work in the first
+week.  Everyone else spends the remaining weeks patching small gaps in that
+person's draft.  If the first person made a fundamental error, the entire
+project is built on a flawed foundation, and no amount of patching fixes it.
+Standard shrinkage is like asking everyone to speak more quietly; it does not
+change the fact that the first speaker set the direction.
+\end{intuition}
+
+\subsection*{Dropout applied to trees}
+
+\textbf{DART} (Dropouts meet Multiple Additive Regression Trees) solves
+over-specialization by borrowing the dropout idea from neural networks
+\citep{VinayakGilad2015}.  In each boosting round, instead of computing
+residuals from the full ensemble, DART randomly \textbf{drops} (removes) a
+subset of the previously built trees.  The new tree is then trained on the
+residuals of the \emph{reduced} ensemble, the one with the dropped trees
+removed.
+
+Concretely, let $\mathcal{D} \subset \{1, \ldots, m-1\}$ denote the set of
+tree indices dropped at round $m$, chosen by including each tree
+independently with \textbf{drop rate} $p$.  The prediction used to compute
+residuals becomes:
+\begin{equation}\label{eq:trees:dart_pred}
+  \hat{y}^{(\text{drop})}_t
+  \;=\; \sum_{k \notin \mathcal{D}} h_k(\bx_t),
+\end{equation}
+where:
+\begin{itemize}[leftmargin=1.8em]
+  \item $h_k(\bx_t)$ is the prediction of tree $k$ for observation $t$
+        (already including its learned weight),
+  \item $\mathcal{D}$ is the random dropout set for this boosting round,
+  \item $\hat{y}^{(\text{drop})}_t$ is the reduced ensemble prediction
+        (with dropped trees excluded).
+\end{itemize}
+
+The new tree $h_m$ is fitted to the residuals
+$r_t = y_t - \hat{y}^{(\text{drop})}_t$.  Because some trees were dropped,
+these residuals are larger than they would be under the full ensemble, so the
+new tree must learn to compensate for the missing trees.  This forces it to
+capture general patterns rather than narrow residual corrections.
+
+\begin{intuition}[In Plain English]
+Dropout randomly benches some of the existing team members during each
+training round.  The new recruit (tree) has to pick up their slack, which
+means learning broadly useful patterns rather than hyper-specialized
+corrections.  After training, all trees are brought back for the final
+prediction.  The result is an ensemble where each tree carries more
+independent information.
+\end{intuition}
+
+\subsection*{Prediction normalization}
+
+After fitting the new tree $h_m$, DART must normalize the ensemble so that
+adding the new tree does not inflate predictions.  The dropped trees and the
+new tree are rescaled so the ensemble stays calibrated:
+\begin{equation}\label{eq:trees:dart_normalize}
+  \hat{y}_t
+  \;=\; \sum_{k \notin \mathcal{D}} h_k(\bx_t)
+  \;+\; \frac{|\mathcal{D}|}{|\mathcal{D}| + 1}\,
+  \sum_{k \in \mathcal{D}} h_k(\bx_t)
+  \;+\; \frac{1}{|\mathcal{D}| + 1}\, h_m(\bx_t),
+\end{equation}
+where:
+\begin{itemize}[leftmargin=1.8em]
+  \item $|\mathcal{D}|$ is the number of dropped trees,
+  \item the factor $\frac{|\mathcal{D}|}{|\mathcal{D}|+1}$ rescales the
+        dropped trees down to make room for the new tree,
+  \item the factor $\frac{1}{|\mathcal{D}|+1}$ rescales the new tree so it
+        contributes an ``equal share'' alongside the dropped trees.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Without normalization, the new tree would be trained against a gap left by
+the dropped trees (large residuals), so its raw predictions would be too
+large.  The normalization splits the ``budget'' of the dropped trees evenly
+between the returning dropped trees and the new tree.  Think of it as
+redistributing playing time: the dropped players come back at slightly
+reduced minutes, and the new player gets a fair share.
+\end{intuition}
+
+\subsection*{DART versus standard shrinkage}
+
+The key difference from the learning rate $\eta$ in standard boosting:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}lp{5.8cm}p{5.8cm}@{}}
+\toprule
+& \textbf{Shrinkage} ($\eta$) & \textbf{DART} (drop rate $p$) \\
+\midrule
+\textbf{Mechanism}
+  & Scales \emph{every} tree by the same constant $\eta$
+  & Randomly removes \emph{entire trees} each round \\
+\textbf{Effect on early trees}
+  & Reduced proportionally but still dominant
+  & May be dropped, forcing later trees to learn independently \\
+\textbf{Diversity}
+  & All trees see residuals from the same full ensemble
+  & Each tree sees residuals from a different random subset \\
+\textbf{Analogy}
+  & Turning down everyone's volume equally
+  & Randomly muting some speakers so others must step up \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Shrinkage and DART are not mutually exclusive.  In LightGBM, you can set
+\texttt{boosting\_type='dart'} and still specify a learning rate, though in
+practice the learning rate is often set higher with DART (e.g., 0.05--0.1)
+because the dropout itself provides regularization.
+
+\begin{projectconnection}[DART for Volatility Forecasting]
+Over-specialization is particularly relevant for $\RV$ forecasting.  The
+dominant signal in volatility data is the autoregressive persistence captured
+by HAR's three lagged averages (Chapter~\ref{ch:har}).  In standard
+boosting, the first few trees learn this persistence, and all subsequent
+trees become narrowly specialized to small residual patterns that may not
+generalize.  DART forces later trees to occasionally reconstruct the
+autoregressive signal on their own, building redundancy into the ensemble
+and reducing dependence on any single tree's overfitting.
+
+In LightGBM, enable DART by setting \texttt{boosting\_type='dart'}.  The key
+hyperparameter is the drop rate: start with
+\texttt{drop\_rate}$\,\in [0.05, 0.15]$ and tune via purged CV
+(Section~\ref{sec:trees:hyperparams}).  Higher drop rates increase diversity
+but slow convergence; lower rates approach standard GBDT behavior.  Note that
+DART disables early stopping (because the loss is non-monotone due to random
+dropping), so you must set \texttt{num\_iterations} explicitly rather than
+relying on patience-based stopping.
+\end{projectconnection}
+
+\begin{warning}[DART Disables Early Stopping]
+With standard GBDT, you monitor validation loss and stop when it plateaus.
+DART's random dropout makes the validation loss noisy and non-monotone from
+round to round, so early stopping triggers prematurely.  When using DART,
+fix the number of boosting rounds via cross-validation rather than relying
+on early stopping.  This increases tuning cost, but the regularization
+benefit of dropout often compensates.
+\end{warning}
+
+
+% ──────────────────────────────────────────────────────────────
 \section{Summary}\label{sec:trees:summary}
 % ──────────────────────────────────────────────────────────────
 
@@ -772,6 +940,13 @@ principle behind portfolio diversification.
   models are properly tuned, the gap is smaller than headline numbers
   suggest.
 
+\item DART \citep{VinayakGilad2015} applies dropout to boosted trees:
+  randomly dropping previous trees during each boosting round prevents
+  over-specialization, where later trees become overly dependent on early
+  trees that captured the dominant autoregressive signal.  Use
+  \texttt{drop\_rate} $\in [0.05, 0.15]$; note that DART disables early
+  stopping.
+
 \item The gains from ML come from richer features and longer horizons, not
   from nonlinear modeling of the same three RV lags.  Chapter~\ref{ch:deeplearning}
   explores whether deep learning changes this conclusion.
@@ -806,6 +981,10 @@ principle behind portfolio diversification.
   & Trees and neural nets dominate linear models in cross-sectional return
     prediction with rich features
   & Canonical ML horse-race; context for tree methods \\
+\citet{VinayakGilad2015}
+  & Dropout for boosted trees reduces over-specialization; each tree learns
+    more independently
+  & Regularization technique in Section~\ref{sec:trees:dart} \\
 \bottomrule
 \end{tabular}
 \end{center}
