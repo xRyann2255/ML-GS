@@ -1,0 +1,45 @@
+Subject: Citrix Workspace Keyboard Compatibility Issue – USB Filter Driver Conflict with Razer Keyboard
+
+Hi,
+
+I'm writing to report a keyboard compatibility issue with Citrix Workspace (version 25.11.10.50) that is preventing me from using my physical keyboard within my Citrix virtual desktop session.
+
+Issue Summary:
+My keyboard (Razer Huntsman V3 Pro / analog optical keyboard) works perfectly on my local machine, but almost all keystrokes fail to register within the Citrix session. Only the Windows key and partial modifier key presses (e.g. Alt key-down) are detected — all other keys are completely unresponsive. The on-screen keyboard within the Citrix session works fine, confirming the issue is specific to how my physical keyboard input is being passed through.
+
+Troubleshooting Completed:
+- Verified the keyboard works correctly outside of Citrix
+- Tried different USB ports
+- Restarted Citrix Workspace and reset sessions via Connection Center
+- Modified registry keys under HKLM\SOFTWARE\Citrix\ICA Client\Engine (TransparentKeyPassthrough)
+- Reduced keyboard polling rate from 8000Hz to 125Hz
+- Disabled gamepad override and analog input features in Razer Synapse
+- Fully closed Razer Synapse and killed all related processes before launching Citrix
+- Disabled the virtual Xbox 360 controller device in Device Manager
+- None of the above resolved the issue
+
+Likely Cause:
+After researching the issue, I found that Citrix's own documentation acknowledges this as a known compatibility problem between the App Protection USB Filter Driver and specialised external keyboards such as gaming keyboards. The filter driver appears to intercept and block input from my keyboard at the driver level, which is why standard keystrokes don't reach the Citrix session while system-level keys like the Windows key still function.
+
+The relevant Citrix documentation is here:
+https://docs.citrix.com/en-us/citrix-workspace-app/app-protection/features.html
+
+Specifically, it states: "Sometimes, when you're using specialized external keyboards such as gaming keyboards with the Citrix Workspace app, the App Protection USB Filter Driver might cause compatibility issues and block you from using the keyboard."
+
+Suggested Fix:
+Citrix provides a USB Filter Driver Exclusion List (available from Workspace App version 2402 onwards) that allows specific USB devices to be excluded from the filter driver by Vendor ID and Product ID. My keyboard's details are:
+
+- Device: Razer Huntsman [please fill in your exact model]
+- Vendor ID: 1532
+- Product ID: [please check Device Manager → your keyboard → Properties → Details → Hardware Ids]
+
+The configuration steps are documented here:
+https://docs.citrix.com/en-us/citrix-workspace-app/app-protection/configure/usb-filter-driver-exclusion-list
+
+This can be configured via Group Policy (Administrative Templates → Citrix Components → Citrix Workspace → App Protection → USB Filter Driver Exclusion List) or through the Global App Configuration Service.
+
+I want to emphasise that I'm not requesting any changes to the App Protection security policies themselves — the anti-keylogging and anti-screen capture protections should remain fully in place. The exclusion list simply allows the USB filter driver to correctly pass through input from a specific hardware device that it currently blocks due to a compatibility issue.
+
+I'm currently unable to type in my Citrix session at all, so any help getting this resolved would be greatly appreciated. Happy to jump on a call or provide any additional information.
+
+Many thanks
