@@ -925,6 +925,7 @@ Figure~\ref{fig:estimator-flowchart} provides a practical decision tree.
 
 \begin{figure}[htbp]
 \centering
+\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
   node distance=1.2cm and 2.0cm,
   every node/.style={font=\small},
@@ -940,22 +941,22 @@ Figure~\ref{fig:estimator-flowchart} provides a practical decision tree.
 \node[decisionblock, below=1.5cm of q1, text width=3.5cm] (q2) {Is noise roughly i.i.d.?};
 
 % Yes to iid
-\node[decisionblock, below left=1.5cm and 1.0cm of q2, text width=3.2cm] (q3) {Need simplicity?};
+\node[decisionblock, below left=1.5cm and 2.0cm of q2, text width=3.2cm] (q3) {Need simplicity?};
 
 % Simple
-\node[flowblock, below left=1.2cm and 0.5cm of q3, fill=keyorange!15] (tsrv) {TSRV\\(slower rate, easy)};
+\node[flowblock, below left=1.2cm and 1.0cm of q3, fill=keyorange!15] (tsrv) {TSRV\\(slower rate, easy)};
 
 % Not simple
-\node[flowblock, below right=1.2cm and 0.5cm of q3, fill=defblue!10] (msrv) {MSRV or QMLE\\(optimal rate)};
+\node[flowblock, below right=1.2cm and 1.0cm of q3, fill=defblue!10] (msrv) {MSRV or QMLE\\(optimal rate)};
 
 % No to iid (dependent noise)
-\node[decisionblock, below right=1.5cm and 1.0cm of q2, text width=3.5cm] (q4) {Prefer kernel or local averaging?};
+\node[decisionblock, below right=1.5cm and 2.0cm of q2, text width=3.5cm] (q4) {Prefer kernel or local averaging?};
 
 % Kernel
-\node[flowblock, below left=1.2cm and 0.3cm of q4, fill=defblue!10] (kernel) {Realized kernel\\(most popular)};
+\node[flowblock, below left=1.2cm and 1.0cm of q4, fill=defblue!10] (kernel) {Realized kernel\\(most popular)};
 
 % Pre-avg
-\node[flowblock, below right=1.2cm and 0.3cm of q4, fill=examteal!10] (preavg) {Pre-averaging\\(intuitive)};
+\node[flowblock, below right=1.2cm and 1.0cm of q4, fill=examteal!10] (preavg) {Pre-averaging\\(intuitive)};
 
 % Arrows
 \draw[arrow] (q1) -- node[above, font=\scriptsize] {No} (fivemin);
@@ -967,7 +968,8 @@ Figure~\ref{fig:estimator-flowchart} provides a practical decision tree.
 \draw[arrow] (q4) -- node[left, font=\scriptsize] {Kernel} (kernel);
 \draw[arrow] (q4) -- node[right, font=\scriptsize] {Averaging} (preavg);
 
-\end{tikzpicture}
+\end{tikzpicture}%
+}
 \caption{Decision tree for choosing a noise-robust estimator.
 For daily volatility forecasting, 5-min RV is the starting point.
 For intraday analysis or when estimation accuracy matters, use the realized kernel (default) or pre-averaging.
