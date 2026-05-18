@@ -55,9 +55,13 @@ The result is a return stream with approximately constant realized volatility eq
 > A better vol forecast means you cut exposure earlier and more precisely.
 
 > **Project Connection: Why This Matters**
-> This formula is the direct economic-value test for your internship project (Project Direction 1: HARQ-X + ML residual).
-> Every QLIKE improvement in your forecast translates into a tighter $\hat\sigma_t$, which means more precise position sizing and higher Sharpe.
-> The vol-targeting backtest is your primary deliverable for demonstrating that statistical accuracy creates real P&L.
+>
+> This formula is the direct economic-value test for your internship project.
+> Your LightGBM model, trained with custom QLIKE loss on Layers 0-7, produces a
+> forecast $\hat\sigma_t$ that feeds directly into this position-sizing equation.
+> Every QLIKE improvement translates into more precise position sizing and higher
+> Sharpe. The vol-targeting backtest is your primary deliverable for demonstrating
+> that statistical accuracy creates real P&L.
 
 ### Connection to Time-Series Momentum
 

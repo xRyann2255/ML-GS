@@ -2,7 +2,7 @@
 
 > **Application: Why This Chapter**
 >
-> Volatility is the central quantity in quantitative finance. Options pricing, risk management, portfolio construction, and trade execution all depend on accurate volatility estimates. Every chapter in this guide builds on the concepts introduced here. All five project directions ([Chapter 17](ch17-applications-projects.md)) start from the returns and variance foundations covered in this chapter.
+> Volatility is the central quantity in quantitative finance. Options pricing, risk management, portfolio construction, and trade execution all depend on accurate volatility estimates. Every chapter in this guide builds on the concepts introduced here. Your internship project---forecasting realized volatility with progressive feature layering and ML (Chapter 17)---starts from the returns and variance foundations covered in this chapter.
 
 Financial markets produce a stream of prices. To do anything quantitative with those prices, you first need to convert them into *returns*, measure how much those returns vary, and understand *why* that variation matters. This chapter covers that ground.
 
