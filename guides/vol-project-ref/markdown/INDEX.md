@@ -39,7 +39,7 @@ These markdown files are a faithful word-for-word conversion of `vol-project-ref
 
 | Ch. | Title | Summary |
 |-----|-------|---------|
-| [13](ch13-evaluation.md) | Evaluation | QLIKE (primary), DM tests, MCS. Purged k-fold CV with embargo. Walk-forward evaluation. |
+| [13](ch13-evaluation.md) | Evaluation | QLIKE, retransformation bias, MZ regression, DM test, MCS, DSR. Purged CV, walk-forward, evaluation workflow pipeline. |
 | [14](ch14-complete-pipeline.md) | The Complete Pipeline | End-to-end system diagram. Six-step implementation roadmap. Lookahead bias checklist. |
 
 ## Part V: The Build
