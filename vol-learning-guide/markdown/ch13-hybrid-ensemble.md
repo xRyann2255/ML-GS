@@ -152,11 +152,13 @@ post-jump or regime-change dates (Rahimikia and Poon, 2020).
 
    > **Project Connection: Why This Matters**
    >
-   > This two-step decomposition is the backbone of Project Direction 1
-   > (HARQ-X + ML residual). Because HARQ already adapts its
-   > coefficients to measurement-error regimes, its residuals are
-   > even cleaner than plain HAR residuals, giving the downstream ML
-   > model a higher signal-to-noise starting point.
+   > This two-step decomposition underpins your project's model comparison.
+   > HAR and HARQ serve as econometric baselines; LightGBM then learns
+   > nonlinear patterns from the full feature set (Layers 0-7). Because
+   > HARQ already adapts its coefficients to measurement-error regimes,
+   > comparing LightGBM's QLIKE against HARQ tells you exactly how much
+   > the ML model's nonlinearity adds beyond what the noise-adaptive
+   > linear baseline already captures.
 
 3. Construct a feature matrix $\mathbf{X}_t$ from the feature engineering
    toolkit of [Ch. 10](ch10-feature-engineering.md) (jump indicators, leverage,

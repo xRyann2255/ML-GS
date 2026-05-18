@@ -66,9 +66,11 @@ $$\mathbf{y}_t = \mathbf{\mu} + \sum_{h=0}^{\infty} \mathbf{\Phi}_h \, \mathbf{u
 > **Project Connection: Why This Matters**
 >
 > The MA representation is what lets you decompose forecast errors into contributions
-> from each asset. For GNN-based vol forecasting (Project Direction 3), the impulse-response
-> matrices $\mathbf{\Phi}_h$ define the effective "edge weights" of the spillover graph
-> at each horizon.
+> from each asset. In your project, the impulse-response matrices $\mathbf{\Phi}_h$
+> underpin the Diebold-Yilmaz spillover index that enters Layer 4 of your feature
+> pipeline. The total spillover index $S^{(H)}_t$ becomes a scalar regime indicator
+> for LightGBM, while directional spillovers identify which assets are currently
+> transmitting or receiving volatility shocks.
 
 where the $N \times N$ matrices $\mathbf{\Phi}_h$ are the impulse-response coefficients
 at horizon $h$. Entry $(\mathbf{\Phi}_h)_{jk}$ tells you how a unit shock to asset $k$
@@ -109,7 +111,8 @@ on variable ordering (unlike Cholesky decompositions).
 > The GFEVD is the core building block for spillover features. Each off-diagonal
 > entry $\theta_{jk}^{(H)}$ is a direct measure of cross-asset vol predictability:
 > it tells you how much of asset $j$'s vol surprise came from asset $k$. These
-> entries become edges in the spillover graph that a GNN can learn over.
+> entries feed the Diebold-Yilmaz decomposition that produces your Layer 4
+> spillover features for LightGBM.
 
 Because GFEVD rows do not sum to one in general, normalize each row:
 
@@ -165,9 +168,9 @@ spillover measures follow immediately.
 > spillover $S^{(H)}_t$ is a regime indicator (high = crisis = different vol dynamics).
 > Directional FROM measures how "vulnerable" an asset is to imported vol. Net
 > spillover identifies transmitters vs. receivers. All three become columns in your
-> feature matrix. For Project Direction 3 (GNNs), the pairwise entries form the
-> adjacency matrix of the volatility graph, and time-varying versions define dynamic
-> graph structure.
+> Layer 4 feature matrix, entering LightGBM as scalar cross-asset signals. Their
+> value is concentrated in regime transitions---precisely the forecasts where
+> single-asset features alone break down.
 
 The framework evolved across three papers:
 Diebold and Yilmaz (2009) introduced the total index using a Cholesky decomposition,

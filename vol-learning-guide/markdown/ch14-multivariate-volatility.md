@@ -7,8 +7,9 @@
 > much as individual volatilities. Minimum-variance portfolios, risk parity, hedging, and
 > option pricing on baskets all require a full covariance matrix, not just a list of
 > variances. This chapter extends realized volatility to the multivariate setting:
-> estimating, modeling, and forecasting entire covariance matrices. Project 3
-> (Multivariate RC with GNNs) builds directly on this material.
+> estimating, modeling, and forecasting entire covariance matrices. Your
+> project uses this material directly: the cross-asset covariance structure
+> feeds the Layer 4 spillover features that enter LightGBM as scalar inputs.
 
 ## Realized Covariance
 
@@ -46,7 +47,9 @@ with outer products.
 > covariance extends your RV pipeline ([Chapter 3](ch03-realized-variance.md)) from a single number
 > per day to a $p \times p$ matrix per day, with $p(p+1)/2$ unique entries. For
 > $p = 50$ assets, that is 1,275 quantities to estimate and forecast daily.
-> This is the starting point for Project Direction 3 (Multivariate RC with GNNs).
+> Your project forecasts univariate RV for 34 instruments, but the cross-asset
+> covariance structure feeds directly into the Layer 4 spillover features that
+> enter LightGBM as scalar inputs.
 
 ```mermaid
 graph TD
@@ -399,9 +402,10 @@ then reassembled._
 > forecasting. It directly extends the HARQ framework your project builds on:
 > you can apply the $\sqrt{\operatorname{RQ}}$ measurement-error correction from
 > [Chapter 6](ch06-har.md) to each variance element, improving forecasts on noisy
-> days. If Project Direction 3 (GNN) is to justify its complexity, it must beat
-> HAR-DRD on QLIKE across the full covariance matrix, not just on individual
-> variances.
+> days. Your project uses univariate forecasting per instrument, but the
+> cross-sectional structure that HAR-DRD captures is exactly what your Layer 4
+> cross-asset features (sector-mean RV, Diebold-Yilmaz spillover index) distill
+> into scalar inputs for LightGBM.
 
 > **Key Result: Separate Modeling Beats Joint**
 >
@@ -498,12 +502,12 @@ are weak. Graph-based models exploit this structure._
 
 > **Project Connection: Why This Matters**
 >
-> This is the linear foundation for Project Direction 3 (GNNs). Graph-HAR adds
-> one cross-asset spillover term and already improves on standard HAR. The GNN
-> extension (below) replaces this linear weighted average with learnable nonlinear
-> message passing, potentially capturing richer interaction patterns. Your project
-> contribution: show whether the nonlinear GNN spillover term yields statistically
-> significant QLIKE gains over the linear Graph-HAR spillover on real equity data.
+> Graph-HAR demonstrates that cross-asset spillover information improves univariate
+> vol forecasts. Your project captures this same mechanism through Layer 4
+> cross-asset features: sector-mean RV, the Diebold-Yilmaz spillover index, and
+> cross-asset RV rank. These scalar features distill the neighbor-weighted-average
+> idea into inputs that LightGBM can exploit without requiring a full graph
+> learning framework.
 
 > **Key Idea: GNN for Covariance -- Zhang, Cucuringu, and Dong (2023)**
 >
