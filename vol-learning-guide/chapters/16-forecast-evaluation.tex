@@ -194,8 +194,10 @@ Of the two robust losses, QLIKE is less sensitive to extreme $\RV$ days and is t
 
 \subsection{Worked Example: MSE vs.\ QLIKE Rankings}
 
-\begin{workedexample}{MSE vs.\ QLIKE Can Disagree}
-Consider five days of forecasts from two models, evaluated against realized variance:
+\begin{workedexample}{MSE and QLIKE Can Disagree on Rankings}
+Consider five days of forecasts from two models, evaluated against realized variance.
+Model~A is a reactive forecaster that under-predicts during calm periods but partially captures the crisis spike.
+Model~B is a stable forecaster that nails normal days but barely reacts to the spike.
 
 \medskip
 \begin{center}
@@ -203,40 +205,44 @@ Consider five days of forecasts from two models, evaluated against realized vari
 \toprule
 Day & $\RV_t$ & Model A ($h^A_t$) & Model B ($h^B_t$) \\
 \midrule
-1 & 1.2 & 1.0 & 1.3 \\
-2 & 0.9 & 1.0 & 0.8 \\
-3 & 1.1 & 1.0 & 1.0 \\
-4 & 1.0 & 1.0 & 1.1 \\
-5 & 8.0 & 1.0 & 3.0 \\
+1 & 1.0 & 0.4 & 1.0 \\
+2 & 1.1 & 0.4 & 1.1 \\
+3 & 0.9 & 0.4 & 0.9 \\
+4 & 1.0 & 0.4 & 1.0 \\
+5 & 8.0 & 6.0 & 2.0 \\
 \bottomrule
 \end{tabular}
 \end{center}
 \medskip
 
-Model A is a constant forecast ($h_t = 1.0$).
-Model B adapts but is still far from the spike on day 5.
-
 \textbf{MSE computation:}
 \begin{align*}
-\text{MSE}_A &= \frac{1}{5}\bigl[(1.2-1)^2 + (0.9-1)^2 + (1.1-1)^2 + (1-1)^2 + (8-1)^2\bigr] \\
-  &= \frac{1}{5}(0.04 + 0.01 + 0.01 + 0 + 49) = 9.812 \\[4pt]
-\text{MSE}_B &= \frac{1}{5}\bigl[(1.2-1.3)^2 + (0.9-0.8)^2 + (1.1-1)^2 + (1-1.1)^2 + (8-3)^2\bigr] \\
-  &= \frac{1}{5}(0.01 + 0.01 + 0.01 + 0.01 + 25) = 5.008
+\text{MSE}_A &= \tfrac{1}{5}\bigl[(1.0-0.4)^2 + (1.1-0.4)^2 + (0.9-0.4)^2 + (1.0-0.4)^2 + (8-6)^2\bigr] \\
+  &= \tfrac{1}{5}(0.36 + 0.49 + 0.25 + 0.36 + 4) = 1.092 \\[4pt]
+\text{MSE}_B &= \tfrac{1}{5}\bigl[(1.0-1.0)^2 + (1.1-1.1)^2 + (0.9-0.9)^2 + (1.0-1.0)^2 + (8-2)^2\bigr] \\
+  &= \tfrac{1}{5}(0 + 0 + 0 + 0 + 36) = 7.200
 \end{align*}
 
-MSE ranks Model B first (5.008 < 9.812), driven almost entirely by day 5.
+MSE ranks Model A first (1.092 < 7.200).
+The crisis day drives the entire result: Model B's MSE is 99.9\% from day~5 alone.
 
 \textbf{QLIKE computation:}
 \begin{align*}
-\QLIKE_A &= \frac{1}{5}\left[\left(\ln 1 + \frac{1.2}{1}\right) + \left(\ln 1 + \frac{0.9}{1}\right) + \left(\ln 1 + \frac{1.1}{1}\right) + \left(\ln 1 + \frac{1.0}{1}\right) + \left(\ln 1 + \frac{8.0}{1}\right)\right] \\
-  &= \frac{1}{5}(1.2 + 0.9 + 1.1 + 1.0 + 8.0) = 2.440 \\[4pt]
-\QLIKE_B &= \frac{1}{5}\bigl[(\ln 1.3 + 1.2/1.3) + (\ln 0.8 + 0.9/0.8) \\
-  &\qquad + (\ln 1.0 + 1.1/1.0) + (\ln 1.1 + 1.0/1.1) + (\ln 3.0 + 8.0/3.0)\bigr] \\
-  &= \frac{1}{5}(1.185 + 0.902 + 1.100 + 1.004 + 3.766) = 1.591
+\QLIKE_A &= \tfrac{1}{5}\bigl[(\ln 0.4 + \tfrac{1.0}{0.4}) + (\ln 0.4 + \tfrac{1.1}{0.4}) + (\ln 0.4 + \tfrac{0.9}{0.4}) + (\ln 0.4 + \tfrac{1.0}{0.4}) + (\ln 6 + \tfrac{8}{6})\bigr] \\
+  &= \tfrac{1}{5}(1.584 + 1.834 + 1.334 + 1.584 + 3.125) = 1.892 \\[4pt]
+\QLIKE_B &= \tfrac{1}{5}\bigl[(\ln 1.0 + \tfrac{1.0}{1.0}) + (\ln 1.1 + \tfrac{1.1}{1.1}) + (\ln 0.9 + \tfrac{0.9}{0.9}) + (\ln 1.0 + \tfrac{1.0}{1.0}) + (\ln 2 + \tfrac{8}{2})\bigr] \\
+  &= \tfrac{1}{5}(1.000 + 1.095 + 0.895 + 1.000 + 4.693) = 1.737
 \end{align*}
 
-QLIKE also ranks Model B first here (1.591 < 2.440), but the gap is much smaller: Model B wins by 35\% under QLIKE versus 49\% under MSE.
-In samples where the crisis day is less extreme, MSE and QLIKE rankings can reverse entirely.
+QLIKE ranks Model B first (1.737 < 1.892).
+The rankings \emph{reverse}: MSE picks A, QLIKE picks B.
+
+\textbf{What this tells you.}
+MSE picked Model~A because the crisis day dominates quadratically: $(8-2)^2 = 36$ versus $(8-6)^2 = 4$.
+Being closer on one extreme day overwhelmed Model~A's poor performance on four normal days.
+QLIKE picked Model~B because QLIKE penalizes Model~A's under-prediction on normal days through the $\sigma^2_t / h_t$ ratio ($1.0/0.4 = 2.5$ on each normal day), and the crisis-day QLIKE gap ($4.693 - 3.125 = 1.57$) is not large enough to compensate.
+For daily risk management, where forecast quality on typical days matters more than one extreme day, QLIKE's ranking is more useful.
+When MSE and QLIKE disagree, check whether the MSE ranking is driven by a handful of extreme days.
 \end{workedexample}
 
 \begin{keyidea}[Always Report QLIKE as Primary]
