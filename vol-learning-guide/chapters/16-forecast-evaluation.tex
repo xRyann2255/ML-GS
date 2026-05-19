@@ -335,6 +335,10 @@ On a day where $\widehat{\log \RV}_{t+1} = -4.0$ (corresponding to annualized vo
 
 For 1-day-ahead forecasts with $\hat{\sigma}^2_\varepsilon \approx 0.08$, the correction factor is $\exp(0.04) \approx 1.04$, a 4\% adjustment.
 For 22-day-ahead forecasts with $\hat{\sigma}^2_\varepsilon \approx 0.35$, it reaches $\exp(0.175) \approx 1.19$, nearly a 20\% adjustment.
+
+\textbf{Impact on evaluation.}
+Without this correction, the 10.5\% systematic under-prediction on a typical 5-day horizon inflates $\QLIKE$ loss by roughly 3--5\% and shows up as $a > 0$ in the Mincer--Zarnowitz regression (Section~\ref{sec:eval-mz}).
+Applying the correction is often the single cheapest $\QLIKE$ improvement available: it costs one line of code and zero additional data.
 \end{workedexample}
 
 \begin{warning}[Without Correction, Every Forecast Is Biased Low]
@@ -821,6 +825,9 @@ If labels are constructed from $\tau$-day forward returns, remove training obser
 \textbf{Embargo} removes an additional buffer of training observations \emph{after} the end of the test fold.
 This guards against serial correlation in features: day $t+1$ features are correlated with day $t$ features, so training on day $t+1$ while testing on day $t$ leaks information.
 A typical embargo is 1--2\% of total sample size.
+The embargo length should cover the autocorrelation decay of your features.
+For HAR features (which use lags up to 22 days), the serial correlation in $\RV$ drops below 0.05 within about 5--10 days, so 1--2\% of a typical 1,000--2,500 day sample (10--50 days) is conservative.
+If you use features with longer memory (e.g., monthly moving averages or regime indicators), increase the embargo accordingly.
 \end{definition}
 
 \subsection{Worked Example}
