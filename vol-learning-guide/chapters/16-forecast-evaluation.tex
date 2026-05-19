@@ -700,6 +700,16 @@ A 2\% QLIKE improvement is rarely significant with 3--5 years of daily data.
 If your fancy model is in the same MCS as HAR, be honest about it.
 \end{keyidea}
 
+\begin{keyidea}[What to Do When Multiple Models Survive]
+When four models survive the MCS, you cannot rank among them statistically.
+Choose among survivors using secondary criteria: simplicity (HAR is easier to explain to a portfolio manager than LightGBM), computational cost (GARCH fits in seconds versus minutes), interpretability (can you explain why the forecast changed?), or economic value in a downstream application (Chapter~\ref{ch:applications}).
+The MCS does not pick your model; it eliminates the ones you should not pick.
+
+The MCS $p$-values for surviving models (1.000, 0.482, 0.312, 0.551 in the table above) are \emph{not} a ranking.
+They indicate how far each model is from elimination: a $p$-value of 0.312 means GARCH would be eliminated at $\alpha = 0.30$ but survives at $\alpha = 0.10$.
+Do not treat these as confidence scores or use them to rank survivors.
+\end{keyidea}
+
 \begin{projectconnection}[Why This Matters]
 Your model needs to be IN the Model Confidence Set, and ideally, simpler baselines like raw HAR should be excluded.
 If your LightGBM model and plain HAR both survive in the 90\% MCS, you cannot honestly claim superiority.
