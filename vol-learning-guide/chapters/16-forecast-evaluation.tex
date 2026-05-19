@@ -255,7 +255,8 @@ If the two metrics disagree on model rankings, the QLIKE ranking is more reliabl
 QLIKE is THE primary evaluation metric for your project.
 When you report that your ML model beats HAR, the headline number is the percentage reduction in QLIKE.
 The asymmetry is critical: QLIKE penalizes you more for underestimating vol than overestimating it (through the $\sigma^2_t / h_t$ ratio), which aligns with risk management priorities where underestimating vol means holding too much risk.
-Target a 30--80 bps QLIKE improvement over HAR to claim a meaningful result.
+Target a 30--80 bps $\QLIKE$ improvement over HAR to claim a meaningful result.
+Report the percentage reduction to two decimal places in your results table, and always pair it with a DM test $p$-value (Section~\ref{sec:eval-dm}).
 \end{projectconnection}
 
 
@@ -716,7 +717,7 @@ Do not treat these as confidence scores or use them to rank survivors.
 
 \begin{projectconnection}[Why This Matters]
 Your model needs to be IN the Model Confidence Set, and ideally, simpler baselines like raw HAR should be excluded.
-If your LightGBM model and plain HAR both survive in the 90\% MCS, you cannot honestly claim superiority.
+If your LightGBM model and plain HAR both survive in the 90\% MCS, you cannot honestly claim superiority; report them as statistically equivalent and justify your model choice on secondary criteria (interpretability, computational cost, economic value).
 The MCS is also your defense: if a reviewer asks ``why not use an LSTM?'', you can show it was eliminated from the MCS.
 Use the \texttt{MCS} package in R or the \texttt{arch} library in Python to compute MCS $p$-values.
 \end{projectconnection}
@@ -935,6 +936,7 @@ A DSR near 1 means your Sharpe is almost certainly genuine; a DSR near 0 means i
 If your vol-forecasting project includes a variance risk premium trading strategy (Chapter~\ref{ch:vrp}), you will need to report DSR alongside the raw Sharpe.
 With the typical 10--30 experiments you will run during hyperparameter tuning, even a Sharpe of 1.5 can be entirely consistent with luck.
 DSR $> 0.95$ is the bar for a credible backtest result.
+If DSR $< 0.95$, do not claim the strategy has skill; report the DSR value and the number of trials $N$ alongside the raw Sharpe so readers can judge for themselves.
 \end{projectconnection}
 
 \begin{keyresult}[Bailey and Lopez de Prado (2014): The Deflated Sharpe Ratio]
