@@ -3,7 +3,7 @@
 > **Application: Why This Chapter Is Non-Negotiable**
 >
 > This chapter teaches the evaluation methodology used across all project directions.
-> Every volatility forecast you produce must be evaluated with $\QLIKE$ (not MSE),
+> Every volatility forecast you produce must be evaluated with $\operatorname{QLIKE}$ (not MSE),
 > compared with the Diebold--Mariano test, and placed in a Model Confidence Set.
 > If you use cross-validation, it must be purged.
 > If you report Sharpe ratios, they must be deflated.
@@ -12,7 +12,7 @@
 
 A good forecast is useless if you cannot prove it is good.
 This chapter gives you the statistical machinery to distinguish genuine forecasting ability from noise, luck, and overfitting.
-We cover the right loss function ($\QLIKE$), the right comparison test (Diebold--Mariano), the right multi-model framework (Model Confidence Set), the right cross-validation (purged K-fold with embargo), and the right Sharpe ratio adjustment (Deflated Sharpe Ratio).
+We cover the right loss function ($\operatorname{QLIKE}$), the right comparison test (Diebold--Mariano), the right multi-model framework (Model Confidence Set), the right cross-validation (purged K-fold with embargo), and the right Sharpe ratio adjustment (Deflated Sharpe Ratio).
 
 
 ## Why Evaluation Methodology Matters
@@ -20,7 +20,7 @@ We cover the right loss function ($\QLIKE$), the right comparison test (Diebold-
 Before diving into specific tools, consider two scenarios that illustrate why evaluation methodology *is* the credibility of your results.
 
 **Scenario 1.**
-You build a LightGBM volatility forecast that achieves 5% lower $\QLIKE$ than the HAR benchmark ([Chapter 6](ch06-har-model.md)).
+You build a LightGBM volatility forecast that achieves 5% lower $\operatorname{QLIKE}$ than the HAR benchmark ([Chapter 6](ch06-har-model.md)).
 Your manager asks: "Is that improvement statistically significant, or would it vanish on a different sample?"
 Without a Diebold--Mariano test, you cannot answer.
 
@@ -33,11 +33,26 @@ Without the Deflated Sharpe Ratio, you cannot answer.
 >
 > Evaluation errors come in two flavors:
 >
-> 1. **Declaring a winner that isn't one.** A 5% improvement in $\QLIKE$ that is not statistically significant is noise, not signal.
+> 1. **Declaring a winner that isn't one.** A 5% improvement in $\operatorname{QLIKE}$ that is not statistically significant is noise, not signal.
 > 2. **Reporting a Sharpe ratio inflated by multiple testing.** A Sharpe of 1.5 from 30 experiments may be pure luck (Bailey and Lopez de Prado, 2014).
 
 The evaluation framework is not a final step you tack on after research.
 It is the infrastructure you build *first*, so that every experiment you run produces honest, comparable numbers from day one.
+
+> **Key Idea: Seven Tools, Seven Questions**
+>
+> This chapter introduces seven evaluation tools.
+> Each answers one question:
+>
+> 1. **QLIKE**: which model has lower loss? (Primary metric.)
+> 2. **MSE**: does the ranking hold under a different loss? (Secondary check.)
+> 3. **MZ regression**: is my forecast biased or too smooth? (Diagnostic.)
+> 4. **DM test**: is the loss difference between two models statistically significant? (Pairwise test.)
+> 5. **MCS**: given all candidate models, which ones survive? (Multi-model filter.)
+> 6. **Purged CV**: how do I tune hyperparameters without leaking future data? (Training procedure.)
+> 7. **DSR**: is my backtest Sharpe real after accounting for all experiments? (Multiple-testing correction.)
+>
+> You will use all seven, in roughly this order.
 
 
 ## MSE and Its Limitations for Volatility
@@ -54,7 +69,9 @@ We start with the loss function you already know, then explain why it is not eno
 
 The mean squared error between a sequence of forecasts $\{h_t\}$ and realized values $\{\sigma^2_t\}$ is:
 
-$$\text{MSE} = \frac{1}{T}\sum_{t=1}^{T} \bigl(\sigma^2_t - h_t\bigr)^2$$
+$$
+\text{MSE} = \frac{1}{T}\sum_{t=1}^{T} \bigl(\sigma^2_t - h_t\bigr)^2
+$$
 
 where:
 
@@ -94,7 +111,7 @@ MSE has a deeper problem: it is symmetric and heavily penalizes extreme values.
 >
 > MSE is proxy-robust, which is valuable.
 > But its sensitivity to extreme realized variance values makes it a poor primary metric for volatility.
-> Report it as a secondary check alongside $\QLIKE$.
+> Report it as a secondary check alongside $\operatorname{QLIKE}$.
 
 > **Project Connection: Why This Matters**
 >
@@ -109,13 +126,15 @@ Having seen why MSE over-penalizes extreme days, we now introduce the loss funct
 
 ### Intuition
 
-$\QLIKE$ (quasi-likelihood loss) comes from the negative log-likelihood of a Gaussian distribution with variance $h_t$.
-Think of it this way: if returns were exactly normal with variance $h_t$, the best forecast would minimize $\QLIKE$.
-Even when returns are not normal (and they never are), $\QLIKE$ retains two critical properties that MSE shares one of and lacks the other.
+$\operatorname{QLIKE}$ (quasi-likelihood loss) comes from the negative log-likelihood of a Gaussian distribution with variance $h_t$.
+Think of it this way: if returns were exactly normal with variance $h_t$, the best forecast would minimize $\operatorname{QLIKE}$.
+Even when returns are not normal (and they never are), $\operatorname{QLIKE}$ retains two critical properties that MSE shares one of and lacks the other.
 
 ### The QLIKE Formula
 
-$$\QLIKE = \frac{1}{T}\sum_{t=1}^{T} \left(\ln h_t + \frac{\sigma^2_t}{h_t}\right)$$
+$$
+\operatorname{QLIKE} = \frac{1}{T}\sum_{t=1}^{T} \left(\ln h_t + \frac{\sigma^2_t}{h_t}\right)
+$$
 
 where:
 
@@ -131,6 +150,25 @@ where:
 > The $\ln h_t$ term punishes you for forecasting too high (wasting capital on unnecessary hedges), while the $\sigma^2_t / h_t$ term punishes you for forecasting too low (holding unrecognized risk).
 > Critically, the under-prediction penalty ($\sigma^2_t / h_t$) explodes as $h_t \to 0$, so QLIKE is far harsher on dangerous under-estimates than on conservative over-estimates.
 > This asymmetry matches real-world priorities: underestimating volatility gets you fired; overestimating it merely costs some opportunity.
+> This does not mean the optimal forecast is biased upward.
+> It means that among two equally wrong forecasts, the one that errs low is more costly.
+> The target is still the true variance.
+
+> **Intuition: QLIKE Is Still Minimized at the True Value**
+>
+> A common misreading of the asymmetric penalty is: "If under-prediction is punished more, shouldn't I forecast a bit high to be safe?"
+> No.
+> Take the derivative of a single day's QLIKE contribution with respect to the forecast $h_t$:
+>
+> $$
+> \frac{\partial}{\partial h_t}\left(\ln h_t + \frac{\sigma^2_t}{h_t}\right) = \frac{1}{h_t} - \frac{\sigma^2_t}{h_t^2} = 0 \quad \Longrightarrow \quad h_t = \sigma^2_t.
+> $$
+>
+> The minimum is at $h_t = \sigma^2_t$ exactly.
+> The asymmetry shapes the penalty *curve*, not the penalty *minimum*.
+> Think of a speed limit: the best speed is exactly the limit.
+> Getting caught going 20 over is worse than going 20 under, but that does not make 20-under the target.
+> QLIKE works the same way: the best forecast is the true variance, but being wrong on the low side hurts more than being wrong on the high side by the same amount.
 
 > **Intuition: Why QLIKE Is Less Sensitive to Outliers**
 >
@@ -147,7 +185,7 @@ where:
 
 > **Key Idea: Always Report QLIKE as Primary**
 >
-> Use $\QLIKE$ as your primary loss function for volatility forecast evaluation.
+> Use $\operatorname{QLIKE}$ as your primary loss function for volatility forecast evaluation.
 > Report MSE as a secondary check.
 > If the two metrics disagree on model rankings, the QLIKE ranking is more reliable for practical forecasting because it is less distorted by a few extreme days.
 
@@ -156,28 +194,33 @@ where:
 > QLIKE is THE primary evaluation metric for your project.
 > When you report that your ML model beats HAR, the headline number is the percentage reduction in QLIKE.
 > The asymmetry is critical: QLIKE penalizes you more for underestimating vol than overestimating it (through the $\sigma^2_t / h_t$ ratio), which aligns with risk management priorities where underestimating vol means holding too much risk.
-> Target a 30--80 bps QLIKE improvement over HAR to claim a meaningful result.
+> Target a 30--80 bps $\operatorname{QLIKE}$ improvement over HAR to claim a meaningful result.
+> Report the percentage reduction to two decimal places in your results table, and always pair it with a DM test $p$-value (Section 16.4).
 
 
-## Retransformation Bias
+### Retransformation Bias
 
 Many volatility models forecast in log space because $\log \operatorname{RV}_t$ is more Gaussian, more homoskedastic, and better behaved for regression than raw $\operatorname{RV}_t$.
 The HAR-log model, for example, regresses $\log \operatorname{RV}_{t+1}$ on lagged log realized variances.
 But when you need a level-space forecast (e.g., for portfolio variance targeting or VaR computation), you must exponentiate the log forecast back to levels.
 This innocent-looking step introduces a systematic downward bias known as **retransformation bias**.
 
-### The Problem: Jensen's Inequality
+#### The Problem: Jensen's Inequality
 
 The root cause is **Jensen's inequality**: for any convex function $g$ and non-degenerate random variable $X$,
 
-$$\mathbb{E}\bigl[g(X)\bigr] > g\bigl(\mathbb{E}[X]\bigr).$$
+$$
+\mathbb{E}\bigl[g(X)\bigr] > g\bigl(\mathbb{E}[X]\bigr).
+$$
 
 The exponential function is convex, so $\mathbb{E}[\exp(X)] > \exp(\mathbb{E}[X])$.
 
 Suppose your log-space model produces a point forecast $\widehat{\log \operatorname{RV}}_{t+1}$.
 The naive level-space forecast is:
 
-$$\widehat{\operatorname{RV}}^{\text{naive}}_{t+1} = \exp\!\bigl(\widehat{\log \operatorname{RV}}_{t+1}\bigr).$$
+$$
+\widehat{\operatorname{RV}}^{\text{naive}}_{t+1} = \exp\!\bigl(\widehat{\log \operatorname{RV}}_{t+1}\bigr).
+$$
 
 But because the log-space forecast has estimation error, the true conditional expectation of $\operatorname{RV}_{t+1}$ is *larger* than this.
 Exponentiating the conditional mean of the log gives you something systematically below the conditional mean of the level.
@@ -191,11 +234,13 @@ Every single forecast is biased low.
 > It is higher, because the distribution of $\log \operatorname{RV}$ has spread around 0.5, and the exponential function amplifies high values more than it shrinks low values.
 > The more uncertain your log-space forecast (wider error distribution), the larger the gap between $\exp(\mathbb{E}[\log \operatorname{RV}])$ and $\mathbb{E}[\operatorname{RV}]$.
 
-### The Correction Formula
+#### The Correction Formula
 
 If log-space forecast errors are approximately Gaussian with variance $\hat{\sigma}^2_\varepsilon$, the bias-corrected level-space forecast is:
 
-$$\widehat{\operatorname{RV}}_{t+1} = \exp\!\left(\widehat{\log \operatorname{RV}}_{t+1} + \frac{\hat{\sigma}^2_\varepsilon}{2}\right)$$
+$$
+\widehat{\operatorname{RV}}_{t+1} = \exp\!\left(\widehat{\log \operatorname{RV}}_{t+1} + \frac{\hat{\sigma}^2_\varepsilon}{2}\right)
+$$
 
 where:
 
@@ -214,13 +259,9 @@ The corrected forecast multiplies the naive exponential by this factor.
 > When forecast errors are small ($\hat{\sigma}^2_\varepsilon \approx 0$), the correction is negligible.
 > When they are large, as in long-horizon forecasts or during volatile regimes, it can be substantial.
 
-### How Large Is the Bias?
-
-For 1-day-ahead forecasts with $\hat{\sigma}^2_\varepsilon \approx 0.08$, the correction factor is $\exp(0.04) \approx 1.04$, a 4% adjustment. For 5-day-ahead forecasts with $\hat{\sigma}^2_\varepsilon \approx 0.20$, it reaches $\exp(0.10) \approx 1.105$, about a 10.5% adjustment. For 22-day-ahead forecasts with $\hat{\sigma}^2_\varepsilon \approx 0.35$, it reaches $\exp(0.175) \approx 1.19$, nearly a 20% adjustment.
-
 > **Warning: Without Correction, Every Forecast Is Biased Low**
 >
-> If you forecast in log space and naively exponentiate, your Mincer--Zarnowitz regression (Section on Mincer--Zarnowitz Regressions below) will show $a > 0$ (systematic under-prediction) and the bias grows with forecast uncertainty.
+> If you forecast in log space and naively exponentiate, your Mincer--Zarnowitz regression (Section 16.3) will show $a > 0$ (systematic under-prediction) and the bias grows with forecast uncertainty.
 > During high-volatility regimes, when $\hat{\sigma}^2_\varepsilon$ is largest, the bias is at its worst, precisely when accurate forecasts matter most for risk management.
 
 > **Key Idea: Estimating the Correction Variance**
@@ -231,27 +272,27 @@ For 1-day-ahead forecasts with $\hat{\sigma}^2_\varepsilon \approx 0.08$, the co
 
 > **Project Connection: Why This Matters**
 >
-> Your project forecasts $\log \operatorname{RV}_{t+1}$ (because log realized variance is better behaved for HAR and LightGBM regressions), but $\QLIKE$ evaluation and downstream applications (volatility targeting, VaR) require level-space forecasts.
+> Your project forecasts $\log \operatorname{RV}_{t+1}$ (because log realized variance is better behaved for HAR and LightGBM regressions), but $\operatorname{QLIKE}$ evaluation and downstream applications (volatility targeting, VaR) require level-space forecasts.
 > Apply the retransformation correction whenever you convert back to levels.
-> Without it, you introduce a systematic negative bias that inflates $\QLIKE$ loss and makes your MZ regression show $a > 0$.
+> Without it, you introduce a systematic negative bias that inflates $\operatorname{QLIKE}$ loss and makes your MZ regression show $a > 0$.
 > The correction is trivially cheap to compute, so there is no reason to skip it (Patton, 2011).
 
----
-
-**Figure: QLIKE vs. MSE Penalty Asymmetry.**
-Both losses are minimized at the perfect forecast ($h_t = \sigma^2_t$, ratio $= 1$). MSE penalizes over- and under-prediction symmetrically. QLIKE penalizes under-prediction (ratio $< 1$) much more harshly than over-prediction (ratio $> 1$), matching the asymmetric risk preferences in volatility forecasting: underestimating vol means holding too much risk. The normalized QLIKE contribution is $\ln(h_t/\sigma^2_t) + \sigma^2_t/h_t - 1$ and the normalized MSE contribution is $(1 - h_t/\sigma^2_t)^2$, plotted as a function of the forecast ratio $h_t / \sigma^2_t$ over the range $[0.2, 3.5]$.
+*[Figure: QLIKE vs. MSE penalty as a function of the forecast ratio $h_t / \sigma^2_t$. Both losses are minimized at the perfect forecast ($h_t = \sigma^2_t$, ratio $= 1$). MSE (blue curve) penalizes over- and under-prediction symmetrically, forming a parabola centered at ratio $= 1$. QLIKE (red curve) penalizes under-prediction (ratio $< 1$) much more harshly than over-prediction (ratio $> 1$): as the ratio drops toward zero, the QLIKE penalty rises steeply through the $\sigma^2_t / h_t$ term, while for ratios above 1 the penalty rises gently through $\ln h_t$. Despite this asymmetry, both losses are minimized at ratio $= 1$ (the true variance); the asymmetry shapes the penalty curve, not the optimal forecast.]*
 
 
 ## Mincer--Zarnowitz Regressions
 
-$\QLIKE$ tells you which model has lower average loss, but it does not tell you *why* a forecast is bad.
-The Mincer--Zarnowitz regression is a simple diagnostic that decomposes forecast errors into bias and inefficiency.
+$\operatorname{QLIKE}$ tells you which model has lower average loss, but it does not tell you *why* a forecast is bad.
+Think of $\operatorname{QLIKE}$ as the scoreboard and the Mincer--Zarnowitz regression as the film review: $\operatorname{QLIKE}$ tells you who won; MZ tells you what to fix.
+The MZ regression is a simple diagnostic that decomposes forecast errors into bias and inefficiency.
 
 ### The Regression
 
 Regress realized variance on the forecast:
 
-$$\sigma^2_t = a + b \cdot h_t + \varepsilon_t$$
+$$
+\sigma^2_t = a + b \cdot h_t + \varepsilon_t
+$$
 
 where:
 
@@ -288,9 +329,18 @@ where:
 > **Intuition: Mincer--Zarnowitz as a Diagnostic**
 >
 > Think of the MZ regression as a "bias and calibration check."
-> $\QLIKE$ tells you the overall score; MZ tells you what to fix.
+> $\operatorname{QLIKE}$ tells you the overall score; MZ tells you what to fix.
 > If $b = 0.7$, your forecast is too smooth: it needs to react more aggressively to recent information.
 > If $a = 0.003$, your forecast systematically under-predicts by about 0.3 variance points.
+
+> **Key Idea: What to Fix Based on MZ Results**
+>
+> The MZ regression is only useful if you act on the diagnosis:
+>
+> - **$b < 1$ (forecast too smooth):** your model over-relies on long-horizon averages. Try adding shorter-lag features (e.g., 1-day lagged $\operatorname{RV}$), reducing regularization strength, or increasing model capacity.
+> - **$b > 1$ (forecast too reactive):** your model is chasing noise. Try increasing regularization, using a longer lookback window, or smoothing the forecast with an exponential moving average.
+> - **$a > 0$ (systematic under-prediction):** check for retransformation bias first if you forecast in log space (Section 16.2.1 above). If that is not the issue, add a bias correction term or recalibrate the intercept.
+> - **$a < 0$ (systematic over-prediction):** less common in volatility forecasting, but check whether your features include stale high-vol observations that inflate the forecast.
 
 > **Warning: Use HAC Standard Errors**
 >
@@ -301,15 +351,17 @@ where:
 
 ## The Diebold--Mariano Test
 
-You now have a loss function ($\QLIKE$) and a diagnostic (MZ regression).
+You now have a loss function ($\operatorname{QLIKE}$) and a diagnostic (MZ regression).
 The next question is: given two models, is the difference in loss *statistically significant*, or could it be sampling noise?
 
 ### Setup
 
-Suppose you have two volatility forecasts, $h^A_t$ and $h^B_t$, and a loss function $L$ (use $\QLIKE$).
+Suppose you have two volatility forecasts, $h^A_t$ and $h^B_t$, and a loss function $L$ (use $\operatorname{QLIKE}$).
 Define the **loss differential**:
 
-$$d_t = L(\sigma^2_t, h^A_t) - L(\sigma^2_t, h^B_t)$$
+$$
+d_t = L(\sigma^2_t, h^A_t) - L(\sigma^2_t, h^B_t)
+$$
 
 where:
 
@@ -328,7 +380,9 @@ The question is whether $\bar{d}$ is significantly different from zero.
 
 ### The Test Statistic
 
-$$\text{DM} = \frac{\bar{d}}{\sqrt{\widehat{\text{Var}}(\bar{d})}}$$
+$$
+\text{DM} = \frac{\bar{d}}{\sqrt{\widehat{\text{Var}}(\bar{d})}}
+$$
 
 where:
 
@@ -356,8 +410,6 @@ where:
 > A common rule of thumb is $\ell = \lfloor T^{1/3} \rfloor$.
 > For $T = 1{,}000$ days, this gives $\ell = 10$.
 
-The DM statistic follows a standard normal distribution under the null. For example, with mean QLIKE loss differential $\bar{d} = 0.023$ and HAC standard error $\text{SE}_{\text{HAC}} = 0.011$, the DM statistic is $0.023/0.011 = 2.09$, giving a two-sided $p$-value of approximately 0.037. At the 5% level, you would reject $H_0$: the improvement is statistically significant. Always report the $p$-value and let the reader decide.
-
 > **Warning: Small-Sample Correction**
 >
 > Diebold and Mariano (1995) derived the test for large samples.
@@ -367,8 +419,11 @@ The DM statistic follows a standard normal distribution under the null. For exam
 ## The Model Confidence Set
 
 The Diebold--Mariano test compares models in pairs.
+Use it when you have a specific pairwise claim to make ("my ML model beats HAR").
 With $M$ models, you would need $\binom{M}{2}$ pairwise tests, and the more tests you run, the more likely you are to find a "significant" difference by chance.
 The Model Confidence Set solves this by comparing all models simultaneously.
+Use it when you have a model zoo and need to know which ones to keep and which to discard.
+DM is your scalpel for targeted claims; MCS is your filter for the full candidate set.
 
 ### Intuition
 
@@ -393,7 +448,9 @@ The MCS algorithm of Hansen, Lunde, and Nason (2011) works as follows:
 > The Model Confidence Set $\widehat{\mathcal{M}}^*_\alpha$ at significance level $\alpha$ contains all models whose forecasting performance is not significantly worse than the best model.
 > Formally, it satisfies:
 >
-> $$\Pr\left(\mathcal{M}^* \subseteq \widehat{\mathcal{M}}^*_\alpha\right) \geq 1 - \alpha$$
+> $$
+> \Pr\left(\mathcal{M}^* \subseteq \widehat{\mathcal{M}}^*_\alpha\right) \geq 1 - \alpha
+> $$
 >
 > where $\mathcal{M}^*$ is the (unknown) set of truly best models.
 
@@ -403,41 +460,14 @@ The MCS algorithm of Hansen, Lunde, and Nason (2011) works as follows:
 > The MCS produces a *set*, not a ranking.
 > Reporting "these 4 models are in the 90% MCS" is more honest than reporting "model X has the lowest QLIKE" when differences are small.
 
-**Figure: The Model Confidence Set.**
-The MCS procedure eliminates models whose performance is significantly worse than the best, and retains all models that are statistically indistinguishable from it. A conceptual diagram shows all candidate models $\mathcal{M}_0$ in an outer region. The MCS$_{90\%}$ inner region contains LightGBM, HAR, GARCH, and Random Forest (statistically indistinguishable at 90% confidence). Outside the MCS, LSTM and Historical average are eliminated as significantly worse.
-
-```mermaid
-flowchart TD
-    A["All candidate models M₀"]
-    B["LightGBM + HAR features"]
-    C["HAR (daily/weekly/monthly)"]
-    D["GARCH(1,1)"]
-    E["Random Forest"]
-    F["LSTM"]
-    G["Historical average"]
-
-    A --> B & C & D & E
-    A --> F & G
-
-    subgraph MCS90["MCS 90%: statistically indistinguishable"]
-        B
-        C
-        D
-        E
-    end
-
-    subgraph Eliminated["Eliminated (significantly worse)"]
-        F
-        G
-    end
-```
+*[Figure: The Model Confidence Set. An outer rectangle represents all candidate models $\mathcal{M}_0$. Inside, a green-shaded region labeled "MCS 90%" contains four models (LightGBM, HAR, GARCH, Random Forest) that are statistically indistinguishable at the 90% confidence level. Outside the green region, two models (LSTM and Historical average) are shown in red, connected by dashed elimination arrows. The surviving models cannot be ranked among themselves with statistical confidence.]*
 
 ### Practical Use
 
 Report which models survive at both $\alpha = 0.10$ and $\alpha = 0.05$:
 
 | Model | QLIKE | MCS $p$-value | In MCS$_{90\%}$? |
-|---|---|---|---|
+|-------|-------|---------------|-------------------|
 | LightGBM + HAR features | 1.423 | 1.000 | Yes |
 | HAR (daily, weekly, monthly) | 1.441 | 0.482 | Yes |
 | GARCH(1,1) | 1.467 | 0.312 | Yes |
@@ -455,10 +485,20 @@ In this example, four models are statistically indistinguishable at the 90% leve
 > A 2% QLIKE improvement is rarely significant with 3--5 years of daily data.
 > If your fancy model is in the same MCS as HAR, be honest about it.
 
+> **Key Idea: What to Do When Multiple Models Survive**
+>
+> When four models survive the MCS, you cannot rank among them statistically.
+> Choose among survivors using secondary criteria: simplicity (HAR is easier to explain to a portfolio manager than LightGBM), computational cost (GARCH fits in seconds versus minutes), interpretability (can you explain why the forecast changed?), or economic value in a downstream application ([Chapter 17](ch17-applications-projects.md)).
+> The MCS does not pick your model; it eliminates the ones you should not pick.
+>
+> The MCS $p$-values for surviving models (1.000, 0.482, 0.312, 0.551 in the table above) are *not* a ranking.
+> They indicate how far each model is from elimination: a $p$-value of 0.312 means GARCH would be eliminated at $\alpha = 0.30$ but survives at $\alpha = 0.10$.
+> Do not treat these as confidence scores or use them to rank survivors.
+
 > **Project Connection: Why This Matters**
 >
 > Your model needs to be IN the Model Confidence Set, and ideally, simpler baselines like raw HAR should be excluded.
-> If your LightGBM model and plain HAR both survive in the 90% MCS, you cannot honestly claim superiority.
+> If your LightGBM model and plain HAR both survive in the 90% MCS, you cannot honestly claim superiority; report them as statistically equivalent and justify your model choice on secondary criteria (interpretability, computational cost, economic value).
 > The MCS is also your defense: if a reviewer asks "why not use an LSTM?", you can show it was eliminated from the MCS.
 > Use the `MCS` package in R or the `arch` library in Python to compute MCS $p$-values.
 
@@ -486,31 +526,7 @@ The problem: volatility on day 501 is highly correlated with volatility on day 5
 Training on day 501 while testing on day 500 is using the future to predict the past.
 Worse, if your labels use multi-day returns (e.g., 5-day forward realized variance), then the label for day 498 overlaps with the label for day 502; the training and test sets share information through the label construction.
 
-**Figure: Purged K-Fold CV with Embargo.**
-A timeline diagram ($K=5$, $T=1{,}250$, embargo $= 2\%$) illustrates the difference between standard and purged CV. **Top row:** standard fold assignment with fold 2 as the test set (training uses all other folds including days immediately adjacent to the test window). **Bottom row:** after purging and embargo. The 25 days before the test set (purge zone) are removed from training to prevent label overlap. The 25 days after the test set (embargo zone) are removed to prevent information leakage from serial correlation. Training uses only the remaining regions.
-
-```mermaid
-gantt
-    title Purged K-Fold CV (K=5, T=1250, test=fold 2, embargo=2%)
-    dateFormat  X
-    axisFormat  %s
-
-    section Standard CV
-    Train (fold 1)    :done,    f1,   0, 250
-    TEST (fold 2)     :crit,    f2, 250, 500
-    Train (fold 3)    :done,    f3, 500, 750
-    Train (fold 4)    :done,    f4, 750, 1000
-    Train (fold 5)    :done,    f5, 1000, 1250
-
-    section Purged CV
-    Train             :done,    p1,   0, 225
-    Purge zone        :crit,    pz, 225, 250
-    TEST (fold 2)     :crit,    pt, 250, 500
-    Embargo zone      :active,  ez, 500, 525
-    Train             :done,    p3, 525, 750
-    Train             :done,    p4, 750, 1000
-    Train             :done,    p5, 1000, 1250
-```
+*[Figure: Purged K-fold CV with embargo ($K=5$, $T=1{,}250$, embargo $= 2\%$). Two rows of a timeline from day 0 to day 1250. **Top row** (standard fold assignment): Fold 1 (days 1--250, blue), Test fold 2 (days 251--500, red), Fold 3 (days 501--750, blue), Fold 4 (days 751--1000, blue), Fold 5 (days 1001--1250, blue). **Bottom row** (after purging and embargo): Train (days 1--245, blue), purge zone (days 246--250, red dashed, 25 days removed), Test (days 251--500, red), embargo zone (days 501--525, purple dashed, 25 days removed), Train (days 526--750, blue), Train (days 751--1000, blue), Train (days 1001--1250, blue). The purge zone before the test set prevents label overlap; the embargo zone after the test set prevents information leakage from serial correlation.]*
 
 ### The Fix: Purging and Embargo
 
@@ -526,8 +542,9 @@ Lopez de Prado (2018) introduces two modifications to standard K-fold CV:
 > **Embargo** removes an additional buffer of training observations *after* the end of the test fold.
 > This guards against serial correlation in features: day $t+1$ features are correlated with day $t$ features, so training on day $t+1$ while testing on day $t$ leaks information.
 > A typical embargo is 1--2% of total sample size.
-
-With $T = 1{,}250$ daily observations ($K = 5$, 5-day labels, embargo $= 2\%$ of $T = 25$ days), the purged CV removes 5 days before the test fold (label overlap) and 25 days after (serial correlation buffer), for a total of 30 training observations lost per fold (about 3% of the total), a small price for preventing look-ahead bias.
+> The embargo length should cover the autocorrelation decay of your features.
+> For HAR features (which use lags up to 22 days), the serial correlation in $\operatorname{RV}$ drops below 0.05 within about 5--10 days, so 1--2% of a typical 1,000--2,500 day sample (10--50 days) is conservative.
+> If you use features with longer memory (e.g., monthly moving averages or regime indicators), increase the embargo accordingly.
 
 > **Project Connection: Why This Matters**
 >
@@ -562,7 +579,9 @@ This section explains why raw Sharpe ratios are misleading when you have tried m
 
 Bailey and Lopez de Prado (2014) derive the expected maximum Sharpe ratio under the null when $N$ independent strategies are tested:
 
-$$\mathbb{E}\bigl[\max_{i=1,\ldots,N} \operatorname{SR}_i\bigr] \approx \sqrt{2 \ln N}$$
+$$
+\mathbb{E}\bigl[\max_{i=1,\ldots,N} \operatorname{SR}_i\bigr] \approx \sqrt{2 \ln N}
+$$
 
 where:
 
@@ -589,7 +608,9 @@ A reported Sharpe of 1.5 after 30 trials is *below* what you would expect from p
 
 The Deflated Sharpe Ratio adjusts the observed Sharpe ratio for the number of trials:
 
-$$\operatorname{DSR} = \Phi\!\left(\frac{(\widehat{\operatorname{SR}} - \operatorname{SR}_0)\sqrt{T-1}}{\sqrt{1 - \hat{\gamma}_3 \widehat{\operatorname{SR}} + \frac{\hat{\gamma}_4 - 1}{4}\widehat{\operatorname{SR}}^2}}\right)$$
+$$
+\operatorname{DSR} = \Phi\!\left(\frac{(\widehat{\operatorname{SR}} - \operatorname{SR}_0)\sqrt{T-1}}{\sqrt{1 - \hat{\gamma}_3 \widehat{\operatorname{SR}} + \frac{\hat{\gamma}_4 - 1}{4}\widehat{\operatorname{SR}}^2}}\right)
+$$
 
 where:
 
@@ -612,14 +633,13 @@ where:
 > If your vol-forecasting project includes a variance risk premium trading strategy ([Chapter 9](ch09-variance-risk-premium.md)), you will need to report DSR alongside the raw Sharpe.
 > With the typical 10--30 experiments you will run during hyperparameter tuning, even a Sharpe of 1.5 can be entirely consistent with luck.
 > DSR $> 0.95$ is the bar for a credible backtest result.
+> If DSR $< 0.95$, do not claim the strategy has skill; report the DSR value and the number of trials $N$ alongside the raw Sharpe so readers can judge for themselves.
 
 > **Key Result: Bailey and Lopez de Prado (2014): The Deflated Sharpe Ratio**
 >
 > Bailey and Lopez de Prado (2014) show that ignoring the number of trials leads to systematic over-reporting of Sharpe ratios in backtested strategies.
 > The DSR corrects for this by benchmarking the observed Sharpe against the expected maximum under the null.
 > A DSR above 0.95 provides evidence that the strategy's Sharpe ratio is unlikely to have arisen from multiple testing alone.
-
-For example, testing $N = 20$ strategies over $T = 1{,}260$ trading days with best observed Sharpe $\widehat{\operatorname{SR}} = 1.8$, skewness $\hat{\gamma}_3 = -0.3$, and kurtosis $\hat{\gamma}_4 = 4.2$: the null benchmark is $\operatorname{SR}_0 = \sqrt{2 \ln 20} \approx 2.45$, which already exceeds the observed Sharpe of 1.8. The DSR is essentially zero: despite an impressive-looking Sharpe, the strategy does not survive correction for 20 trials. You cannot reject the null that this is the luckiest of 20 random strategies.
 
 > **Key Idea: Every Experiment Counts as a Trial**
 >
@@ -639,19 +659,19 @@ For example, testing $N = 20$ strategies over $T = 1{,}260$ trading days with be
 
 ## What Doesn't Work
 
-This chapter has given you the right tools.
-This section catalogs the wrong ones, so you can recognize them in other people's work and avoid them in your own.
+You now have the full evaluation toolkit: a loss function ($\operatorname{QLIKE}$), a diagnostic (MZ), a pairwise test (DM), a multi-model filter (MCS), a leakage-proof CV procedure, and a multiple-testing correction (DSR).
+This section catalogs the mistakes these tools are designed to prevent, so you can recognize them in other people's work and avoid them in your own.
 
 > **Warning: Evaluation Pitfalls**
 >
 > 1. **Random K-fold on time series.**
 >    Shuffling observations before splitting destroys temporal structure.
 >    Reported accuracy is inflated; real performance collapses.
->    Always use purged CV or walk-forward (see the Purged K-Fold CV section above).
+>    Always use purged CV or walk-forward (Section 16.6 above).
 >
 > 2. **Naive out-of-sample $R^2$ without statistical tests.**
->    "Our model achieves OOS $R^2 = 3.2\%$ versus the benchmark's 2.8\%."
->    Without a DM test or MCS, you do not know whether 0.4 percentage points is signal or noise.
+>    "Our model achieves OOS $R^2 = 3.2\%$ versus the benchmark's 2.8%."
+>    Without a DM test (Section 16.4) or MCS (Section 16.5), you do not know whether 0.4 percentage points is signal or noise.
 >
 > 3. **Training on one regime, testing on another.**
 >    Training on 2015--2019 (low volatility) and testing on 2020 (COVID) is not a fair evaluation; it is a regime-change stress test.
@@ -696,7 +716,7 @@ The danger is that the boundary between "today" and "tomorrow" is not always cle
 > **Key Idea: Prevention: Strict Temporal Cutoff**
 >
 > All features for forecasting $\operatorname{RV}_{t+1}$ must use data from day $t$ or earlier.
-> Define $\operatorname{RV}_t$ using a fixed, consistent intraday window (e.g., 9:30 AM to 3:59 PM) and apply this cutoff uniformly across all realized measures: $\operatorname{RV}$, realized quarticity ($\text{RQ}$), bipower variation ($\text{BV}$), and signed components ($\operatorname{RV}^+$, $\operatorname{RV}^-$).
+> Define $\operatorname{RV}_t$ using a fixed, consistent intraday window (e.g., 9:30 AM to 3:59 PM) and apply this cutoff uniformly across all realized measures: $\operatorname{RV}$, realized quarticity (RQ), bipower variation (BV), and signed components ($\operatorname{RV}^+$, $\operatorname{RV}^-$).
 > Timestamp every data point and assert programmatically that no feature for $\operatorname{RV}_{t+1}$ uses data with timestamp $> t$ close.
 > When in doubt, lag by one full day.
 
@@ -766,12 +786,10 @@ The complication is that these markets operate on different schedules, creating 
 
 #### Summary
 
-Table 1 collects all four sources with their specific pitfalls and prevention rules.
-
-**Table 1: Lookahead bias taxonomy for volatility forecasting pipelines. Each source represents a distinct mechanism by which future information can leak into features.**
+The table below collects all four sources with their specific pitfalls and prevention rules.
 
 | Source | Pitfall | Prevention Rule |
-|---|---|---|
+|--------|---------|-----------------|
 | Realized measures | Target-day intraday returns leak into features via boundary overlap | Features use data only up to day $t$ close; enforce with programmatic timestamp assertions |
 | Microstructure | Full-day LOB features (VPIN, spreads) include close-period information | Truncate all LOB features at a fixed cutoff (e.g., 3:00 PM) before close |
 | Options surface | Intraday IV changes reflect target-day information (e.g., earnings anticipation) | Use previous-day close IV or a fixed morning snapshot only |
@@ -785,7 +803,7 @@ Table 1 collects all four sources with their specific pitfalls and prevention ru
 > (1) add a `max_timestamp` column to every feature table and assert it precedes the forecast cutoff;
 > (2) run a nightly integration test that checks no feature for $\operatorname{RV}_{t+1}$ uses data with timestamp $> t$ close;
 > (3) when adding new features, require the contributor to specify the information cutoff in the feature registry.
-> A single lookahead bug can invalidate months of work and is almost impossible to detect from $\QLIKE$ numbers alone: the contaminated model simply looks "better than it should."
+> A single lookahead bug can invalidate months of work and is almost impossible to detect from $\operatorname{QLIKE}$ numbers alone: the contaminated model simply looks "better than it should."
 
 
 ## Putting It All Together: An Evaluation Workflow
@@ -794,24 +812,30 @@ You now have all the individual tools. This section assembles them into a practi
 
 ```mermaid
 flowchart TD
-    A["1. Reserve holdout (3-6 months)"]
-    B["2. Initialize experiment log (N = 0)"]
-    C["3. Tune with purged K-fold CV"]
-    D["4. Evaluate: QLIKE (primary), MSE (secondary)"]
-    E["5. MZ regression: check bias (a=0, b=1)"]
-    F["6. DM test: pairwise significance"]
-    G["7. MCS: which models survive?"]
-    H{Strategy?}
-    I["8. DSR on Sharpe ratio"]
-    J["9. Report with all metrics"]
+    A["1. Reserve holdout\n(3-6 months)"] --> B["2. Initialize experiment log\n(N = 0)"]
+    B --> C["3. Tune with purged\nK-fold CV"]
+    C --> D["4. Evaluate: QLIKE (primary),\nMSE (secondary)"]
+    D --> E["5. MZ regression:\ncheck bias (a=0, b=1)"]
+    E --> F["6. DM test:\npairwise significance"]
+    F --> G["7. MCS:\nwhich models survive?"]
+    G --> H{"Strategy?"}
+    H -- Yes --> I["8. DSR on\nSharpe ratio"]
+    H -- No --> J["9. Report with\nall metrics"]
+    I --> J
 
-    A --> B --> C --> D --> E --> F --> G --> H
-    H -- Yes --> I --> J
-    H -- No --> J
-
-    note1["Every experiment increments N.\nLog feature set, hyperparameters, and QLIKE."]
-    C -. annotation .-> note1
+    style A fill:#f3e8ff,stroke:#6c3483
+    style B fill:#e8f0fe,stroke:#1a5276
+    style C fill:#e8f0fe,stroke:#1a5276
+    style D fill:#e8f0fe,stroke:#1a5276
+    style E fill:#e8f0fe,stroke:#1a5276
+    style F fill:#e8f0fe,stroke:#1a5276
+    style G fill:#fff3e0,stroke:#e67e22
+    style H fill:#fff3e0,stroke:#e67e22
+    style I fill:#fef9e7,stroke:#b7950b
+    style J fill:#e8f8f5,stroke:#1e8449
 ```
+
+*Figure: Evaluation workflow for volatility forecasting. Reserve the holdout first; log every experiment; use purged CV for tuning; evaluate with QLIKE and MZ; compare with DM and MCS; deflate the Sharpe if the forecast feeds a strategy. Every experiment increments $N$. Log feature set, hyperparameters, and QLIKE.*
 
 > **Key Idea: The Workflow Is the Standard**
 >
@@ -848,12 +872,12 @@ flowchart TD
 
 - **Lookahead bias has four sources** in volatility pipelines: realized measures, microstructure features, options surface, and cross-asset data. Each requires a specific prevention rule; build these as hard constraints in your pipeline, not as documentation.
 
-- **Follow the full workflow** (Evaluation Workflow figure): reserve holdout, log experiments, purged CV, QLIKE, MZ, DM, MCS, DSR.
+- **Follow the full workflow** (the evaluation workflow diagram above): reserve holdout, log experiments, purged CV, QLIKE, MZ, DM, MCS, DSR.
 
 ### Key Results Recap
 
 | Tool | What It Does | Key Reference |
-|---|---|---|
+|------|-------------|---------------|
 | QLIKE loss | Primary loss function; proxy-robust, outlier-resistant | Patton (2011) |
 | MSE loss | Secondary loss; proxy-robust but outlier-sensitive | Patton (2011) |
 | Mincer--Zarnowitz | Diagnoses forecast bias and inefficiency | Mincer and Zarnowitz (1969) |
