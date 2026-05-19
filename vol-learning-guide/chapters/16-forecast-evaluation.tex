@@ -967,6 +967,17 @@ The DSR is essentially zero.
 Despite an impressive-looking Sharpe of 1.8, the strategy does not survive correction for 20 trials.
 The expected maximum Sharpe under pure luck ($\SR_0 = 2.45$) exceeds the observed Sharpe.
 You cannot reject the null that this is the luckiest of 20 random strategies.
+
+\textbf{What this tells you.}
+$\DSR \approx 0$ means your best strategy does not survive multiple-testing correction.
+This does not mean volatility forecasting is hopeless; it means you tested too many strategies relative to your sample size.
+Your options:
+\begin{enumerate}[nosep]
+  \item \textbf{Get more data.} A longer backtest period increases $T$, which widens the numerator of the DSR formula and makes it easier to clear the luck threshold.
+  \item \textbf{Test fewer strategies.} Use stronger priors about which feature sets to try, so $N$ stays small and $\SR_0 = \sqrt{2 \ln N}$ stays low.
+  \item \textbf{Pre-register.} Commit to a single strategy before backtesting, setting $N = 1$ and $\SR_0 = 0$. The DSR then reduces to a standard Sharpe ratio test.
+  \item \textbf{Shift the claim.} Accept that you cannot make a statistical Sharpe claim and justify the strategy on economic grounds (e.g., cost-aware backtest, Chapter~\ref{ch:applications}) rather than statistical grounds.
+\end{enumerate}
 \end{workedexample}
 
 \begin{keyidea}[Every Experiment Counts as a Trial]
