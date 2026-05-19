@@ -572,6 +572,12 @@ At the 5\% level, you reject $H_0$: the LightGBM improvement over HAR is statist
 
 At the 1\% level, you would not reject.
 Report the $p$-value and let the reader decide.
+
+\textbf{What this tells you.}
+DM $= 2.09$, $p = 0.037$ means you can credibly claim LightGBM beats HAR at the 5\% significance level.
+This $p$-value goes in your results table next to the $\QLIKE$ numbers.
+If $p$ had been 0.15, the $\QLIKE$ improvement would be real in your sample but you could not rule out that a different sample would reverse it; you would need more data or a larger improvement before claiming victory.
+If you have a directional hypothesis (ML should beat HAR, not vice versa), a one-sided test is appropriate, halving the $p$-value to $0.037/2 = 0.018$.
 \end{workedexample}
 
 \begin{warning}[Small-Sample Correction]
@@ -586,8 +592,11 @@ With fewer than 100 observations, use the modified DM statistic from \citet{Harv
 % ══════════════════════════════════════════════════════════════
 
 The Diebold--Mariano test compares models in pairs.
+Use it when you have a specific pairwise claim to make (``my ML model beats HAR'').
 With $M$ models, you would need $\binom{M}{2}$ pairwise tests, and the more tests you run, the more likely you are to find a ``significant'' difference by chance.
 The Model Confidence Set solves this by comparing all models simultaneously.
+Use it when you have a model zoo and need to know which ones to keep and which to discard.
+DM is your scalpel for targeted claims; MCS is your filter for the full candidate set.
 
 \subsection{Intuition}
 
