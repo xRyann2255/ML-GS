@@ -415,7 +415,8 @@ Despite this asymmetry, both losses are minimized at ratio $= 1$ (the true varia
 % ══════════════════════════════════════════════════════════════
 
 $\QLIKE$ tells you which model has lower average loss, but it does not tell you \emph{why} a forecast is bad.
-The Mincer--Zarnowitz regression is a simple diagnostic that decomposes forecast errors into bias and inefficiency.
+Think of $\QLIKE$ as the scoreboard and the Mincer--Zarnowitz regression as the film review: $\QLIKE$ tells you who won; MZ tells you what to fix.
+The MZ regression is a simple diagnostic that decomposes forecast errors into bias and inefficiency.
 
 \subsection{The Regression}
 
@@ -465,6 +466,16 @@ $\QLIKE$ tells you the overall score; MZ tells you what to fix.
 If $b = 0.7$, your forecast is too smooth: it needs to react more aggressively to recent information.
 If $a = 0.003$, your forecast systematically under-predicts by about 0.3 variance points.
 \end{intuition}
+
+\begin{keyidea}[What to Fix Based on MZ Results]
+The MZ regression is only useful if you act on the diagnosis:
+\begin{itemize}[nosep]
+  \item \textbf{$b < 1$ (forecast too smooth):} your model over-relies on long-horizon averages. Try adding shorter-lag features (e.g., 1-day lagged $\RV$), reducing regularization strength, or increasing model capacity.
+  \item \textbf{$b > 1$ (forecast too reactive):} your model is chasing noise. Try increasing regularization, using a longer lookback window, or smoothing the forecast with an exponential moving average.
+  \item \textbf{$a > 0$ (systematic under-prediction):} check for retransformation bias first if you forecast in log space (Section~\ref{sec:eval-retransformation}). If that is not the issue, add a bias correction term or recalibrate the intercept.
+  \item \textbf{$a < 0$ (systematic over-prediction):} less common in volatility forecasting, but check whether your features include stale high-vol observations that inflate the forecast.
+\end{itemize}
+\end{keyidea}
 
 \begin{warning}[Use HAC Standard Errors]
 Volatility forecast errors are serially correlated (today's error predicts tomorrow's error) because volatility clusters (Chapter~\ref{ch:garch}).
