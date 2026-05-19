@@ -160,6 +160,23 @@ QLIKE has two parts pulling in opposite directions.
 The $\ln h_t$ term punishes you for forecasting too high (wasting capital on unnecessary hedges), while the $\sigma^2_t / h_t$ term punishes you for forecasting too low (holding unrecognized risk).
 Critically, the under-prediction penalty ($\sigma^2_t / h_t$) explodes as $h_t \to 0$, so QLIKE is far harsher on dangerous under-estimates than on conservative over-estimates.
 This asymmetry matches real-world priorities: underestimating volatility gets you fired; overestimating it merely costs some opportunity.
+This does not mean the optimal forecast is biased upward.
+It means that among two equally wrong forecasts, the one that errs low is more costly.
+The target is still the true variance.
+\end{intuition}
+
+\begin{intuition}[QLIKE Is Still Minimized at the True Value]
+A common misreading of the asymmetric penalty is: ``If under-prediction is punished more, shouldn't I forecast a bit high to be safe?''
+No.
+Take the derivative of a single day's QLIKE contribution with respect to the forecast $h_t$:
+\[
+\frac{\partial}{\partial h_t}\left(\ln h_t + \frac{\sigma^2_t}{h_t}\right) = \frac{1}{h_t} - \frac{\sigma^2_t}{h_t^2} = 0 \quad \Longrightarrow \quad h_t = \sigma^2_t.
+\]
+The minimum is at $h_t = \sigma^2_t$ exactly.
+The asymmetry shapes the penalty \emph{curve}, not the penalty \emph{minimum}.
+Think of a speed limit: the best speed is exactly the limit.
+Getting caught going 20 over is worse than going 20 under, but that does not make 20-under the target.
+QLIKE works the same way: the best forecast is the true variance, but being wrong on the low side hurts more than being wrong on the high side by the same amount.
 \end{intuition}
 
 \begin{intuition}[Why QLIKE Is Less Sensitive to Outliers]
@@ -380,7 +397,8 @@ The correction is trivially cheap to compute, so there is no reason to skip it \
 \caption{QLIKE vs.\ MSE penalty as a function of the forecast ratio $h_t / \sigma^2_t$.
 Both losses are minimized at the perfect forecast ($h_t = \sigma^2_t$, ratio $= 1$).
 MSE penalizes over- and under-prediction symmetrically.
-QLIKE penalizes under-prediction (ratio $< 1$) much more harshly than over-prediction (ratio $> 1$), matching the asymmetric risk preferences in volatility forecasting: underestimating vol means holding too much risk.}
+QLIKE penalizes under-prediction (ratio $< 1$) much more harshly than over-prediction (ratio $> 1$), matching the asymmetric risk preferences in volatility forecasting: underestimating vol means holding too much risk.
+Despite this asymmetry, both losses are minimized at ratio $= 1$ (the true variance); the asymmetry shapes the penalty curve, not the optimal forecast.}
 \label{fig:qlike-vs-mse}
 \end{figure}
 
