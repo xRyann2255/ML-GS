@@ -1,11 +1,11 @@
 ---
 name: write-chapter
-description: Multi-pass pipeline for writing LaTeX learning guide chapters. 5 passes: source extraction → write → verify → condense → naive-reader review. Every formula verified against source papers.
+description: Multi-pass pipeline for writing LaTeX learning guide chapters: source extraction → contract → write → verify → condense → naive-reader review. The contract fixes notation, labels, and citations before drafting; every formula verified against source papers.
 ---
 
 # Write Chapter
 
-Write a complete LaTeX chapter using a 5-pass quality pipeline.
+Write a complete LaTeX chapter using a staged quality pipeline: source extraction → contract → write → verify → condense → naive-reader review.
 
 ## Input
 
@@ -70,13 +70,36 @@ Rules:
 - If a claim appears in the spec or vol-project-ref but has no paper backing it, flag it and do not include it in the chapter
 - The extraction stays in the agent's context as ground truth for Pass 1. Do not save it as a file.
 
+## Chapter Contract (after Pass 0, before Pass 1)
+
+Before writing a single line of prose, fix the chapter's structural decisions in one place. A chapter's value is its connective tissue — one voice, consistent notation, a dense web of cross-references — and that is exactly what drifts over a long file: notation gets redefined, labels collide or dangle, claims wander from their sources. The contract is the guardrail. Like the Pass 0 extraction, it stays in the agent's context as ground truth for Pass 1; do not save it as a file.
+
+1. Read the target guide's `preamble.tex` or `conventions.tex` for the available box types and the exact macro set, and read `main.tex` for the chapter's place in the structure and the label prefixes existing chapters already use.
+2. Record the contract:
+
+```
+SECTIONS: ordered list, simplest-first so each section builds on the last
+  - [section title] — covers [subtopics]; assumes only [earlier sections/chapters]
+NOTATION: every quantity → the exact preamble macro to use (never redefine inline)
+  - realized variance → \RV ; bipower variation → \BPV ; QLIKE loss → \QLIKE ; ...
+LABELS: this chapter's unique prefix scheme (no collisions with existing chapters)
+  - sections sec:<ch>:<slug> ; equations eq:<ch>:<slug> ; figures fig:<ch>:<slug> ; definitions def:<ch>:<slug>
+CITATIONS: which Pass 0 source anchors which claim/section
+  - [claim or section] ← [Author Year], p.[page], eq.[n]
+```
+
+Rules:
+- Every macro listed must already exist in the guide's preamble. If a needed macro is missing, note it so it can be added to the preamble — never silently redefine notation inside the chapter
+- Every label uses this chapter's prefix; check `main.tex` and sibling chapters so no label is reused
+- Every claim in the SECTIONS plan must trace to a CITATIONS entry drawn from the Pass 0 extraction — if it has no source, it does not go in the plan
+- Surface the SECTIONS outline to the user for a quick sanity check before drafting. Reordering or rescoping is cheap now and expensive once the prose exists
+
 ## Pass 1 — Writer (main agent)
 
 Write the full chapter `.tex` file following the guide's conventions:
 
-1. Read the target guide's `preamble.tex` or `conventions.tex` to know available box types and macros
-2. Read the guide's `main.tex` to understand structure and existing chapters
-3. Write the chapter following CLAUDE.md guide-writing rules AND the Learning Style Requirements above:
+1. Follow the Chapter Contract — its section order, notation macros, label scheme, and citation map are now fixed. Do not improvise new notation or labels mid-draft; if you genuinely need something the contract lacks, amend the contract first, then write
+2. Write the chapter following CLAUDE.md guide-writing rules AND the Learning Style Requirements above:
    - Opening paragraph: concrete question or problem, not abstract definition
    - Prerequisites box at the start
    - Every equation follows the mandatory pattern (setup → equation → symbols → plain English → project connection)
@@ -84,13 +107,14 @@ Write the full chapter `.tex` file following the guide's conventions:
    - `booktabs` tables, `listings` for code
    - Define every term on first use (bold)
    - Geometric diagrams for key concepts
-4. Save as `guides/<guide>/chapters/<filename>.tex`
-5. **Mid-write paper discovery:** If you encounter a concept that needs a citation or formula not in the Pass 0 extraction:
+3. Save as `guides/<guide>/chapters/<filename>.tex`
+4. **Mid-write paper discovery:** If you encounter a concept that needs a citation or formula not in the Pass 0 extraction:
    a. Search `reference/project-papers/` and `reference/papers/` for relevant papers
    b. If found, read the relevant pages and extract the needed material
    c. If not found in the repo, search the web for the paper (arXiv, open-access proceedings, author websites)
    d. If available, download it to `reference/project-papers/` and extract the needed material
    e. If behind a paywall, note it as a gap and write around it -- never guess a formula
+   f. Add the new source to the contract's CITATIONS map so provenance stays complete
 
 ## Pass 2 — Verifier (parallel sub-agent)
 
