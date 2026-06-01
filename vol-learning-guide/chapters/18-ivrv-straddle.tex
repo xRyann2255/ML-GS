@@ -27,7 +27,7 @@ You do not need to re-read these; cross-references point back to the exact equat
 
 The strategy trades a single, sharp idea: \textbf{a delta-hedged straddle is a bet on realized variance against the variance the market has priced in.} If our forecast says realized volatility will come in \emph{below} what the option's implied volatility charges, the option is expensive, so we sell it; if our forecast says realized will come in \emph{above} the implied charge, the option is cheap, so we buy it. Everything else in this chapter is the machinery that makes this bet measurable and honest.
 
-Two building blocks make the idea precise. A \textbf{straddle} is a package of one call and one put on the same underlying, struck at the same price $K$ and expiring on the same date. Bought together, the pair has almost no directional view at inception (the call's positive delta roughly cancels the put's negative delta) but a large sensitivity to how much the underlying \emph{moves}: any large move, up or down, pushes one leg deep into the money. \textbf{Delta hedging} is the act of repeatedly trading the underlying to cancel whatever directional exposure remains, so that what is left is a near-pure exposure to \emph{variance} rather than to direction. We hold the delta-hedged straddle for one period, collect its profit or loss, and repeat.
+Two building blocks make the idea precise. A \textbf{straddle} is a package of one call and one put on the same underlying, struck at the same price $K$ and expiring on the same date. Bought together, the pair has almost no directional view at inception (the call's positive \textbf{delta}, an option's price sensitivity to the underlying expressed as an equivalent number of shares, roughly cancels the put's negative delta; see \Cref{sec:greeks}) but a large sensitivity to how much the underlying \emph{moves}: any large move, up or down, pushes one leg deep into the money. \textbf{Delta hedging} is the act of repeatedly trading the underlying to cancel whatever directional exposure remains, so that what is left is a near-pure exposure to \emph{variance} rather than to direction. We hold the delta-hedged straddle for one period, collect its profit or loss, and repeat.
 
 \begin{intuition}[In Plain English]
 Selling a delta-hedged straddle is like selling insurance against large price moves. You collect a premium set by the market's implied volatility, then pay out whenever the underlying actually moves a lot (high realized volatility). You profit when the premium you charged exceeds the claims you pay, that is, when implied volatility was higher than the realized volatility that followed. Our forecast $\widehat{\RV}_t$ is the actuary: it tells us, before we write the policy, whether the premium on offer looks rich or cheap.
@@ -63,7 +63,7 @@ The size of the bet can scale with the size of the gap. The quality of the forec
   \draw[arrow] (h) -- (p);
   \draw[arrow] (p) -- (e);
 \end{tikzpicture}
-\caption{The IV--RV straddle pipeline. A realized-volatility forecast feeds a variance-risk-premium signal, which decides the direction of a delta-hedged straddle; the position is hedged intraday, marked to market daily through the gamma P\&L identity, and the resulting return stream is judged with a deflated Sharpe ratio. Each stage adds a layer of realism developed in this chapter.}
+\caption{The IV--RV straddle pipeline. A realized-volatility forecast feeds a variance-risk-premium signal, which decides the direction of a delta-hedged straddle; the position is hedged intraday, marked to market daily through the gamma P\&L identity, and the resulting return stream is judged with a deflated Sharpe ratio. Each stage adds a layer of realism developed in this chapter; every symbol shown in the boxes is defined in the sections that follow.}
 \label{fig:ivrv:pipeline}
 \end{figure}
 
@@ -96,7 +96,7 @@ The signal asks a single question: how rich is the insurance the market is selli
 This equation is the only place the forecast enters the strategy. Every later section is execution and accounting that is identical no matter whose forecast you plug in. A more accurate $\widehat{\RV}_t$ sharpens both the \emph{sign} (are we on the right side of the trade?) and the \emph{magnitude} (how hard should we press?) of the signal. This is the precise mechanism by which a lower QLIKE is supposed to become higher P\&L, and \Cref{sec:ivrv:evaluation} tests whether it actually does.
 \end{projectconnection}
 
-Before differencing, the two numbers must live in the same units. Implied volatility is quoted annualized; realized volatility forecasts are usually expressed per day. We convert the implied quote to daily units by dividing by the square root of the number of trading days in a year,
+Before differencing, the two numbers must live in the same units. Implied volatility is quoted annualized; realized volatility forecasts are usually expressed per day. Because volatility scales with the square root of time, we convert the implied quote to daily units by dividing by the square root of the number of trading days in a year,
 \begin{equation}
 \label{eq:ivrv:deannualize}
 \IVol^{\text{daily}}_{t-1} = \frac{\IVol_{t-1}}{\sqrt{252}},
@@ -108,7 +108,7 @@ so that the difference $\widehat{\RV}_t - \IVol^{\text{daily}}_{t-1}$ compares l
 \begin{keyidea}[The Lookahead-Safe Timing Protocol]
 For each trading day $t$:
 \begin{enumerate}
-  \item Update the realized-volatility model using information available up to \textbf{3:55\,pm ET} on day $t$; the predictor $x_t$ lives in the information set $\mathcal{F}_t^{\,3:55}$.
+  \item Update the realized-volatility model and form the signal $X_{t-1}$ using only information available up to \textbf{3:55\,pm ET} on day $t$.
   \item \textbf{Execute} the straddle (and its initial hedge) before the \textbf{4:00\,pm} close on day $t$.
   \item \textbf{Realize} the position's return over day $t+1$.
 \end{enumerate}
@@ -134,7 +134,7 @@ The gap in \Cref{eq:ivrv:signal} is the variance risk premium wearing a trading 
 \label{sec:ivrv:pnl-engine}
 % ═══════════════════════════════════════════════════
 
-Why should a delta-hedged option pay off on realized-minus-implied variance at all? The answer is one of the most elegant identities in derivatives, and it is the engine under the whole strategy. Suppose we hold an option and continuously rebalance the stock hedge using the delta computed at the option's \emph{implied} volatility. \citet{AhmadWilmott2005} show that the one-day mark-to-market profit is then completely deterministic:
+Why should a delta-hedged option pay off on realized-minus-implied variance at all? The answer is one of the most elegant identities in derivatives, and it is the engine under the whole strategy. Suppose we hold an option and continuously rebalance the stock hedge using the delta computed at the option's \emph{implied} volatility. Where an \emph{unhedged} option's daily P\&L would be dominated by a large random term in the direction the stock moved, \citet{AhmadWilmott2005} show that hedging at implied volatility cancels that randomness, leaving a one-day mark-to-market profit (the change in the position's value at current prices) that is completely deterministic:
 
 \begin{equation}
 \label{eq:ivrv:aw-daily}
@@ -162,9 +162,9 @@ Summing the discounted daily increments over the life of the trade gives the tot
 \label{eq:ivrv:aw-total}
 \Pi = \tfrac{1}{2}\big(\sigma^2 - \tilde{\sigma}^2\big)\int_{t_0}^{T} e^{-r(t-t_0)}\, S^2\,\Gamma^{i}\,dt ,
 \end{equation}
-which \citet{AhmadWilmott2005} describe as ``always positive, but highly path dependent'': positive because (for a correct view) every daily increment has the same sign, yet path dependent because the dollar-gamma weight $S^2\Gamma^{i}$ depends on where the stock wanders relative to the strike. The more general statement, that hedging with a delta based on \emph{any} volatility $\sigma_h$ yields present value $V(S,t;\sigma_h) - V(S,t;\tilde{\sigma}) + \tfrac{1}{2}(\sigma^2-\sigma_h^2)\int_{t_0}^{T} e^{-r(t-t_0)}S^2\Gamma^{h}\,dt$, is due to Carr (2005) and Henrard (2003), as presented by \citet{AhmadWilmott2005}.
+where $t_0$ is the trade date, $T$ the expiry, $r$ the interest rate, and $e^{-r(t-t_0)}$ the discount factor that converts each future day's profit into today's dollars. \citet{AhmadWilmott2005} describe this total as ``always positive, but highly path dependent'': positive because (for a correct view) every daily increment has the same sign, yet path dependent because the dollar-gamma weight $S^2\Gamma^{i}$ depends on where the stock wanders relative to the strike. (Carr (2005) and Henrard (2003), as presented by \citealp{AhmadWilmott2005}, give the more general result for hedging at \emph{any} volatility rather than implied; we need only the implied-vol case here.)
 
-In a daily backtest we do not integrate; we sum one increment per day, replacing the instantaneous variance $\sigma^2 dt$ with the day's realized variance $\RV_t$ and the implied term with the daily implied variance $\IVol^2/252$:
+In a daily backtest we do not integrate; we sum one increment per day. The unobservable instantaneous variance $\sigma^2\,dt$ accumulated over a day is precisely what our realized-variance estimator measures, so we substitute the measured $\RV_t$ for it (this is the whole reason the guide built an RV estimator in the first place); the annualized implied variance $\IVol^2$ is sliced into one trading day's share by dividing by the $252$ trading days in a year:
 \begin{equation}
 \label{eq:ivrv:daily-discrete}
 \text{PnL}_t \approx \tfrac{1}{2}\,\Gamma_t\,S_t^2\,\Big(\underbrace{\RV_t}_{\text{realized var, day }t} - \underbrace{\tfrac{\IVol^2}{252}}_{\text{daily implied var}}\Big).
@@ -213,7 +213,7 @@ The dollar-gamma weight $S_t^2\Gamma_t$ is not constant: it is largest when the 
 \end{figure}
 
 \begin{workedexample}[Three Days of Gamma P\&L]
-Hold a short straddle on a \$100 stock with dollar gamma $\Gamma_t S_t^2 = \$200{,}000$ (treated as roughly constant), against an implied volatility of $20\%$. The daily implied variance charged is $\IVol^2/252 = 0.04/252 = 1.587\times10^{-4}$. Suppose the realized daily variances on three days are $1.0$, $2.5$, and $0.6$ (all $\times10^{-4}$). Each day's P\&L for the \emph{short} is $-\tfrac12\Gamma_t S_t^2(\RV_t - \IVol^2/252)$:
+Hold a short straddle on a \$100 stock with dollar gamma $\Gamma_t S_t^2 = \$200{,}000$ (treated as roughly constant), against an implied volatility of $20\%$. The daily implied variance charged is $\IVol^2/252 = 0.04/252 = 1.587\times10^{-4}$. Suppose the realized daily variances on three days are $1.0$, $2.5$, and $0.6$ (all $\times10^{-4}$). Because a short position earns the negative of the long P\&L, each day's P\&L for the \emph{short} is $-\tfrac12\Gamma_t S_t^2(\RV_t - \IVol^2/252)$ (we profit when realized variance comes in below implied):
 \begin{itemize}
   \item Day 1: $-\tfrac12(200{,}000)(1.0-1.587)\times10^{-4} = +\$5.9$.
   \item Day 2: $-\tfrac12(200{,}000)(2.5-1.587)\times10^{-4} = -\$9.1$.
@@ -271,12 +271,12 @@ The third crack is \textbf{jumps}. The gamma identity is a statement about quadr
 The fourth crack is \textbf{discreteness of the hedge}, and it is the one we will quantify. Because we rebalance a finite number of times per day rather than continuously, the realized hedge never perfectly cancels the directional exposure, leaving a residual tracking error. \citet{BertsimasKoganLo2000} characterise its size.
 
 \begin{keyidea}[The Discrete-Hedging Error Shrinks as $1/\sqrt{N}$]
-With $N$ equally spaced rebalances, the root-mean-square tracking error of a delta-hedged option behaves as
+With $N$ equally spaced rebalances, the typical size of the tracking error (its root-mean-square, RMSE) shrinks with the square root of the rebalancing count:
 \begin{equation}
 \label{eq:ivrv:bkl-rmse}
 \text{RMSE} = \frac{g}{\sqrt{N}} + O\!\left(\frac{1}{N}\right),
 \end{equation}
-and the rescaled error $\sqrt{N}\times(\text{error})$ converges to a mixed-normal (conditionally Gaussian) limit driven by the integrated squared dollar gamma, where $g$ is a ``granularity'' coefficient (\citealp{BertsimasKoganLo2000}, Thm.~1c, Eq.~2.13; Eq.~2.18). For a vanilla payoff with a kink, such as our straddle, the relevant statement is their Theorem~2 (Eq.~2.17), not Theorem~1, which requires a six-times-differentiable payoff the straddle does not have.
+where the ``granularity'' constant $g$ and the smaller $O(1/N)$ correction are spelled out in \citet[Thm.~1c, Eqs.~2.13, 2.18]{BertsimasKoganLo2000}; the practical takeaway is the rate itself, $1/\sqrt{N}$. One technical point matters for us: a straddle's payoff has a kink at the strike, so the governing result is their Theorem~2 (for piecewise-linear payoffs), not Theorem~1, which needs a smooth payoff.
 \end{keyidea}
 
 \begin{warning}[A Single Straddle Is Not a Clean Variance Bet]
@@ -369,8 +369,8 @@ Maturity bucket & Effective spread (\% of premium) \\
 \end{equation}
 \begin{itemize}
   \item $\hat{\sigma}$: the \textbf{Leland-modified volatility} to use in the hedge (and in pricing) instead of the true $\sigma$.
-  \item $k$: the round-trip proportional transaction cost of trading the underlying (e.g.\ the relative bid--ask spread).
-  \item $\delta t$: the time between hedge rebalances; more frequent hedging (smaller $\delta t$) inflates the adjustment more.
+  \item $k$: the round-trip (buy-then-sell) proportional transaction cost of trading the underlying, a fraction such as $0.001 = 0.1\%$ (e.g.\ the relative bid--ask spread).
+  \item $\delta t$: the time between hedge rebalances, the same role $dt$ played in \Cref{eq:ivrv:aw-daily} but now a finite interval rather than infinitesimal; more frequent hedging (smaller $\delta t$) inflates the adjustment more.
   \item $\sqrt{2/\pi} \approx 0.798$: the mean of the half-normal distribution, that is, $\E|u|$ for $u \sim \N(0,1)$.
 \end{itemize}
 
@@ -407,7 +407,7 @@ so that the total error at expiry is $HE(T) = \sum_{i=1}^{N} H_i$.
   \item $H_i$: the replication error contributed by the $i$-th rebalancing interval.
   \item $\Gamma S^2$: the dollar gamma; $\sigma^2\,\delta t$: the variance accrued over the step of length $\delta t$.
   \item $u_i \sim \N(0,1)$: the standardized return over the step, so $u_i^2 \sim \chi^2_1$ is a (skewed, fat-tailed) chi-squared with one degree of freedom.
-  \item $1 - u_i^2$: a mean-zero shock; it is positive when the realized squared return undershoots its expectation and negative when it overshoots.
+  \item $1 - u_i^2$: a mean-zero shock (mean zero because $\E[u_i^2] = 1$); positive when the realized squared return undershoots its expectation, negative when it overshoots.
 \end{itemize}
 
 This is the discrete-hedging error of \citet{BoyleEmanuel1980}, here in the convenient decomposition of \citet{AnagnouHodges2007} (their Eqs.~5 and~7). Note the per-step shock $1-u_i^2$ is \emph{not} Gaussian; it is a shifted chi-squared, skewed and leptokurtic. Only after summing many independent steps does a central-limit effect make the aggregate roughly normal.
@@ -426,7 +426,7 @@ Because the steps are independent and $\Var(u_i^2) = 2$ for a Gaussian return, t
 \Var\!\big(HE(T)\big) = \sum_{i=1}^{N}\Big(\tfrac{1}{2}\Gamma S^2\sigma^2\,\delta t\Big)^2 \Var(u_i^2)
 = \big(\tfrac{1}{2}\Gamma S^2\sigma^2\big)^2 T^2\,\frac{2}{N},
 \end{equation}
-so the hedging-error standard deviation scales as $1/\sqrt{N}$: hedge four times as often and you roughly halve the noise. This is the \citet{BoyleEmanuel1980} result that the replication error is inversely related to the rebalancing frequency.
+where the middle-to-right step uses that the $N$ terms are identical: each contributes $(\tfrac12\Gamma S^2\sigma^2\cdot T/N)^2\cdot 2$, and summing $N$ of them turns the $(T/N)^2$ into $T^2/N$. So the hedging-error standard deviation scales as $1/\sqrt{N}$: hedge four times as often and you roughly halve the noise. This is the \citet{BoyleEmanuel1980} result that the replication error is inversely related to the rebalancing frequency.
 
 Now the refinement that matters for intraday data. \citet{AnagnouHodges2007} observe that finer sampling raises the excess kurtosis of returns under non-Gaussian processes, which enlarges the replication error, but they keep $\Var(u_i^2) = 2$ in their closed form. We make that dependence explicit. For a standardized shock with kurtosis $\kappa = \E[u_i^4]$, the variance of the squared shock is $\Var(u_i^2) = \E[u_i^4] - (\E[u_i^2])^2 = \kappa - 1$ (the Gaussian case $\kappa = 3$ recovers $2$). Substituting into \Cref{eq:ivrv:he-gaussian} gives the leptokurtic hedging-error variance.
 
@@ -437,7 +437,7 @@ For a standardized per-step return with kurtosis $\kappa$,
 \Var\!\big(HE(T)\big) = \big(\tfrac{1}{2}\Gamma S^2\sigma^2\big)^2\, T^2\,\frac{\kappa - 1}{N}
 \;\propto\; \frac{\sigma^4\,(\kappa - 1)}{N}.
 \end{equation}
-\textbf{Provenance, stated honestly:} the $1/N$ scaling and the per-step form are \citet{BoyleEmanuel1980} (via \citealp{AnagnouHodges2007}, Eq.~7). The explicit $(\kappa-1)$ substitution is \emph{our own leptokurtic extension}; it does not appear in Boyle--Emanuel, in Anagnou--Hodges (who fix $\Var(u_i^2)=2$), or in Ahmad--Wilmott. Re-derive it, do not cite it to those sources.
+The symbol $\propto$ means ``proportional to'': dropping the fixed factors ($\Gamma$, $S$, $T$, the $\tfrac12$) leaves what actually drives the noise, namely volatility to the fourth power and the fat-tail factor $\kappa-1$, divided by the rebalancing count $N$. \textbf{Provenance, stated honestly:} the $1/N$ scaling and the per-step form are \citet{BoyleEmanuel1980} (via \citealp{AnagnouHodges2007}, Eq.~7). The explicit $(\kappa-1)$ substitution is \emph{our own leptokurtic extension}; it does not appear in Boyle--Emanuel, in Anagnou--Hodges (who fix $\Var(u_i^2)=2$), or in Ahmad--Wilmott. Re-derive it, do not cite it to those sources.
 \end{keyresult}
 
 \begin{warning}[Do Not Attribute This to Ahmad--Wilmott]
@@ -487,7 +487,7 @@ RK_t = \frac{n\sum_{i=1}^{n} r_{t,i}^4}{\Big(\sum_{i=1}^{n} r_{t,i}^2\Big)^2},
 \begin{itemize}
   \item $RK_t$: the realized kurtosis estimate for day $t$.
   \item $r_{t,i}$: the $i$-th intraday (e.g.\ 5-minute) return on day $t$; $n$: the number of such returns per day.
-  \item the numerator is the realized fourth moment (scaled by $n$); the denominator is realized variance squared.
+  \item the numerator is the realized fourth moment scaled by the count $n$ (this normalization makes a perfectly Gaussian day score $3$); the denominator is realized variance squared.
 \end{itemize}
 
 \begin{intuition}[In Plain English]
@@ -556,7 +556,7 @@ For each symbol and each trading day $t$:
   \node[align=center, font=\scriptsize, warnred] at (5.9,-0.45) {$-$ hedge\\ cost};
   \node[align=center, font=\scriptsize] at (8.2,-0.45) {Net\\ P\&L};
 \end{tikzpicture}
-\caption{P\&L attribution for the delta-hedged straddle. The gross gamma P\&L is reduced by the option transaction cost (\Cref{sec:ivrv:option-costs}) and the delta-hedge transaction cost (\Cref{sec:ivrv:leland}) to give the net mean P\&L. The discrete-hedging error of \Cref{sec:ivrv:hedging-error} is zero-mean, so it does not appear as a bar; instead it widens the risk around the net, shown as the blue band.}
+\caption{P\&L attribution for the delta-hedged straddle (bar heights illustrative). The gross gamma P\&L is reduced by the option transaction cost (\Cref{sec:ivrv:option-costs}) and the delta-hedge transaction cost (\Cref{sec:ivrv:leland}) to give the net mean P\&L. The discrete-hedging error of \Cref{sec:ivrv:hedging-error} is zero-mean, so it does not appear as a bar; instead it widens the risk around the net, shown as the blue band.}
 \label{fig:ivrv:waterfall}
 \end{figure}
 
@@ -586,6 +586,10 @@ Whichever Sharpe we report, it must be \emph{deflated} for the number of strateg
   \item $\SR_0$: the expected maximum Sharpe under the null that none of the $N$ trials has skill; $Z^{-1}$ is the inverse standard normal CDF.
   \item $\gamma_{\!E} \approx 0.5772$: the Euler--Mascheroni constant (distinct from $\gamma_3, \gamma_4$); $N$: the number of strategy configurations tried.
 \end{itemize}
+
+\begin{intuition}[In Plain English]
+The deflated Sharpe answers a single question: what is the probability that this strategy's Sharpe is \emph{real}, rather than the luckiest of the many variants we tried? It returns a number between $0$ and $1$; close to $1$ means ``probably real.'' Read the numerator as the observed Sharpe minus the bar $\SR_0$ that the best of $N$ purely-lucky strategies would be expected to clear, scaled up by how much data $T$ we have; the denominator deflates that confidence when the returns are skewed ($\gamma_3$) or fat-tailed ($\gamma_4$). Here $\Phi$ is the standard normal CDF and $Z^{-1} = \Phi^{-1}$ its inverse; $\SR_0$ is built from how far into the tail the \emph{maximum} of $N$ lucky draws is expected to reach, which is exactly why trying more strategies raises the bar. A fully worked numerical example is in \Cref{sec:eval-dsr}.
+\end{intuition}
 
 \begin{warning}[Three Traps in Applying the Deflated Sharpe Here]
 (1) The \emph{denominator} of \Cref{eq:ivrv:dsr-restate} uses the \emph{observed} $\widehat{\SR}$, not $\SR_0$; a well-known web summary places $\SR_0$ there and is wrong. (2) Feed \emph{non-annualized} inputs at the native frequency, with $T$ the raw observation count; annualizing first double-counts. (3) Be honest about $N$: if you tried $20$ forecast or sizing variants, the simple approximation gives $\SR_0 \approx \sqrt{2\ln 20} = 2.45$ (\Cref{eq:expected-max-sr}), a high bar your reported Sharpe must clear. And do not confuse the Euler--Mascheroni $\gamma_{\!E}$ with the return-kurtosis $\gamma_4$ sharing the symbol family.
