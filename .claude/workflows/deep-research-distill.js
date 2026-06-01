@@ -334,11 +334,15 @@ log(`Verified ${verified.length}; ${dossier.length} sources kept for the dossier
 // =====================================================================
 phase('Acquire')
 
-// Only primary sources (papers/preprints) are download candidates; never blogs/docs/datasets.
+// Only primary sources are download candidates; never blogs/docs/datasets. A source
+// qualifies if the harvester tagged it a 'paper' OR the verifier rated it primary-source
+// credibility (preprint/peer-reviewed). ('preprint' is a credibility value, not a harvest
+// type, so it must be read off the verdict — not s.type.)
 // Drop anything we already hold (id / title / author-year match against the Scope inventory).
 const acquireTargets = dossier
+  .filter(d => d.source.type === 'paper'
+    || (d.verdict && (d.verdict.credibility === 'preprint' || d.verdict.credibility === 'peer-reviewed')))
   .map(d => d.source)
-  .filter(s => s.type === 'paper' || s.type === 'preprint')
   .filter(s => !isAlreadyHave(s, plan.alreadyHave))
 
 const ACQUIRE_SCHEMA = {
@@ -397,15 +401,15 @@ For EACH candidate:
    - If the only source is PAYWALLED (journal DOI, locked SSRN), ACTIVELY HUNT for an open equivalent via WebSearch/WebFetch: the arXiv / SSRN / RePEc / NBER working-paper version, the author's homepage PDF, or a Semantic Scholar / OpenReview open PDF. If you find one, use it and add the paper to openAccessRecovered ("title — open url used").
    - If NO open route exists, add it to paywalledStillNeeded and SKIP the download.
 3. NAME the file 'firstauthor-year-shorttitle.pdf' (lowercase, hyphenated, ~3-4 title words, stopwords dropped), matching the existing convention in reference/project-papers/.
-4. DOWNLOAD with: curl -L -s -o "reference/project-papers/<name>" "<pdf-url>"
-5. VALIDATE: confirm the file exists, is more than ~10 KB, and begins with the bytes "%PDF" (e.g. head -c 4). If not a real PDF, delete it and record under failed { title, reason }.
+4. DOWNLOAD with: curl -fL -s -o "reference/project-papers/<name>" "<pdf-url>"   (the -f flag makes curl fail on HTTP 403/404 instead of saving an error page).
+5. VALIDATE — this is the only corruption guard, so do it reliably: confirm the file exists, is more than ~10 KB, and that its FIRST BYTES are "%PDF". Paywalls/CDNs often return HTTP 200 with an HTML interstitial, which would be saved as a fake .pdf. Check the magic bytes with the Bash tool (run head -c 4 on the file, in Git Bash) or by reading the file's first line; do NOT assume PowerShell 'head' exists. If it is not a real PDF, delete the file and record it under failed { title, reason }.
 6. On success, record under downloaded { filename, fromUrl, title, category (which README section A-E it belongs to: A foundational/HAR, B ML-core, C deep-learning/foundation, D multivariate/graph, E rough-vol), status ('Essential' only if clearly foundational, else 'Recommended') }.
 
-THEN UPDATE 'reference/project-papers/README.md' with the Edit tool (idempotent — never add a filename that already appears):
-- For each downloaded paper, append a new numbered row to the matching category table, format EXACTLY:
-  | <next #> | <Author(s) (Year), "Title" -- venue> | \`<filename>\` | <**Essential** or Recommended> |
-- For each paywalledStillNeeded paper, append a bullet under "## Papers Still Needed (paywalled)":
-  - <Author(s) (Year), "Title" -- venue>
+THEN UPDATE 'reference/project-papers/README.md' with the Edit tool. First READ the README; for idempotency, before appending any row confirm that the exact \`<filename>\` does NOT already appear anywhere in the file — if it does, skip that append.
+- For each downloaded paper, append a new numbered row to the matching category table, matching the EXACT format of the existing rows (note the venue is wrapped in *italics* and rows use a "--" separator):
+  | <next #> | <Author(s) (Year), "Title" -- *venue*> | \`<filename>\` | <**Essential** or Recommended> |
+- For each paywalledStillNeeded paper, append a bullet under "## Papers Still Needed (paywalled)" (only if that exact citation is not already listed):
+  - <Author(s) (Year), "Title" -- *venue*>
 Set readmeUpdated=true if you edited the README.
 
 DO NOT git add or git commit anything — leave all changes staged in the working tree for the user to review. Return the manifest.`,
@@ -465,7 +469,7 @@ Write a tight markdown brief — the user hates fluff and hedging — with this 
 
 # Deep Research: ${Q}
 
-**Date:** ${SLUG} · **Sources:** N kept of harvested · **Lens:** state of the art, ${PREV_YEAR}-${YEAR}
+**Date:** ${SLUG} · **Sources:** ${dossier.length} kept of ${allSources.length} harvested · **Lens:** state of the art, ${PREV_YEAR}-${YEAR}
 
 ## Direct Answer
 (3-6 sentences. LEAD with the current state of the art and the methodologies in active use. State confidence and the single biggest caveat — especially that cited studies' asset universe/sample differs from ours.)
