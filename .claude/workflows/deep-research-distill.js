@@ -440,6 +440,7 @@ const distillInput = JSON.stringify(
     method: d.source.method, data: d.source.data, reportedResults: d.source.reportedResults,
     codeLink: d.source.codeLink, access: d.source.access,
     credibility: d.verdict && d.verdict.credibility, grounded: d.verdict ? d.verdict.grounded : null,
+    claimLocation: d.verdict && d.verdict.claimLocation,
     correction: d.verdict && d.verdict.correction, verifierNote: d.verdict && d.verdict.verifierNote,
   })), null, 1
 )
@@ -451,27 +452,35 @@ You are writing the DISTILLED RESEARCH BRIEF and saving it into the repo.
 
 Already-in-repo (avoid re-deriving; mark the delta): ${JSON.stringify(plan.alreadyKnown)}
 
-VERIFIED SOURCE DOSSIER (only verified/kept sources; 'grounded:false' or 'correction' means treat the original claim with care):
+VERIFIED SOURCE DOSSIER (only verified/kept sources; 'grounded:false' or 'correction' means treat the original claim with care; 'claimLocation' is where the number lives in the source):
 ${distillInput}
+
+PAPERS ACQUIRED THIS RUN (download manifest — report it faithfully, do not invent):
+${JSON.stringify(acquire, null, 1)}
+
+HARD RULE — FULL TRACEABILITY: every number, claim, and methodology statement MUST carry an explicit inline source reference: author-year + link, plus the claimLocation anchor (table/section/page) when available, e.g. "(Corsi 2009, §3, arxiv.org/...)". If a figure cannot be traced to fetched text in the dossier, DO NOT include it. Practitioner sources must be tagged context-only.
 
 Write a tight markdown brief — the user hates fluff and hedging — with this structure:
 
 # Deep Research: ${Q}
 
-**Date:** 2026 internship session · **Sources:** N kept of harvested
+**Date:** ${SLUG} · **Sources:** N kept of harvested · **Lens:** state of the art, ${PREV_YEAR}-${YEAR}
 
 ## Direct Answer
-(3-6 sentences. Lead with the answer. State confidence and the single biggest caveat — especially that cited studies' asset universe/sample differs from ours.)
+(3-6 sentences. LEAD with the current state of the art and the methodologies in active use. State confidence and the single biggest caveat — especially that cited studies' asset universe/sample differs from ours.)
 
 ## Key Insights
-(5-9 bullets, quantitative where the sources give numbers — bps QLIKE deltas, Sharpe, benchmark comparisons. Each insight tagged with credibility: [peer-reviewed] / [preprint] / [practitioner].)
+(5-9 bullets, quantitative where the sources give numbers — bps QLIKE deltas, Sharpe, benchmark comparisons. Each bullet carries its inline source ref + claimLocation, and a credibility tag: [peer-reviewed] / [preprint] / [practitioner].)
+
+## What's New Since Our Last Sweep
+(the freshest ${PREV_YEAR}-${YEAR} sources and what they add beyond the repo's existing notes — the current frontier.)
 
 ## Evidence Table
-| Claim / finding | Source | Year | Credibility | Grounded? | Reported result |
-(one row per material claim, with the verbatim-ish reported result and a link)
+| Claim / finding | Source | Year | Credibility | Grounded? | Location | Reported result |
+(one row per material claim, with the verbatim-ish reported result, the claimLocation anchor, and a link)
 
-## Papers to Ingest (reference/project-papers/)
-(ranked; "Title (year) — url — why it matters for us")
+## Papers Acquired
+(report the manifest: downloaded PDFs with their filenames; any paywalled paper recovered via an open-access version; what remains paywalled/still-needed. State counts plainly.)
 
 ## Code to Study (on the GS machine, H:\\)
 (ranked GitHub repos; "repo — url — what's reusable, does it have a HAR baseline")
@@ -482,7 +491,7 @@ Write a tight markdown brief — the user hates fluff and hedging — with this 
 ## New vs Already Known
 (one paragraph: what this adds beyond what notes/ already had)
 
-After composing it, WRITE the full brief to '${OUT}' using the Write tool (create the notes/deep-research/ directory if needed). Then return the structured summary, with filePath='${OUT}' and written=true if the Write succeeded. If you cannot write the file, set written=false and put the full markdown in directAnswer so it isn't lost.`,
+After composing it, WRITE the full brief to '${OUT}' using the Write tool (create the notes/deep-research/ directory if needed). Then return the structured summary, with filePath='${OUT}' and written=true if the Write succeeded. If you cannot write the file, set written=false and put the full markdown in directAnswer so it isn't lost. DO NOT git commit.`,
   { label: 'distill:brief', phase: 'Distill', schema: DISTILL_SCHEMA }
 )
 
@@ -497,4 +506,9 @@ return {
   topRepos: distilled.topRepos,
   contradictions: distilled.contradictions,
   newVsKnown: distilled.newVsKnown,
+  downloaded: acquire.downloaded.map(d => d.filename),
+  openAccessRecovered: acquire.openAccessRecovered,
+  alreadyPresent: acquire.alreadyPresent,
+  paywalledStillNeeded: acquire.paywalledStillNeeded,
+  readmeUpdated: acquire.readmeUpdated,
 }
