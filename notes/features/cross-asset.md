@@ -30,3 +30,11 @@ What we've learned about volatility spillovers and correlations.
 **Realized covariance estimation:**
 - BNHLS (2011) multivariate realized kernels; Hayashi-Yoshida (2005) refresh-time sampling for asynchronous assets
 - HEAVY-MV (Noureldin, Shephard & Sheppard 2012) for multivariate realized measures
+
+## Deep Research Findings (2026-05-31): graph methods win on covariance, not univariate RV
+
+Full brief: `notes/deep-research/2026-05-31-what-beats-har-2024-26.md`.
+
+- **The cleanest, significance-backed graph win is on realized COVARIANCE, not univariate RV.** GHAR + Graphical-LASSO: QLIKE **-1.8%** vs HAR-DRD, Frobenius -2.5%, **MCS p=1.000**, 27 DJIA names, rolling 1,000-obs windows 2011-2021 (`chaozhang-ox/GNNHAR` on GitHub implements it, with HAR as the identity-adjacency special case and MCS testing built in).
+- Cross-market spatial-temporal GNN-HAR (DCRNN-HAR, 8 global indices) shows MSE gains that grow with horizon (-13% at h=1 -> -54% at h=22) but **never computes QLIKE** -- treat the horizon-scaling pattern as real, the QLIKE transfer as unproven.
+- **Strategic implication:** if the project targets the covariance problem (portfolio risk), graphs demonstrably help and there is a ready harness to port. If it stays univariate daily RV, graphs are not yet justified. This is now a flagged open decision in `open-questions.md`.

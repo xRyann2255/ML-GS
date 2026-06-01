@@ -32,3 +32,10 @@ What we've learned about options-implied information and the variance risk premi
 
 **ML on VRP:**
 - Relatively under-explored. Bali, Hu, Murray (2019) and others use RF/XGBoost on VRP-conditioned features for return prediction, but not VRP forecasting itself -- potential gap to exploit
+
+## Deep Research Findings (2026-05-31): options-implied vol is the strongest univariate QLIKE win
+
+Full brief: `notes/deep-research/2026-05-31-what-beats-har-2024-26.md`.
+
+- **Rough-Heston / options-implied spot vol augmenting HAR is the most credible univariate QLIKE win found in the 2024-26 sweep**: HAR-RV 0.0428 -> HAR-RHeston 0.0403 QLIKE (**+5.8%**), MAE -9%, DM stat -3.12 (p<0.01), robust across h=1-22 (arXiv 2604.02743, 2026). Caveat: single asset (S&P 500), 6-month COVID-spanning test window, and it needs an options surface + parametric calibration -- not pure ML. Directly motivates building out our Tier-2 options/VRP feature layer with a concrete spot-vol estimator.
+- Reinforces the project's through-line: for HAR, the biggest wins come from the **information set** (options/VRP), not the model architecture. Paper worth ingesting into `reference/project-papers/`.

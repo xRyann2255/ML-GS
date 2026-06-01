@@ -145,3 +145,27 @@ Each step has a clear scientific question and is independently reportable.
 - Does regime-conditional QLIKE evaluation reveal that ensemble benefits are concentrated in crisis periods?
 
 ---
+
+## 2026-05-31 -- What Beats HAR? (2024-26 SOTA deep-research sweep)
+
+**Question explored:** For daily realized-vol forecasting under QLIKE, does any modern method (transformers, TS foundation models, GNNs, LLMs, gradient boosting) actually beat HAR/HARQ out-of-sample with statistical significance?
+
+**Method:** Built and ran a new deep-research workflow (`deep-research-distill`) -- 87 external sources harvested, 11 adversarially verified and kept. Full brief: `notes/deep-research/2026-05-31-what-beats-har-2024-26.md`
+
+**What we found:**
+- For daily, univariate, equity-index RV under QLIKE -- our exact cell -- essentially nothing beats a properly-fitted rolling HAR with significance. HARd-to-Beat (IJF 2025, 1,445 stocks): HAR-WLS QLIKE ~0.313 vs FNN 0.571; HAR in the MCS 85.5% vs FNN 36.4%
+- ML/modern methods win reliably only when the problem changes: richer info sets (options-implied/rough-Heston spot vol: +5.8% QLIKE, DM p<0.01), multivariate realized covariance (GHAR +1.8% QLIKE, MCS p=1.000), or longer horizons (h=5/22)
+- Christensen-Siggaard-Veliyev (ML beats HAR, gains rise with horizon) vs Branco-Rubesam-Zevallos (no nonlinear ML beats HAR-X) reconciles to: the win is in FEATURES, not architecture -- give the linear baseline every predictor the ML model gets (HAR-X) before claiming an edge
+
+**What surprised us / corrections to prior notes:**
+- Two "facts" in our notes are wrong: the "XGBoost 0.1219 vs HAR 0.1482 daily" figure does NOT appear in the Intraday-Commonality paper (it shows HAR-D >= XGBoost at h=1); HARd-to-Beat's window is 630 days (~1.7y), not the 2.5-4y previously noted
+- The Fed FEDS regime-HAR superiority we'd logged is an MSPE result; the authors say it largely vanishes under QLIKE (our primary loss). MSPE-win != QLIKE-win is the single most common way the literature overstates ML
+- Every 2025-26 transformer/foundation-model/LLM QLIKE claim so far is MSE-only, significance-free, low-tier-venue, or metric-ambiguous -- none clears the DM+MCS bar on daily equity-index RV yet
+
+**Open threads:**
+- Decision needed: univariate RV (HAR's fortress) vs realized covariance (where graph methods demonstrably win, and the desk may care more for portfolio risk) -- reshapes which SOTA is relevant
+- Port target: JLDC/HARd-to-Beat (Python: rolling HAR-WLS + lasso/ffnn/gbt/rf + QLIKE losses) as the fair-fight baseline harness on the GS machine; adopt its 630-day/daily-re-estimate spec
+- Ingest arXiv 2604.02743 (rough-Heston options augmentation) -- strongest grounded univariate win, validates the Tier-2 options/VRP layer
+- Resolve the skill-score direction ambiguity in the foundation-model paper (arXiv 2505.11163) before citing any number
+
+---

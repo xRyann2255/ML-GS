@@ -102,3 +102,17 @@
 **Next:** Session 2 -- update vol-project-ref guide with project plan chapter and development roadmap
 
 ---
+
+## 2026-05-31
+
+**Focus:** Agentic workflows -- highest-value workflow analysis + a reusable deep-research engine
+
+- Ran a multi-agent workflow (32 agents) to map the repo and rank candidate workflows by value; top pick was a feature-evidence dossier, then pivoted to a more general capability
+- Built `.claude/workflows/deep-research-distill.js`: reusable, parameterized engine (Scope -> parallel Harvest of arXiv/SSRN/GitHub/web -> adversarial Verify -> Distill into the repo). Invoke by name with `args={question, slug, depth}`
+- First run -- "What beats HAR for daily RV forecasting in 2024-26?": 87 sources harvested, 11 adversarially verified and kept; brief written to `notes/deep-research/2026-05-31-what-beats-har-2024-26.md`
+- Verify phase caught two fabricated figures and a wrong window spec already sitting in our notes; corrected har-components.md and the QLIKE-vs-MSPE record
+- Hardened the workflow to parse JSON-string args (slug/depth were being dropped)
+
+**Next:** Decide univariate-RV vs realized-covariance focus; port JLDC/HARd-to-Beat as the HAR baseline harness on the GS machine
+
+---
