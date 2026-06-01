@@ -1,0 +1,68 @@
+\chapter{From Forecast to P\&L: A Realistic, Evaluable IV--RV Straddle}
+\label{ch:ivrv-straddle}
+
+\begin{application}[Why This Chapter]
+Every preceding chapter built one half of a bridge: estimators and models that turn raw prices into a realized-volatility forecast, and an evaluation toolkit that scores those forecasts with QLIKE, Diebold--Mariano tests, and the deflated Sharpe ratio.
+This chapter builds the other half. It takes a single forecast number, $\widehat{\RV}_t$, and turns it into a traded strategy whose profit and loss (P\&L) can be measured, costed honestly, and judged with the same statistical rigour we demand of the forecast itself.
+It is the capstone: the place where ``my model beats HAR by 40 basis points of QLIKE'' becomes ``my model makes money, and here is the deflated Sharpe ratio that proves it is not luck.''
+\end{application}
+
+Suppose your machine-learning model forecasts tomorrow's realized variance more accurately than the HAR benchmark. A desk head will not be impressed by a lower QLIKE; they will ask a blunt question: \emph{does the better forecast make money, and how do you know it is not a fluke of the backtest?} Answering honestly is harder than it looks. The natural way to monetise a volatility view is to trade an option and hedge away its directional exposure, but the moment you do this you inherit a thicket of frictions: the option's bid--ask spread, the cost of rebalancing the hedge, the random error the discrete hedge injects, and the statistical trap of having tried many strategy variants before reporting the best one. This chapter assembles the \textbf{most realistic version} of that trade, component by component, and shows exactly where each standard shortcut is sound, where it is flawed, and what it quietly leaves out.
+
+\begin{prereq}[Background]
+This chapter is the synthesis of four earlier strands, and it leans on each rather than repeating them:
+\begin{itemize}
+  \item \textbf{Options and Greeks} (\Cref{sec:greeks}): the Black--Scholes price, delta, gamma, vega; and variance swaps with their log-contract replication (\Cref{sec:var-swap}).
+  \item \textbf{The variance risk premium} (\Cref{sec:vrp-definition}) and the \textbf{gamma P\&L identity} (\Cref{sec:gamma-pnl}): why a delta-hedged option pays off on realized-minus-implied variance.
+  \item \textbf{Forecast evaluation} (\Cref{ch:evaluation}): QLIKE (\Cref{sec:eval-qlike}), the Diebold--Mariano test (\Cref{sec:eval-dm}), and the deflated Sharpe ratio (\Cref{sec:eval-dsr}).
+  \item \textbf{Economic-value testing} (\Cref{ch:applications}): transaction costs, turnover, and the Sharpe drag (\Cref{sec:net-econ-value}).
+\end{itemize}
+You do not need to re-read these; cross-references point back to the exact equation when it is used.
+\end{prereq}
+
+% ═══════════════════════════════════════════════════
+\section{The Strategy in One Picture}
+\label{sec:ivrv:picture}
+% ═══════════════════════════════════════════════════
+
+The strategy trades a single, sharp idea: \textbf{a delta-hedged straddle is a bet on realized variance against the variance the market has priced in.} If our forecast says realized volatility will come in \emph{below} what the option's implied volatility charges, the option is expensive, so we sell it; if our forecast says realized will come in \emph{above} the implied charge, the option is cheap, so we buy it. Everything else in this chapter is the machinery that makes this bet measurable and honest.
+
+Two building blocks make the idea precise. A \textbf{straddle} is a package of one call and one put on the same underlying, struck at the same price $K$ and expiring on the same date. Bought together, the pair has almost no directional view at inception (the call's positive delta roughly cancels the put's negative delta) but a large sensitivity to how much the underlying \emph{moves}: any large move, up or down, pushes one leg deep into the money. \textbf{Delta hedging} is the act of repeatedly trading the underlying to cancel whatever directional exposure remains, so that what is left is a near-pure exposure to \emph{variance} rather than to direction. We hold the delta-hedged straddle for one period, collect its profit or loss, and repeat.
+
+\begin{intuition}[In Plain English]
+Selling a delta-hedged straddle is like selling insurance against large price moves. You collect a premium set by the market's implied volatility, then pay out whenever the underlying actually moves a lot (high realized volatility). You profit when the premium you charged exceeds the claims you pay, that is, when implied volatility was higher than the realized volatility that followed. Our forecast $\widehat{\RV}_t$ is the actuary: it tells us, before we write the policy, whether the premium on offer looks rich or cheap.
+\end{intuition}
+
+The signal that decides which way to trade is the gap between the implied volatility the market is charging at the close of the prior day, $\IVol_{t-1}$, and our model's forecast of the realized volatility that will actually occur, $\widehat{\RV}_t$. This gap is the \textbf{variance risk premium} viewed through a tradeable lens (\Cref{sec:vrp-definition}): when implied sits above forecast realized, we are paid to bear variance risk, so we sell; when implied sits below, we pay to hold it, so we buy.
+
+\begin{keyidea}[The IV--RV Gap Trading Rule]
+On each day $t$, compare lagged implied volatility to the forecast of realized volatility:
+\begin{itemize}
+  \item if $\IVol_{t-1} > \widehat{\RV}_t$ (implied rich), \textbf{short} the delta-hedged straddle;
+  \item if $\IVol_{t-1} < \widehat{\RV}_t$ (implied cheap), \textbf{long} the delta-hedged straddle.
+\end{itemize}
+The size of the bet can scale with the size of the gap. The quality of the forecast $\widehat{\RV}_t$ is the only proprietary ingredient; everything downstream is execution and accounting.
+\end{keyidea}
+
+\Cref{fig:ivrv:pipeline} traces the whole pipeline, from forecast to a judged Sharpe ratio. The rest of the chapter walks through each stage, adding one layer of realism at a time: the signal and its timing (\Cref{sec:ivrv:signal}), the P\&L engine and where it breaks (\Cref{sec:ivrv:pnl-engine,sec:ivrv:breaks}), the two kinds of transaction cost (\Cref{sec:ivrv:option-costs,sec:ivrv:leland}), the variance the discrete hedge injects (\Cref{sec:ivrv:hedging-error}), the kurtosis input it needs (\Cref{sec:ivrv:kurtosis}), the assembled algorithm (\Cref{sec:ivrv:algorithm}), and finally the evaluation that ties it all back to forecast accuracy (\Cref{sec:ivrv:evaluation}).
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=1.15cm and 1.25cm]
+  \node[flowblock] (f) {Forecast\\ $\widehat{\RV}_t$};
+  \node[flowblock, right=of f] (s) {Signal\\ $X_{t-1}=f(\widehat{\RV}_t,\IVol_{t-1})$};
+  \node[decisionblock, right=of s] (d) {$\IVol_{t-1}$\\ vs $\widehat{\RV}_t$};
+  \node[flowblock, below=of d] (t) {Trade\\ straddle};
+  \node[flowblock, left=of t] (h) {Delta-\\hedge};
+  \node[flowblock, left=of h] (p) {Daily MTM\\ $\tfrac12\Gamma S^2(\RV-\IVol^2/252)$};
+  \node[flowblock, left=of p] (e) {Evaluate\\ deflated Sharpe};
+  \draw[arrow] (f) -- (s);
+  \draw[arrow] (s) -- (d);
+  \draw[arrow] (d) -- node[right, font=\scriptsize, align=left] {short if rich,\\ long if cheap} (t);
+  \draw[arrow] (t) -- (h);
+  \draw[arrow] (h) -- (p);
+  \draw[arrow] (p) -- (e);
+\end{tikzpicture}
+\caption{The IV--RV straddle pipeline. A realized-volatility forecast feeds a variance-risk-premium signal, which decides the direction of a delta-hedged straddle; the position is hedged intraday, marked to market daily through the gamma P\&L identity, and the resulting return stream is judged with a deflated Sharpe ratio. Each stage adds a layer of realism developed in this chapter.}
+\label{fig:ivrv:pipeline}
+\end{figure}
