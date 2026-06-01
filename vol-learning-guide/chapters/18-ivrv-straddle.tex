@@ -338,12 +338,13 @@ Maturity bucket & Effective spread (\% of premium) \\
 \begin{tikzpicture}
 \begin{axis}[
   ybar, width=0.74\textwidth, height=5.2cm,
-  ymin=0, ymax=1.6,
+  ymin=0, ymax=1.7, ytick={0,0.5,1},
   symbolic x coords={Gross, Timing-aware, Effective, Quoted},
   xtick=data, x tick label style={font=\small},
   ylabel={Pooled Sharpe (illustrative)}, ylabel style={font=\small},
   bar width=22pt, nodes near coords, nodes near coords style={font=\scriptsize},
-  enlarge x limits=0.18, ymajorgrids, axis lines=left,
+  xlabel={Option-cost assumption (more conservative $\rightarrow$)}, xlabel style={font=\small},
+  enlarge x limits=0.22, ymajorgrids, axis lines=left,
   every axis plot/.append style={fill=examteal!55, draw=examteal},
 ]
   \addplot coordinates {(Gross,1.40) (Timing-aware,1.00) (Effective,0.55) (Quoted,0.10)};
@@ -453,9 +454,9 @@ Finally, a caution about the limit. The clean $1/N$ decay assumes a continuous d
 \begin{axis}[
   width=0.78\textwidth, height=5.4cm,
   xlabel={Rebalances per day, $N$}, ylabel={Hedging-error std},
-  xmin=1, xmax=26, ymin=0, ymax=1.15,
-  ytick=\empty, xtick={1,5,10,15,20,25},
-  axis lines=left, samples=100, domain=1:26,
+  xmin=1, xmax=40, ymin=0, ymax=1.15,
+  ytick=\empty, xtick={1,10,20,30,40},
+  axis lines=left, samples=140, domain=1:40,
   legend style={font=\scriptsize, at={(0.97,0.97)}, anchor=north east},
   clip=false,
 ]
@@ -463,8 +464,9 @@ Finally, a caution about the limit. The clean $1/N$ decay assumes a continuous d
   \addlegendentry{diffusion: $\propto 1/\sqrt{N}$ (vanishes)}
   \addplot[very thick, warnred] { sqrt(0.09 + 1/x) };
   \addlegendentry{with jumps: floor $> 0$}
-  \draw[dashed, gray] (axis cs:1,0.3) -- (axis cs:26,0.3);
-  \node[anchor=west, font=\scriptsize, gray] at (axis cs:14,0.38) {non-vanishing floor};
+  \draw[dashed, gray] (axis cs:1,0.3) -- (axis cs:40,0.3);
+  \node[anchor=north east, font=\scriptsize, gray] at (axis cs:40,0.285) {jump floor};
+  \node[anchor=west, font=\scriptsize, defblue] at (axis cs:29,0.105) {diffusion $\to 0$};
 \end{axis}
 \end{tikzpicture}
 \caption{Discrete-hedging error standard deviation versus rebalances per day. Under a pure diffusion the error falls as $1/\sqrt{N}$ and can in principle be driven to zero (blue). Once the underlying can jump, the rescaled error no longer vanishes: it asymptotes to a positive floor \citep[red,][]{BrodenTankov2010}, so the analytic $1/N$ variance of \Cref{eq:ivrv:kappa-inflation} is a lower bound on the true intraday hedging noise.}
