@@ -65,7 +65,7 @@ and find every \\begin{tikzpicture}. For each occurrence, emit one flat array el
 - lineStart: the 1-based line number of its \\begin{tikzpicture}
 - id: the label, or "<file>:<lineStart>" if unlabeled
 Do NOT attach a neighbouring figure's label/caption to a bare picture. Return a FLAT 'figures' array.`,
-  { label: 'discover:figures', phase: 'Discover', agentType: 'Explore', schema: DISCOVER_SCHEMA }
+  { label: 'discover:figures', phase: 'Discover', agentType: 'Explore', model: 'opus', schema: DISCOVER_SCHEMA }
 )
 
 const figures = (discovery.figures || []).map(f => ({ ...f, locate: locateSubstr(f) }))
@@ -116,7 +116,7 @@ the deterministic checks are the hard floor and you add the visual judgement you
 Do NOT git commit — leave edits in the working tree. Other guides are handled by parallel agents; touch
 ONLY files under ${group.guide}. Return the schema (one result per figure).`,
     { label: `verify:${group.guide.split('/').pop()}`.slice(0, 40), phase: 'Verify',
-      schema: GUIDE_RESULT_SCHEMA }
+      model: 'opus', schema: GUIDE_RESULT_SCHEMA }
   )
 ))).filter(Boolean)
 
@@ -143,15 +143,16 @@ INPUTS (one row per figure): ${JSON.stringify(flat, null, 1)}
 Guides touched: ${JSON.stringify(GUIDES)}
 
 Do:
-1. Recompile each touched guide whole (cd <guide> && pdflatex -interaction=nonstopmode -halt-on-error
-   main.tex) to confirm nothing broke. Note any guide that now fails to compile.
+1. FULLY recompile each touched guide so its PDF reflects the diagram fixes AND resolved refs/TOC:
+   cd <guide> && pdflatex -interaction=nonstopmode -halt-on-error main.tex && (bibtex main || true) && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode -halt-on-error main.tex
+   (the bibtex step is a no-op if the guide has no .bib; ignore its exit code). Note any guide that fails to compile.
 2. Build a contact sheet of the final crops (skip any path that doesn't exist):
    PYTHONIOENCODING=utf-8 py .claude/skills/verify-diagram/contact_sheet.py --crops <finalCrop...> --out notes/diagram-audit/contact-sheet.png
 3. Write a markdown report to notes/diagram-audit/2026-06-01-audit.md: a table of guide | figure |
    status | blockingBefore->blockingAfter, then a "Needs human" section listing the unresolved ones
    with their final crop paths, then a link to the contact sheet.
 4. Do NOT git commit anything. Return the schema.`,
-  { label: 'consolidate', phase: 'Consolidate', schema: SUMMARY_SCHEMA }
+  { label: 'consolidate', phase: 'Consolidate', model: 'opus', schema: SUMMARY_SCHEMA }
 )
 
 return {
