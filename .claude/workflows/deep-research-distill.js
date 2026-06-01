@@ -2,12 +2,14 @@ export const meta = {
   name: 'deep-research-distill',
   description: 'One question in: sweep the internet for the state of the art (arXiv/SSRN papers, GitHub repos, practitioner web), adversarially verify, DOWNLOAD the relevant open-access papers into reference/project-papers/, and distill a fully source-traced brief into the repo',
   whenToUse: 'When you want to deeply research one question on the current state of the art, harvest + DOWNLOAD the relevant papers (deduped against what we already hold, recovering open versions of paywalled journals), and persist a verified, distilled brief into notes/deep-research/. Pass args="the question" or args={question, slug}.',
+  // Every phase dispatches its agents on Opus (the 'opus' alias = Opus 4.8); see the model: 'opus'
+  // override on each agent() call below. No phase is allowed to fall back to a cheaper model.
   phases: [
-    { title: 'Scope', detail: 'read the local corpus, inventory held PDFs, decompose into source-typed facets incl. a frontier facet' },
-    { title: 'Harvest', detail: 'parallel agents sweep arXiv/SSRN, GitHub, and practitioner web per facet, date-biased to recent work' },
-    { title: 'Verify', detail: 'adversarially ground the top claims against their sources; record claim location; dedup; rate credibility' },
-    { title: 'Acquire', detail: 'download open-access PDFs (recovering open versions of paywalled journals) and auto-update the README index' },
-    { title: 'Distill', detail: 'synthesize the SOTA answer + fully-traced evidence table + acquired-papers manifest and write it into the repo' },
+    { title: 'Scope', model: 'opus', detail: 'read the local corpus, inventory held PDFs, decompose into source-typed facets incl. a frontier facet' },
+    { title: 'Harvest', model: 'opus', detail: 'parallel agents sweep arXiv/SSRN, GitHub, and practitioner web per facet, date-biased to recent work' },
+    { title: 'Verify', model: 'opus', detail: 'adversarially ground the top claims against their sources; record claim location; dedup; rate credibility' },
+    { title: 'Acquire', model: 'opus', detail: 'download open-access PDFs (recovering open versions of paywalled journals) and auto-update the README index' },
+    { title: 'Distill', model: 'opus', detail: 'synthesize the SOTA answer + fully-traced evidence table + acquired-papers manifest and write it into the repo' },
   ],
 }
 
@@ -214,7 +216,7 @@ You are SCOPING this research question before the external sweep.
 4. Name specific seminal papers/authors/repos to hunt for by name, AND the newest method families currently considered state-of-the-art for this question.
 
 Lead with the current state of the art and the methodologies in active use today. Be concrete and finance-vol-aware. Return the plan.`,
-  { label: 'scope:plan', phase: 'Scope', agentType: 'Explore', schema: PLAN_SCHEMA }
+  { label: 'scope:plan', phase: 'Scope', agentType: 'Explore', model: 'opus', schema: PLAN_SCHEMA }
 )
 
 log(`Scoped into ${plan.facets.length} facets; ${plan.alreadyKnown.length} things already known; ${plan.alreadyHave.length} PDFs already held`)
@@ -269,7 +271,7 @@ Bias HARD toward the current state of the art and the most recent credible work 
 We ALREADY HOLD these papers — do NOT propose them for download (you may still cite them as known baselines): ${JSON.stringify(plan.alreadyHave.map(h => h.title))}
 
 Use WebSearch to find sources, then WebFetch the most promising ones to read them. For 'code' facets, fetch GitHub repo pages / READMEs / raw files and capture whether the repo has a runnable HAR baseline, what data it uses, and the code link. For 'academic', capture effect sizes, data context, and method. For each source you keep, you MUST include snippetEvidence: the actual fetched text the key claim came from — do NOT report a claim you didn't see in fetched text. Mark access honestly (open / abstract-only / paywalled). Aim for 4-10 high-relevance sources; skip low-signal hits. Return only what you actually fetched.`,
-    { label: `harvest:${f.key}`.slice(0, 40), phase: 'Harvest', agentType: 'Explore', schema: HARVEST_SCHEMA }
+    { label: `harvest:${f.key}`.slice(0, 40), phase: 'Harvest', agentType: 'Explore', model: 'opus', schema: HARVEST_SCHEMA }
   )
 ))).filter(Boolean)
 
@@ -315,7 +317,7 @@ ADVERSARIALLY VERIFY one harvested source. Default to skepticism.
 SOURCE: ${JSON.stringify({ title: s.title, url: s.url, type: s.type, keyClaims: s.keyClaims, reportedResults: s.reportedResults, access: s.access, snippetEvidence: s.snippetEvidence }, null, 1)}
 
 Re-fetch the URL (WebFetch). Check: (a) does the source actually contain the load-bearing claim / numbers reported, and WHERE (record claimLocation: the exact table/section/page where the number lives, so the brief can cite it precisely)? (b) is it really accessible, or abstract-only / paywalled / dead? (c) how credible is it (peer-reviewed > preprint > practitioner blog)? If the harvested claim is overstated or unsupported by what you can actually read, set grounded=false and give the correction. Only set keep=true for sources that materially help answer the question AND whose key claim you could ground (or that are clearly credible primary sources worth citing with a caveat).`,
-    { label: `verify:${(s.title || s.url || '').slice(0, 30)}`, phase: 'Verify', agentType: 'Explore', schema: VERIFY_SCHEMA }
+    { label: `verify:${(s.title || s.url || '').slice(0, 30)}`, phase: 'Verify', agentType: 'Explore', model: 'opus', schema: VERIFY_SCHEMA }
   )
 ))).filter(Boolean)
 
@@ -413,7 +415,7 @@ THEN UPDATE 'reference/project-papers/README.md' with the Edit tool. First READ 
 Set readmeUpdated=true if you edited the README.
 
 DO NOT git add or git commit anything — leave all changes staged in the working tree for the user to review. Return the manifest.`,
-    { label: 'acquire:download', phase: 'Acquire', schema: ACQUIRE_SCHEMA }
+    { label: 'acquire:download', phase: 'Acquire', model: 'opus', schema: ACQUIRE_SCHEMA }
   )
 }
 
@@ -497,7 +499,7 @@ Write a tight markdown brief — the user hates fluff and hedging — with this 
 (one paragraph: what this adds beyond what notes/ already had)
 
 After composing it, WRITE the full brief to '${OUT}' using the Write tool (create the notes/deep-research/ directory if needed). Then return the structured summary, with filePath='${OUT}' and written=true if the Write succeeded. If you cannot write the file, set written=false and put the full markdown in directAnswer so it isn't lost. DO NOT git commit.`,
-  { label: 'distill:brief', phase: 'Distill', schema: DISTILL_SCHEMA }
+  { label: 'distill:brief', phase: 'Distill', model: 'opus', schema: DISTILL_SCHEMA }
 )
 
 return {

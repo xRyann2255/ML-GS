@@ -165,7 +165,7 @@ Write the `.md` file. If converting multiple chapters, commit in batches by part
 
 ## Batch Conversion
 
-All chapters in a guide are independent. For bulk conversion, dispatch parallel subagents (one per chapter or per part). Each subagent gets:
+All chapters in a guide are independent. For bulk conversion, dispatch parallel subagents (one per chapter or per part), **each dispatched with `model: 'opus'`** (the `opus` alias = Opus 4.8) so no sub-agent runs on a cheaper model. Each subagent gets:
 - This skill's rules
 - The source `.tex` file path
 - The output `.md` file path

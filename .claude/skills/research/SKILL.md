@@ -16,7 +16,7 @@ The user specifies a research query, e.g.:
 
 ## Execution
 
-Dispatch three sub-agents in parallel (single message, three Agent tool calls):
+Dispatch three sub-agents in parallel (single message, three Agent tool calls). **Set `model: 'opus'` on every Agent call** (the `opus` alias = Opus 4.8) so no sub-agent runs on a cheaper model:
 
 ### Agent 1 — Internal Search
 
