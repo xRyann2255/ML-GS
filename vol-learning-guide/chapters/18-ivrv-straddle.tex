@@ -354,3 +354,119 @@ Maturity bucket & Effective spread (\% of premium) \\
 \caption{Schematic: pooled Sharpe falls as the option-cost assumption becomes more conservative, from gross (no cost) through timing-aware ($\approx$ one-third of quoted) and empirically grounded effective (\Cref{tab:ivrv:cost-schedule}) to the full quoted half-spread. The numbers are illustrative; the shape is the point. A strategy whose Sharpe sinks below a sensible floor under the quoted assumption is living on execution optimism, not edge \citep{MuravyevPearson2020}.}
 \label{fig:ivrv:cost-band}
 \end{figure}
+
+% ═══════════════════════════════════════════════════
+\section{The Hedge Also Costs: Leland and Its Critique}
+\label{sec:ivrv:leland}
+% ═══════════════════════════════════════════════════
+
+\Cref{sec:ivrv:option-costs} charged the spread on the option. But every time we rebalance the delta hedge we also trade the underlying, and that trade crosses a spread too. The classic way to fold this cost into the pricing, due to \citet{Leland1985}, is a beautiful sleight of hand: pretend you are hedging at a slightly \emph{higher} volatility, chosen so that the extra option premium exactly funds the expected hedging costs.
+
+\begin{equation}
+\label{eq:ivrv:leland-vol}
+\hat{\sigma}^2 = \sigma^2\left(1 + \sqrt{\frac{2}{\pi}}\,\frac{k}{\sigma\sqrt{\delta t}}\right).
+\end{equation}
+\begin{itemize}
+  \item $\hat{\sigma}$: the \textbf{Leland-modified volatility} to use in the hedge (and in pricing) instead of the true $\sigma$.
+  \item $k$: the round-trip proportional transaction cost of trading the underlying (e.g.\ the relative bid--ask spread).
+  \item $\delta t$: the time between hedge rebalances; more frequent hedging (smaller $\delta t$) inflates the adjustment more.
+  \item $\sqrt{2/\pi} \approx 0.798$: the mean of the half-normal distribution, that is, $\E|u|$ for $u \sim \N(0,1)$.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Each rebalance trades an amount of stock proportional to how much delta moved, and the expected size of that move is governed by the half-normal mean $\sqrt{2/\pi}$. Leland's insight is that you can bake the resulting expected cost into a single fudge to volatility: hedge as if the world were slightly more volatile, and the fatter option premium pays your transaction bill. The $1/\sqrt{\delta t}$ factor warns that hedging twice as often does not halve costs, it raises the volatility adjustment.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Leland's formula gives the backtest a cheap, deterministic way to load delta-hedging costs into the P\&L without simulating every fill: inflate the variance used in the gamma identity by the bracketed factor. It tells us how the hedging-frequency knob trades replication accuracy against accumulated cost, which is exactly the dial \Cref{sec:ivrv:algorithm} must set.
+\end{projectconnection}
+
+The catch is that \Cref{eq:ivrv:leland-vol} is a heuristic, not an optimal policy, and modern work has mapped its limits precisely. \citet{KabanovSafarian1997} prove that if transaction costs are held \emph{constant} as the rebalancing frequency grows, the Leland-hedged portfolio does \emph{not} converge to the option payoff: a nonzero, negative limiting error remains, meaning the strategy systematically under-hedges. The error only vanishes if costs shrink with frequency: \citet{LepinetteKabanov2010} show that with costs scaling as $k_n = k_0\,n^{-1/2}$, the mean-square hedging error converges to zero at rate $n^{-1}$ (root-mean-square at $n^{-1/2}$) for \emph{convex} payoffs, and a straddle is convex. Beyond these results, the current frontier treats hedging as a control problem rather than a volatility fudge: \citet{ArzelLehdili2026} use a no-transaction band of width $h_{WW} = \big(3\lambda\delta S\,\Gamma^2/(2\gamma)\big)^{1/3}$ (the Whalley--Wilmott band) inside which one simply does not trade, and \citet{BrugiereTurinici2025} show a neural-network hedger beating Leland at realistic cost levels.
+
+\begin{warning}[Leland Is a Cost-Line Inflator, Not the Optimal Trade]
+Use \Cref{eq:ivrv:leland-vol} as a transparent, deterministic way to charge hedging costs in the backtest, exactly as \Cref{sec:net-econ-value} charged turnover costs for the underlying. Do not present it as the best possible hedging policy: under constant costs it under-hedges \citep{KabanovSafarian1997}, and band or learned policies dominate it \citep{ArzelLehdili2026, BrugiereTurinici2025}. For our purposes it is a baseline cost model, and a good one.
+\end{warning}
+
+% ═══════════════════════════════════════════════════
+\section{The Variance the Hedge Injects}
+\label{sec:ivrv:hedging-error}
+% ═══════════════════════════════════════════════════
+
+Here is the subtlest cost of all, and the one most often mis-handled. Even with a perfect volatility forecast and zero transaction costs, hedging at discrete moments leaves a \emph{random} replication error every period. Its mean is zero, so it does not bias the P\&L, but its \emph{variance} is real risk that must inflate the denominator of any Sharpe ratio. If we forget it, we overstate the strategy's risk-adjusted return. The goal of this section is a closed form for that variance, attributed to exactly the right source.
+
+Start with one rebalancing interval. Applying the Black--Scholes PDE and dropping higher-order terms, the hedging error accrued over a single step is
+
+\begin{equation}
+\label{eq:ivrv:boyle-emanuel}
+H_i = \tfrac{1}{2}\,\Gamma\, S^2\, \sigma^2\, \delta t \,\big(1 - u_i^2\big), \qquad u_i \sim \N(0,1),
+\end{equation}
+so that the total error at expiry is $HE(T) = \sum_{i=1}^{N} H_i$.
+
+\begin{itemize}
+  \item $H_i$: the replication error contributed by the $i$-th rebalancing interval.
+  \item $\Gamma S^2$: the dollar gamma; $\sigma^2\,\delta t$: the variance accrued over the step of length $\delta t$.
+  \item $u_i \sim \N(0,1)$: the standardized return over the step, so $u_i^2 \sim \chi^2_1$ is a (skewed, fat-tailed) chi-squared with one degree of freedom.
+  \item $1 - u_i^2$: a mean-zero shock; it is positive when the realized squared return undershoots its expectation and negative when it overshoots.
+\end{itemize}
+
+This is the discrete-hedging error of \citet{BoyleEmanuel1980}, here in the convenient decomposition of \citet{AnagnouHodges2007} (their Eqs.~5 and~7). Note the per-step shock $1-u_i^2$ is \emph{not} Gaussian; it is a shifted chi-squared, skewed and leptokurtic. Only after summing many independent steps does a central-limit effect make the aggregate roughly normal.
+
+\begin{intuition}[In Plain English]
+Between hedge adjustments the stock moves, and your frozen delta is wrong by a little. The gamma term tells you how badly: each interval you book half the dollar gamma times the gap between the variance you expected ($\sigma^2\delta t$) and the variance that actually happened ($\sigma^2\delta t\,u_i^2$). On average this gap is zero, so you neither make nor lose money from it systematically, but it jitters your P\&L, and that jitter is pure noise added on top of the variance bet you actually wanted.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This noise is the floor on how cleanly any forecast can be monetised through a discretely hedged straddle. It does not care how good $\widehat{\RV}_t$ is; it is the cost of hedging in discrete time. In \Cref{sec:ivrv:evaluation} its standard deviation is added to the Sharpe denominator, so getting it right is the difference between an honest Sharpe and an inflated one.
+\end{projectconnection}
+
+Because the steps are independent and $\Var(u_i^2) = 2$ for a Gaussian return, the aggregate error variance is a sum of $N$ equal pieces. With $\delta t = T/N$,
+\begin{equation}
+\label{eq:ivrv:he-gaussian}
+\Var\!\big(HE(T)\big) = \sum_{i=1}^{N}\Big(\tfrac{1}{2}\Gamma S^2\sigma^2\,\delta t\Big)^2 \Var(u_i^2)
+= \big(\tfrac{1}{2}\Gamma S^2\sigma^2\big)^2 T^2\,\frac{2}{N},
+\end{equation}
+so the hedging-error standard deviation scales as $1/\sqrt{N}$: hedge four times as often and you roughly halve the noise. This is the \citet{BoyleEmanuel1980} result that the replication error is inversely related to the rebalancing frequency.
+
+Now the refinement that matters for intraday data. \citet{AnagnouHodges2007} observe that finer sampling raises the excess kurtosis of returns under non-Gaussian processes, which enlarges the replication error, but they keep $\Var(u_i^2) = 2$ in their closed form. We make that dependence explicit. For a standardized shock with kurtosis $\kappa = \E[u_i^4]$, the variance of the squared shock is $\Var(u_i^2) = \E[u_i^4] - (\E[u_i^2])^2 = \kappa - 1$ (the Gaussian case $\kappa = 3$ recovers $2$). Substituting into \Cref{eq:ivrv:he-gaussian} gives the leptokurtic hedging-error variance.
+
+\begin{keyresult}[Kurtosis-Inflated Hedging-Error Variance]
+For a standardized per-step return with kurtosis $\kappa$,
+\begin{equation}
+\label{eq:ivrv:kappa-inflation}
+\Var\!\big(HE(T)\big) = \big(\tfrac{1}{2}\Gamma S^2\sigma^2\big)^2\, T^2\,\frac{\kappa - 1}{N}
+\;\propto\; \frac{\sigma^4\,(\kappa - 1)}{N}.
+\end{equation}
+\textbf{Provenance, stated honestly:} the $1/N$ scaling and the per-step form are \citet{BoyleEmanuel1980} (via \citealp{AnagnouHodges2007}, Eq.~7). The explicit $(\kappa-1)$ substitution is \emph{our own leptokurtic extension}; it does not appear in Boyle--Emanuel, in Anagnou--Hodges (who fix $\Var(u_i^2)=2$), or in Ahmad--Wilmott. Re-derive it, do not cite it to those sources.
+\end{keyresult}
+
+\begin{warning}[Do Not Attribute This to Ahmad--Wilmott]
+It is tempting to credit the $1/N$-and-kurtosis hedging-error variance to \citet{AhmadWilmott2005}, because they give a closed-form variance for delta-hedged P\&L. They do not. Their ``Result~2'' (their \S4.2, Eq.~10, p.~70) is the variance of \emph{continuous} hedging at implied volatility, a $G(S_0,t_0) - F(S_0,t_0)^2$ expression that arises from the path-dependence of the gamma profit under the real drift; it contains \emph{no} $1/N$ term and \emph{no} kurtosis term, because it is not about discrete rebalancing at all. The discrete-rebalancing variance is Boyle--Emanuel; the kurtosis inflation is the extension above.
+\end{warning}
+
+Practitioners often package the same idea in vega form: the hedging-error standard deviation of a delta-hedged option is sometimes written $\sigma_{\text{P\&L}} = \Vega\,\sigma\sqrt{\pi/(4N)}$ \citep[][context only]{Bennett2014}. Beware a coefficient ambiguity here: $\sqrt{\pi/4} \approx 0.886$ follows the half-normal mean-absolute convention, whereas the root-variance (L2) convention gives $1/\sqrt{2} \approx 0.707$; which is ``correct'' depends on whether you are reporting a mean-absolute error or a standard deviation. Match the convention to the quantity you put in the Sharpe denominator.
+
+Finally, a caution about the limit. The clean $1/N$ decay assumes a continuous diffusion. \citet{BrodenTankov2010} show that under jumps (an exponential Levy model) the rescaled tracking error does \emph{not} vanish at the $1/N$ rate: $\lim_{n} n\,\E[\varepsilon_T^2]$ is strictly positive and can even be infinite, so for a jumpy underlying the analytic variance is a \emph{lower bound}, not the truth. For vanilla calls and puts the $1/N$ rate survives but with a jump-inflated constant; for digital or barrier payoffs the rate is strictly slower than $1/\sqrt{N}$. \Cref{fig:ivrv:error-vs-n} contrasts the two regimes.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.78\textwidth, height=5.4cm,
+  xlabel={Rebalances per day, $N$}, ylabel={Hedging-error std},
+  xmin=1, xmax=26, ymin=0, ymax=1.15,
+  ytick=\empty, xtick={1,5,10,15,20,25},
+  axis lines=left, samples=100, domain=1:26,
+  legend style={font=\scriptsize, at={(0.97,0.97)}, anchor=north east},
+  clip=false,
+]
+  \addplot[very thick, defblue] { 1/sqrt(x) };
+  \addlegendentry{diffusion: $\propto 1/\sqrt{N}$ (vanishes)}
+  \addplot[very thick, warnred] { sqrt(0.09 + 1/x) };
+  \addlegendentry{with jumps: floor $> 0$}
+  \draw[dashed, gray] (axis cs:1,0.3) -- (axis cs:26,0.3);
+  \node[anchor=west, font=\scriptsize, gray] at (axis cs:14,0.38) {non-vanishing floor};
+\end{axis}
+\end{tikzpicture}
+\caption{Discrete-hedging error standard deviation versus rebalances per day. Under a pure diffusion the error falls as $1/\sqrt{N}$ and can in principle be driven to zero (blue). Once the underlying can jump, the rescaled error no longer vanishes: it asymptotes to a positive floor \citep[red,][]{BrodenTankov2010}, so the analytic $1/N$ variance of \Cref{eq:ivrv:kappa-inflation} is a lower bound on the true intraday hedging noise.}
+\label{fig:ivrv:error-vs-n}
+\end{figure}
