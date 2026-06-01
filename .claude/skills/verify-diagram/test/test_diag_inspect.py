@@ -38,7 +38,7 @@ def test_find_overlaps_ignores_blank_and_below_threshold():
              _span([10, 0, 30, 10], "b", line_id=2)]
     assert di.find_overlaps(spans) == []
     spans = [_span([0, 0, 20, 10], "a", line_id=1),
-             _span([19, 0, 39, 10], "b", line_id=2)]         # 1/20 = 5% < 20%
+             _span([19, 0, 39, 10], "b", line_id=2)]         # overlap area 10/200 = 5% < 20%
     assert di.find_overlaps(spans, frac=0.20) == []
 
 def test_node_text_spill_flags_overflow():

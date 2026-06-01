@@ -29,7 +29,8 @@ def find_overlaps(spans, frac=0.20):
     for i in range(len(spans)):
         for j in range(i + 1, len(spans)):
             si, sj = spans[i], spans[j]
-            if si.get("line_id") == sj.get("line_id"):
+            li, lj = si.get("line_id"), sj.get("line_id")
+            if li is not None and lj is not None and li == lj:
                 continue                                   # same line: adjacent / sub-superscripts
             if not si["text"].strip() or not sj["text"].strip():
                 continue
@@ -140,6 +141,7 @@ def _draw_rects(page):
     return out
 
 def locate_page(doc, substr):
+    """Return index of first page containing substr. Empty string matches page 0."""
     for i, page in enumerate(doc):
         if substr in page.get_text():
             return i
@@ -149,7 +151,10 @@ def inspect(pdf_path, locate, out_dir, dpi=300, min_font=6.0, overlap_frac=0.20,
             whole_guide=True):
     import fitz
     _os.makedirs(out_dir, exist_ok=True)
-    doc = fitz.open(pdf_path)
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception as e:
+        return {"located": False, "error": str(e)}
     pi = locate_page(doc, locate)
     if pi is None:
         doc.close()
@@ -167,7 +172,7 @@ def inspect(pdf_path, locate, out_dir, dpi=300, min_font=6.0, overlap_frac=0.20,
     page.get_pixmap(dpi=dpi, clip=fitz.Rect(*bb)).save(crop_path)
     result = {
         "located": True, "page": pi + 1, "bbox": [round(v, 1) for v in bb],
-        "crop": crop_path, "tiles": [],
+        "crop": crop_path, "tiles": [],  # tiles reserved for Phase C tiling
         "metrics": {"n_spans": len(spans),
                     "min_font_pt": round(min((s["size"] for s in spans if s["text"].strip()),
                                              default=0.0), 1)},
