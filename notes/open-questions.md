@@ -27,6 +27,9 @@ Running list of things to investigate. Add questions as they come up. Move to re
 
 ## Bigger Picture
 
+- [ ] **DECISION: univariate RV vs realized covariance as the project target?** Graph methods demonstrably beat HAR on covariance (GHAR, MCS p=1.000) but NOT on univariate daily RV (HAR's fortress). The desk may care more about covariance for portfolio risk. This reshapes which SOTA is relevant. (Raised 2026-05-31, see deep-research brief)
 - [ ] Where exactly does HAR fail? Regime transitions? High-vol periods? Specific assets?
+  - *Literature state (2026-05-31 deep-research):* HAR fails mainly at longer horizons (h=5/22), when richer info sets are available (options/cross-asset), and on covariance (not univariate). See `notes/deep-research/2026-05-31-what-beats-har-2024-26.md`. Still need to confirm WHERE it fails on OUR data.
 - [ ] If we could only add ONE feature to HAR, what would give the biggest QLIKE improvement?
+  - *Literature prior (2026-05-31):* options-implied/rough-Heston spot vol is the strongest grounded univariate QLIKE win (+5.8%, DM p<0.01); signed semivariances (RS-) and the VRP are the other leading candidates. Confirm on our data.
 - [x] What features do the Optiver competition winners actually use, and which translate to daily forecasting? -- Answered 2026-05-06, see research-journal.md and features/microstructure.md
