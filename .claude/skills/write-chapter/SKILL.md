@@ -35,7 +35,7 @@ Add geometric/graphical TikZ illustrations for important concepts — especially
 
 Do NOT add a diagram for every equation. Use judgment — only when a visual genuinely unlocks understanding.
 
-**After writing any TikZ diagram, invoke the `verify-diagram` skill to visually inspect the rendered output.** The skill compiles the LaTeX, renders the diagram page to a PNG, and checks for arrows going through boxes, overlapping paths, broken routing, and dependency accuracy. Fix any issues found and re-verify until the diagram is clean. Never submit a chapter with an unverified diagram.
+**After writing any TikZ diagram, invoke the `verify-diagram` skill.** Pass it: the guide root, a unique caption/label substring on the figure's page, a one-line **concept** (what the diagram should teach), and the intended **relationships** (the arrows/dependencies it should encode -- this enables the correctness lens). The engine crops the figure to high resolution, runs deterministic geometric checks plus two blind reviewers (legibility + learning-clarity), and loops fix->re-verify until both gates pass. If it returns a **`needs-human`** result (it hit the iteration cap), do NOT proceed -- surface the remaining defects to the user and resolve them before submitting the chapter. Never submit a chapter with an unverified diagram.
 
 ### Worked Examples
 

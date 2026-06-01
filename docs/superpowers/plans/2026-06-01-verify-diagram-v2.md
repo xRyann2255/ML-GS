@@ -4,9 +4,12 @@
 
 **Goal:** Rebuild the `verify-diagram` skill around a deterministic Python core (crop-to-figure + geometric defect detection) plus independent blind reviewers and a trustworthy fix-loop gate, and expose the same engine as a batch workflow over every diagram in all guides.
 
-**Architecture:** A pure, unit-tested Python module `diag_inspect.py` does the deterministic work (locate figure, crop at high DPI, flag overlap/spill/tiny-font/node-overlap, emit `inspection.json`). The `verify-diagram` SKILL.md orchestrates a loop: compile → inspect → dispatch blind reviewer subagents (legibility + learning-clarity) → synthesize defects → fix TikZ → repeat until both gates pass or a cap is hit. A new `verify-all-diagrams.js` workflow discovers all figures and fans the engine out, grouped by file, in git worktrees.
+**Architecture:** A pure, unit-tested Python module `diag_inspect.py` does the deterministic work (locate figure, crop at high DPI, flag overlap/spill/tiny-font/node-overlap, emit `inspection.json`). The `verify-diagram` SKILL.md orchestrates a loop: compile → inspect → dispatch blind reviewer subagents (legibility + learning-clarity) → synthesize defects → fix TikZ → repeat until both gates pass or a cap is hit. A new `verify-all-diagrams.js` workflow discovers all figures and fans the engine out, one agent per guide.
 
-> **Deviation from the spec (flagged for the user):** the spec said *standalone-first* compile. In practice the guide preamble assumes a chaptered `report` class (`\chaptermark`, `\thechapter`) and figures are wrapped in `\resizebox{\textwidth}{!}{...}` with inline TikZ styles, which makes true standalone compilation fragile. Cropping from the **whole-guide PDF already works** (proven in the design demo). So this plan makes **whole-guide compile + crop the reliable default**, and implements standalone compilation as an **optional speed optimization with automatic fallback** (Phase E). The engine is correct and complete without Phase E.
+> **Two deviations from the spec (flagged for the user):**
+>
+> 1. **Compile (Component C):** the spec said *standalone-first*. In practice the guide preamble assumes a chaptered `report` class (`\chaptermark`, `\thechapter`) and figures are wrapped in `\resizebox{\textwidth}{!}{...}` with inline TikZ styles, which makes true standalone compilation fragile. Cropping from the **whole-guide PDF already works** (proven in the design demo). So this plan makes **whole-guide compile + crop the reliable default**, with standalone as an **optional speed optimization with automatic fallback** (Phase E). The engine is correct and complete without Phase E.
+> 2. **Batch isolation (Component D):** the spec said *group-by-file in git worktrees*, with blind reviewer sub-agents per diagram. Three workflow-runtime constraints make that unworkable: (a) workflow sub-agents **cannot spawn their own sub-agents**, so a per-file agent can't dispatch the blind reviewers; (b) uncommitted edits in an isolation worktree aren't reachable by a later consolidation step; (c) two agents fixing different files in the **same guide** would race on that guide's shared `main.tex`/aux/pdf during compile. So the batch workflow instead runs **one agent per guide** (compile-isolated, figures handled sequentially within a guide, guides in parallel), with that agent acting as its own inspector+reviewer (the deterministic checks remain the hard floor). The interactive `write-chapter` path keeps the full blind-reviewer rigor. No worktrees; edits land in the working tree and the controller commits at the end.
 
 **Tech Stack:** Python 3 + PyMuPDF (`fitz` 1.27.x), pytest 9; `pdflatex` (MiKTeX); Node.js built-in test runner (`node --test`) for workflow helpers; the Workflow tool's JS DSL (`agent`/`pipeline`/`parallel`/`phase`/`log`).
 
@@ -950,82 +953,49 @@ import assert from 'node:assert'
 // >>> VERIFY-ALL-DIAGRAMS HELPERS (mirror into .claude/workflows/verify-all-diagrams.js) >>>
 // Pure, dependency-free. EDIT HERE ONLY; the workflow mirrors this block verbatim.
 
-function discoverFiguresInTex(relPath, tex) {
-  // Returns one entry per tikzpicture, with the nearest enclosing \label and \caption if present.
-  const out = []
-  const lines = String(tex).split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    if (!/\\begin\{tikzpicture\}/.test(lines[i])) continue
-    let end = i
-    for (let j = i; j < lines.length; j++) { if (/\\end\{tikzpicture\}/.test(lines[j])) { end = j; break } }
-    // search a small window around the picture for label/caption
-    const lo = Math.max(0, i - 3), hi = Math.min(lines.length, end + 6)
-    const window = lines.slice(lo, hi).join('\n')
-    const label = (window.match(/\\label\{([^}]+)\}/) || [])[1] || null
-    const caption = (window.match(/\\caption\{([\s\S]*?)\}/) || [])[1] || null
-    out.push({
-      file: relPath,
-      label,
-      caption: caption ? caption.replace(/\s+/g, ' ').trim().slice(0, 80) : null,
-      lineStart: i + 1,
-      lineEnd: end + 1,
-      id: label || `${relPath}:${i + 1}`,
-    })
-  }
-  return out
-}
+// Discovery itself (reading .tex files) is done by an agent in the workflow; these helpers
+// deterministically post-process the agent's FLAT figure list.
 
-function groupByFile(figures) {
+function groupByGuide(figures) {
+  // [{guide, figures:[...]}] in first-seen guide order; figures keep their original order.
   const m = new Map()
   for (const f of figures) {
-    if (!m.has(f.file)) m.set(f.file, [])
-    m.get(f.file).push(f)
+    if (!m.has(f.guide)) m.set(f.guide, [])
+    m.get(f.guide).push(f)
   }
-  return Array.from(m.entries()).map(([file, figs]) => ({ file, figures: figs }))
+  return Array.from(m.entries()).map(([guide, figs]) => ({ guide, figures: figs }))
 }
 
 function locateSubstr(fig) {
-  // what diag_inspect --locate should use: prefer a distinctive caption fragment, else the label
-  if (fig.caption) return fig.caption.split(' ').slice(0, 6).join(' ')
+  // the --locate substring diag_inspect uses to find a figure's page:
+  // a distinctive caption fragment, else the label, else the synthetic id
+  if (fig.caption && fig.caption.trim()) {
+    return fig.caption.trim().split(/\s+/).filter(Boolean).slice(0, 6).join(' ')
+  }
   return fig.label || fig.id
 }
 // <<< VERIFY-ALL-DIAGRAMS HELPERS <<<
 
-const SAMPLE = String.raw`
-\begin{figure}
-\centering
-\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}
-  \node {A};
-\end{tikzpicture}}
-\caption{Pipeline architecture with plug points. Config parameterises all.}
-\label{fig:pipeline-plugpoints}
-\end{figure}
-\begin{tikzpicture}\node{bare};\end{tikzpicture}
-`
-
-test('discoverFiguresInTex finds both figures with metadata', () => {
-  const figs = discoverFiguresInTex('guides/g/chapters/ch.tex', SAMPLE)
-  assert.equal(figs.length, 2)
-  assert.equal(figs[0].label, 'fig:pipeline-plugpoints')
-  assert.match(figs[0].caption, /Pipeline architecture/)
-  assert.equal(figs[1].label, null)
-  assert.equal(figs[1].id, 'guides/g/chapters/ch.tex:9')
-})
-
-test('groupByFile groups figures by their file', () => {
-  const groups = groupByFile([
-    { file: 'a.tex', id: '1' }, { file: 'a.tex', id: '2' }, { file: 'b.tex', id: '3' },
+test('groupByGuide groups by guide, preserving figure order', () => {
+  const groups = groupByGuide([
+    { guide: 'guides/a', id: '1' },
+    { guide: 'guides/b', id: '3' },
+    { guide: 'guides/a', id: '2' },
   ])
   assert.equal(groups.length, 2)
-  assert.equal(groups[0].figures.length, 2)
+  const a = groups.find(g => g.guide === 'guides/a')
+  assert.deepEqual(a.figures.map(f => f.id), ['1', '2'])
 })
 
-test('locateSubstr prefers a caption fragment', () => {
+test('locateSubstr prefers a 6-word caption fragment', () => {
   assert.equal(
-    locateSubstr({ caption: 'Pipeline architecture with plug points here now', label: 'x' }),
-    'Pipeline architecture with plug points')
-  assert.equal(locateSubstr({ caption: null, label: 'fig:y', id: 'z' }), 'fig:y')
+    locateSubstr({ caption: 'Pipeline architecture with plug points shown here now', label: 'x', id: 'y' }),
+    'Pipeline architecture with plug points shown')
+})
+
+test('locateSubstr falls back to label then id', () => {
+  assert.equal(locateSubstr({ caption: '', label: 'fig:y', id: 'z' }), 'fig:y')
+  assert.equal(locateSubstr({ caption: null, label: null, id: 'file.tex:12' }), 'file.tex:12')
 })
 ```
 
@@ -1054,41 +1024,26 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```js
 export const meta = {
   name: 'verify-all-diagrams',
-  description: 'Audit and fix every TikZ diagram across all guides: crop + deterministic checks + blind reviewers + fix-loop, grouped by file in isolated worktrees, with a contact-sheet report.',
+  description: 'Audit and fix every TikZ diagram across all guides: crop + deterministic checks + a visual pass + fix-loop, one agent per guide (compile-isolated), with a contact-sheet report. Leaves edits staged; never auto-commits.',
   whenToUse: 'When you want to sweep all guide diagrams for legibility/clarity defects and fix the failures. Pass args="guides/vol-project-ref" to limit to one guide, or omit for all.',
   phases: [
     { title: 'Discover', detail: 'enumerate every tikzpicture figure across the guides' },
-    { title: 'Verify', detail: 'run the engine per diagram, grouped by file, in parallel worktrees' },
+    { title: 'Verify', detail: 'one agent per guide runs the engine on its figures sequentially' },
     { title: 'Consolidate', detail: 'recompile guides, build the contact sheet, write the summary' },
   ],
 }
 
 // >>> VERIFY-ALL-DIAGRAMS HELPERS (mirror of __tests__/verify-all-diagrams-helpers.test.mjs) >>>
 // EDIT IN THE TEST FILE ONLY; paste verbatim here.
-function discoverFiguresInTex(relPath, tex) {
-  const out = []
-  const lines = String(tex).split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    if (!/\\begin\{tikzpicture\}/.test(lines[i])) continue
-    let end = i
-    for (let j = i; j < lines.length; j++) { if (/\\end\{tikzpicture\}/.test(lines[j])) { end = j; break } }
-    const lo = Math.max(0, i - 3), hi = Math.min(lines.length, end + 6)
-    const window = lines.slice(lo, hi).join('\n')
-    const label = (window.match(/\\label\{([^}]+)\}/) || [])[1] || null
-    const caption = (window.match(/\\caption\{([\s\S]*?)\}/) || [])[1] || null
-    out.push({ file: relPath, label,
-      caption: caption ? caption.replace(/\s+/g, ' ').trim().slice(0, 80) : null,
-      lineStart: i + 1, lineEnd: end + 1, id: label || `${relPath}:${i + 1}` })
-  }
-  return out
-}
-function groupByFile(figures) {
+function groupByGuide(figures) {
   const m = new Map()
-  for (const f of figures) { if (!m.has(f.file)) m.set(f.file, []); m.get(f.file).push(f) }
-  return Array.from(m.entries()).map(([file, figs]) => ({ file, figures: figs }))
+  for (const f of figures) { if (!m.has(f.guide)) m.set(f.guide, []); m.get(f.guide).push(f) }
+  return Array.from(m.entries()).map(([guide, figs]) => ({ guide, figures: figs }))
 }
 function locateSubstr(fig) {
-  if (fig.caption) return fig.caption.split(' ').slice(0, 6).join(' ')
+  if (fig.caption && fig.caption.trim()) {
+    return fig.caption.trim().split(/\s+/).filter(Boolean).slice(0, 6).join(' ')
+  }
   return fig.label || fig.id
 }
 // <<< VERIFY-ALL-DIAGRAMS HELPERS <<<
@@ -1097,54 +1052,54 @@ const GUIDES = args && String(args).trim()
   ? [String(args).trim()]
   : ['guides/vol-project-ref', 'guides/quant-trading', 'vol-learning-guide']
 
-// ---- Phase 1: Discover ----
+// ---- Phase 1: Discover (an agent reads the .tex; JS post-processes deterministically) ----
 phase('Discover')
 const DISCOVER_SCHEMA = {
   type: 'object', additionalProperties: false,
   properties: {
-    files: { type: 'array', items: {
+    figures: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       properties: {
-        file: { type: 'string' },
-        figures: { type: 'array', items: {
-          type: 'object', additionalProperties: false,
-          properties: {
-            id: { type: 'string' }, label: { type: 'string' },
-            caption: { type: 'string' }, locate: { type: 'string' },
-            guide: { type: 'string' },
-          },
-          required: ['id', 'locate', 'guide'],
-        } },
+        guide: { type: 'string' }, file: { type: 'string' },
+        label: { type: 'string' }, caption: { type: 'string' },
+        lineStart: { type: 'number' }, id: { type: 'string' },
       },
-      required: ['file', 'figures'],
+      required: ['guide', 'file', 'id'],
     } },
   },
-  required: ['files'],
+  required: ['figures'],
 }
 
 const discovery = await agent(
   `Enumerate every TikZ figure in these guides: ${JSON.stringify(GUIDES)}.
-For each guide, Glob its chapter .tex files (e.g. <guide>/chapters/*.tex and <guide>/*.tex), Read each,
-and find every \\begin{tikzpicture}. For each, record the nearest \\label and \\caption, the file path
-(repo-relative), the guide root, and a "locate" string = the first ~6 words of the caption if present,
-else the label. Group the result by file. Return strictly the schema.`,
+For each guide root, Glob its chapter .tex files (<guide>/chapters/*.tex and <guide>/*.tex), Read each,
+and find every \\begin{tikzpicture}. For each occurrence, emit one flat array element:
+- guide: the guide root (exactly one of the inputs)
+- file: the repo-relative .tex path
+- label: the \\label that belongs to THIS picture (the one that follows it, before the enclosing
+  \\end{figure} or the next \\begin{tikzpicture}); null if none
+- caption: the first ~80 chars of THIS picture's \\caption (same association rule); null if none
+- lineStart: the 1-based line number of its \\begin{tikzpicture}
+- id: the label, or "<file>:<lineStart>" if unlabeled
+Do NOT attach a neighbouring figure's label/caption to a bare picture. Return a FLAT 'figures' array.`,
   { label: 'discover:figures', phase: 'Discover', agentType: 'Explore', schema: DISCOVER_SCHEMA }
 )
 
-const fileGroups = discovery.files.filter(g => g.figures && g.figures.length)
-const totalFigs = fileGroups.reduce((n, g) => n + g.figures.length, 0)
-log(`Discovered ${totalFigs} figures across ${fileGroups.length} files`)
+const figures = (discovery.figures || []).map(f => ({ ...f, locate: locateSubstr(f) }))
+const guideGroups = groupByGuide(figures)
+const totalFigs = figures.length
+log(`Discovered ${totalFigs} figures across ${guideGroups.length} guides`)
 
-// ---- Phase 2: Verify (one agent per FILE-group; figures within a file handled sequentially) ----
+// ---- Phase 2: Verify — ONE agent per guide (compile-isolated: no two agents share a main.tex) ----
 phase('Verify')
-const FILE_RESULT_SCHEMA = {
+const GUIDE_RESULT_SCHEMA = {
   type: 'object', additionalProperties: false,
   properties: {
-    file: { type: 'string' },
+    guide: { type: 'string' },
     results: { type: 'array', items: {
       type: 'object', additionalProperties: false,
       properties: {
-        id: { type: 'string' },
+        id: { type: 'string' }, file: { type: 'string' },
         status: { type: 'string', enum: ['already_clean', 'fixed', 'needs_human'] },
         blockingBefore: { type: 'number' }, blockingAfter: { type: 'number' },
         finalCrop: { type: 'string' }, notes: { type: 'string' },
@@ -1152,32 +1107,37 @@ const FILE_RESULT_SCHEMA = {
       required: ['id', 'status'],
     } },
   },
-  required: ['file', 'results'],
+  required: ['guide', 'results'],
 }
 
-const perFile = await parallel(fileGroups.map(group => () =>
+const perGuide = (await parallel(guideGroups.map(group => () =>
   agent(
-    `You are fixing the TikZ diagrams in ONE file, in an isolated git worktree.
-FILE: ${group.file}
-FIGURES (process sequentially, one at a time, because they share this file):
-${JSON.stringify(group.figures, null, 1)}
+    `You are auditing and fixing every TikZ diagram in ONE guide: ${group.guide}.
+Work through these figures ONE AT A TIME (they share this guide's main.pdf, so never parallelise them):
+${JSON.stringify(group.figures.map(f => ({ id: f.id, file: f.file, locate: f.locate, caption: f.caption })), null, 1)}
 
-For EACH figure, follow the verify-diagram skill engine exactly:
-1. Compile the figure's guide ('${''}' the figure carries its guide root) with
-   pdflatex -interaction=nonstopmode -halt-on-error main.tex.
-2. Run: PYTHONIOENCODING=utf-8 py .claude/skills/verify-diagram/diag_inspect.py --pdf <guide>/main.pdf
-   --locate "<figure.locate>" --out <guide>/.diagverify
-3. View <guide>/.diagverify/crop.png (Read tool). Dispatch the two blind reviewers (legibility +
-   learning-clarity) on the crop — they must NOT see the TikZ. Apply the gate from the skill.
-4. If it fails, edit ONLY this file's TikZ for that figure, recompile, re-inspect. Cap 5 iterations.
-5. Record status: already_clean (passed first try), fixed (passed after edits), or needs_human (hit cap).
-Do NOT commit. Leave edits in the working tree of this worktree. Return the schema with one result per figure.`,
-    { label: `verify:${group.file.split('/').pop()}`.slice(0, 40), phase: 'Verify',
-      isolation: 'worktree', schema: FILE_RESULT_SCHEMA }
+Apply the verify-diagram engine to each figure, with this batch adaptation: a workflow agent CANNOT
+spawn sub-agents, so YOU are both the inspector and the reviewer (you lose the blind-reviewer split;
+the deterministic checks are the hard floor and you add the visual judgement yourself).
+1. Compile the guide once: cd ${group.guide} && pdflatex -interaction=nonstopmode -halt-on-error main.tex
+   (run bibtex + pdflatex x2 if refs are unresolved). Fix any compile error before proceeding.
+2. For the figure run:
+   PYTHONIOENCODING=utf-8 py .claude/skills/verify-diagram/diag_inspect.py --pdf ${group.guide}/main.pdf --locate "<the figure's locate>" --out ${group.guide}/.diagverify
+   Read ${group.guide}/.diagverify/inspection.json and VIEW ${group.guide}/.diagverify/crop.png (Read tool).
+3. Blocking defects = the JSON's blocking deterministic defects PLUS anything you can SEE in the crop as
+   a first-time learner: overlapping/cramped/illegible text, ambiguous arrows, "does the concept read?".
+4. If there are blocking defects, edit ONLY this figure's TikZ in its .tex file, recompile (step 1),
+   re-inspect (step 2). Cap at 5 iterations.
+5. Record per figure: status = already_clean | fixed | needs_human; file; blockingBefore/blockingAfter
+   (from inspection.json); finalCrop = the last crop.png path.
+Do NOT git commit — leave edits in the working tree. Other guides are handled by parallel agents; touch
+ONLY files under ${group.guide}. Return the schema (one result per figure).`,
+    { label: `verify:${group.guide.split('/').pop()}`.slice(0, 40), phase: 'Verify',
+      schema: GUIDE_RESULT_SCHEMA }
   )
-)).filter(Boolean)
+))).filter(Boolean)
 
-const flat = perFile.flatMap(f => f.results.map(r => ({ file: f.file, ...r })))
+const flat = perGuide.flatMap(g => g.results.map(r => ({ guide: g.guide, ...r })))
 const needHuman = flat.filter(r => r.status === 'needs_human')
 const fixed = flat.filter(r => r.status === 'fixed')
 log(`Verified ${flat.length} figures: ${fixed.length} fixed, ${needHuman.length} need human, ` +
@@ -1194,20 +1154,20 @@ const SUMMARY_SCHEMA = {
 }
 
 const consolidation = await agent(
-  `Consolidate the batch diagram audit. The per-file worktrees hold the edits (disjoint files).
+  `Consolidate the batch diagram audit. All edits are already in the working tree (each guide was fixed
+in place by its own agent — there are no worktrees to merge).
 INPUTS (one row per figure): ${JSON.stringify(flat, null, 1)}
 Guides touched: ${JSON.stringify(GUIDES)}
 
 Do:
 1. Recompile each touched guide whole (cd <guide> && pdflatex -interaction=nonstopmode -halt-on-error
    main.tex) to confirm nothing broke. Note any guide that now fails to compile.
-2. Build a contact sheet of the final crops:
-   PYTHONIOENCODING=utf-8 py .claude/skills/verify-diagram/contact_sheet.py --crops <crop1> <crop2> ...
-   --out notes/diagram-audit/contact-sheet.png   (create the dir; skip crops that don't exist).
-3. Write a markdown report to notes/diagram-audit/2026-06-01-audit.md: a table of file | figure |
+2. Build a contact sheet of the final crops (skip any path that doesn't exist):
+   PYTHONIOENCODING=utf-8 py .claude/skills/verify-diagram/contact_sheet.py --crops <finalCrop...> --out notes/diagram-audit/contact-sheet.png
+3. Write a markdown report to notes/diagram-audit/2026-06-01-audit.md: a table of guide | figure |
    status | blockingBefore->blockingAfter, then a "Needs human" section listing the unresolved ones
-   with their final crop paths, then an embedded link to the contact sheet.
-4. Do NOT commit anything. Return the schema.`,
+   with their final crop paths, then a link to the contact sheet.
+4. Do NOT git commit anything. Return the schema.`,
   { label: 'consolidate', phase: 'Consolidate', schema: SUMMARY_SCHEMA }
 )
 
@@ -1215,7 +1175,7 @@ return {
   guides: GUIDES,
   totalFigures: totalFigs,
   fixed: fixed.length,
-  needHuman: needHuman.map(r => `${r.file}#${r.id}`),
+  needHuman: needHuman.map(r => `${r.guide}#${r.id}`),
   report: consolidation.reportPath,
   contactSheet: consolidation.contactSheet,
 }
@@ -1224,7 +1184,7 @@ return {
 - [ ] **Step 2: Verify the mirrored helper block matches the test file**
 
 Run: `node --test .claude/workflows/__tests__/verify-all-diagrams-helpers.test.mjs`
-Expected: PASS — and visually confirm the three helper functions in the workflow are byte-identical to the test file's block (between the `>>>`/`<<<` markers).
+Expected: PASS — and visually confirm the two helper functions (`groupByGuide`, `locateSubstr`) in the workflow are byte-identical to the test file's block (between the `>>>`/`<<<` markers).
 
 - [ ] **Step 3: Syntax-check the workflow**
 
@@ -1557,7 +1517,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Component A (deterministic core) → Tasks A1–A8. ✓ (The spec's `clip` is implemented as `node_text_spill` — a label overflowing its own box, which is the readability-relevant, mode-independent form. Raw page-margin clipping was intentionally dropped because it false-positives under `tightpage`/standalone rendering. Flagged here so it isn't mistaken for a gap.)
 - Component B (reviewers + gate) → Task B1 (reviewer prompts, blind constraint, gate, cap). ✓
 - Component C (engine loop, standalone-first) → Task B1 loop + Phase E (standalone). Standalone demoted to optional with fallback — flagged. ✓
-- Component D (batch workflow, worktree isolation, contact sheet, no auto-commit) → Tasks C1–C3. ✓
+- Component D (batch workflow, contact sheet, no auto-commit) → Tasks C1–C3. ✓ (Spec's worktree isolation + per-diagram blind reviewers replaced by **one agent per guide** for compile-isolation, because workflow sub-agents can't nest sub-agents and worktree edits can't be consolidated — flagged in the Architecture deviation note.)
 - Component E (write-chapter integration) → Task D1. ✓
 - TDD plan (five fixtures incl. clean + subscript guards) → Task A8. ✓
 - Acceptance criteria → covered by A8 (fixtures), B2 (real crop), C (workflow). ✓
