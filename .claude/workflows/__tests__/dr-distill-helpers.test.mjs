@@ -35,6 +35,31 @@ function harvestTierWeight(type) {
     default: return 0.5
   }
 }
+
+const STOPWORDS = new Set(['a','an','the','of','for','and','or','to','in','on','with','via','using','at','by'])
+
+function slugifyWords(text, maxWords) {
+  return String(text || '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(w => w && !STOPWORDS.has(w))
+    .slice(0, maxWords)
+    .join('-')
+}
+
+function firstAuthorLast(authors) {
+  const first = String(authors || '').split(/,|;|&|\band\b/)[0].trim()
+  const parts = first.split(/\s+/).filter(Boolean)
+  const last = parts.length ? parts[parts.length - 1] : ''
+  return last.toLowerCase().replace(/[^a-z0-9]/g, '') || 'unknown'
+}
+
+function paperSlugName(authors, year, title) {
+  const a = firstAuthorLast(authors)
+  const y = (String(year || '').match(/20\d{2}/) || ['nd'])[0]
+  const t = slugifyWords(title, 4) || 'paper'
+  return `${a}-${y}-${t}.pdf`
+}
 // <<< DR-DISTILL HELPERS <<<
 
 test('deriveYear parses a YYYY-MM-DD slug prefix', () => {
@@ -67,4 +92,29 @@ test('harvestTierWeight prioritises primary sources by harvest type', () => {
   assert.strictEqual(harvestTierWeight('repo'), 0.8)
   assert.strictEqual(harvestTierWeight('blog'), 0.5)
   assert.strictEqual(harvestTierWeight('other'), 0.5)
+})
+
+test('firstAuthorLast extracts the lowercased surname of the first author', () => {
+  assert.strictEqual(firstAuthorLast('Fulvio Corsi'), 'corsi')
+  assert.strictEqual(firstAuthorLast('Bollerslev, Tim; Patton, Andrew'), 'bollerslev')
+  assert.strictEqual(firstAuthorLast('Chen and Robert'), 'chen')
+  assert.strictEqual(firstAuthorLast(''), 'unknown')
+})
+
+test('slugifyWords lowercases, strips stopwords/punctuation, caps word count', () => {
+  assert.strictEqual(
+    slugifyWords('A Simple Approximate Long-Memory Model of Realized Volatility', 4),
+    'simple-approximate-long-memory'
+  )
+})
+
+test('paperSlugName builds firstauthor-year-shorttitle.pdf', () => {
+  assert.strictEqual(
+    paperSlugName('Fulvio Corsi', '2009', 'A Simple Approximate Long-Memory Model of Realized Volatility'),
+    'corsi-2009-simple-approximate-long-memory.pdf'
+  )
+})
+
+test('paperSlugName degrades gracefully on missing fields', () => {
+  assert.strictEqual(paperSlugName('', '', ''), 'unknown-nd-paper.pdf')
 })
