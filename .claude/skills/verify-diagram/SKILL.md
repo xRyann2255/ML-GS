@@ -43,7 +43,8 @@ figure at full resolution, not a shrunken page.
 
 ### Step 3 — Reviewers (independent, blind, parallel)
 Dispatch BOTH reviewers as subagents using the Agent tool, **in the same message** so they run in
-parallel. Give each ONLY: the path to `crop.png`, the caption, and the one-line concept — **never the
+parallel, **each dispatched with `model: 'opus'`** (the `opus` alias = Opus 4.8) so no reviewer ever
+runs on a cheaper model. Give each ONLY: the path to `crop.png`, the caption, and the one-line concept — **never the
 TikZ source**. Each must return strict JSON.
 
 **Reviewer 1 — Legibility & layout.** Prompt:
