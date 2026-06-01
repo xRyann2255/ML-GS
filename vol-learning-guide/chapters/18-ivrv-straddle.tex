@@ -66,3 +66,158 @@ The size of the bet can scale with the size of the gap. The quality of the forec
 \caption{The IV--RV straddle pipeline. A realized-volatility forecast feeds a variance-risk-premium signal, which decides the direction of a delta-hedged straddle; the position is hedged intraday, marked to market daily through the gamma P\&L identity, and the resulting return stream is judged with a deflated Sharpe ratio. Each stage adds a layer of realism developed in this chapter.}
 \label{fig:ivrv:pipeline}
 \end{figure}
+
+% ═══════════════════════════════════════════════════
+\section{The Signal and the Anti-Lookahead Protocol}
+\label{sec:ivrv:signal}
+% ═══════════════════════════════════════════════════
+
+The trade needs a single number, computed before we commit capital, that decides whether to be short or long the straddle. We have two raw ingredients: our model's forecast of the realized volatility that will occur over day $t$, written $\widehat{\RV}_t$, and the implied volatility the option market was charging at the close of the previous day, $\IVol_{t-1}$. The signal is some function of their gap.
+
+\begin{equation}
+\label{eq:ivrv:signal}
+X_{t-1} = f\!\left(\widehat{\RV}_t,\ \IVol_{t-1}\right),
+\qquad
+f \in \Big\{\, \underbrace{x - y}_{\text{difference}},\ \ \underbrace{x/y}_{\text{ratio}},\ \ \underbrace{\ln(x/y)}_{\text{log-ratio}} \,\Big\}.
+\end{equation}
+
+\begin{itemize}
+  \item $X_{t-1}$: the trading signal known at the close of day $t-1$, before day $t$'s position is taken.
+  \item $\widehat{\RV}_t$: the model's forecast (made with data through $t-1$) of day $t$'s realized volatility, the ``$x$'' argument.
+  \item $\IVol_{t-1}$: the option-implied volatility observed at the close of $t-1$, the ``$y$'' argument.
+  \item $f$: the gap functional. The difference is the most direct; the ratio and log-ratio are scale-free and behave better when volatility levels swing widely.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+The signal asks a single question: how rich is the insurance the market is selling, compared with what I expect to pay out? A large positive gap (implied far above forecast realized) means the premium looks fat relative to the claims I anticipate, so I want to be the seller. A negative gap means insurance is cheap, so I want to be the buyer. The functional form barely matters; what matters is the sign and rough magnitude of the gap.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This equation is the only place the forecast enters the strategy. Every later section is execution and accounting that is identical no matter whose forecast you plug in. A more accurate $\widehat{\RV}_t$ sharpens both the \emph{sign} (are we on the right side of the trade?) and the \emph{magnitude} (how hard should we press?) of the signal. This is the precise mechanism by which a lower QLIKE is supposed to become higher P\&L, and \Cref{sec:ivrv:evaluation} tests whether it actually does.
+\end{projectconnection}
+
+Before differencing, the two numbers must live in the same units. Implied volatility is quoted annualized; realized volatility forecasts are usually expressed per day. We convert the implied quote to daily units by dividing by the square root of the number of trading days in a year,
+\begin{equation}
+\label{eq:ivrv:deannualize}
+\IVol^{\text{daily}}_{t-1} = \frac{\IVol_{t-1}}{\sqrt{252}},
+\end{equation}
+so that the difference $\widehat{\RV}_t - \IVol^{\text{daily}}_{t-1}$ compares like with like.\footnote{Some studies use $\sqrt{250}$ rather than $\sqrt{252}$; the choice is a convention and shifts the gap by a constant scale factor, not its sign.}
+
+\textbf{Lookahead} is the cardinal sin of any backtest: using information at time $t$ that would not actually have been available when the position was taken. For this strategy the danger is acute, because the predictor (which needs the day's data to update the forecast) and the trade (which must happen while the market is open) both want to live at the same instant. \citet{Pollok2025} fixes a clean protocol that keeps them safely ordered.
+
+\begin{keyidea}[The Lookahead-Safe Timing Protocol]
+For each trading day $t$:
+\begin{enumerate}
+  \item Update the realized-volatility model using information available up to \textbf{3:55\,pm ET} on day $t$; the predictor $x_t$ lives in the information set $\mathcal{F}_t^{\,3:55}$.
+  \item \textbf{Execute} the straddle (and its initial hedge) before the \textbf{4:00\,pm} close on day $t$.
+  \item \textbf{Realize} the position's return over day $t+1$.
+\end{enumerate}
+The five-minute gap between measuring the predictor and trading guarantees the signal uses no information from the moment of execution onward.
+\end{keyidea}
+
+Finally, how big should the bet be? The crude choice is binary: a fixed-size short whenever the gap is positive, a fixed-size long whenever it is negative. A better choice scales the position with confidence in the signal.
+
+\begin{keyidea}[Graded Sizing Beats a Binary Switch]
+\citet{LiWu2026} find that a \emph{moderate}, confidence-scaled position size delivers higher Sharpe ratios than either a binary on/off rule or maximally aggressive scaling. The intuition is risk budgeting: press hardest when the edge is largest and the forecast most confident, but never so hard that a single adverse day dominates the P\&L.
+\end{keyidea}
+
+\begin{warning}[Cite This Result Narrowly]
+\citet{LiWu2026} study a \emph{directional} machine-learning hedging rule on a single ETF, not an IV--RV straddle. It supports the qualitative claim ``moderate scaling beats a binary switch'' and nothing more; do not borrow any of its magnitudes for this strategy.
+\end{warning}
+
+\begin{warning}[Do Not Re-derive the Premium Here]
+The gap in \Cref{eq:ivrv:signal} is the variance risk premium wearing a trading hat. Its economics (why implied sits above realized roughly $85\%$ of the time, the ex-ante versus ex-post distinction) were settled in \Cref{sec:vrp-definition}, equation~\eqref{eq:vrp-operational}. The four-source taxonomy of lookahead biases, including the subtle cross-sectional kind that appears when pooling many symbols, is in \Cref{sec:eval-lookahead-taxonomy} and \Cref{tab:lookahead-taxonomy}.
+\end{warning}
+
+% ═══════════════════════════════════════════════════
+\section{The P\&L Engine: The Gamma Identity}
+\label{sec:ivrv:pnl-engine}
+% ═══════════════════════════════════════════════════
+
+Why should a delta-hedged option pay off on realized-minus-implied variance at all? The answer is one of the most elegant identities in derivatives, and it is the engine under the whole strategy. Suppose we hold an option and continuously rebalance the stock hedge using the delta computed at the option's \emph{implied} volatility. \citet{AhmadWilmott2005} show that the one-day mark-to-market profit is then completely deterministic:
+
+\begin{equation}
+\label{eq:ivrv:aw-daily}
+d\Pi_t = \tfrac{1}{2}\big(\sigma^2 - \tilde{\sigma}^2\big)\,S^2\,\Gamma^{i}\,dt .
+\end{equation}
+
+\begin{itemize}
+  \item $\sigma$: the \textbf{actual} (realized) volatility that the underlying delivers over the step.
+  \item $\tilde{\sigma}$: the \textbf{implied} volatility baked into the option's price and into the hedge ratio.
+  \item $S$: the underlying price; $\Gamma^{i}$: the option's \textbf{gamma} computed with the implied volatility (the curvature of its value in $S$).
+  \item $S^2\Gamma^{i}$: the \textbf{dollar gamma}, the weight that converts a variance gap into money.
+  \item $dt$: the length of the step.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Hedging at the implied volatility makes each day's profit a clean, sign-definite bet: you earn the gap between the variance that actually happened ($\sigma^2$) and the variance the market charged for ($\tilde{\sigma}^2$), scaled by how much curvature (dollar gamma) the position carries that day. Remarkably there is no random $dX$ term: once you fix the hedge at implied vol, the daily P\&L stops depending on the direction the stock moved and depends only on how \emph{much} it moved. The position has been turned into a pure variance meter.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+\Cref{eq:ivrv:aw-daily} is the bridge from a volatility forecast to dollars. If our forecast says $\sigma$ will be below the implied $\tilde{\sigma}$, the daily increment is positive for a short position; the better the forecast pins $\sigma$, the more reliably we sit on the profitable side of the gap. This is the exact quantity our backtest accumulates day by day.
+\end{projectconnection}
+
+Summing the discounted daily increments over the life of the trade gives the total profit from hedging at implied volatility,
+\begin{equation}
+\label{eq:ivrv:aw-total}
+\Pi = \tfrac{1}{2}\big(\sigma^2 - \tilde{\sigma}^2\big)\int_{t_0}^{T} e^{-r(t-t_0)}\, S^2\,\Gamma^{i}\,dt ,
+\end{equation}
+which \citet{AhmadWilmott2005} describe as ``always positive, but highly path dependent'': positive because (for a correct view) every daily increment has the same sign, yet path dependent because the dollar-gamma weight $S^2\Gamma^{i}$ depends on where the stock wanders relative to the strike. The more general statement, that hedging with a delta based on \emph{any} volatility $\sigma_h$ yields present value $V(S,t;\sigma_h) - V(S,t;\tilde{\sigma}) + \tfrac{1}{2}(\sigma^2-\sigma_h^2)\int_{t_0}^{T} e^{-r(t-t_0)}S^2\Gamma^{h}\,dt$, is due to Carr (2005) and Henrard (2003), as presented by \citet{AhmadWilmott2005}.
+
+In a daily backtest we do not integrate; we sum one increment per day, replacing the instantaneous variance $\sigma^2 dt$ with the day's realized variance $\RV_t$ and the implied term with the daily implied variance $\IVol^2/252$:
+\begin{equation}
+\label{eq:ivrv:daily-discrete}
+\text{PnL}_t \approx \tfrac{1}{2}\,\Gamma_t\,S_t^2\,\Big(\underbrace{\RV_t}_{\text{realized var, day }t} - \underbrace{\tfrac{\IVol^2}{252}}_{\text{daily implied var}}\Big).
+\end{equation}
+
+\begin{itemize}
+  \item $\RV_t$: the realized \emph{variance} over day $t$ (e.g.\ the sum of squared 5-minute returns).
+  \item $\IVol^2/252$: the implied variance apportioned to a single trading day.
+  \item $\Gamma_t S_t^2$: the dollar gamma at the start of day $t$, treated as fixed across the day.
+\end{itemize}
+
+\begin{warning}[Notation: Variance Form vs.\ Volatility Form]
+\Cref{sec:gamma-pnl} wrote this identity as equation~\eqref{eq:gamma-pnl-simple}, $\tfrac12\Gamma S^2(\RV^2 - \IVol^2)T$, where there $\RV$ denotes realized \emph{volatility}, so $\RV^2$ is a variance. Here $\RV_t$ denotes realized \emph{variance} directly, so the bracket is $(\RV_t - \IVol^2/252)$ with no square. The two are the same object; only the symbol's meaning differs, and we use the variance form throughout this chapter.
+\end{warning}
+
+\begin{intuition}[In Plain English]
+Each day you collect (or pay) one number: half the dollar gamma times how much the realized variance overshot or undershot the slice of implied variance you were charged for that day. String these daily numbers together and you have the strategy's gross P\&L, before any costs.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+\Cref{eq:ivrv:daily-discrete} is literally the line of code at the heart of the backtest loop in \Cref{sec:ivrv:algorithm}. Every refinement still to come, transaction costs, hedging-error variance, kurtosis, modifies what surrounds this line; the line itself is the payoff of the forecast.
+\end{projectconnection}
+
+The dollar-gamma weight $S_t^2\Gamma_t$ is not constant: it is largest when the stock sits near the strike and falls away as the stock drifts into either wing (\Cref{fig:ivrv:dollar-gamma}). This is the source of the path dependence: the same average variance gap earns very different money depending on whether the stock spent the period parked at the strike (high weight) or trending away from it (low weight). The variance \emph{swap} removes this dependence entirely by replacing the single option with a static strip of options weighted $1/K^2$ (the log contract of \Cref{sec:var-swap}); a single straddle does not have that luxury, which is why \Cref{sec:ivrv:breaks} examines where its clean variance interpretation frays.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.78\textwidth, height=5.4cm,
+  xlabel={Underlying price $S$}, ylabel={Dollar gamma $S^2\Gamma$},
+  xmin=60, xmax=150, ymin=0, ymax=1.15,
+  ytick=\empty, xtick={100}, xticklabels={$K$},
+  axis lines=left, samples=120, domain=60:150,
+  every axis plot/.append style={very thick, intgreen},
+  clip=false,
+]
+  \addplot { exp(-((x-100)^2)/(2*120)) };
+  \draw[dashed, gray] (axis cs:100,0) -- (axis cs:100,1.02);
+  \node[anchor=south, font=\scriptsize, intgreen] at (axis cs:103,1.0) {peaks at-the-money};
+  \node[anchor=west, font=\scriptsize, gray] at (axis cs:128,0.18) {decays in the wings};
+\end{axis}
+\end{tikzpicture}
+\caption{The dollar-gamma weight $S^2\Gamma$ as a function of the underlying price, for a fixed strike $K$. The weight that converts a variance gap into P\&L is concentrated near the money and decays as the stock drifts into either wing. This is why a single delta-hedged straddle is a \emph{path-dependent} variance bet: the same realized-minus-implied gap earns more money on days the stock loiters near the strike than on days it trends away.}
+\label{fig:ivrv:dollar-gamma}
+\end{figure}
+
+\begin{workedexample}[Three Days of Gamma P\&L]
+Hold a short straddle on a \$100 stock with dollar gamma $\Gamma_t S_t^2 = \$200{,}000$ (treated as roughly constant), against an implied volatility of $20\%$. The daily implied variance charged is $\IVol^2/252 = 0.04/252 = 1.587\times10^{-4}$. Suppose the realized daily variances on three days are $1.0$, $2.5$, and $0.6$ (all $\times10^{-4}$). Each day's P\&L for the \emph{short} is $-\tfrac12\Gamma_t S_t^2(\RV_t - \IVol^2/252)$:
+\begin{itemize}
+  \item Day 1: $-\tfrac12(200{,}000)(1.0-1.587)\times10^{-4} = +\$5.9$.
+  \item Day 2: $-\tfrac12(200{,}000)(2.5-1.587)\times10^{-4} = -\$9.1$.
+  \item Day 3: $-\tfrac12(200{,}000)(0.6-1.587)\times10^{-4} = +\$9.9$.
+\end{itemize}
+The quiet days pay the short; the one stormy day claws most of it back. Net over three days: $+\$6.7$, gross of every cost still to come. This is the whole game in miniature: a short straddle is a steady drip of premium punctuated by sharp losses when realized variance spikes.
+\end{workedexample}
