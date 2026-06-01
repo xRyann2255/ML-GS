@@ -4,7 +4,7 @@
 
 > **Application: From Components to Combinations**
 >
-> [Ch. 11](ch11-trees-boosting.md) and [Ch. 12b](ch12b-deep-learning-vol.md) showed that ML models
+> [Chapter 11](ch11-tree-methods-vol.md) and [Chapter 12b](ch12b-deep-learning-vol.md) showed that ML models
 > improve on HAR primarily through richer features and nonlinear interactions,
 > not by replacing the linear structure that HAR captures well. This chapter
 > asks: why not let HAR handle the linear part and train ML only on the
@@ -13,8 +13,8 @@
 > (HARQ-X with ML Residual Augmentation) is a hybrid by design.
 
 You already have two powerful toolkits: the econometric models of
-[Ch. 5](ch05-garch-models.md)--[Ch. 7](ch07-har-models.md) and the machine-learning models of
-[Ch. 11](ch11-trees-boosting.md)--[Ch. 12b](ch12b-deep-learning-vol.md). Each has blind spots.
+[Chapter 5](ch05-garch-family.md)--[Chapter 6](ch06-har-model.md) and the machine-learning models of
+[Chapter 11](ch11-tree-methods-vol.md)--[Chapter 12b](ch12b-deep-learning-vol.md). Each has blind spots.
 HAR is parsimonious but linear; gradient-boosted trees are flexible but
 hungry for signal. This chapter shows you how to combine them so that
 each component operates where it is strongest.
@@ -161,7 +161,7 @@ post-jump or regime-change dates (Rahimikia and Poon, 2020).
    > linear baseline already captures.
 
 3. Construct a feature matrix $\mathbf{X}_t$ from the feature engineering
-   toolkit of [Ch. 10](ch10-feature-engineering.md) (jump indicators, leverage,
+   toolkit of [Chapter 10](ch10-feature-engineering.md) (jump indicators, leverage,
    signed volatility, VIX basis, microstructure noise proxies).
 
 4. Fit SVR with radial basis function (RBF) kernel on $(e_t, \mathbf{X}_t)$:
@@ -227,7 +227,7 @@ post-jump or regime-change dates (Rahimikia and Poon, 2020).
 
 ### Motivation
 
-The models in earlier sections use a two-stage pipeline: fit an econometric model, then correct its errors. GARCH-Informed Neural Networks (GINN) take a different approach. They hard-wire the GARCH recursion directly into the neural network architecture so that the network learns corrections to the GARCH parameters rather than learning the entire volatility dynamics from scratch (Li et al., 2024).
+The models in earlier sections use a two-stage pipeline: fit an econometric model, then correct its errors. GARCH-Informed Neural Networks (GINN) take a different approach. They hard-wire the GARCH recursion directly into the neural network architecture so that the network learns corrections to the GARCH parameters rather than learning the entire volatility dynamics from scratch (Cuchiero, Heiss, Khosrawi, and Spoida, 2024).
 
 > **Key Idea: GINN = Residual Learning for GARCH**
 >
@@ -261,7 +261,7 @@ $$\sigma^2_{t+1} = \omega_t + \alpha_t\,\epsilon_t^2
 
 where each term is:
 - $g_{\boldsymbol{\theta}}(\mathbf{X}_t)$ -- a small feedforward network (typically 2 hidden layers, 32--64 units each) that maps auxiliary features $\mathbf{X}_t$ to time-varying GARCH parameters,
-- $\omega_t, \alpha_t, \beta_t$ -- the GARCH coefficients at time $t$, constrained to satisfy $\omega_t > 0$, $\alpha_t \geq 0$, $\beta_t \geq 0$, and $\alpha_t + \beta_t < 1$ via softmax and sigmoid output activations (Li et al., 2024),
+- $\omega_t, \alpha_t, \beta_t$ -- the GARCH coefficients at time $t$, constrained to satisfy $\omega_t > 0$, $\alpha_t \geq 0$, $\beta_t \geq 0$, and $\alpha_t + \beta_t < 1$ via softmax and sigmoid output activations (Cuchiero, Heiss, Khosrawi, and Spoida, 2024),
 - $\epsilon_t^2$ -- the squared innovation (return shock),
 - $\sigma^2_t$ -- the previous conditional variance, fed back recurrently.
 
@@ -310,7 +310,7 @@ volatility clusters, shocks decay exponentially, and the unconditional
 variance is finite. The neural network modulates these dynamics based on
 auxiliary information (sentiment, jump indicators, cross-asset signals)
 without having to discover the clustering structure itself.
-Li et al. (2024) show that GINN matches or outperforms both standard
+Cuchiero, Heiss, Khosrawi, and Spoida (2024) show that GINN matches or outperforms both standard
 GARCH and unconstrained LSTMs on equity index volatility, with
 substantially fewer parameters than the LSTM.
 
@@ -370,8 +370,8 @@ The procedure has three stages:
    >
    > At Goldman Sachs you may have access to proprietary news feeds
    > or internal research sentiment. Public NLP signals show modest
-   > and conditional improvements -- primarily on volatility jump
-   > days -- but a curated internal signal could do better. More
+   > and conditional improvements, primarily on volatility jump
+   > days, but a curated internal signal could do better. More
    > importantly, this equation shows the general template for
    > augmenting HAR with any exogenous feature: just add it as an
    > extra regressor and test whether $\gamma \neq 0$.
@@ -422,8 +422,8 @@ $$\hat{y}_{t+1} = w\,\widehat{\mathrm{HAR}}_t + (1-w)\,\widehat{\text{GBM}}_t,$$
 
 where:
 - $w$ -- the HAR weight, typically calibrated on a validation set or set to $w = 0.7$ as a robust default,
-- $\widehat{\mathrm{HAR}}_t$ -- the HAR forecast,
-- $\widehat{\text{GBM}}_t$ -- the LightGBM forecast trained on the full feature set of [Ch. 10](ch10-feature-engineering.md).
+- $\widehat{\mathrm{HAR}}_t$ -- the HAR forecast from the HAR fit equation above,
+- $\widehat{\text{GBM}}_t$ -- the LightGBM forecast trained on the full feature set of [Chapter 10](ch10-feature-engineering.md).
 
 > **Intuition: In Plain English**
 >
@@ -538,7 +538,7 @@ $$\tilde{\mathbf{X}}_t = \bigl[\,\mathbf{X}_t^{\text{tab}} \;\|\;
   \mathbf{h}_t^{\text{LSTM}}\,\bigr],$$
 
 where each term is:
-- $\mathbf{X}_t^{\text{tab}}$ -- the tabular feature matrix (RV lags, jump indicators, leverage, microstructure proxies, cross-asset signals) from [Ch. 10](ch10-feature-engineering.md),
+- $\mathbf{X}_t^{\text{tab}}$ -- the tabular feature matrix (RV lags, jump indicators, leverage, microstructure proxies, cross-asset signals) from [Chapter 10](ch10-feature-engineering.md),
 - $\mathbf{h}_t^{\text{LSTM}}$ -- the $k$-dimensional embedding vector extracted from the LSTM's final hidden state after processing the intraday sequence,
 - $\|$ -- concatenation along the feature axis.
 
@@ -596,7 +596,7 @@ trains on the residuals left by all prior stages. The canonical
 three-stage pipeline for volatility forecasting is:
 
 1. **Stage 1 -- HAR (linear baseline).** Fit HAR on the
-   training set. HAR captures the dominant
+   training set exactly as in the HAR fit equation above. HAR captures the dominant
    multi-scale autoregressive structure of realized volatility.
    Compute residuals: $e_t^{(1)} = \operatorname{RV}_{t+1} -
    \widehat{\mathrm{HAR}}_t$.
@@ -623,7 +623,7 @@ $$\hat{y}_{t+1} = \widehat{\mathrm{HAR}}_t
   + \widehat{\text{LSTM}}(\mathbf{X}_t^{\text{seq}}),$$
 
 where each term is:
-- $\widehat{\mathrm{HAR}}_t$ -- the HAR baseline forecast,
+- $\widehat{\mathrm{HAR}}_t$ -- the HAR baseline forecast (from the HAR fit equation above),
 - $\widehat{\text{GBM}}(\mathbf{X}_t)$ -- the LightGBM correction trained on HAR residuals with tabular features,
 - $\widehat{\text{LSTM}}(\mathbf{X}_t^{\text{seq}})$ -- the LSTM correction trained on Stage 2 residuals with intraday sequences (set to zero if Stage 3 is dropped).
 
@@ -631,13 +631,13 @@ where each term is:
 >
 > Residual stacking is like a relay race. HAR runs the first leg and
 > explains everything it can with three coefficients. LightGBM picks up
-> what HAR dropped -- the nonlinear, interaction-driven patterns in the
+> what HAR dropped, the nonlinear, interaction-driven patterns in the
 > leftover signal. If there is still structure remaining (temporal
 > dependencies in the second-stage residuals), an LSTM runs the final
 > leg. Each runner is specialized by construction: you never ask a model
 > to redo work that a prior stage already handled. This is the
-> three-stage extension of the HAR-SVR pipeline, replacing SVR with LightGBM and
-> adding an optional LSTM stage.
+> three-stage extension of the HAR-SVR pipeline from the HAR-SVR section,
+> replacing SVR with LightGBM and adding an optional LSTM stage.
 
 > **Project Connection: Residual Stacking Is Your Default Architecture**
 >
@@ -676,7 +676,7 @@ $$\hat{y}_{t+1} = \sum_{k=1}^{K} w_k\,\hat{y}_{t+1}^{(k)},
 
 where each term is:
 - $\hat{y}_{t+1}^{(k)}$ -- the independent forecast from model $k$,
-- $w_k$ -- the blend weight for model $k$, constrained to sum to one (though a ridge meta-learner relaxes this constraint).
+- $w_k$ -- the blend weight for model $k$, constrained to sum to one (though a ridge meta-learner as in the stacking equation above relaxes this constraint).
 
 > **Intuition: In Plain English**
 >
@@ -756,11 +756,451 @@ The table below summarizes the tradeoffs across the three architectures on five 
 > The table reveals a clear pattern: moving from left to right (feature
 > stacking to residual stacking to prediction blending), complexity
 > decreases, debuggability increases, and literature support strengthens.
-> Feature stacking sounds appealing in theory -- richer input to the
-> tree -- but gradient isolation undermines the premise. Residual
+> Feature stacking sounds appealing in theory, richer input to the
+> tree, but gradient isolation undermines the premise. Residual
 > stacking gives each model a distinct role by construction. Prediction
 > blending is the simplest and most robust, requiring no architectural
 > coupling between models at all.
+
+
+## Identifying Regimes: GMM, EM, and BIC
+
+The regime-dependent weighting scheme of the next subsection, and the
+regime-switching combination of [Chapter 11](ch11-tree-methods-vol.md)
+(the regime-switching combination equation), both rely on a single ingredient
+we have so far left undefined: a *regime indicator*. Until now we
+have used ad-hoc thresholds, $\operatorname{RV}_t^{(w)}$ above its 75th percentile,
+or $\operatorname{IV}_t > 30$ for the VIX, to declare a market "stressed." Those
+rules are easy to state and easy to defend, but they raise an obvious
+question: *why $75$th and not $80$th?* This section replaces the
+hand-picked threshold with a probabilistic model that lets the data decide
+both how many regimes exist and which one each day belongs to, the
+"GMM-based regime probability" that [Chapter 11](ch11-tree-methods-vol.md) promised when
+it defined the stress indicator $s_t$.
+
+> **Prereq: Multivariate Gaussian and Mixture Models**
+>
+> A $d$-dimensional Gaussian density is
+> $$\mathcal{N}(\mathbf{x} \mid \bm{\mu}, \bm{\Sigma})
+>   = \frac{1}{(2\pi)^{d/2} |\bm{\Sigma}|^{1/2}}
+>     \exp\!\Bigl(-\tfrac{1}{2}(\mathbf{x} - \bm{\mu})^\top \bm{\Sigma}^{-1}
+>     (\mathbf{x} - \bm{\mu})\Bigr),$$
+> where $\bm{\mu} \in \mathbb{R}^d$ is the mean and
+> $\bm{\Sigma} \in \mathbb{R}^{d \times d}$ is the covariance matrix (symmetric
+> positive-definite, a square table recording each feature's spread on
+> its diagonal and how every pair of features co-moves off it). A
+> **mixture model** says the data come from several such Gaussians,
+> each chosen with some probability. If this is unfamiliar, review
+> Bishop (2006), Ch. 2 and 9.
+>
+> *You do not need to understand every symbol above.* The key idea is
+> *distance from the center*: this is the ordinary bell curve
+> generalized to $d$ features at once. The $\exp(\cdots)$ term is large when
+> $\mathbf{x}$ sits close to the center $\bm{\mu}$ and shrinks as $\mathbf{x}$ moves away;
+> the quadratic $(\mathbf{x}-\bm{\mu})^\top \bm{\Sigma}^{-1}(\mathbf{x}-\bm{\mu})$ measures
+> that distance while accounting for how the features spread and co-move. The
+> fraction in front is just a normalizing constant that makes the total
+> probability sum to one, you never compute it by hand. Notationally,
+> $|\bm{\Sigma}|$ is the **determinant** (a single number summarizing
+> the overall spread), the superscript $^\top$ is the **transpose**
+> (turn a column into a row so the multiplication works), and
+> $\bm{\Sigma}^{-1}$ is the **matrix inverse**.
+
+### The GMM Density Model for Soft Regime Clustering
+
+The idea is to treat each trading day as a point in a low-dimensional
+space of volatility descriptors and ask: *which cluster of historical
+days does today most resemble?* A **Gaussian Mixture Model (GMM)**
+formalizes "cluster" as a Gaussian blob and "which one" as a
+probability. We first state what the model is, then how to fit it.
+
+> **Definition: Gaussian Mixture Model**
+>
+> A $K$-component Gaussian Mixture Model models the density of observations
+> $\mathbf{x} \in \mathbb{R}^d$ as
+> $$p(\mathbf{x}) = \sum_{k=1}^{K}
+>     \underbrace{\pi_k}_{\text{how common regime }k\text{ is}}\;
+>     \underbrace{\mathcal{N}(\mathbf{x} \mid \bm{\mu}_k, \bm{\Sigma}_k)}_{\text{regime-}k\text{ shape}},$$
+> where each term is:
+> - $K$ -- the number of mixture components, interpreted here as the number of **volatility regimes**,
+> - $\pi_k \geq 0$ -- the **mixing weight** (prior probability) of regime $k$, with $\sum_{k=1}^K \pi_k = 1$; the long-run fraction of days spent in regime $k$,
+> - $\bm{\mu}_k \in \mathbb{R}^d$ -- the **mean** feature vector of regime $k$ (e.g., the typical $(\operatorname{RV}, \text{jump}, \operatorname{IV})$ profile of a crisis),
+> - $\bm{\Sigma}_k \in \mathbb{R}^{d \times d}$ -- the **covariance** of regime $k$, describing how tightly days cluster around $\bm{\mu}_k$ and how the features co-move within the regime.
+>
+> > **Intuition: In Plain English**
+> >
+> > The GMM density equation says: "Pretend volatility days are drawn
+> > from $K$ different bell-shaped clouds. Each cloud has its own center
+> > (typical RV, jump size, VIX) and its own spread. A calm cloud sits at low
+> > RV and low VIX; a crisis cloud sits at high RV, large jumps, and a
+> > blown-out VIX." Rather than slicing the data with a single hard line at
+> > the 75th percentile, the GMM draws soft, possibly overlapping blobs and
+> > lets a day belong partly to several of them.
+>
+> > **Project Connection: Why This Matters**
+> >
+> > The regime descriptors we feed the GMM are precisely the quantities this
+> > guide has spent chapters building: the HAR components $\operatorname{RV}_t$,
+> > $\operatorname{RV}_t^{(w)}$, $\operatorname{RV}_t^{(m)}$ ([Chapter 6](ch06-har-model.md)), the signed jump
+> > variation that separates good from bad volatility
+> > ([Chapter 4](ch04-jumps-continuous-variation.md)), and the option-implied $\operatorname{IV}_t$ with its
+> > variance risk premium $\operatorname{VRP}_t$ ([Chapter 9](ch09-variance-risk-premium.md)). A fitted GMM turns
+> > these into a soft regime label per day, which becomes the
+> > stress-indicator $s_t$ that drives the regime-dependent blend weights in
+> > the section on static vs. regime-dependent weights below, replacing the arbitrary
+> > "$\operatorname{RV}^{(w)} > 75$th percentile" rule with a data-driven one.
+
+**What goes into $\mathbf{x}_t$.**
+The regime model takes *volatility-state descriptors*, not your full
+prediction feature set. A compact, defensible choice for daily
+RV forecasting is
+
+$$\mathbf{x}_t = \bigl(\,\operatorname{RV}_t,\;\operatorname{RV}_t^{(w)},\;\operatorname{RV}_t^{(m)},\;
+    J_t^{+},\;J_t^{-},\;\operatorname{IV}_t,\;\operatorname{VRP}_t\,\bigr)^\top,$$
+
+where each term is:
+- $\operatorname{RV}_t,\,\operatorname{RV}_t^{(w)},\,\operatorname{RV}_t^{(m)}$ -- the daily, weekly, and monthly HAR components, capturing the level and slope of the volatility term structure,
+- $J_t^{+},\,J_t^{-}$ -- the signed (positive and negative) jump variation, separating "good" upside jumps from "bad" downside jumps ([Chapter 4](ch04-jumps-continuous-variation.md)),
+- $\operatorname{IV}_t$ -- the option-implied volatility (VIX), a forward-looking risk gauge,
+- $\operatorname{VRP}_t = \operatorname{IV}_t^2 - \mathbb{E}_t[\operatorname{RV}_{t+1}]$ -- the variance risk premium. Here $\mathbb{E}_t[\operatorname{RV}_{t+1}]$ is the market's *expected* next-day realized variance given everything known by day $t$ (the subscript $t$ means "conditional on information up to today"; in practice this is a forecast such as the HAR prediction itself). The VRP is then how much more the option market is charging ($\operatorname{IV}_t^2$) than that expected realized amount, large when investors are paying up for crash protection ([Chapter 9](ch09-variance-risk-premium.md), which uses the full multi-day horizon).
+
+> **Warning: Standardize Before You Fit**
+>
+> $\operatorname{RV}$ lives near $10^{-4}$ in variance units while the VIX lives near
+> $20$. Left raw, the GMM's distances would be dominated entirely by the
+> VIX and would ignore $\operatorname{RV}$ altogether. (**Euclidean distance** just
+> means straight-line distance in feature space; a feature measured in
+> $20$s swamps one measured in $0.0001$s, so the model would only ever
+> "see" the VIX.) Apply the z-score leg of the **Triple Expansion**
+> from [Chapter 10](ch10-feature-engineering.md) (the Triple Expansion section) to every
+> input. **Z-scoring** means subtract each feature's mean and divide
+> by its standard deviation, so it is recentred to a mean of $0$ and
+> rescaled to a typical size of $1$, putting every feature on the same
+> footing. Use only a trailing window to compute the standardization
+> moments, so the regime label for day $t$ uses no future information.
+
+### The EM Algorithm: Soft Labels, Then Updated Blobs
+
+How do we find the $\pi_k$, $\bm{\mu}_k$, $\bm{\Sigma}_k$ that best explain
+the data? By **maximum likelihood**, pick the parameters that make
+the data we actually observed as probable as possible. The log-likelihood
+of the parameters
+$\bm{\theta} = \{\pi_k, \bm{\mu}_k, \bm{\Sigma}_k\}_{k=1}^K$ is
+
+$$\ell(\bm{\theta}) = \sum_{t=1}^{T} \log
+    \underbrace{\sum_{k=1}^{K} \pi_k\,\mathcal{N}(\mathbf{x}_t \mid \bm{\mu}_k, \bm{\Sigma}_k)}_{\text{mixture density at day } t},$$
+
+where each term is:
+- $T$ -- the number of trading days in the fitting window,
+- the inner sum -- the GMM density (from the GMM density equation above) evaluated at day $t$'s descriptor $\mathbf{x}_t$,
+- the outer $\log$-sum -- the total log-probability the model assigns to the observed history.
+
+> **Intuition: In Plain English**
+>
+> The log-likelihood equation scores a candidate set of regime
+> blobs by asking "how likely is the actual volatility history under these
+> blobs?" We want the blobs that make the data look most ordinary. The
+> trouble is the $\log$ wraps a *sum* over regimes, so there is no
+> *closed form*, a direct formula you could just plug numbers into.
+> Taking the log of a single bell curve simplifies nicely (the $\exp$
+> cancels), but taking the log of a *sum* of bell curves does not
+> simplify, so we have to iterate instead: knowing the best blobs requires
+> knowing which regime each day belongs to, and knowing each day's regime
+> requires the blobs. This chicken-and-egg structure is exactly what the EM
+> algorithm untangles.
+
+The **Expectation-Maximization (EM)** algorithm
+(Dempster, Laird, and Rubin, 1977) breaks the deadlock by alternating two
+steps until the log-likelihood stops increasing.
+
+> **Key Idea: EM for Gaussian Mixtures**
+>
+> **E-step (soft labels).** Given the current blobs, compute the
+> **responsibility** of regime $k$ for day $t$:
+> $$\gamma_{tk} = \frac{\pi_k\,\mathcal{N}(\mathbf{x}_t \mid \bm{\mu}_k, \bm{\Sigma}_k)}
+>     {\sum_{j=1}^{K} \pi_j\,\mathcal{N}(\mathbf{x}_t \mid \bm{\mu}_j, \bm{\Sigma}_j)},$$
+> where $\gamma_{tk}$ is how strongly regime $k$ claims day $t$,
+> literally regime $k$'s share of the total density at that day, a number
+> between $0$ and $1$ (top divided by the sum of all the tops). In words:
+> what fraction of today belongs to the calm cloud, the crisis cloud, the
+> elevated cloud. Statisticians write this as the *posterior
+> probability* $\Pr(\text{regime}=k \mid \mathbf{x}_t)$, read "the probability the
+> regime is $k$, given that we observed today's descriptor $\mathbf{x}_t$" (the
+> vertical bar means "given").
+>
+> **M-step (update blobs).** Treating the responsibilities as soft
+> counts, re-estimate each regime:
+> $$N_k = \sum_{t=1}^{T} \gamma_{tk},$$
+> $$\bm{\mu}_k^{\text{new}} = \frac{1}{N_k}
+>     \sum_{t=1}^{T} \gamma_{tk}\,\mathbf{x}_t,$$
+> $$\bm{\Sigma}_k^{\text{new}} = \frac{1}{N_k}
+>     \sum_{t=1}^{T} \gamma_{tk}\,(\mathbf{x}_t - \bm{\mu}_k^{\text{new}})
+>     (\mathbf{x}_t - \bm{\mu}_k^{\text{new}})^\top,$$
+> $$\pi_k^{\text{new}} = \frac{N_k}{T},$$
+> where $N_k$ is the **effective number of days** assigned to regime
+> $k$. The mean update is just a weighted average
+> of the days (each day weighted by how much it claims to belong). The
+> covariance update is the weighted average
+> *squared spread* of the days around the new center, it measures how
+> wide and what shape each cloud is. The outer product
+> $(\mathbf{x}_t - \bm{\mu}_k^{\text{new}})(\mathbf{x}_t - \bm{\mu}_k^{\text{new}})^\top$ is
+> the multi-feature version of squaring a deviation: the second factor is
+> written as a row (that is the $^\top$ transpose), so a column times a row
+> produces a $d\times d$ *matrix*, not a single number, capturing both
+> how much each feature varies and how the features move together.
+> Iterate the E-step and M-step updates until
+> $|\ell^{(i+1)} - \ell^{(i)}| < \tau_{\text{EM}}$, where $\ell^{(i)}$ is the
+> log-likelihood after iteration $i$ (the parenthesized superscript is an
+> iteration counter, not a power) and $\tau_{\text{EM}}$ is a small stopping
+> threshold (e.g. $10^{-6}$), stop when the log-likelihood barely changes.
+> EM guarantees $\ell(\bm{\theta})$ never decreases
+> (Dempster, Laird, and Rubin, 1977).
+
+> **Intuition: In Plain English**
+>
+> EM is soft $k$-means. The E-step asks each day "what fraction of you
+> belongs to the calm cloud, the crisis cloud, the elevated cloud?" and
+> records those fractions. The M-step then redraws each cloud's center and
+> spread using every day, but weighting each day by how much it claims to
+> belong. A day that is 90% crisis pulls the crisis center hard and the
+> calm center barely at all. Repeat, and the clouds drift until they settle
+> on the natural groupings in the volatility data, no hand-labelling
+> required.
+
+> **Project Connection: Why This Matters**
+>
+> The responsibilities $\gamma_{tk}$ are the soft regime probabilities you
+> want. Feed them in two ways. (1) As *features*: append
+> $\gamma_{t,\text{crisis}}$ as an extra column to the LightGBM feature
+> matrix of [Chapter 11](ch11-tree-methods-vol.md), letting the tree split on regime
+> membership directly. (2) As a *blend dial*: set the stress indicator
+> $s_t = \gamma_{t,\text{high-vol}}$ and let the regime-dependent weights of
+> the section on static vs. regime-dependent weights below interpolate smoothly between the
+> calm-market and stressed-market blends, instead of flipping abruptly at a
+> threshold.
+
+### Choosing the Number of Regimes: BIC
+
+How many regimes should there be, two (calm/crisis), three, four? You
+cannot read $K$ off the log-likelihood, because adding components always
+improves in-sample fit: a GMM with one blob per day fits perfectly and
+learns nothing. The **Bayesian Information Criterion (BIC)**
+(Schwarz, 1978) penalizes that complexity.
+
+$$\text{BIC}(K) = \underbrace{-2\,\ell(\hat{\bm{\theta}})}_{\text{misfit}}
+    + \underbrace{p\,\log T}_{\text{complexity penalty}},$$
+
+where each term is:
+- $\ell(\hat{\bm{\theta}})$ -- the maximized log-likelihood from the log-likelihood equation above at the EM solution,
+- $p$ -- the number of free parameters; for a $K$-component GMM in $d$ dimensions with full covariances, $p = K\bigl(1 + d + \tfrac{d(d+1)}{2}\bigr) - 1$. Reading the count: each regime needs $1$ mixing weight, $d$ numbers for its mean vector, and $\tfrac{d(d+1)}{2}$ numbers for its (symmetric) covariance matrix, times $K$ regimes, minus $1$ because the mixing weights must sum to one so the last one is determined by the rest. (For $K=2$ regimes and $d=7$ features, $p = 2(1+7+28) - 1 = 71$ parameters.)
+- $T$ -- the sample size (trading days), so $\log T$ scales the per-parameter penalty.
+
+> **Intuition: In Plain English**
+>
+> BIC scores a model as "how badly it fits" plus "how much it costs in
+> parameters." Each extra regime buys a lower misfit term but pays the
+> $p\log T$ tax. You pick the $K$ that *minimizes* BIC: the point where
+> one more regime no longer explains enough new structure to justify its
+> parameters. In volatility data, $K=2$ or $K=3$ usually wins, markets
+> have a calm state, a crisis state, and sometimes an in-between "elevated
+> but orderly" state.
+
+> **Project Connection: Why This Matters**
+>
+> Fit a GMM for each $K \in \{2,3,4\}$, record BIC, and pick the minimum.
+> Then *inspect* the regimes: do the cluster means in the regime-inputs
+> equation correspond to recognizable market
+> conditions (low-$\operatorname{RV}$/low-VIX calm, high-$\operatorname{RV}$/high-jump crisis)? If $K=2$
+> and $K=3$ have near-tied BIC, prefer the smaller, more interpretable model,
+> a two-regime calm/crisis split is the cleanest fit for the
+> regime-dependent blend, and it maps directly onto the two states of the
+> Markov-switching model in the section on adding persistence below.
+
+### The sklearn Workflow
+
+The entire fit is a few lines with `scikit-learn`. The one
+non-obvious knob is `n_init`.
+
+> **Key Idea: GMM in scikit-learn**
+>
+> 1. **Standardize** the inputs with a trailing-window z-score (see the warning above; the Triple Expansion section).
+> 2. **Fit** for each candidate $K$:
+>    `GaussianMixture(n_components=K, covariance_type='full', n_init=10, random_state=0).fit(X)`
+> 3. **Select** $K$ by minimizing `gmm.bic(X)`.
+> 4. **Label** each day with soft probabilities `gmm.predict_proba(X)` (the responsibilities $\gamma_{tk}$), *not* the hard `gmm.predict(X)`.
+
+> **Warning: Always Use `n_init` Restarts**
+>
+> The GMM log-likelihood is **non-convex**:
+> the likelihood surface has multiple hills, not one. EM always climbs
+> uphill, so it can get stuck on a smaller hill (a *local* maximum)
+> depending on where it starts, that is why we try several random starting
+> points and keep the best. A single bad start can merge a crisis regime
+> into the calm one. Set `n_init=10` (ten random restarts, keeping the
+> highest-likelihood solution) so the regimes are stable across reruns. Use
+> `covariance_type='full'` unless you are short on data, volatility
+> features are correlated within a regime (high $\operatorname{RV}$ comes with high VIX),
+> and a diagonal covariance would miss that.
+
+### Adding Persistence: Markov-Switching and HMMs
+
+The GMM has a blind spot that matters enormously for volatility:
+*it has no memory*. It classifies each day independently, so its
+labels can flicker calm-crisis-calm-crisis on consecutive days even though
+we know volatility regimes are sticky, a crisis that starts today is
+overwhelmingly likely to persist tomorrow. How do we bake that
+stickiness into the regime model?
+
+> **Prereq: Hidden Markov Models**
+>
+> A **Hidden Markov Model (HMM)** has two layers: (1) a latent state
+> sequence $s_t \in \{1, \ldots, K\}$ that evolves as a Markov chain, and
+> (2) observed emissions $\mathbf{x}_t$ whose distribution depends on $s_t$. The
+> key assumption is that $s_t$ depends on $s_{t-1}$ only (the Markov
+> property). A Markov-switching model is an HMM whose emission is a
+> regression rather than a static Gaussian.
+
+**Markov-switching regression** (Hamilton, 1989) adds exactly the
+missing persistence. The latent state still indexes the regime, but now a
+**transition matrix** governs how the state evolves over time:
+
+$$\mathbf{P} = \begin{pmatrix}
+    p_{00} & p_{01} \\
+    p_{10} & p_{11}
+  \end{pmatrix},
+  \qquad
+  p_{ij} = \underbrace{\Pr(s_t = j \mid s_{t-1} = i)}_{\text{regime } i \to j},
+  \qquad p_{i0} + p_{i1} = 1,$$
+
+where each term is:
+- $s_t \in \{0,1\}$ -- the latent regime (here $0=$ low-vol, $1=$ high-vol, so the diagonal $p_{00}$ is the calm-regime persistence; this is the opposite of Hamilton's expansion$=1$ coding),
+- $p_{ij}$ -- the probability of moving from regime $i$ today to regime $j$ tomorrow,
+- the **diagonal** entries $p_{00}, p_{11}$ -- the **persistence** of each regime: how likely it is to stay put.
+
+> **Intuition: In Plain English**
+>
+> The transition matrix is the memory the GMM lacked. Where the GMM treats
+> today as a fresh draw, the transition matrix says "if you
+> were calm yesterday, you are probably calm today" through a high $p_{00}$
+> (rows are today's regime, columns are tomorrow's, so $p_{ij}$ reads "from
+> $i$ to $j$"). If each day you stay with probability $p$, the average run
+> length before you leave is $1/(1-p)$, the same arithmetic as "if a coin
+> lands heads $98\%$ of the time, you wait about $50$ flips for a tail." So
+> the expected length of a regime is $1/(1-p_{ii})$ days, and a persistence
+> near $0.98$ implies spells of roughly $50$ days. Estimating the
+> regime now requires running forward through the whole sequence with the
+> **Hamilton filter** (Hamilton, 1989), which combines yesterday's
+> regime belief, the transition matrix, and today's observation into
+> today's filtered probability $\Pr(s_t = k \mid \mathbf{x}_{1:t})$, the
+> probability of today's regime using only data up to and including today
+> (days $1$ through $t$).
+
+> **Project Connection: Why This Matters**
+>
+> Persistent regime labels are far more useful as a blend dial than
+> flickering ones. If your stress indicator $s_t$ jumps in and out of
+> "crisis" on alternate days, the regime-dependent blend of
+> the section on static vs. regime-dependent weights below will whipsaw between the calm and
+> stressed weight sets, churning the forecast for no reason. A
+> Markov-switching filter smooths the indicator using the persistence it
+> learned from history, giving a regime signal that turns on at the start of
+> a crisis and stays on until it genuinely ends.
+
+The canonical demonstration of Markov-switching is Hamilton (1989)'s
+two-state model of U.S. GNP growth (expansion vs. recession). We rebuild
+that example on the object we actually care about: realized volatility.
+
+> **Key Result: Two-State Markov-Switching Model on RV**
+>
+> Fit a two-state Markov-switching model to daily (log) realized volatility,
+> $$\log \operatorname{RV}_t = \mu_{s_t} + \phi\bigl(\log \operatorname{RV}_{t-1} - \mu_{s_{t-1}}\bigr)
+>     + \varepsilon_t,
+>   \qquad \varepsilon_t \sim \mathcal{N}(0, \sigma_{s_t}^2),$$
+> where each term is:
+> - $\mu_{s_t}$ -- the regime-dependent average level of log-$\operatorname{RV}$, which flips between a calm value and a crisis value as the latent state $s_t$ switches (the double subscript means "the mean for whichever regime applies on day $t$"),
+> - $\phi$ -- the **persistence** (autoregressive) coefficient, between $-1$ and $1$, controlling how strongly yesterday's deviation carries into today,
+> - $\bigl(\log \operatorname{RV}_{t-1} - \mu_{s_{t-1}}\bigr)$ -- yesterday's gap above or below *its* regime mean,
+> - $\varepsilon_t \sim \mathcal{N}(0,\sigma_{s_t}^2)$ -- random noise (the "$\sim$" reads "is distributed as") whose size $\sigma_{s_t}$ is itself regime-dependent, bigger in a crisis,
+>
+> with $s_t \in \{\text{low},\text{high}\}$ and the transition
+> matrix above. A representative equity-index fit
+> yields two clearly separated regimes:
+> - a **low-vol state** with a low mean log-$\operatorname{RV}$ level ($\mu_{\text{low}}$) and high persistence $p_{00} \approx 0.98$ (calm spells last $\approx 1/(1-0.98) = 50$ days),
+> - a **high-vol state** with a markedly higher mean ($\mu_{\text{high}} \gg \mu_{\text{low}}$) and persistence $p_{11} \approx 0.95$ (crisis spells last $\approx 20$ days), confirming the well-documented asymmetry that calm regimes are stickier than turbulent ones.
+>
+> The filtered probability $\Pr(s_t = \text{high} \mid \mathbf{x}_{1:t})$ spikes
+> during known stress episodes (2008, 2020) without those dates being
+> supplied as inputs, the analogue of Hamilton's filtered recession
+> probabilities tracking NBER dates.
+
+> **Intuition: In Plain English**
+>
+> The Markov-switching RV equation is just an AR(1), autoregressive of
+> order $1$, meaning today depends on yesterday plus noise, for
+> log-volatility whose
+> *level* $\mu_{s_t}$ flips between a calm value and a crisis value, with
+> the flips governed by the transition matrix. The two estimated means tell
+> you where calm and crisis volatility sit; the two persistences tell you how
+> long each lasts. Because the level shifts discretely, the model captures
+> the abrupt jump into a high-vol regime that a single smooth AR process
+> would smear out.
+
+> **Project Connection: Link to Markov-Switching GARCH**
+>
+> Replacing the regime-dependent *mean* in
+> the Markov-switching RV equation with a regime-dependent *GARCH
+> variance recursion* gives the **Markov-switching GARCH** model: the
+> $(\omega, \alpha, \beta)$ parameters of the GARCH update from
+> [Chapter 5](ch05-garch-family.md) themselves switch with the latent state. This is
+> the econometric cousin of the GINN idea in
+> the GARCH-Informed Neural Networks section, where a neural network, rather than a
+> two-state Markov chain, supplies the time-varying GARCH parameters.
+> Both answer the same question: "what if the volatility dynamics
+> themselves depend on the current regime?"
+
+#### GMM vs. Markov-Switching: Which to Use
+
+The table below contrasts the two on the dimensions that
+matter for a volatility-forecasting pipeline.
+
+**Table: Choosing between GMM and Markov-switching for regime identification.**
+
+| Dimension | GMM | Markov-Switching |
+|---|---|---|
+| Temporal structure / persistence | None, each day classified independently, so labels can flicker | Markov chain: $s_t$ depends on $s_{t-1}$; persistence explicit via transition matrix $\mathbf{P}$ |
+| Estimation | EM on the mixture (fast, scales well) | Hamilton filter (forward recursion; slower) |
+| Output | Responsibilities $\gamma_{tk}$ per day | Filtered $\Pr(s_t \mid \mathbf{x}_{1:t})$ and smoothed $\Pr(s_t \mid \mathbf{x}_{1:T})$ |
+| Python | `sklearn.mixture.GaussianMixture` | `statsmodels.tsa.regime_switching` |
+| Best for | Quick soft labels; a regime feature for LightGBM | When persistence matters; a smooth blend dial |
+
+> **Key Idea: Start with GMM; Upgrade to Markov-Switching for Persistence**
+>
+> For a first regime feature, a column of soft probabilities to hand the
+> LightGBM model or a quick blend dial, the GMM is simpler, faster, and
+> sufficient. Reach for Markov-switching only when day-to-day flickering of
+> the regime label is actively hurting the blend, or when you want a regime
+> signal whose persistence is calibrated from the data. The two are
+> complementary: GMM answers "what does today look like?"; Markov-switching
+> answers "what does today look like, given the whole run-up to it?"
+
+### Regime Backtesting Hygiene
+
+Regime-conditional forecasts look better in backtests than in production
+for one reason: *the regime is only known with certainty in
+hindsight*. When you fit a GMM (or smooth a Markov-switching filter) on
+the full sample and then condition on the resulting labels, you have leaked
+future information into today's regime call.
+
+> **Warning: Test Regimes the Way You Will Trade Them**
+>
+> Three disciplines keep a regime overlay honest:
+> 1. **Use soft probabilities, not hard labels** (workflow step 4 above). A strategy that flips fully risk-on at a hard "calm" label implicitly assumes a perfect classification you do not have, today's responsibility might be only $60\%$ calm, $40\%$ elevated.
+> 2. **Test with lagged regime labels.** Apply yesterday's regime classification to today's blend, never a label that used today's or future data. For Markov-switching, use the *filtered* probability $\Pr(s_t \mid \mathbf{x}_{1:t})$, which uses only data up to and including today (days $1$ through $t$), not the *smoothed* $\Pr(s_t \mid \mathbf{x}_{1:T})$, which uses the *entire* sample (days $1$ through the last day $T$) and so secretly looks into the future: fine for describing history, fatal for backtesting a tradable signal.
+> 3. **Check label stability.** Measure how often the GMM revises its call on the most recent days when one new observation arrives. A regime indicator that keeps changing its mind about the recent past is not a tradable signal.
+>
+> Report the regime-conditional $\operatorname{QLIKE}$ improvement only after passing
+> these checks; a gain that survives lagged, soft labels is real, one that
+> needs full-sample hard labels is hindsight.
 
 
 ### Static vs. Regime-Dependent Weights
@@ -792,7 +1232,7 @@ where each term is:
 > but underperforms during calm weeks, it makes sense to shift weight
 > toward LightGBM when volatility is elevated and toward HAR when
 > markets are quiet. Regime-dependent weights let you exploit this
-> pattern. But the key word is "consistently" -- if the performance
+> pattern. But the key word is "consistently", if the performance
 > difference across regimes is noisy or unstable, regime conditioning
 > adds complexity without improving accuracy.
 
@@ -888,7 +1328,7 @@ flowchart LR
 - Hybrid models decompose the forecasting problem into a linear component (HAR, GARCH) and a nonlinear residual component (ML), allowing each method to operate where it is strongest.
 - HAR explains 40--60% of next-day RV with three coefficients; training ML on the residual rather than the raw target improves signal-to-noise and prevents the ML model from wasting capacity on structure that a linear model already captures.
 - HAR-SVR uses support vector regression with an $\varepsilon$-insensitive loss on HAR residuals, automatically ignoring days where HAR is "close enough" and focusing on the hard cases.
-- GINN hard-wires the GARCH recursion into a neural network, letting the network learn time-varying corrections to GARCH parameters rather than learning volatility dynamics from scratch (Li et al., 2024).
+- GINN hard-wires the GARCH recursion into a neural network, letting the network learn time-varying corrections to GARCH parameters rather than learning volatility dynamics from scratch (Cuchiero, Heiss, Khosrawi, and Spoida, 2024).
 - NLP-augmented HAR (Word2Vec sentiment) yields 1--3% $\operatorname{QLIKE}$ improvement concentrated in crisis periods, but gains are fragile and source-dependent (Rahimikia, Zohren, and Poon, 2021).
 - A simple 70/30 HAR/LightGBM weighted average is the safest production choice and is remarkably hard to beat with more complex ensembles.
 - Stacking via a ridge meta-learner on OOS predictions adapts the combination weights to the data while guarding against overfitting at the meta-level.
@@ -909,7 +1349,7 @@ flowchart LR
 > |---|---|
 > | Hybrid principle | Decompose into linear (HAR/GARCH) + nonlinear (ML) components |
 > | HAR-SVR | $\varepsilon$-insensitive loss filters small residuals automatically |
-> | GINN | Hard-wired GARCH recursion with NN-learned time-varying parameters (Li et al., 2024) |
+> | GINN | Hard-wired GARCH recursion with NN-learned time-varying parameters (Cuchiero, Heiss, Khosrawi, and Spoida, 2024) |
 > | NLP + HAR | 1--3% $\operatorname{QLIKE}$ gain, concentrated in crises (Rahimikia, Zohren, and Poon, 2021) |
 > | 70/30 blend | HAR/LightGBM weighted average: simple, robust, hard to beat |
 > | Stacking | Ridge meta-learner on OOS predictions adapts weights safely |
