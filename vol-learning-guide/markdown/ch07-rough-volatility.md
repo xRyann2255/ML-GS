@@ -1,13 +1,14 @@
 # Rough Volatility
 
-> **Application:**
+> **Application: Why This Chapter**
+>
 > Rough volatility provides an alternative explanation for the slow decay in volatility autocorrelation that HAR ([Chapter 6](ch06-har-model.md)) captures with three components and FIGARCH ([Chapter 5](ch05-garch-family.md)) captures with fractional integration.
 > The RFSV model is a parsimonious forecaster competitive with HAR and LSTM.
 > The Cont--Das counterargument warns against taking roughness as ground truth.
 > Project 4 (rough vol vs. deep learning) directly tests RFSV against universal LSTM.
 
 [Chapter 6](ch06-har-model.md) showed that HAR's three-component structure (daily, weekly, monthly) approximates the slow power-law decay of volatility autocorrelations.
-[Chapter 5](ch05-garch-family.md) showed that FIGARCH captures the same slow decay with a fractional differencing parameter $d$.
+[Chapter 5](ch05-garch-family.md) showed that FIGARCH (the FIGARCH section) captures the same slow decay with a fractional differencing parameter $d$.
 Both approaches are empirically motivated heuristics: they match the shape of the autocorrelation function, but neither explains *why* the decay is so slow.
 
 This chapter presents a different starting point.
@@ -28,7 +29,7 @@ But the trader's P&L depends on *when* the moves happened, not just their aggreg
 > Path A: the stock drifts quietly for 25 days then has 5 days of extreme moves.
 > Path B: moves are spread evenly across all 30 days.
 > Both paths have identical 30-day RV = 20%.
-> But the trader's cumulative gamma P&L differs because:
+> But the trader's cumulative gamma P&L (covered in the gamma P&L section of the straddle chapter) differs because:
 >
 > - Gamma varies with moneyness: it is highest when the stock is near the strike.
 > - On Path A, most of the vol occurs after the stock has moved away from the strike (gamma is low), so the trader captures less.
@@ -94,7 +95,10 @@ The Hurst exponent controls two things simultaneously: the roughness of the path
 > At $H = 0.1$, the path is so anti-persistent that it reverses direction almost constantly.
 > The result is a path so jagged that it looks qualitatively different from standard Brownian motion.
 
-*[Figure: Sample paths of fractional Brownian motion at four values of the Hurst exponent $H$. Top left ($H = 0.1$): extremely rough, rapidly oscillating path that reverses direction almost every step, range roughly $\pm 0.65$. Top right ($H = 0.3$): rough but with visible short-range structure, values drifting upward from 0 to about 0.85 with frequent local reversals. Bottom left ($H = 0.5$, standard Brownian motion): familiar random walk, values drifting from 0 to about 1.1 with moderate fluctuations. Bottom right ($H = 0.7$): smooth, trending trajectory that rises to a peak near 1.60 around $t = 49$ then gently descends and rises again. Empirically, $\log \operatorname{RV}$ behaves like the top-left panel.]*
+The figure below shows sample paths at four values of $H$.
+This is the most important visual in the chapter.
+
+*[Figure: Sample paths of fractional Brownian motion at four values of the Hurst exponent $H$, shown in a 2x2 panel layout. Top left ($H = 0.1$, red): extremely rough, rapidly oscillating, reversing direction almost every step and staying confined to roughly the band $[-0.6, 0.65]$. Top right ($H = 0.3$, orange): rough but with visible short-range structure, drifting gently upward toward about $0.85$. Bottom left ($H = 0.5$, blue): standard Brownian motion, the familiar random walk, wandering up to about $1.4$. Bottom right ($H = 0.7$, green): smooth, trending trajectory, rising steadily to a plateau near $1.5$--$1.6$. Empirically, $\log \operatorname{RV}$ behaves like the top-left panel.]*
 
 > **Project Connection: Why This Matters**
 >
@@ -109,7 +113,31 @@ The Hurst exponent controls two things simultaneously: the roughness of the path
 > The lower $H$ is, the rougher the path.
 > Empirical log-volatility has $H \approx 0.1$, which is far into the rough regime.
 
-*[Figure: The Hurst exponent number line from 0 to 1. The region $H < 0.5$ is shaded red and labeled "Rough ($H < 0.5$): anti-persistent, jagged." The region $H > 0.5$ is shaded green and labeled "Smooth ($H > 0.5$): persistent, trending." A dashed blue vertical line at $H = 0.5$ marks Standard BM. An arrow points down to $H \approx 0.1$ labeled "Empirical $\log \operatorname{RV}$." Arrows below the line mark $H = 0.5$ as the location of Heston and SABR, and $H = 0.7$ as the location of some macro series. The gap between 0.1 and 0.5 is the motivation for the entire rough volatility program.]*
+The diagram below provides a compact reference for how different $H$ values map to path behavior and real-world examples.
+
+```mermaid
+flowchart LR
+    Z["H = 0"] --> R1["H = 0.1<br/>Empirical log RV"]
+    R1 --> M["H = 0.5<br/>Heston, SABR<br/>Standard BM (dividing line)"]
+    M --> S1["H = 0.7<br/>Some macro series"]
+    S1 --> E["H = 1.0"]
+
+    subgraph rough["Rough (H &lt; 0.5): anti-persistent, jagged"]
+        R1
+    end
+    subgraph smooth["Smooth (H &gt; 0.5): persistent, trending"]
+        S1
+    end
+
+    classDef roughcol fill:#f5d5d0,stroke:#c0392b,color:#000;
+    classDef smoothcol fill:#d4ede0,stroke:#1e8449,color:#000;
+    classDef bmcol fill:#d5e3ec,stroke:#1a5276,color:#000;
+    class R1 roughcol;
+    class S1 smoothcol;
+    class M bmcol;
+```
+
+*The Hurst exponent number line. Empirical log-volatility sits at $H \approx 0.1$, deep in the rough regime. Standard stochastic volatility models (Heston, SABR) assume $H = 0.5$. The gap between 0.1 and 0.5 is the motivation for the entire rough volatility program.*
 
 ## Volatility Is Rough
 
@@ -119,17 +147,17 @@ Gatheral, Jaisson, and Rosenbaum (2018) studied the time series of $\log \operat
 For each asset, they estimated the Hurst exponent $H$ of the $\log \operatorname{RV}$ series.
 The finding was striking.
 
-> **Key Result: Gatheral, Jaisson, and Rosenbaum (2018) -- Volatility Is Rough**
+> **Key Result: Gatheral, Jaisson, and Rosenbaum (2018): Volatility Is Rough**
 >
 > Across equity indices and bond futures, the Hurst exponent of $\log \operatorname{RV}_t$ is consistently around $H \approx 0.1$ (ranging from roughly $0.06$ to $0.2$ depending on the asset), far below the $H = 0.5$ of standard Brownian motion.
 > This means that log-volatility paths are much rougher (more jagged, more rapidly oscillating) than any standard diffusion model would predict.
 
 To put $H = 0.1$ in context: standard stochastic volatility models (Heston, SABR) assume that the volatility process is driven by a standard Brownian motion, which has $H = 0.5$.
-An $H$ of $0.1$ means the volatility path is far more jagged than a standard diffusion: it reverses direction much more frequently, creating the rapidly oscillating pattern visible in the top-left panel of the figure above.
+An $H$ of $0.1$ means the volatility path is far more jagged than a standard diffusion: it reverses direction much more frequently, creating the rapidly oscillating pattern visible in the top-left panel of the four-panel figure above.
 
 ### How to Estimate $H$: The Variogram Method
 
-The estimation approach in Gatheral, Jaisson, and Rosenbaum (2018) uses the scaling relationship in the variance equation above.
+The estimation approach in Gatheral, Jaisson, and Rosenbaum (2018) uses the scaling relationship from the fBM variance equation.
 If $X_t$ is an fBM with exponent $H$, then the variance of its increments scales as $h^{2H}$.
 In log-log coordinates, this becomes a straight line.
 
@@ -161,11 +189,13 @@ In log-log coordinates, this becomes a straight line.
 > Before fitting any model (HAR, RFSV, or LSTM), estimating $H$ from the data tells you whether the long-memory structure that these models exploit is actually present in your specific asset.
 > If $\hat{H}$ comes back near 0.1, you have confirmation that multi-scale models like HAR are appropriate; if it comes back near 0.5, simpler AR(1)-type models may suffice.
 
-*[Figure: Variogram in log-log coordinates for three Hurst exponent values. The horizontal axis is $\log_{10} h$ (lag) from 0 to 1.3; the vertical axis is $\log_{10} m(2, h)$. Three lines all start near $-1.30$ at $\log h = 0$. The red line ($H = 0.1$, slope 0.2) is nearly flat, barely rising to about $-1.03$ at $\log h = 1.3$; five data points from the worked example lie on it. The blue dashed line ($H = 0.5$, slope 1.0) rises steeply to about $0.0$ at $\log h = 1.3$. The green dotted line ($H = 0.7$, slope 1.4) rises even more steeply. A brace on the right marks the gap between the red and blue lines, labeled "gap = why standard models miss long memory."]*
+The figure below shows the variogram in log-log coordinates, illustrating how the slope distinguishes rough from smooth processes.
 
-> **Key Result: Bayer, Friz, and Gassiat (2022) -- Cross-Asset Universality**
+*[Figure: Variogram in log-log coordinates ($\log_{10} m(2, h)$ versus $\log_{10} h$) for three Hurst exponent values. The red line and data points ($H = 0.1$) follow slope $0.2$ (the line $0.2x - 1.30$), the flat slope characteristic of rough volatility: variance of increments grows very slowly with lag. The blue dashed line ($H = 0.5$) is standard Brownian motion with a steep slope of $1.0$ ($1.0x - 1.30$). The green dotted line ($H = 0.7$) is smooth with slope $1.4$ ($1.4x - 1.30$). A brace annotation marks the vertical gap between the $H = 0.5$ and $H = 0.1$ lines at lag $\log_{10} h \approx 1.1$, labeled "gap = why standard models miss long memory." The gap between the slopes quantifies how much standard diffusion models underestimate the persistence of volatility.]*
+
+> **Key Result: Bennedsen, Lunde, and Pakkanen (2022): Cross-Asset Universality**
 >
-> Bayer, Friz, and Gassiat (2022) extend the analysis of Gatheral, Jaisson, and Rosenbaum (2018) to a broad cross-section of asset classes (equities, equity indices, FX, fixed income, commodities) and confirm that $H \approx 0.1$ is universal.
+> Bennedsen, Lunde, and Pakkanen (2022) extend the analysis of Gatheral, Jaisson, and Rosenbaum (2018) to a broad cross-section of asset classes (equities, equity indices, FX, fixed income, commodities) and confirm that $H \approx 0.1$ is universal.
 > The Hurst exponent does not vary meaningfully across asset classes, geographies, or time periods.
 > This universality suggests that $H \approx 0.1$ reflects a deep structural property of volatility dynamics, not a peculiarity of any particular market.
 
@@ -265,7 +295,7 @@ Could the apparent roughness be an artefact of this noise?
 
 Cont and Das (2024) argue that the answer is yes, at least in part.
 
-> **Key Result: Cont and Das (2024) -- Roughness as a Noise Artefact**
+> **Key Result: Cont and Das (2024): Roughness as a Noise Artefact**
 >
 > Observed roughness of realized volatility estimates is partly a microstructure-noise artefact.
 > When i.i.d. noise contaminates the high-frequency returns used to compute $\operatorname{RV}$, the resulting $\operatorname{RV}$ series appears rougher than the true spot volatility process.
@@ -273,11 +303,11 @@ Cont and Das (2024) argue that the answer is yes, at least in part.
 
 The mechanism is intuitive and illustrated in the figure below.
 
-*[Figure: Two panels showing how microstructure noise creates apparent roughness. Top panel: the true spot volatility $\sigma^2_t$ is a smooth process ($H = 0.5$), shown as a green curve rising gently from 1.0 to a peak near 1.60 around day 70, then declining slightly. Bottom panel: the estimated $\operatorname{RV}_t$ (red jagged line) oscillates rapidly above and below the dashed green underlying curve, which is the same smooth process repeated. The noisy $\operatorname{RV}_t$ series looks rough (anti-persistent, rapidly oscillating) even though the underlying process is smooth. An arrow between the panels is labeled "add estimation noise." Applying the variogram estimator to the red series yields $\hat{H} \approx 0.1$, but this reflects noise contamination, not true roughness of $\sigma^2_t$.]*
+*[Figure: How microstructure noise creates apparent roughness, shown in two stacked panels over 100 trading days. Top panel: the true spot volatility $\sigma^2_t$ (green, solid) is a smooth process ($H = 0.5$), drifting gently between about $1.0$ and $1.6$. Bottom panel: the estimated $\operatorname{RV}_t$ (red) adds i.i.d. estimation noise around the same true level (shown dashed green), oscillating rapidly between roughly $0.8$ and $1.7$. A gray arrow between the panels is labeled "add estimation noise." The noisy $\operatorname{RV}_t$ series looks rough (anti-persistent, rapidly oscillating) even though the underlying process is smooth. Applying the variogram estimator to the red series yields $\hat{H} \approx 0.1$, but this reflects noise contamination, not true roughness of $\sigma^2_t$.]*
 
 The Cont and Das (2024) argument proceeds in three steps:
 
-1. **Noise adds estimation errors.** Each day's $\operatorname{RV}_t$ differs from the true integrated variance by an estimation error $\eta_t$ ([Chapter 2](ch02-realized-volatility.md)). Under certain models (e.g., the Ornstein--Uhlenbeck stochastic volatility model), these log-estimation errors are approximately i.i.d. Gaussian across days.
+1. **Noise adds estimation errors.** Each day's $\operatorname{RV}_t$ differs from the true $\operatorname{IV}_t$ by an estimation error $\eta_t$ (see the realized variance CLT in [Chapter 2](ch02-realized-volatility.md)). Under certain models (e.g., the Ornstein--Uhlenbeck stochastic volatility model), these log-estimation errors are approximately i.i.d. Gaussian across days.
 
 2. **Independent errors create anti-persistence.** If you add i.i.d. noise to a smooth signal, the increments of the noisy series are negatively autocorrelated. An unusually high noise draw today will be followed (on average) by a smaller one tomorrow, creating artificial "reversals" in the series.
 
@@ -288,7 +318,7 @@ The Cont and Das (2024) argument proceeds in three steps:
 > The observed $H \approx 0.1$ from $\log \operatorname{RV}_t$ data does not establish that the true spot volatility process $\sigma^2_t$ is rough.
 > The noise channel documented by Cont and Das (2024) is a plausible alternative explanation.
 > The truth may lie in between: some genuine roughness in $\sigma^2_t$, amplified by estimation noise in $\operatorname{RV}_t$.
-> For forecasting, this distinction does not matter much (see the section on the Universal LSTM Connection below).
+> For forecasting, this distinction does not matter much (see the universal LSTM section below).
 > For model calibration and theoretical claims about the nature of volatility, it matters a great deal.
 
 > **Intuition: The Coin-Flip Analogy**
@@ -298,7 +328,7 @@ The Cont and Das (2024) argument proceeds in three steps:
 > Now suppose someone records your totals but makes small random errors (e.g., occasionally miscounting by $\pm 1$).
 > If you estimate $H$ from their error-contaminated records, you will get $\hat{H} < 0.5$, because the errors introduce artificial reversals.
 > The path *looks* rougher than it is.
-> Cont and Das argue that $\operatorname{RV}_t$ is the error-contaminated record and $\sigma^2_t$ is the true total.
+> Cont--Das argue that $\operatorname{RV}_t$ is the error-contaminated record and $\sigma^2_t$ is the true total.
 
 ## The Universal LSTM Connection
 
@@ -326,14 +356,14 @@ The natural interpretation is that both are learning the same underlying statist
 
 > **Key Idea: Practical Equivalence Despite Theoretical Ambiguity**
 >
-> Whether spot volatility is truly rough or the roughness is an artefact of estimation noise, both RFSV and universal LSTM exploit the same statistical regularity in realized volatility estimates.
+> Whether spot volatility is truly rough or the roughness is an artefact of estimation noise (see the Fact or Artefact section above), both RFSV and universal LSTM exploit the same statistical regularity in realized volatility estimates.
 > The practical forecasting value is the same either way.
 > The debate about the nature of the spot process is theoretically important but does not affect your forecast accuracy.
 
 Rosenbaum and Zhang (2022) also document a "universality" property: the LSTM trained on US equities transfers well to European equities it has never seen, without degradation in performance.
-This is consistent with the cross-asset universality of $H \approx 0.1$ documented by Bayer, Friz, and Gassiat (2022).
+This is consistent with the cross-asset universality of $H \approx 0.1$ documented by Bennedsen, Lunde, and Pakkanen (2022).
 
-> **Key Result: Rosenbaum and Zhang (2022) -- Universal LSTM**
+> **Key Result: Rosenbaum and Zhang (2022): Universal LSTM**
 >
 > A single LSTM trained on hundreds of stocks consistently outperforms asset-specific RFSV models.
 > A combined RFSV + QRH parametric forecaster with fixed parameters matches the LSTM, and both outperform HAR.
@@ -355,7 +385,7 @@ If the former, you need to demonstrate the improvement with a proper out-of-samp
 
 - $H$ can be estimated from data using the **variogram method**: regress $\log m(q,h)$ on $\log h$ and divide the slope by $q$.
 
-- Bayer, Friz, and Gassiat (2022) confirmed the **cross-asset universality** of $H \approx 0.1$ across equities, FX, fixed income, and commodities.
+- Bennedsen, Lunde, and Pakkanen (2022) confirmed the **cross-asset universality** of $H \approx 0.1$ across equities, FX, fixed income, and commodities.
 
 - The **RFSV model** forecasts $\log \operatorname{RV}_{t+1}$ as a weighted average of past $\log \operatorname{RV}$ values, with weights derived from the fBM covariance structure. It achieves HAR-level accuracy with essentially one parameter ($H$).
 
@@ -378,7 +408,7 @@ If the former, you need to demonstrate the improvement with a proper out-of-samp
 | Result | Source | Finding |
 |---|---|---|
 | Volatility is rough | Gatheral, Jaisson, and Rosenbaum (2018) | $\log \operatorname{RV}_t$ behaves like fBM with $H \approx 0.1$ across equity indices and bond futures; far below $H = 0.5$ of standard models |
-| Cross-asset universality | Bayer, Friz, and Gassiat (2022) | $H \approx 0.1$ is universal across asset classes, geographies, and time periods |
+| Cross-asset universality | Bennedsen, Lunde, and Pakkanen (2022) | $H \approx 0.1$ is universal across asset classes, geographies, and time periods |
 | Rough Bergomi pricing | Bayer, Friz, and Gatheral (2016) | First rough-vol pricing model; $H \approx 0.07$ generates steep short-maturity implied volatility smiles |
 | Roughness as artefact | Cont and Das (2024) | Microstructure noise in $\operatorname{RV}$ estimates creates apparent roughness; $\hat{H} \approx 0.1$ may not reflect true spot-vol dynamics |
 | Universal LSTM | Rosenbaum and Zhang (2022) | Single LSTM trained on hundreds of stocks outperforms RFSV; RFSV + QRH parametric combination matches LSTM performance |

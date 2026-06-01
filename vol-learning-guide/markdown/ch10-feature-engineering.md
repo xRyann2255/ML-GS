@@ -18,28 +18,28 @@ The figure below groups every feature family into five branches.
 You do not need all of them for every project; the tree is a menu, not a checklist.
 
 ```mermaid
-flowchart TD
-    ROOT["Volatility Features"]:::blue --> PB["Price-Based"]:::orange
-    ROOT --> OI["Options-Implied"]:::orange
-    ROOT --> MS["Microstructure"]:::orange
+flowchart LR
+    ROOT["Volatility Features"]:::blue --> CS["Calendar & Sentiment"]:::orange
     ROOT --> CA["Cross-Asset"]:::orange
-    ROOT --> CS["Calendar & Sentiment"]:::orange
+    ROOT --> MS["Microstructure"]:::orange
+    ROOT --> OI["Options-Implied"]:::orange
+    ROOT --> PB["Price-Based"]:::orange
 
-    PB --> PB1["Lagged RV transforms"]:::green
+    CS --> CS1["News sentiment"]:::green
+    CS --> CS2["FOMC, NFP, expiry"]:::green
+
+    CA --> CA1["Spillover indices"]:::green
+    CA --> CA2["Multi-asset RV"]:::green
+
+    MS --> MS1["WAP, volume profiles"]:::green
+    MS --> MS2["Spread, OBI, VPIN"]:::green
+
+    OI --> OI1["VRP, VIX, VVIX"]:::green
+    OI --> OI2["IV, skew, term slope"]:::green
+
+    PB --> PB1["Signed & asymmetric"]:::green
     PB --> PB2["Quarticity (RQ)"]:::green
-    PB --> PB3["Signed & asymmetric"]:::green
-
-    OI --> OI1["IV, skew, term slope"]:::green
-    OI --> OI2["VRP, VIX, VVIX"]:::green
-
-    MS --> MS1["Spread, OBI, VPIN"]:::green
-    MS --> MS2["WAP, volume profiles"]:::green
-
-    CA --> CA1["Multi-asset RV"]:::green
-    CA --> CA2["Spillover indices"]:::green
-
-    CS --> CS1["FOMC, NFP, expiry"]:::green
-    CS --> CS2["News sentiment"]:::green
+    PB --> PB3["Lagged RV transforms"]:::green
 
     classDef blue fill:#dbeafe,stroke:#3b82f6
     classDef orange fill:#fed7aa,stroke:#f97316
