@@ -228,17 +228,21 @@ def find_node_text_spill(spans, node_rects, margin=1.0):
     for s in spans:
         if not s["text"].strip():
             continue
-        cx = (s["bbox"][0] + s["bbox"][2]) / 2
-        cy = (s["bbox"][1] + s["bbox"][3]) / 2
+        # associate the span with the node box it overlaps most (robust even when the
+        # label overflows so far that its centre falls outside the box)
+        best, best_ov = None, 0.0
         for r in node_rects:
-            if r[0] <= cx <= r[2] and r[1] <= cy <= r[3]:        # text centered in this node
-                b = s["bbox"]
-                if (b[0] < r[0] - margin or b[2] > r[2] + margin or
-                        b[1] < r[1] - margin or b[3] > r[3] + margin):
-                    out.append({
-                        "type": "node_text_spill", "severity": "warn", "bbox": b,
-                        "detail": "label '%s' overflows its box" % s["text"][:20]})
-                break
+            ov = rect_intersection_area(s["bbox"], r)
+            if ov > best_ov:
+                best_ov, best = ov, r
+        if best is None or best_ov <= 0:
+            continue
+        b = s["bbox"]
+        if (b[0] < best[0] - margin or b[2] > best[2] + margin or
+                b[1] < best[1] - margin or b[3] > best[3] + margin):
+            out.append({
+                "type": "node_text_spill", "severity": "warn", "bbox": b,
+                "detail": "label '%s' overflows its box" % s["text"][:20]})
     return out
 ```
 
@@ -591,14 +595,16 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 \end{document}
 ```
 
-`spill.tex` (label wider than its fixed-size box, no `text width`):
+`spill.tex` (an oversized label centered on a small drawn box so it overflows *within* the
+picture bbox — a plain auto-sizing node would just grow to fit, and a forced overfull hbox
+escapes `standalone`'s crop, so use an explicit `\draw` rectangle + a wide centered node):
 ```latex
-\documentclass[border=4pt]{standalone}
+\documentclass[border=6pt]{standalone}
 \usepackage{tikz}
 \begin{document}
 \begin{tikzpicture}
-  \node[draw, minimum width=1cm, minimum height=0.8cm, inner sep=0pt]
-    {expanding\_window\_cv};
+  \draw (0,0) rectangle (1,0.6);
+  \node at (0.5,0.3) {WideLabelOverflowingItsBox};
 \end{tikzpicture}
 \end{document}
 ```
