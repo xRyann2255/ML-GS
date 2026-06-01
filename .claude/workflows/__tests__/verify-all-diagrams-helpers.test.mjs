@@ -26,6 +26,12 @@ function locateSubstr(fig) {
   }
   return fig.label || fig.id
 }
+
+function slugify(s, i) {
+  // filesystem-safe, index-prefixed crop-dir name for a figure (unique even when ids collide)
+  const base = String(s || '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 44)
+  return `f${String(i).padStart(3, '0')}_${base || 'fig'}`
+}
 // <<< VERIFY-ALL-DIAGRAMS HELPERS <<<
 
 test('groupByGuide groups by guide, preserving figure order', () => {
@@ -48,4 +54,17 @@ test('locateSubstr prefers a 6-word caption fragment', () => {
 test('locateSubstr falls back to label then id', () => {
   assert.equal(locateSubstr({ caption: '', label: 'fig:y', id: 'z' }), 'fig:y')
   assert.equal(locateSubstr({ caption: null, label: null, id: 'file.tex:12' }), 'file.tex:12')
+})
+
+test('slugify is filesystem-safe and index-prefixed', () => {
+  assert.equal(slugify('fig:har/components', 3), 'f003_fig_har_components')
+  assert.equal(slugify('', 0), 'f000_fig')
+  assert.equal(slugify(null, 7), 'f007_fig')
+})
+
+test('slugify stays short and unique-by-index for long/colliding ids', () => {
+  const a = slugify('a'.repeat(80), 12)
+  assert.ok(a.length <= 50, `slug too long: ${a.length}`)
+  // same raw id, different index -> different slug
+  assert.notEqual(slugify('fig:dup', 1), slugify('fig:dup', 2))
 })
