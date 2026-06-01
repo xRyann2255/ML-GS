@@ -51,3 +51,12 @@ def test_node_text_spill_ok_when_contained():
     node = [0, 0, 30, 12]
     spans = [_span([3, 2, 27, 10], "fits", line_id=1)]
     assert di.find_node_text_spill(spans, [node], margin=1.0) == []
+
+def test_find_tiny_warns_and_blocks():
+    spans = [_span([0, 0, 10, 6], "a", size=5.5, line_id=1),   # <6 -> warn
+             _span([0, 0, 10, 5], "b", size=4.0, line_id=2),   # <5 -> blocking
+             _span([0, 0, 10, 9], "c", size=9.0, line_id=3)]   # ok
+    d = di.find_tiny(spans, min_pt=6.0)
+    sev = sorted(x["severity"] for x in d)
+    assert sev == ["blocking", "warn"]
+    assert all(x["type"] == "tiny_font" for x in d)

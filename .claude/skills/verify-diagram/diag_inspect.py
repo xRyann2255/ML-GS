@@ -64,3 +64,16 @@ def find_node_text_spill(spans, node_rects, margin=1.0):
                 "type": "node_text_spill", "severity": "warn", "bbox": b,
                 "detail": "label '%s' overflows its box" % s["text"][:20]})
     return out
+
+def find_tiny(spans, min_pt=6.0):
+    out = []
+    for s in spans:
+        if not s["text"].strip():
+            continue
+        if s["size"] < min_pt:
+            out.append({
+                "type": "tiny_font",
+                "severity": "blocking" if s["size"] < 5.0 else "warn",
+                "bbox": s["bbox"],
+                "detail": "label '%s' is %.1fpt" % (s["text"][:20], s["size"])})
+    return out
