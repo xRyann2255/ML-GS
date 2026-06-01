@@ -470,3 +470,90 @@ Finally, a caution about the limit. The clean $1/N$ decay assumes a continuous d
 \caption{Discrete-hedging error standard deviation versus rebalances per day. Under a pure diffusion the error falls as $1/\sqrt{N}$ and can in principle be driven to zero (blue). Once the underlying can jump, the rescaled error no longer vanishes: it asymptotes to a positive floor \citep[red,][]{BrodenTankov2010}, so the analytic $1/N$ variance of \Cref{eq:ivrv:kappa-inflation} is a lower bound on the true intraday hedging noise.}
 \label{fig:ivrv:error-vs-n}
 \end{figure}
+
+% ═══════════════════════════════════════════════════
+\section{Calibrating the Kurtosis $\kappa$ from 5-Minute Data}
+\label{sec:ivrv:kurtosis}
+% ═══════════════════════════════════════════════════
+
+\Cref{eq:ivrv:kappa-inflation} needs one number we have not yet pinned down: the kurtosis $\kappa$ of the per-step return. We can estimate it directly from intraday data using \textbf{realized kurtosis}, the high-frequency analogue of realized variance \citep{AmayaEtAl2015}:
+
+\begin{equation}
+\label{eq:ivrv:realized-kurtosis}
+RK_t = \frac{n\sum_{i=1}^{n} r_{t,i}^4}{\Big(\sum_{i=1}^{n} r_{t,i}^2\Big)^2},
+\end{equation}
+\begin{itemize}
+  \item $RK_t$: the realized kurtosis estimate for day $t$.
+  \item $r_{t,i}$: the $i$-th intraday (e.g.\ 5-minute) return on day $t$; $n$: the number of such returns per day.
+  \item the numerator is the realized fourth moment (scaled by $n$); the denominator is realized variance squared.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Realized kurtosis asks how much of the day's variance came from a few big five-minute jumps versus many small wiggles. If a handful of intervals dominate the sum of fourth powers, $RK_t$ is large and the return distribution is fat-tailed; if the moves are evenly sized, it sits near the Gaussian value of $3$. It is the empirical answer to ``how leptokurtic are my returns?'', which is exactly the $\kappa$ that \Cref{eq:ivrv:kappa-inflation} demands.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The kurtosis feeds straight into the hedging-error variance and therefore into the Sharpe denominator. A reassuring fact from \citet{AmayaEtAl2015} is that realized kurtosis is far more robust to microstructure noise than realized \emph{variance}: the noise-sensitive moment is RV, not the fourth-moment ratio, so we can trust $RK_t$ even where we would worry about $\RV_t$ (\Cref{ch:micro}).
+\end{projectconnection}
+
+Two cautions keep this honest. First, realized higher moments are \textbf{interval-variant}: \citet{AhadzieJeyasreedharan2020} show they do not converge to the sample skewness and kurtosis of daily returns and depend on both the sampling interval and the holding interval. Aggregating 5-minute estimates up to a 15-minute horizon via a central-limit argument is therefore a \emph{stated convention}, not a free lunch; the number you report is tied to the frequency you chose. Second, $\kappa$ is not one constant across names: realized kurtosis is systematically higher for small-cap, high book-to-market, and low-beta stocks \citep{AmayaEtAl2015}, so imposing a single conservative value such as $\kappa = 4.0$ across a single-name universe is a simplification, defensible as a baseline but worth stress-testing.
+
+\begin{warning}[$\kappa = 4.0$ Is a Convention, Not a Measurement]
+A flat $\kappa = 4.0$ is a reasonable, mildly conservative default (it sits above the Gaussian $3$), but it is a placeholder for a per-symbol estimate. Estimate $RK_t$ for each name from its own 5-minute returns where you can, and always report how the deflated Sharpe of \Cref{sec:ivrv:evaluation} moves as $\kappa$ ranges over, say, $\{3, 4, 6\}$. If the conclusion flips within that range, the strategy's edge is inside the hedging noise, not above it.
+\end{warning}
+
+\begin{workedexample}[A Realized-Kurtosis Number]
+Take a toy day of four 5-minute returns (in standardized units): $r = (0.5,\ -0.3,\ 1.8,\ -0.4)$. Then $\sum r_i^2 = 0.25 + 0.09 + 3.24 + 0.16 = 3.74$ and $\sum r_i^4 = 0.0625 + 0.0081 + 10.4976 + 0.0256 = 10.59$. With $n=4$, $RK = (4 \times 10.59)/(3.74^2) = 42.38/13.99 \approx 3.03$. One slightly larger move (the $1.8$) already pulls the realized kurtosis to the Gaussian neighbourhood; a single genuine jump would send it far higher. This is why a fat-tailed day inflates the hedging-error variance through $\kappa$ in \Cref{eq:ivrv:kappa-inflation}.
+\end{workedexample}
+
+% ═══════════════════════════════════════════════════
+\section{Assembling the Backtest}
+\label{sec:ivrv:algorithm}
+% ═══════════════════════════════════════════════════
+
+We now have every piece. The strategy is the loop below, run over every (symbol, day) pair in the sample. Each numbered step points back to the section that justified it, so the algorithm is just the chapter in executable order.
+
+\begin{keyidea}[The IV--RV Straddle Backtest, One (Symbol, Day) at a Time]
+For each symbol and each trading day $t$:
+\begin{enumerate}
+  \item \textbf{Signal.} Before 3:55\,pm, compute the forecast $\widehat{\RV}_t$ and read the lagged implied volatility $\IVol_{t-1}$; form the signal $X_{t-1}$ of \Cref{eq:ivrv:signal} (units aligned via \Cref{eq:ivrv:deannualize}); decide short / long / flat and a graded size (\Cref{sec:ivrv:signal}).
+  \item \textbf{Enter.} Trade the straddle before the 4\,pm close, charging the option cost $c_{\text{opt}}$ of \Cref{eq:ivrv:vega-cost} on entry, on any flip, and on exit (\Cref{sec:ivrv:option-costs}).
+  \item \textbf{Hedge.} Over day $t+1$, delta-hedge $N$ times, charging the underlying's trading cost through the Leland-modified volatility of \Cref{eq:ivrv:leland-vol} (\Cref{sec:ivrv:leland}).
+  \item \textbf{Mark.} At the close, book the day's gamma P\&L from \Cref{eq:ivrv:daily-discrete} using realized variance $\RV_{t+1}$.
+  \item \textbf{Risk.} Attach the hedging-error variance of \Cref{eq:ivrv:kappa-inflation}, using a $\kappa$ calibrated per \Cref{sec:ivrv:kurtosis}, to the day's risk (not its mean).
+  \item \textbf{Accumulate.} Append the net P\&L to the (symbol, day) panel for evaluation in \Cref{sec:ivrv:evaluation}.
+\end{enumerate}
+\end{keyidea}
+
+\Cref{fig:ivrv:waterfall} shows where the gross gamma P\&L goes. The two transaction costs (option spread, hedge spread) bite the \emph{mean}; the discrete-hedging error does not move the mean (it is zero-mean) but widens the \emph{risk}, shown as the band on the net bar. Keeping these two effects separate, mean drag versus risk inflation, is the single most common bookkeeping error in volatility-strategy backtests, and it is exactly what \Cref{sec:ivrv:evaluation} must respect when it forms the Sharpe ratio.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[font=\small]
+  % axes
+  \draw[->] (0,0) -- (0,4.6) node[above, font=\scriptsize] {P\&L};
+  \draw[->] (0,0) -- (10.2,0);
+  % bars: gross 4.0; -option 0.9 ->3.1; -hedge 0.6 ->2.5 (net)
+  \fill[examteal!60] (0.6,0) rectangle (2.0,4.0);
+  \fill[warnred!55] (2.9,3.1) rectangle (4.3,4.0);
+  \fill[warnred!55] (5.2,2.5) rectangle (6.6,3.1);
+  \fill[examteal!60] (7.5,0) rectangle (8.9,2.5);
+  % connectors
+  \draw[dashed,gray] (2.0,4.0) -- (2.9,4.0);
+  \draw[dashed,gray] (4.3,3.1) -- (5.2,3.1);
+  \draw[dashed,gray] (6.6,2.5) -- (7.5,2.5);
+  % hedging-error band on net
+  \draw[very thick, defblue] (8.2,3.05) -- (8.2,1.95);
+  \draw[very thick, defblue] (8.05,3.05) -- (8.35,3.05);
+  \draw[very thick, defblue] (8.05,1.95) -- (8.35,1.95);
+  \node[defblue, anchor=west, font=\scriptsize] at (9.0,2.5) {$\pm$ hedging};
+  \node[defblue, anchor=west, font=\scriptsize] at (9.0,2.15) {error ($1/\sqrt{N}$)};
+  % labels
+  \node[align=center, font=\scriptsize] at (1.3,-0.45) {Gross\\ gamma P\&L};
+  \node[align=center, font=\scriptsize, warnred] at (3.6,-0.45) {$-$ option\\ cost};
+  \node[align=center, font=\scriptsize, warnred] at (5.9,-0.45) {$-$ hedge\\ cost};
+  \node[align=center, font=\scriptsize] at (8.2,-0.45) {Net\\ P\&L};
+\end{tikzpicture}
+\caption{P\&L attribution for the delta-hedged straddle. The gross gamma P\&L is reduced by the option transaction cost (\Cref{sec:ivrv:option-costs}) and the delta-hedge transaction cost (\Cref{sec:ivrv:leland}) to give the net mean P\&L. The discrete-hedging error of \Cref{sec:ivrv:hedging-error} is zero-mean, so it does not appear as a bar; instead it widens the risk around the net, shown as the blue band. Mean drag and risk inflation must be accounted separately.}
+\label{fig:ivrv:waterfall}
+\end{figure}
