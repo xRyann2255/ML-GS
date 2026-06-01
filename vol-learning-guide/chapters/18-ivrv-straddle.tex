@@ -221,3 +221,136 @@ Hold a short straddle on a \$100 stock with dollar gamma $\Gamma_t S_t^2 = \$200
 \end{itemize}
 The quiet days pay the short; the one stormy day claws most of it back. Net over three days: $+\$6.7$, gross of every cost still to come. This is the whole game in miniature: a short straddle is a steady drip of premium punctuated by sharp losses when realized variance spikes.
 \end{workedexample}
+
+% ═══════════════════════════════════════════════════
+\section{Where the Clean Identity Breaks}
+\label{sec:ivrv:breaks}
+% ═══════════════════════════════════════════════════
+
+The gamma identity of \Cref{eq:ivrv:daily-discrete} is beautiful, but it rests on four quiet assumptions: that we hold a single, near-the-money option; that the underlying follows a continuous, jump-free diffusion; that volatility itself does not move while we trade; and that we rebalance the hedge continuously. Real life violates all four. This section names each crack and the Greek or theorem that measures it, so that \Cref{sec:ivrv:hedging-error} can put a number on the most important one.
+
+The first two cracks are \textbf{higher-order Greeks}: sensitivities of the position to things the simple identity treats as frozen. \textbf{Vanna} measures how the option's delta drifts as volatility moves:
+\begin{equation}
+\label{eq:ivrv:vanna}
+\Vanna = \frac{\partial^2 V}{\partial S\,\partial \sigma} = \frac{\partial\, \Vega}{\partial S} = -\,e^{-q\tau}\,N'(d_1)\,\frac{d_2}{\sigma},
+\end{equation}
+\begin{itemize}
+  \item $V$: the option value; $\Vega = \partial V/\partial\sigma$ its sensitivity to volatility.
+  \item $N'(\cdot)$: the standard normal density; $d_1, d_2$: the usual Black--Scholes arguments (\Cref{sec:black-scholes}).
+  \item $q$: the dividend yield; $\tau = T-t$: time to expiry; $\sigma$: volatility.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Vanna is the cross-talk between price and volatility. It says: when volatility ticks up, my delta is no longer where I left it, so my ``delta-neutral'' hedge has quietly become directional. A position with large vanna leaks P\&L whenever spot and volatility move together, which is exactly what happens in an equity sell-off (price down, vol up).
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+The gamma identity assumes the only thing that matters is how much the stock moved. Vanna is the first correction: if implied volatility shifts while we hold the straddle (and in equities it systematically shifts opposite to price, the leverage effect of \Cref{ch:vrp}), our realized P\&L departs from the clean $\tfrac12\Gamma S^2(\RV - \IVol^2/252)$ prediction. A backtest that ignores vanna will misattribute this leakage to forecast error.
+\end{projectconnection}
+
+\textbf{Volga} (also called vomma) measures the position's convexity in volatility itself:
+\begin{equation}
+\label{eq:ivrv:volga}
+\Volga = \frac{\partial^2 V}{\partial \sigma^2} = \Vega\,\frac{d_1 d_2}{\sigma}.
+\end{equation}
+\begin{itemize}
+  \item $\Volga$: curvature of the option value as a function of volatility (the ``gamma of vega'').
+  \item $\Vega, d_1, d_2, \sigma$: as above.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Gamma is convexity in the stock price; volga is convexity in volatility. A position with positive volga gains more from a large volatility swing than it loses from a small one, so it is implicitly long vol-of-vol. For a straddle the legs carry volga away from the money, which is why a straddle held through a volatility regime change behaves differently from a textbook variance bet.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+When realized volatility is itself volatile (vol-of-vol, the VVIX story of \Cref{sec:vvix}), volga turns the clean linear-in-variance payoff into something curved. Our forecast targets the level of realized variance, not its volatility; volga is the channel through which a correct level forecast can still produce a surprising P\&L.
+\end{projectconnection}
+
+The third crack is \textbf{jumps}. The gamma identity is a statement about quadratic variation accumulated smoothly; a gap (an earnings move, a macro shock) is not captured by $\tfrac12\Gamma S^2 \,\RV$ because gamma is not constant across a large jump. \citet{CarrLee2009} show that for the variance-swap replication the leading error from discreteness and jumps is \emph{third order} in the daily return, so it is small for ordinary days and bites only on the rare large move, precisely when it hurts most.
+
+The fourth crack is \textbf{discreteness of the hedge}, and it is the one we will quantify. Because we rebalance a finite number of times per day rather than continuously, the realized hedge never perfectly cancels the directional exposure, leaving a residual tracking error. \citet{BertsimasKoganLo2000} characterise its size.
+
+\begin{keyidea}[The Discrete-Hedging Error Shrinks as $1/\sqrt{N}$]
+With $N$ equally spaced rebalances, the root-mean-square tracking error of a delta-hedged option behaves as
+\begin{equation}
+\label{eq:ivrv:bkl-rmse}
+\text{RMSE} = \frac{g}{\sqrt{N}} + O\!\left(\frac{1}{N}\right),
+\end{equation}
+and the rescaled error $\sqrt{N}\times(\text{error})$ converges to a mixed-normal (conditionally Gaussian) limit driven by the integrated squared dollar gamma, where $g$ is a ``granularity'' coefficient (\citealp{BertsimasKoganLo2000}, Thm.~1c, Eq.~2.13; Eq.~2.18). For a vanilla payoff with a kink, such as our straddle, the relevant statement is their Theorem~2 (Eq.~2.17), not Theorem~1, which requires a six-times-differentiable payoff the straddle does not have.
+\end{keyidea}
+
+\begin{warning}[A Single Straddle Is Not a Clean Variance Bet]
+Off the money, the dollar-gamma weight collapses (\Cref{fig:ivrv:dollar-gamma}) and vanna and volga take over, so the straddle's payoff drifts away from ``realized minus implied variance.'' The instrument that \emph{is} a clean variance bet is the variance swap, whose $1/K^2$ strip of options (\Cref{sec:var-swap}) holds its variance exposure constant regardless of where spot goes. We trade the straddle anyway, because it is far more liquid, but we must account honestly for the gap, and the next sections do.
+\end{warning}
+
+% ═══════════════════════════════════════════════════
+\section{Option Transaction Costs}
+\label{sec:ivrv:option-costs}
+% ═══════════════════════════════════════════════════
+
+So far every P\&L number has been gross. The single most dangerous shortcut in a volatility-strategy backtest is to ignore, or badly under-model, the cost of the options themselves. We pay this cost as the option's bid--ask spread, and the honest way to charge it is in volatility points converted to dollars through vega, only at the moments we actually trade: when we open the position, when we flip from short to long (or back), and when we close.
+
+\begin{equation}
+\label{eq:ivrv:vega-cost}
+c_{\text{opt}} = \Vega \cdot \tfrac{1}{2}\big(\sigma_{\text{ask}} - \sigma_{\text{bid}}\big),
+\end{equation}
+\begin{itemize}
+  \item $c_{\text{opt}}$: the dollar cost charged to the position at a single entry, flip, or exit event.
+  \item $\Vega$: the straddle's vega, dollars of value per volatility point (\Cref{sec:greeks}).
+  \item $\sigma_{\text{ask}} - \sigma_{\text{bid}}$: the bid--ask spread quoted \emph{in implied-volatility points}; the half-spread is what we cross.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Option market makers quote a spread in volatility, and crossing it once costs you half of it. Vega is the exchange rate that turns ``volatility points'' into ``dollars,'' so the cost of trading the option is simply vega times the half-spread. Charging it only on the days you actually trade (rather than smearing a daily fee across the whole holding period) matches how the cost is really incurred: you pay the spread when you cross it, not while you sit.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This is the cost most likely to decide whether the strategy is real. A forecast edge of a few volatility points is easily swallowed by a spread of a few volatility points if you trade too often. Modelling $c_{\text{opt}}$ event-by-event, rather than as a flat daily haircut, is what lets the backtest reward a forecast that trades patiently and punish one that churns.
+\end{projectconnection}
+
+How large is the spread in practice, and does event-driven costing match reality? Two findings anchor the answer. First, \citet{MuravyevPearson2020} show that the cost actually paid depends enormously on execution: for the most liquid US equity options the average quoted half-spread corresponds to roughly $8.1$ cents, the conventional ``effective'' spread to about $6.2$ cents, but a timing-aware execution that waits for favourable quotes pays only about $1.3$ cents, roughly a fifth of the effective and a sixth of the quoted figure. The strategy-level consequence is stark: they document that a long--short straddle portfolio sorted on implied-minus-realized volatility earns about $22.7\%$ per month gross but collapses to about $3.9\%$ per month once the full quoted spread is charged. \emph{The sign of the conclusion flips with the cost assumption.}
+
+\begin{warning}[Charge a Cost \emph{Band}, Not a Point Estimate]
+Because a plausible execution cost ranges from the full quoted half-spread (pessimistic) down to roughly a third of it (timing-aware), a single cost number is meaningless. Report the strategy's Sharpe across the whole band (\Cref{fig:ivrv:cost-band}). A strategy is only credible if it survives the pessimistic end, or at the very least the empirically grounded middle.
+\end{warning}
+
+Second, the spread is not one number but a schedule that widens sharply as expiry approaches. \citet{DoshiPariShamsuddin2025} measure the effective option spread by maturity for liquid index options:
+
+\begin{table}[ht]
+\centering
+\caption{Effective option bid--ask spread as a fraction of premium, by maturity, for liquid at-the-money index options \citep{DoshiPariShamsuddin2025}. The very short maturities are far more expensive to trade.}
+\label{tab:ivrv:cost-schedule}
+\begin{tabular}{lc}
+\toprule
+Maturity bucket & Effective spread (\% of premium) \\
+\midrule
+21--48 days to expiry & $\approx 2\%$ \\
+7--13 days to expiry  & $\approx 3.5\%$ \\
+0 days to expiry (0DTE) & $\approx 9\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\citet{DoshiPariShamsuddin2025} also document a spread spike on the third-Friday monthly expiry (the standard roll date), and note that routing across the sixteen US options exchanges materially narrows spreads for single names but not for products such as SPX that trade only on one venue. Practitioner backtests reflect this event-driven reality directly: \citet{WysockiSlepaczuk2024} fill every execution at the midpoint plus half the quoted bid--ask on both the option and the hedge leg, and \citet{FrancoisEtAl2025} charge a percentage cost $\kappa_2 \in \{0.5, 1, 1.5, 2\}\%$ on every option position change against a far smaller $\kappa_1 = 0.05\%$ on the underlying. The lesson across all of them is the same: cost is incurred per transaction, scales with how rich the spread is at that maturity, and dominates the economics of any strategy that trades options frequently. The mechanics of turning costs into a Sharpe drag, turnover and breakeven cost, were developed for the underlying in \Cref{sec:net-econ-value}; here they apply to the option leg through \Cref{eq:ivrv:vega-cost}.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  ybar, width=0.74\textwidth, height=5.2cm,
+  ymin=0, ymax=1.6,
+  symbolic x coords={Gross, Timing-aware, Effective, Quoted},
+  xtick=data, x tick label style={font=\small},
+  ylabel={Pooled Sharpe (illustrative)}, ylabel style={font=\small},
+  bar width=22pt, nodes near coords, nodes near coords style={font=\scriptsize},
+  enlarge x limits=0.18, ymajorgrids, axis lines=left,
+  every axis plot/.append style={fill=examteal!55, draw=examteal},
+]
+  \addplot coordinates {(Gross,1.40) (Timing-aware,1.00) (Effective,0.55) (Quoted,0.10)};
+  \draw[dashed, warnred, thick] (axis cs:Gross,0.5) -- (axis cs:Quoted,0.5)
+    node[above left, font=\scriptsize, warnred] {credibility floor};
+\end{axis}
+\end{tikzpicture}
+\caption{Schematic: pooled Sharpe falls as the option-cost assumption becomes more conservative, from gross (no cost) through timing-aware ($\approx$ one-third of quoted) and empirically grounded effective (\Cref{tab:ivrv:cost-schedule}) to the full quoted half-spread. The numbers are illustrative; the shape is the point. A strategy whose Sharpe sinks below a sensible floor under the quoted assumption is living on execution optimism, not edge \citep{MuravyevPearson2020}.}
+\label{fig:ivrv:cost-band}
+\end{figure}
