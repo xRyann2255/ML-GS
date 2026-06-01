@@ -172,7 +172,7 @@ def inspect(pdf_path, locate, out_dir, dpi=300, min_font=6.0, overlap_frac=0.20,
     page.get_pixmap(dpi=dpi, clip=fitz.Rect(*bb)).save(crop_path)
     result = {
         "located": True, "page": pi + 1, "bbox": [round(v, 1) for v in bb],
-        "crop": crop_path, "tiles": [],  # tiles reserved for Phase C tiling
+        "crop": crop_path, "tiles": [],  # tiling not implemented in v2 (single 300-DPI crop)
         "metrics": {"n_spans": len(spans),
                     "min_font_pt": round(min((s["size"] for s in spans if s["text"].strip()),
                                              default=0.0), 1)},

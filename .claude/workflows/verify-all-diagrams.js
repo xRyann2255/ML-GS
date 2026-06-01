@@ -112,7 +112,7 @@ the deterministic checks are the hard floor and you add the visual judgement you
 4. If there are blocking defects, edit ONLY this figure's TikZ in its .tex file, recompile (step 1),
    re-inspect (step 2). Cap at 5 iterations.
 5. Record per figure: status = already_clean | fixed | needs_human; file; blockingBefore/blockingAfter
-   (from inspection.json); finalCrop = the last crop.png path.
+   (count of blocking-severity defects in inspection.json, before any fix vs after); finalCrop = the last crop.png path.
 Do NOT git commit — leave edits in the working tree. Other guides are handled by parallel agents; touch
 ONLY files under ${group.guide}. Return the schema (one result per figure).`,
     { label: `verify:${group.guide.split('/').pop()}`.slice(0, 40), phase: 'Verify',
