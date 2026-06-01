@@ -143,6 +143,21 @@ Most HAR papers estimate the model in logs; you should do the same with your fea
 
 **Square-root RV.** An intermediate transform: $\sqrt{\operatorname{RV}_t}$ approximates realized *volatility* (standard deviation), which is more interpretable than variance and less compressed than log.
 
+**Signed-magnitude transform.**
+The square-root transform $\sqrt{x}$ is only defined for non-negative quantities such as $\operatorname{RV}_t$ itself. But many of the most informative features in this chapter are *signed*, they can be strongly negative as well as positive. The simplest example you have already met is a 5-day return, which can be $+3\%$ or $-3\%$; the cumulative signed return over the past 5 days is what we will call **signed momentum**. Several features we will meet later in this chapter are signed too (signed jumps $J_t^-$ and $J_t^+$ from the Signed Jumps equation, realized skewness $\operatorname{RSkew}_t$ from the Higher Moments section, and order flow imbalance $\text{OFI}_k$ from the Order Flow Imbalance section). For all of these we want a transform that compresses large magnitudes the way $\sqrt{\cdot}$ does, yet preserves the sign that carries the leverage-effect information. The **signed-magnitude transform** (also called the signed square-root) does exactly this:
+
+$$x_t^{\text{sgn}} = \operatorname{sign}(x_t)\,\underbrace{|x_t|^{1/2}}_{\text{compressed magnitude}}, \qquad \operatorname{sign}(x_t) = \begin{cases} +1 & x_t > 0 \\ 0 & x_t = 0 \\ -1 & x_t < 0. \end{cases}$$
+
+- where $x_t$ is any signed feature (e.g. a signed jump difference $J_t^+ - J_t^-$, a 5-day signed return, realized skewness, or OFI), $|x_t|^{1/2}$ compresses large magnitudes, and $\operatorname{sign}(x_t)$ re-attaches the direction.
+
+> **Intuition: In Plain English**
+>
+> Think of the signed-magnitude transform as "square root, but it remembers which way the move went." A raw signed feature such as the signed-jump difference is heavy-tailed: a single crash-day value can be ten times larger than a typical day, and that one observation will dominate any linear baseline or distance-based model. Taking $\sqrt{|x|}$ pulls that extreme value back toward the pack, so the feature stops being a near-binary "crash / no crash" switch and becomes a smooth, graded signal. The power $1/2$ pulls big numbers down hard ($\sqrt{100}=10$) while barely touching small ones ($\sqrt{1}=1$), which is exactly the compression we want; plain $|x|$ would not compress at all. A value of exactly zero stays zero, so a feature that is usually zero (like a signed jump on a calm day) is left untouched. Re-attaching the sign keeps the asymmetry intact: a compressed $-1.4\%$ down-jump still reads as bad volatility, the downside kind that risk managers fear, and a compressed $+1.4\%$ up-jump still reads as good volatility (we formalize good vs. bad volatility in the Signed and Asymmetric Features section later in this chapter).
+
+> **Project Connection: Why This Matters**
+>
+> Apply the signed-magnitude transform to every signed feature before it enters a linear or ridge-HAR baseline, where heavy tails inflate coefficient variance and a handful of crisis days can flip the sign of an estimate. The signed jump difference $J_t^+ - J_t^-$, signed 5-day momentum, and realized skewness are the prime candidates: each is dominated by a few extreme days, and the leverage effect ([Ch5](ch05-garch-family.md)) means the *sign* is precisely the part you must preserve. Tree models are scale-invariant (they only care about the *order* of values, not their size, so shrinking outliers does not change which way a split goes) and do not strictly need it, but it still helps gradient boosting place cleaner split points away from the tail. As with every continuous feature, you can then layer the triple expansion (Triple Expansion section) on top of $x_t^{\text{sgn}}$.
+
 **Ratio features.** The ratio $\operatorname{RV}_t^{(d)} / \operatorname{RV}_t^{(m)}$ captures how today's volatility compares to its recent average.
 Values above 1 indicate a local spike; values well below 1 indicate calm.
 This is a simple but effective regime indicator.
@@ -404,8 +419,8 @@ where $m$ is the number of intraday intervals in the rolling window.
 > **Intuition: In Plain English**
 >
 > Kyle's lambda answers: "How many basis points does the price move for every million dollars of net order flow?"
-> When $\lambda$ is high, even modest buying or selling pressure moves prices substantially -- the market is "thin" or carrying a lot of private information.
-> When $\lambda$ is low, the market can absorb large orders without significant price impact -- it is deep and liquid.
+> When $\lambda$ is high, even modest buying or selling pressure moves prices substantially, the market is "thin" or carrying a lot of private information.
+> When $\lambda$ is low, the market can absorb large orders without significant price impact, it is deep and liquid.
 > Rising $\lambda$ predicts higher near-term volatility because it signals that order flow is becoming more informative (or the market is becoming less resilient), both of which lead to larger price swings.
 
 > **Project Connection: Why This Matters**
@@ -424,7 +439,7 @@ where $m$ is the number of intraday intervals in the rolling window.
 ### Amihud Illiquidity Ratio
 
 The features above (OBI, spread, WAP) require tick-level or LOB data.
-The **Amihud illiquidity ratio** (Amihud, 2002) provides a liquidity measure that requires only daily returns and dollar volume -- data available for any traded asset.
+The **Amihud illiquidity ratio** (Amihud, 2002) provides a liquidity measure that requires only daily returns and dollar volume, data available for any traded asset.
 
 > **Definition: Amihud Illiquidity**
 >
@@ -443,7 +458,7 @@ The **Amihud illiquidity ratio** (Amihud, 2002) provides a liquidity measure tha
 > The Amihud ratio answers a simple question: "How much does the price move per dollar of trading activity?"
 > A liquid stock can absorb millions of dollars in trading with barely a price ripple (low ILLIQ).
 > An illiquid stock moves substantially even on modest dollar volume (high ILLIQ).
-> This is exactly Kyle's (1985) concept of market depth, but measured with data available for any publicly traded asset -- no tick data, no LOB snapshots, just daily returns and volume.
+> This is exactly Kyle's (1985) concept of market depth, but measured with data available for any publicly traded asset, no tick data, no LOB snapshots, just daily returns and volume.
 > When ILLIQ spikes, the market is having trouble absorbing order flow, which reliably precedes periods of elevated realized volatility.
 
 > **Project Connection: Why This Matters**
@@ -452,7 +467,6 @@ The **Amihud illiquidity ratio** (Amihud, 2002) provides a liquidity measure tha
 > The log transform compresses the heavy right tail (ILLIQ is highly skewed).
 > For the E-mini, ILLIQ is less informative since the contract is extremely liquid, but for the 30 mega-cap equities in your panel, cross-sectional variation in ILLIQ captures stock-specific liquidity regimes that predict idiosyncratic vol.
 > Apply the triple expansion (level, change, z-score) as with any continuous feature.
->
 > A rising Amihud ratio (increasing illiquidity) is a leading indicator of higher near-term volatility, especially for mid-cap stocks where liquidity can deteriorate rapidly.
 
 ### Microprice and Volume Features
@@ -520,7 +534,7 @@ Cont, Kukanov, and Stoikov (2014) show that mid-price changes are linear in OFI:
 $$\Delta P_k = \beta \cdot \text{OFI}_k + \varepsilon_k,$$
 
 where $\beta$ is the **price impact coefficient** (basis points per unit of order flow) and $\varepsilon_k$ is residual noise from deeper book levels.
-Estimated on 10-second intervals for 50 US equities, this simple regression achieves $R^2 \approx 65\%$ -- far higher than trade-based measures ($R^2 \approx 32\%$ for signed trade imbalance).
+Estimated on 10-second intervals for 50 US equities, this simple regression achieves $R^2 \approx 65\%$, far higher than trade-based measures ($R^2 \approx 32\%$ for signed trade imbalance).
 When both OFI and trade imbalance are included, trade imbalance becomes insignificant: OFI subsumes its information.
 
 > **Intuition: In Plain English**
@@ -534,7 +548,7 @@ When both OFI and trade imbalance are included, trade imbalance becomes insignif
 >
 > For the E-mini L2 data, compute OFI over 10-second or 1-minute intervals and aggregate to your forecasting window (e.g., standard deviation or sum of squared OFI values over the observation window).
 > The aggregated OFI variability is a volatility feature: days with large swings in order flow produce higher near-term RV.
-> The price impact coefficient $\hat{\beta}$ itself is also a feature -- it is inversely proportional to market depth, so rising $\hat{\beta}$ signals deteriorating liquidity and predicts higher volatility.
+> The price impact coefficient $\hat{\beta}$ itself is also a feature, it is inversely proportional to market depth, so rising $\hat{\beta}$ signals deteriorating liquidity and predicts higher volatility.
 
 **Depth ratio.**
 When multi-level LOB data is available (as with E-mini L2), you can look beyond the best quotes.
@@ -562,7 +576,7 @@ where $s_t$ is the bid-ask spread and $|\text{OBI}_t|$ is the absolute order boo
 
 > **Project Connection: Why This Matters**
 >
-> Include all three features -- OFI variability, depth ratio, and market urgency -- in your microstructure feature set.
+> Include all three features, OFI variability, depth ratio, and market urgency, in your microstructure feature set.
 > OFI captures dynamic flow, the depth ratio captures static structural imbalance, and market urgency captures the interaction of spread and imbalance.
 > Together they provide three orthogonal views of market quality.
 > For the E-mini L2 data, use $L = 5$ for the depth ratio.
@@ -581,10 +595,10 @@ For daily RV, short-dated (weekly) options are more informative.
 **Skew (25-delta risk reversal).**
 The risk reversal measures the difference in implied volatility between out-of-the-money calls and puts at matched delta:
 
-$$\text{RR}_{25} = \operatorname{IVol}_{25\Delta\text{call}} - \operatorname{IVol}_{25\Delta\text{put}}.$$
+$$\text{RR}_{25} = \operatorname{IV}_{25\Delta\text{call}} - \operatorname{IV}_{25\Delta\text{put}}.$$
 
-- $\operatorname{IVol}_{25\Delta\text{call}}$: implied volatility of the 25-delta call (out-of-the-money upside).
-- $\operatorname{IVol}_{25\Delta\text{put}}$: implied volatility of the 25-delta put (out-of-the-money downside).
+- $\operatorname{IV}_{25\Delta\text{call}}$: implied volatility of the 25-delta call (out-of-the-money upside).
+- $\operatorname{IV}_{25\Delta\text{put}}$: implied volatility of the 25-delta put (out-of-the-money downside).
 
 > **Intuition: In Plain English**
 >
@@ -597,10 +611,10 @@ $$\text{RR}_{25} = \operatorname{IVol}_{25\Delta\text{call}} - \operatorname{IVo
 **Term structure slope.**
 The slope of the IV term structure reveals whether the market expects volatility to increase or decrease over time:
 
-$$\text{TS}_t = \operatorname{IVol}_t^{(3\text{m})} - \operatorname{IVol}_t^{(1\text{m})}.$$
+$$\text{TS}_t = \operatorname{IV}_t^{(3\text{m})} - \operatorname{IV}_t^{(1\text{m})}.$$
 
-- $\operatorname{IVol}_t^{(3\text{m})}$: 3-month at-the-money implied volatility.
-- $\operatorname{IVol}_t^{(1\text{m})}$: 1-month at-the-money implied volatility.
+- $\operatorname{IV}_t^{(3\text{m})}$: 3-month at-the-money implied volatility.
+- $\operatorname{IV}_t^{(1\text{m})}$: 1-month at-the-money implied volatility.
 
 > **Intuition: In Plain English**
 >
@@ -858,7 +872,7 @@ Before a known event (e.g., FOMC on Wednesday), the IV term structure shows a ch
 The magnitude of this kink, the **event-implied vol**, quantifies how much extra vol the market expects from the event.
 Extract it as:
 
-$$\sigma_{\text{event}} = \sqrt{\frac{T_2\,\sigma_2^2 - T_1\,\sigma_1^2}{T_2 - T_1}},$$
+$$\sigma_{\text{event}} = \sqrt{\frac{T_2\,\sigma_2^2 - T_1\,\sigma_1^2}{T_2 - T_1}}$$
 
 - $T_1, T_2$: expiry times of two options that bracket the event ($T_1 < t_{\text{event}} < T_2$).
 - $\sigma_1, \sigma_2$: ATM implied volatilities for those expiries.
@@ -903,7 +917,7 @@ It ramps up gradually in the days before and decays gradually in the days after.
 > **Intuition: In Plain English**
 >
 > A binary dummy says "FOMC is today" or "FOMC is not today."
-> A proximity measure says "FOMC is 3 days away" -- and the model can learn that volatility starts compressing 2--3 days before FOMC (the "pre-FOMC drift") and then expands sharply on announcement day.
+> A proximity measure says "FOMC is 3 days away", and the model can learn that volatility starts compressing 2--3 days before FOMC (the "pre-FOMC drift") and then expands sharply on announcement day.
 > This anticipation ramp is invisible to binary dummies: 5 days before FOMC looks identical to 50 days before FOMC in a binary encoding, but the market's behavior is measurably different.
 > The continuous encoding lets tree models learn the full shape of the event response, not just the on/off state.
 
@@ -945,7 +959,7 @@ Post-earnings, the "volatility crush" typically resolves within 1--2 days.
 News and social media sentiment contain forward-looking information that market prices may not yet fully reflect.
 
 Audrino, Sigrist, and Ballinari (2020) construct daily sentiment indices from financial news articles and show that adding a negative-sentiment variable to the HAR model improves volatility forecasts, particularly during crisis periods.
-The key finding: negative sentiment matters more than positive sentiment, echoing the asymmetry we saw in signed semivariances above.
+The key finding: negative sentiment matters more than positive sentiment, echoing the asymmetry we saw in signed semivariances (Signed and Asymmetric Features section).
 
 Rahimikia, Zohren, and Poon (2021) apply transformer-based NLP models (FinBERT) to extract sentiment from financial text and demonstrate incremental predictive power for equity volatility at daily and weekly horizons.
 
@@ -1032,18 +1046,107 @@ This is valuable for sanity-checking whether the model has learned economically 
 
 > **Key Idea: Importance Stability Protocol**
 >
-> Before reporting which features matter, run this checklist:
-> 1. Compute MDA importance across 5 purged CV folds ([Ch6](ch06-har-model.md) for purging).
-> 2. Check whether the top-5 ranking is consistent across folds.
-> 3. For any feature that appears in top-5 for some folds but not others, check its correlation with other top features.
-> 4. Report a stability metric: fraction of folds in which a feature appears in the top-$k$.
-> 5. Use ALE plots to visualize the functional form of the top-3 features.
+> Before reporting which features matter, turn the qualitative "is the ranking consistent?" question into a single number. Run MDA (and, separately, mean-$|\operatorname{SHAP}|$) across $K = 5$ purged CV folds (splitting the timeline into chunks, training on some and testing on the rest, with a gap to prevent leakage, see [Chapter 16](ch16-forecast-evaluation.md), purged CV section), rank the features within each fold, and compute the **average pairwise Spearman rank correlation** (a score from $-1$ to $+1$: $+1$ means two lists put the features in exactly the same order, $0$ means unrelated orderings) of those fold-level rankings:
 >
-> Unstable rankings are a warning sign, not a failure: they tell you the signal is shared across correlated features, which is useful information for feature selection and portfolio construction.
+> $$\rho_{\text{stab}} = \frac{2}{K(K-1)} \sum_{k=1}^{K-1} \sum_{l=k+1}^{K} \underbrace{\rho_S\!\left(r^{(k)}, r^{(l)}\right)}_{\text{agreement of folds } k \text{ and } l},$$
+>
+> where $r^{(k)}$ is the ordered list of features for fold $k$ (rank 1 = most important, rank 2 = next, and so on) and $\rho_S$ is the Spearman rank correlation. In words: for every *pair* of the 5 folds, score how similarly they ranked the features (that is the $\rho_S$ term); then take the plain average over all 10 pairs (the prefactor $\tfrac{2}{K(K-1)}$ is just $1$ over the number of pairs, and $l$ starting at $k+1$ counts each pair once). A score near $1$ means all folds agree on which features matter. Read the number against fixed thresholds:
+> - $\rho_{\text{stab}} > 0.8$, **stable**: the same features dominate across folds; proceed with confidence.
+> - $0.5 \le \rho_{\text{stab}} \le 0.8$, **caution**: the top 2--3 features are consistent but mid-ranked features shuffle; report the stable ones and flag the rest.
+> - $\rho_{\text{stab}} < 0.5$, **red flag**: rankings are essentially random across folds, a classic symptom of fitting noise on a short sample.
+>
+> Compute $\rho_{\text{stab}}$ for *both* the MDA rankings and the mean-$|\operatorname{SHAP}|$ rankings. When the two agree (both high or both low) you have a clean verdict. When they *disagree*, the feature's importance is concentrated in a handful of extreme observations; use the disagreement as a diagnostic, not a tie-break, and inspect the high-leverage dates with an ALE or SHAP dependence plot before trusting the feature (see the worked example below).
+
+*[Figure: The stability scale with its three threshold bands (red flag for $\rho_{\text{stab}} < 0.5$, caution for $0.5$ to $0.8$, stable for $> 0.8$). $\sqrt{\operatorname{RQ}_t}$ lands in the green "stable" band for both MDA (0.86) and SHAP (0.83) and is trustworthy. $J_t^-$ straddles the red "red flag" band on MDA (0.41) and the amber "caution" band on SHAP (0.74); that wide split is the diagnostic that its importance is concentrated in a few turbulent dates.]*
 
 > **Project Connection: Why This Matters**
 >
 > Follow this exact protocol for your internship project. Run MDA across your 5 purged CV folds and report the stability of the top-10 feature rankings. If $\log \operatorname{RV}_t^{(d)}$ and $\sqrt{\operatorname{RQ}_t}$ consistently rank in the top 5, you have confirmation that your ML model has learned the HARQ insight from data. Present the stability table and ALE plots in your final report; they are more convincing evidence of model quality than a single QLIKE number.
+
+## Proving a Feature Adds Value: The Incremental-Information Test
+
+> **Prereq: Omitted-Variable Bias**
+>
+> If a candidate predictor $x$ and the target $y$ are both driven by a third variable $z$ that you left out of the model, the apparent predictive relationship between $x$ and $y$ is partly *spurious*: $x$ looks useful only because it is a noisy stand-in for $z$. Including $z$ as a control and asking whether $x$ *still* helps is the standard cure. In volatility forecasting the usual omitted variable is the overall level of market fear, and the cleanest observable proxy for it is the VIX. The question of this section is therefore: *does my new feature add information beyond lagged RV and VIX, or is it just a noisy repackaging of what they already say?*
+
+You have just learned how to rank features by importance (Feature Importance and Selection section). But a high importance score inside one model does not prove a feature *adds value* relative to a sensible baseline. The decisive question for every candidate feature is not "how important is it?" but "does the forecast get better when I add it, and worse when I take it away?" This is the **incremental-information test**, and it is the gate every feature must pass before it earns a column in your production matrix.
+
+### Two Nested Models
+
+The test compares two models, one *nested* inside the other (the bigger model contains every feature of the smaller one, plus exactly one more). We deliberately make Model A a strong baseline, not a weak one, so that passing the test means something.
+
+- **Model A (the baseline):** the HAR core plus VIX. Features are $\log \operatorname{RV}_t^{(d)}$, $\log \operatorname{RV}_t^{(w)}$, $\log \operatorname{RV}_t^{(m)}$ (the HAR-style equations) and $\log \text{VIX}_t$.
+- **Model B (the challenger):** everything in Model A *plus* the single candidate feature $x_t$ you are evaluating.
+
+Because Model A is *nested* inside Model B (B contains every column A has, and one more), any out-of-sample improvement from A to B is attributable to $x_t$ alone. Including VIX in the baseline is the crucial design choice: VIX is the omitted variable that confounds nearly every volatility feature, so a candidate that beats *HAR core $+$ VIX* has demonstrated information the market's own fear gauge does not already contain.
+
+> **Warning: Why HAR Core Alone Is Too Weak a Baseline**
+>
+> A candidate feature will almost always beat plain HAR core, because almost everything correlates with the level of volatility. Skew, VRP, semivariances, and a noisy VIX proxy all clear that low bar. The interesting and decision-relevant question is whether the feature beats a baseline that *already includes the obvious forward-looking control*. If your candidate only helps when VIX is absent, you have built a VIX proxy, not a new signal, exactly the omitted-variable trap. Always put VIX (or, if options data is unavailable, $\operatorname{RV}_t^{(m)}$ as a level control) in Model A.
+
+### Three Verdicts: QLIKE, SHAP, and the Information Coefficient
+
+We judge the candidate on three complementary axes. Each answers a slightly different question, and a feature you trust should pass all three.
+
+**(1) Out-of-sample $\operatorname{QLIKE}$ improvement.** Re-estimate both models with purged $K$-fold cross-validation (splitting the timeline into chunks, training on some and testing on the rest, with a gap to prevent leakage, [Chapter 16](ch16-forecast-evaluation.md), purged CV section) and compare their out-of-sample $\operatorname{QLIKE}$ loss. The incremental value of the feature is the loss reduction:
+
+$$\Delta \operatorname{QLIKE} = \underbrace{\overline{\operatorname{QLIKE}}_A}_{\text{HAR core + VIX}} - \underbrace{\overline{\operatorname{QLIKE}}_B}_{\text{+ candidate } x_t},$$
+
+- $\overline{\operatorname{QLIKE}}_A$: average out-of-sample $\operatorname{QLIKE}$ of the baseline across the CV test folds.
+- $\overline{\operatorname{QLIKE}}_B$: average out-of-sample $\operatorname{QLIKE}$ of the challenger across the same folds.
+- $\Delta \operatorname{QLIKE} > 0$ means the candidate *lowered* loss (improvement); $\Delta \operatorname{QLIKE} \le 0$ means it added nothing or hurt.
+
+> **Intuition: In Plain English**
+>
+> This equation simply asks: "How many units of forecast loss did I save by adding this one column?" Because $\operatorname{QLIKE}$ is the loss the desk actually cares about ([Chapter 16](ch16-forecast-evaluation.md)), $\Delta\operatorname{QLIKE}$ measures value in the units that matter, on data the model has never seen. A positive number is necessary but not sufficient: a tiny positive $\Delta\operatorname{QLIKE}$ could be noise, which is why we test it for significance in the next subsection.
+
+> **Project Connection: Why This Matters**
+>
+> This is the single most important feature-vetting computation in your project. Run it for every candidate before you commit it to the model: a feature that does not lower out-of-sample $\operatorname{QLIKE}$ relative to HAR core $+$ VIX does not belong in the matrix, regardless of how good its in-sample story is. Your QLIKE improvement target of 30--80 bps ([Chapter 16](ch16-forecast-evaluation.md)) is the *cumulative* budget; the incremental test tells you how much of that budget each feature is actually spending.
+
+**(2) SHAP attribution in Model B.** Refit $\operatorname{SHAP}$ (the SHAP equation and feature importance figure) on Model B and read off the mean absolute SHAP value of the candidate, $\overline{|\phi_x|}$, the average over the test-fold observations of $|\phi_x^{(i)}|$, the candidate's per-prediction SHAP contribution from the SHAP equation. A feature with a real $\Delta\operatorname{QLIKE}$ but near-zero SHAP is a contradiction worth investigating; a feature with large SHAP but zero $\Delta\operatorname{QLIKE}$ is importance shared with a correlated baseline column, because SHAP can hand a feature credit that really belongs to a near-identical baseline column it travels with, removing the candidate then changes nothing (zero $\Delta\operatorname{QLIKE}$) since the baseline column still carries the signal (the SHAP-instability warning of the Feature Importance and Selection section). Agreement between the two is the reassuring case.
+
+**(3) Information coefficient ($\operatorname{IC}$).** The third lens, borrowed from active portfolio management, measures how well the feature *by itself* lines up with the target. We introduce it here as a named metric you will use throughout the project.
+
+> **Definition: Information Coefficient**
+>
+> The **information coefficient** of a feature $x_t$ for a target $y_{t+1}$ (here $y_{t+1} = \log \operatorname{RV}_{t+1}$) is the rank correlation between the feature and the realized target over the out-of-sample period:
+>
+> $$\operatorname{IC} = \rho_S\!\left(x_t,\; y_{t+1}\right) = \operatorname{corr}\!\left(\operatorname{rank}(x_t),\; \operatorname{rank}(y_{t+1})\right),$$
+>
+> - $\rho_S$: the Spearman (rank) correlation coefficient, robust to the heavy tails endemic to volatility data.
+> - $x_t$: the candidate feature observed at time $t$ (strictly before the target).
+> - $y_{t+1}$: the realized target one step ahead, e.g. next-day $\log \operatorname{RV}$.
+> - $\operatorname{IC} \in [-1, 1]$; the magnitude measures predictive strength and the sign measures direction.
+
+> **Intuition: In Plain English**
+>
+> The information coefficient asks: "On the days this feature was high, was tomorrow's volatility also high?" It is a rank correlation, so it does not care about the exact scale of the feature, only whether the ordering of feature values matches the ordering of realized outcomes. It is the *size* (distance from zero) that measures strength, so an $\operatorname{IC}$ of $-0.18$ is just as strong as $+0.18$; the sign only tells you the direction. An $\operatorname{IC}$ of $0.05$ sounds tiny, but in volatility forecasting a stable $\operatorname{IC}$ even in the $0.03$--$0.10$ range for a feature that is *not* already spanned by HAR core is meaningful here, weak but useful at the low end, strong toward $0.10$. Forecasting one-step-ahead volatility is hard, and a small edge applied every day adds up over a long backtest. The danger is the opposite of intuition: a large *raw* $\operatorname{IC}$ often just means the feature tracks the level of RV, which HAR core already supplies. That is why $\operatorname{IC}$ is read alongside, not instead of, the nested $\Delta\operatorname{QLIKE}$.
+
+> **Project Connection: Why This Matters**
+>
+> Report $\operatorname{IC}$ for every candidate feature in your feature audit. Compute it two ways: the *raw* $\operatorname{IC}$ of $x_t$ against $\log\operatorname{RV}_{t+1}$, and the *residual* $\operatorname{IC}$ of $x_t$ against the residual of $\log\operatorname{RV}_{t+1}$ after regressing out HAR core and VIX. *Regressing out* HAR core and VIX means: first predict the candidate feature using only HAR core and VIX, then keep only the leftover part (the *residual*) that those baseline features could *not* explain. The residual $\operatorname{IC}$ then asks whether that leftover part still lines up with tomorrow's volatility; if it does not, the feature was just echoing VIX. The gap between the two $\operatorname{IC}$s is the omitted-variable story made quantitative: if the raw $\operatorname{IC}$ is large but the residual $\operatorname{IC}$ collapses to near zero, the feature is a level proxy with no incremental content. A feature whose residual $\operatorname{IC}$ survives is exactly the kind that will also produce a positive $\Delta\operatorname{QLIKE}$ in the nested test.
+
+### Is the Improvement Real? The Diebold--Mariano Test
+
+A positive $\Delta\operatorname{QLIKE}$ from the incremental-QLIKE equation is not proof: with a finite sample it could be luck. The **Diebold--Mariano (DM) test** ([Chapter 16](ch16-forecast-evaluation.md), DM section; Diebold and Mariano, 1995) is the formal instrument for deciding whether the loss difference between two forecasts is statistically distinguishable from zero. Form the per-period loss differential $d_t = \operatorname{QLIKE}_t^A - \operatorname{QLIKE}_t^B$ and test $\mathbb{E}[d_t] = 0$ (the symbol $\mathbb{E}[\cdot]$ denotes the expected, i.e. long-run average, value) using the DM statistic ([Chapter 16](ch16-forecast-evaluation.md), DM-statistic equation). The candidate adds value only if the DM test *rejects* equal predictive accuracy in favour of Model B. As a rule of thumb, a DM statistic bigger than about $1.96$ in magnitude means the improvement is unlikely (less than a 5% chance) to be a fluke; anything well below that leaves us unable to rule out luck.
+
+> **Warning: The Same Caveat the Diminishing-Returns Curve Will Repeat**
+>
+> Many candidate features produce a positive but *insignificant* $\Delta\operatorname{QLIKE}$: the point estimate improves, but the DM test cannot reject equality. This is the data telling you the feature lives on the flat part of the diminishing-returns curve (The Diminishing Returns Curve section). A long string of individually insignificant features can collectively overfit your validation folds and inflate the model's apparent edge.
+
+*Table: The incremental-information test summarized. Each candidate is judged against the same baseline (HAR core $+$ VIX) on three axes, with the Diebold--Mariano test as the significance gate. "Keep" requires a positive, significant $\Delta\operatorname{QLIKE}$ and a surviving residual $\operatorname{IC}$. "Rejects equal accuracy" means the test concludes Model B is genuinely better, not just better by luck.*
+
+| **Axis** | **What it measures** | **Computed on** | **Keep if** |
+|---|---|---|---|
+| $\Delta\operatorname{QLIKE}$ (incremental-QLIKE eq.) | Loss reduction A$\to$B | Purged-CV test folds | $> 0$ and DM-significant |
+| DM test | Significance of $\Delta\operatorname{QLIKE}$ | Per-period loss diff | Rejects equal accuracy |
+| Mean $|\operatorname{SHAP}|$ in B | Attributed contribution | Model B test folds | Non-negligible, stable |
+| Residual $\operatorname{IC}$ (IC eq.) | Edge beyond HAR$+$VIX | Out-of-sample ranks | Still correlates with target after removing VIX/HAR overlap |
+
+> **Key Idea: The Incremental-Information Test in One Line**
+>
+> A feature earns its column only if, relative to HAR core $+$ VIX, it delivers a *positive and Diebold--Mariano-significant* out-of-sample $\Delta\operatorname{QLIKE}$ and a *residual* information coefficient that survives controlling for the baseline.
 
 ## The Diminishing Returns Curve
 
@@ -1052,7 +1155,7 @@ The natural question is: *How much does each layer actually contribute?*
 
 The answer follows a characteristic **diminishing returns curve**: the first few feature families provide the vast majority of forecasting accuracy, and each subsequent layer adds progressively less.
 
-*[Figure: Diminishing returns staircase for volatility forecasting features. Each bar shows the cumulative QLIKE accuracy (normalized so the full feature set achieves 100%) when adding one more feature layer. Layer values: L0 HAR core = 55%, +L1 RQ/asym. = 70%, +L2 Options = 85%, +L3 Micro. = 90%, +L4 Cross-asset = 95%, +L5 Calendar = 97%, +L6--7 Memory/Sent. = 100%. The first three layers achieve 85% of attainable accuracy with roughly 20 features. The remaining four layers add the final 15% with 60--100 additional features. Exact percentages are illustrative and based on findings in Christensen, Siggaard, and Veliyev (2023) and the vol-project-ref feature composition analysis.]*
+*[Figure: Diminishing returns staircase for volatility forecasting features. Each bar shows the cumulative QLIKE accuracy (normalized so the full feature set achieves 100%) when adding one more feature layer. Layer values: L0 HAR core = 55%, +L1 RQ/asym. = 70%, +L2 Options = 85%, +L3 Micro. = 90%, +L4 Cross-asset = 95%, +L5 Calendar = 97%, +L6--7 Memory/Sent. = 100%. The first three layers achieve 85% of attainable accuracy with roughly 20 features (marginal gains: +55 pp, +15 pp, +15 pp). The remaining four layers add the final 15% with 60--100 additional features. Exact percentages are illustrative and based on findings in Christensen, Siggaard, and Veliyev (2023) and the vol-project-ref feature composition analysis.]*
 
 **Interpreting the staircase.**
 The staircase shows approximate cumulative accuracy contributions, normalized so that the full feature set achieves 100%.
@@ -1067,15 +1170,15 @@ The staircase shows approximate cumulative accuracy contributions, normalized so
 
 **The curve shifts with forecast horizon.**
 The diminishing returns curve is not fixed; it depends heavily on the forecast horizon.
-Table 1 summarizes which features dominate at each horizon.
+The table below summarizes which features dominate at each horizon.
+
+*Feature dominance by forecast horizon. The "dominant" column lists the feature families that contribute the most marginal accuracy at each horizon. Based on findings in Christensen, Siggaard, and Veliyev (2023) and Bollerslev, Medeiros, Patton, and Quaedvlieg (2024).*
 
 | **Horizon** | **Dominant features** | **ML vs. linear gap** | **Key insight** |
 |---|---|---|---|
 | $h = 1$ day | Lagged RV, RQ, $\operatorname{RV}^-$ | Small (${\sim}5\%$) | HARQ nearly optimal |
 | $h = 5$ days | Options (VRP, skew) + lagged RV | Moderate (${\sim}10\%$) | VRP begins to matter |
 | $h = 22$ days | VRP, term structure, Hurst | Large (${\sim}15\%$) | Options have max advantage |
-
-*Feature dominance by forecast horizon. The "dominant" column lists the feature families that contribute the most marginal accuracy at each horizon. Based on findings in Christensen, Siggaard, and Veliyev (2023) and Bollerslev, Medeiros, Patton, and Quaedvlieg (2024).*
 
 At the 1-day horizon, the HAR core dominates and ML adds relatively little.
 Bollerslev, Medeiros, Patton, and Quaedvlieg (2024) demonstrate that a properly fitted HAR model with daily re-estimation and a 630-day training window is "hard to beat" even with gradient-boosted trees and neural networks, when the feature set is restricted to lagged RV and VIX.

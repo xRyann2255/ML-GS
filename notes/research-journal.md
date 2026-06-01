@@ -169,3 +169,20 @@ Each step has a clear scientific question and is independently reportable.
 - Resolve the skill-score direction ambiguity in the foundation-model paper (arXiv 2505.11163) before citing any number
 
 ---
+
+## 2026-06-01 -- Realistic IV-RV Straddle Backtest + Capstone Chapter 18
+
+**Question explored:** What is the most realistic, cleanly-evaluable version of a delta-hedged straddle driven by an IV-RV-gap (variance-risk-premium) signal -- the right implied-vol input and lag, the gamma-PnL identity and where it breaks, option and delta-hedge transaction costs, the discrete-hedging-error variance, kurtosis calibration, and pooled/deflated-Sharpe evaluation tied back to the QLIKE accuracy of the RV forecast?
+
+**Method:** Ran `deep-research-distill` (depth deep: 24 of 68 sources kept, 17 open-access papers downloaded into reference/project-papers/). Then authored vol-learning-guide **Chapter 18 (capstone)** from the brief via the `write-chapter` pipeline (source extraction + contract -> draft -> 5 figures each passed through `verify-diagram` -> verify/condense/naive-reader passes). Brief: `notes/deep-research/2026-06-01-realistic-ivrv-straddle-backtest.md`. Chapter: `vol-learning-guide/chapters/18-ivrv-straddle.tex` (+ markdown mirror). Spec/plan: `docs/vol-learning-guide/ivrv-straddle-chapter-{design,plan}.md`.
+
+**Key findings (now in the chapter):**
+- The exact pipeline is codified by Pollok (2025, arXiv 2506.07928): daily ATM delta-neutral straddles on S&P 500 names sorted on $f(\widehat{RV},IV)$, lookahead-safe (predict 3:55pm, trade pre-close, realize $t{+}1$), evaluated by QLIKE *and* straddle PnL.
+- **Correction baked into the chapter:** the $1/N$ + kurtosis discrete-hedging-error variance is Boyle-Emanuel (1980) plus an own leptokurtic extension ($\mathrm{Var}(HE)\propto\sigma^4(\kappa-1)/N$), NOT Ahmad-Wilmott -- whose Result 2 (Eq. 3, p. 70) is a *continuous*-hedge path-dependence variance with no $1/N$ and no kurtosis term.
+- Option cost is make-or-break: timing-aware execution is ~1/3 of quoted, and a long-short straddle decile collapses 22.7% -> 3.9%/month at the quoted spread (Muravyev-Pearson). Report a cost *band*.
+- Leland (1985) is a baseline cost-line inflator, not the optimal policy (Kabanov-Safarian: under-hedges under constant costs; NN/band hedgers beat it).
+- Every economic-value source is daily and 1993-2023; the intraday 5-min hedging-error and cost mechanics must be confirmed by our own bar-by-bar simulation.
+
+**Open threads:** the chapter specifies 4 experiments for the GS machine -- (1) 5-min bar-by-bar hedging-error floor sim ($\mathrm{Var}=a/N+b$), (2) cost-band Sharpe (quoted / effective / timing-aware), (3) per-(symbol,day) PnL regressed on the variance gap and forecast error with a DM test, (4) pooled vs per-symbol deflated Sharpe with honest $N$. Branch `research/ivrv-straddle-backtest` is unmerged.
+
+---

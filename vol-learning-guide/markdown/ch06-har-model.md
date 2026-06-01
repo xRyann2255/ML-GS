@@ -473,6 +473,245 @@ $$\min_{\beta, \gamma} \sum_{t} \left(\operatorname{RV}_{t+1} - \beta_0 - \beta_
 > The answer depends critically on the feature set and forecast horizon.
 
 
+## Ridge and Elastic-Net HAR: Shrinking Collinear Components
+
+> **Prereq: The Collinearity Problem**
+> Two predictors are **collinear** when one is nearly a linear function of the other, so the data carry little independent information about their separate coefficients.
+> The HAR design matrix is a textbook case: the weekly average $\operatorname{RV}^{(w)}_t$ contains $\operatorname{RV}_t$ as one of its five terms, and the monthly average $\operatorname{RV}^{(m)}_t$ contains both as part of its 22 terms (Definition of Weekly and Monthly Realized Variance, above).
+> When columns of the design matrix $\mathbf{X}$ are nearly linearly dependent, the Gram matrix $\mathbf{X}^\top\mathbf{X}$ (a summary grid of how the predictors overlap) has a near-zero **eigenvalue** (a single number that here signals a direction in the data carrying almost no information), OLS coefficients swing wildly from sample to sample, and adding even one exogenous predictor can flip a sign.
+
+> **Intuition: A Note on the Matrix Notation Ahead**
+> This section leans on a few pieces of linear-algebra shorthand; here they are in plain words, once, so the equations read smoothly.
+> **Bold letters** ($\mathbf{y}$, $\mathbf{X}$, $\bm{\beta}$) are whole lists or grids of numbers, not single values.
+> A **matrix** is just a grid of numbers; the notation $\mathbf{y} \in \mathbb{R}^n$ means "$\mathbf{y}$ is a list of $n$ numbers," and $\mathbf{X} \in \mathbb{R}^{n\times p}$ means "$\mathbf{X}$ is a table with $n$ rows (one per training day) and $p$ columns (one per feature)."
+> The double bars $\lVert\mathbf{v}\rVert_2^2$ are a **norm**: square every number in the list $\mathbf{v}$ and add them up.
+> The superscript $\top$ means **transpose**: flip a grid on its side so rows become columns, the bookkeeping that lets two grids multiply.
+> The superscript $-1$ means **matrix inverse**, the grid-version of dividing (it undoes a multiplication).
+> And $\arg\min_{\bm{\beta}}$ reads "the coefficient list $\bm{\beta}$ that makes everything to its right as small as possible."
+> You will meet each of these again in context below.
+
+The Lasso of the HAR-X section answers "which extra predictors matter?" by zeroing out the weak ones.
+But zeroing is exactly the wrong move for the *core* HAR terms.
+When $\operatorname{RV}_t$, $\operatorname{RV}^{(w)}_t$, and $\operatorname{RV}^{(m)}_t$ are strongly correlated (pairwise correlations routinely exceed $0.8$ on equity index data), the Lasso keeps one and drops the rest essentially at random, a disaster for a model whose entire premise (the Heterogeneous Market Hypothesis section) is that all three horizons carry signal.
+
+The principled fix is **ridge regression**, which adds an $L_2$ penalty instead of an $L_1$ penalty.
+Ridge shrinks correlated coefficients *together* rather than forcing a choice between them, so the daily, weekly, and monthly components all survive in damped form.
+**Elastic net** then blends the two penalties to get sparsity over the exogenous predictors *and* ridge-style grouping over the collinear HAR core.
+
+### The Ridge Objective
+
+Start from the penalized least-squares problem.
+Write the HAR-X regression of the HAR-X equation in matrix form, stacking the daily, weekly, monthly, and any exogenous columns into a single design matrix $\mathbf{X}$ with coefficient vector $\bm{\beta}$.
+Ridge regression (Hoerl and Kennard, 1970) adds a squared-coefficient penalty to the residual sum of squares:
+
+$$\hat{\bm{\beta}}_{\mathrm{ridge}} = \arg\min_{\bm{\beta}}\; \underbrace{\lVert \mathbf{y} - \mathbf{X}\bm{\beta} \rVert_2^2}_{\text{fit to past }\operatorname{RV}} + \underbrace{\lambda\,\lVert \bm{\beta} \rVert_2^2}_{\text{shrinkage penalty}}$$
+
+Reading it left to right: $\arg\min_{\bm{\beta}}$ means "find the particular coefficient list $\bm{\beta}$ that makes everything to its right as small as possible," and the double bars $\lVert\mathbf{v}\rVert_2^2$ are shorthand for "take every number in the list $\mathbf{v}$, square it, and add them all up."
+So the first term $\lVert\mathbf{y} - \mathbf{X}\bm{\beta}\rVert_2^2$ is just the total squared forecast error written compactly, and the second term penalizes the total squared coefficient size.
+
+- $\mathbf{y} \in \mathbb{R}^n$: the vector of realized-variance targets $\operatorname{RV}_{t+1}$ across the $n$ training days
+- $\mathbf{X} \in \mathbb{R}^{n \times p}$: the design matrix whose columns are $\operatorname{RV}_t$, $\operatorname{RV}^{(w)}_t$, $\operatorname{RV}^{(m)}_t$, and any exogenous predictors $X_{j,t}$
+- $\bm{\beta} \in \mathbb{R}^p$: the HAR coefficient vector ($\beta_d, \beta_w, \beta_m, \gamma_1, \ldots$)
+- $\lVert \mathbf{y} - \mathbf{X}\bm{\beta} \rVert_2^2 = \sum_t (\operatorname{RV}_{t+1} - \mathbf{x}_t^\top\bm{\beta})^2$: the ordinary HAR sum of squared forecast errors; here $\mathbf{x}_t$ is the one row of $\mathbf{X}$ for day $t$ (that day's feature values), and $\mathbf{x}_t^\top\bm{\beta}$ multiplies each feature by its coefficient and adds them up, i.e. it is the model's forecast for day $t$
+- $\lVert \bm{\beta} \rVert_2^2 = \sum_j \beta_j^2$: the squared $L_2$ norm of the coefficients; penalizes large coefficients
+- $\lambda \geq 0$: the regularization strength. At $\lambda = 0$ this is plain OLS-HAR; as $\lambda \to \infty$ all coefficients shrink toward zero
+
+> **Intuition: In Plain English**
+> Ridge-HAR fits the same daily/weekly/monthly regression as ordinary HAR, but it charges a fee for every unit of coefficient size.
+> Because the fee is on the *squared* size, it punishes one big swollen coefficient far more than two moderate ones that add up to the same forecast.
+> So when the daily and weekly terms are nearly interchangeable, ridge prefers to split the weight between them rather than dump it all on one.
+> The result is a HAR whose three components stay sensible even when the data cannot cleanly tell them apart.
+
+> **Project Connection: Why This Matters**
+> Ridge-HAR is the regularized baseline your project reports next to HARQ.
+> When you eventually feed the same daily/weekly/monthly features to a tree ensemble or neural network, ridge-HAR is the linear bar to clear: if LightGBM cannot beat ridge-HAR on out-of-sample $\operatorname{QLIKE}$ using identical features, the nonlinearity bought you nothing and you have likely overfit (the litmus test of the "Why HAR Is Hard to Beat" section).
+
+### Closed-Form Solution
+
+Unlike the Lasso, ridge has a closed form.
+Expand the ridge objective and set the gradient to zero:
+
+$$\begin{aligned} \mathcal{L}(\bm{\beta}) &= (\mathbf{y} - \mathbf{X}\bm{\beta})^\top(\mathbf{y} - \mathbf{X}\bm{\beta}) + \lambda\,\bm{\beta}^\top\bm{\beta} \\ \nabla_{\bm{\beta}}\mathcal{L} &= -2\mathbf{X}^\top(\mathbf{y} - \mathbf{X}\bm{\beta}) + 2\lambda\bm{\beta} = \mathbf{0} \end{aligned}$$
+
+This step is algebra you can take on faith; the next equation is what you actually use.
+In words: the triangle symbol $\nabla$ ("nabla") means the slope of the error surface, and at the bottom of a valley the slope is flat (zero), so setting $\nabla_{\bm{\beta}}\mathcal{L} = \mathbf{0}$ locates the best $\bm{\beta}$.
+The superscript $\top$ is the transpose, flipping a grid so its rows become columns, which is the bookkeeping that lets these grids multiply together.
+
+Solving for $\bm{\beta}$ gives the ridge estimator:
+
+$$\hat{\bm{\beta}}_{\mathrm{ridge}} = \bigl(\mathbf{X}^\top\mathbf{X} + \lambda\mathbf{I}\bigr)^{-1}\mathbf{X}^\top\mathbf{y}$$
+
+- $\mathbf{X}^\top\mathbf{X} \in \mathbb{R}^{p\times p}$: the Gram matrix; its eigenvalues (each a single number measuring how strongly the data vary along one direction) measure how much the data spread along each direction. For collinear HAR columns, the smallest eigenvalue is near zero, meaning the data barely move that way, exactly the collinear case
+- $\mathbf{I}$: the identity matrix, the grid-version of the number $1$ (ones down the diagonal, zeros elsewhere), so $\lambda\mathbf{I}$ just means "add the amount $\lambda$ along the diagonal"; this adds $\lambda$ to every eigenvalue of $\mathbf{X}^\top\mathbf{X}$, lifting the smallest one away from zero and guaranteeing the inverse exists
+- the superscript $-1$ on $(\mathbf{X}^\top\mathbf{X} + \lambda\mathbf{I})$ is the matrix inverse, the grid-version of dividing, which undoes a multiplication
+- $\mathbf{X}^\top\mathbf{y} \in \mathbb{R}^p$: the cross-covariance between each lagged $\operatorname{RV}$ feature and tomorrow's $\operatorname{RV}$
+- Setting $\lambda = 0$ recovers the OLS-HAR estimator $(\mathbf{X}^\top\mathbf{X})^{-1}\mathbf{X}^\top\mathbf{y}$ behind the HAR-RV equation
+
+> **Intuition: In Plain English**
+> OLS-HAR has to invert $\mathbf{X}^\top\mathbf{X}$, and when the daily/weekly/monthly columns nearly overlap that matrix is almost singular, so the inversion magnifies tiny data wiggles into huge coefficient swings.
+> Ridge slides $\lambda$ down the diagonal first, which is like propping up the near-flat direction so the inversion no longer blows up.
+> The bigger $\lambda$ is, the more the wobbly directions get held in place, and the more stable the three HAR coefficients become from one sample to the next.
+
+> **Project Connection: Why This Matters**
+> The closed form is why ridge-HAR is essentially free to run: there is no iterative optimizer, no convergence to babysit, just one matrix inversion per candidate $\lambda$.
+> You can sweep an entire grid of $\lambda$ values and refit ridge-HAR in milliseconds, which makes it a cheap, robust default to anchor every forecasting table in the project.
+
+### Why Ridge Damps the Noisy Collinear Directions
+
+To see *which* part of the HAR signal ridge shrinks, look through the singular value decomposition (SVD).
+Write $\mathbf{X} = \mathbf{U}\mathbf{D}\mathbf{V}^\top$ with singular values $d_1 \geq d_2 \geq \cdots \geq d_p$.
+You can think of a **singular value** $d_j$ as a single number measuring how much the data stretch along one underlying direction: a big $d_j$ means lots of variation (trustworthy), a tiny $d_j$ means the data barely move that way (the fragile, collinear direction).
+The decomposition $\mathbf{X} = \mathbf{U}\mathbf{D}\mathbf{V}^\top$ is just the standard recipe that extracts those directions ($\mathbf{U}$ and $\mathbf{V}$ hold the direction grids, $\mathbf{D}$ holds the $d_j$); you do not need its details to follow the argument.
+The squared singular values $d_j^2$ are exactly the eigenvalues of the Gram matrix $\mathbf{X}^\top\mathbf{X}$ from the previous subsection, which is the link the worked example below relies on.
+The directions with large $d_j$ are well-determined (the data move a lot along them); the directions with small $d_j$ are the noisy, near-collinear combinations of $\operatorname{RV}_t$, $\operatorname{RV}^{(w)}_t$, $\operatorname{RV}^{(m)}_t$ where the data barely move.
+Along each SVD direction, ridge replaces the OLS amplification factor $d_j^{-1}$ with a damped factor:
+
+$$\underbrace{\frac{1}{d_j}}_{\text{OLS amplifies}} \;\longrightarrow\; \underbrace{\frac{d_j}{d_j^2 + \lambda}}_{\text{ridge damps}}$$
+
+- $d_j$: the $j$-th singular value of $\mathbf{X}$; large for well-determined directions, small for collinear ones
+- $d_j^{-1}$: the OLS weight along direction $j$, which explodes when $d_j$ is tiny
+- $d_j/(d_j^2+\lambda)$: the ridge weight, which $\to d_j^{-1}$ when $d_j^2 \gg \lambda$ (well-determined directions untouched) and $\to 0$ when $d_j^2 \ll \lambda$ (noisy directions damped out)
+
+> **Intuition: In Plain English**
+> OLS-HAR puts the most faith in exactly the directions where it has the least evidence: when the three $\operatorname{RV}$ averages nearly coincide, the leftover direction that distinguishes them has almost no variation, so OLS multiplies it by a giant number and reads pure noise as signal.
+> Ridge does the opposite: it leaves the strong, well-measured directions alone and quietly turns down the volume on the weak, collinear ones.
+> That is the entire point of ridge-HAR: it does not shrink the three coefficients equally; it selectively mutes the unreliable combination of them.
+
+> **Project Connection: Why This Matters**
+> The noisy collinear direction in a HAR regression is precisely where measurement error in $\operatorname{RV}$ does the most damage to coefficients (the same theme HARQ tackles in the HARQ section).
+> Ridge's selective damping is a model-free cousin of HARQ's $RQ$-weighting: instead of down-weighting noisy *days*, ridge down-weights the noisy *direction* in coefficient space.
+> Both push forecasts away from over-trusting fragile information.
+
+### Bias, Variance, and the Hoerl--Kennard Guarantee
+
+Why accept any shrinkage at all, given that ridge biases the coefficients?
+First, three terms in plain English: **bias** means the forecast is systematically off-target on average; **variance** means it jumps around wildly from one data sample to the next; **mean squared error** (MSE) bundles both into a single score, bias-squared plus variance.
+As $\lambda$ grows from zero, the squared bias of $\hat{\bm{\beta}}_{\mathrm{ridge}}$ rises smoothly from zero (the OLS estimator is unbiased) while the estimator variance falls.
+The mean squared error is their sum, and it traces a U-shape in $\lambda$ (see the bias-variance figure below): a wrong-but-stable estimate beats a right-on-average-but-wild one.
+The foundational result makes this precise.
+
+*[Figure: The bias-variance trade-off behind ridge. Three curves are plotted against shrinkage strength $\lambda$ (from 0 to 5). The variance curve (green) starts high near 2.2 at $\lambda = 0$ and falls monotonically as $\lambda$ rises. The squared-bias curve (red) starts at 0 at $\lambda = 0$ and rises smoothly. Their sum, the MSE curve (blue, $= $ bias$^2 +$ variance), traces a U-shape with its minimum at a strictly positive $\lambda$ (marked "best $\lambda$" at approximately $\lambda \approx 1.05$, error $\approx 1.51$), so some shrinkage always beats OLS.]*
+
+> **Key Result: Hoerl--Kennard Theorem (Hoerl and Kennard, 1970)**
+> This is the formal statement; if the notation is unfamiliar, skip to the plain-English box below.
+> A quick legend: $\bm{\varepsilon}$ is the random noise in volatility (the error term); $\mathbb{E}[\cdots]$ means "on average"; $\sigma^2$ is the size of that noise; and $d_j^{-2}$ means $1$ divided by the singular value squared, which is what explodes when a direction is collinear.
+> For any linear model $\mathbf{y} = \mathbf{X}\bm{\beta} + \bm{\varepsilon}$ with $\mathbb{E}[\bm{\varepsilon}] = \mathbf{0}$ (the noise is zero on average) and $\operatorname{Cov}(\bm{\varepsilon}) = \sigma^2\mathbf{I}$ (every day's noise has the same size $\sigma^2$ and is uncorrelated across days), there *always* exists a $\lambda > 0$ for which the ridge estimator has strictly lower mean squared error than OLS:
+> $$\mathrm{MSE}\bigl(\hat{\bm{\beta}}_{\mathrm{ridge}}\bigr) < \mathrm{MSE}\bigl(\hat{\bm{\beta}}_{\mathrm{OLS}}\bigr).$$
+> The intuition: OLS variance is proportional to $\sigma^2\sum_j d_j^{-2}$ (recall the eigenvalues of $\mathbf{X}^\top\mathbf{X}$ are $\lambda_j = d_j^2$), which becomes enormous when any singular value $d_j$ is small, exactly the collinear HAR case.
+> A small dose of bias buys a large variance reduction.
+> The MSE-optimal $\lambda$ depends on the unknown $\bm{\beta}$ and $\sigma^2$, so in practice it is chosen by cross-validation.
+
+> **Intuition: In Plain English**
+> The theorem says there is *always* some amount of shrinkage that makes HAR forecasts better, not just sometimes.
+> For collinear HAR features the "always" is especially generous: the noisier the distinction between daily, weekly, and monthly $\operatorname{RV}$, the more there is to gain.
+> The only catch is that the best $\lambda$ depends on quantities you do not know, which is why you tune it on held-out data rather than guess.
+
+> **Project Connection: Why This Matters**
+> Hoerl--Kennard is the formal license for using ridge-HAR as a default: on the collinear daily/weekly/monthly design, some positive $\lambda$ is guaranteed to forecast $\operatorname{RV}$ better in MSE than OLS-HAR.
+> The practical question is never "should I regularize?" but "how much?", and that is a tuning problem you solve with purged cross-validation (below), reported in out-of-sample $\operatorname{QLIKE}$ in [Chapter 16](ch16-forecast-evaluation.md).
+
+### Ridge vs. Lasso on Correlated HAR Features
+
+The two penalties behave very differently precisely where it matters for HAR: correlated predictors.
+The table below summarizes the contrast.
+The correlated-features row is the decisive one: the daily, weekly, and monthly $\operatorname{RV}$ terms are strongly collinear by construction, so the Lasso's tendency to keep one and drop the rest is a liability, while ridge's group shrinkage preserves all three time scales.
+
+| **Property** | **Ridge ($L_2$)** | **Lasso ($L_1$)** |
+|---|---|---|
+| Penalty | $\lambda\sum_j \beta_j^2$ | $\lambda\sum_j |\beta_j|$ |
+| Sparsity | No (all $\beta_j \neq 0$) | Yes (many $\beta_j = 0$) |
+| Closed form | Yes (ridge closed-form equation) | No (coordinate descent) |
+| Correlated HAR terms | Shrinks $\operatorname{RV}_d,\operatorname{RV}_w,\operatorname{RV}_m$ together | Keeps one, zeros the others (arbitrary) |
+| Constraint geometry | Ball (circle) | Diamond |
+| Variable selection | None | Built in |
+| Best when | Many correlated, all useful | Few strong, mostly irrelevant |
+
+> **Warning: Do Not Lasso the Core HAR Terms**
+> The Lasso is the right tool for selecting among the *exogenous* HAR-X predictors (the HAR-X section), where most candidates are genuinely irrelevant.
+> It is the wrong tool for the three core $\operatorname{RV}$ components.
+> Because $\operatorname{RV}^{(w)}_t$ and $\operatorname{RV}^{(m)}_t$ are built from $\operatorname{RV}_t$, they are mechanically collinear, and the Lasso will drop one whole time scale to satisfy its sparsity preference, choosing essentially at random which one survives across resamples.
+> That destroys the multi-horizon structure that is the entire reason HAR works (the Heterogeneous Market Hypothesis section).
+> Keep the core HAR terms unpenalized or ridge-penalized; reserve $L_1$ for the exogenous block.
+
+### Why $L_1$ Produces Sparsity but $L_2$ Does Not
+
+The difference in the table above comes down to geometry.
+Both penalties can be written as a constraint: minimize the HAR sum of squared errors subject to a budget $t$ on the total coefficient size, $\lVert\bm{\beta}\rVert_2^2 \leq t$ (ridge) or $\lVert\bm{\beta}\rVert_1 \leq t$ (Lasso).
+The OLS-HAR loss has elliptical *contours*, like the rings on a contour map: each ring marks a level of equal forecast error, and the centre is the best (lowest-error) point.
+These rings are elongated and tilted because the daily and weekly terms are correlated.
+The regularized solution is where the smallest such ellipse first touches the constraint region.
+The figure below shows why the shape of that region decides whether a coefficient lands on exactly zero.
+
+*[Figure: Why $L_1$ produces sparsity and $L_2$ does not. Two side-by-side panels plot the coefficient plane with axes $\beta_d$ (horizontal) and $\beta_w$ (vertical). In both panels, the same tilted orange ellipses are contours of the HAR sum-of-squares loss (the tilt, about 35 degrees, reflects the strong correlation between $\operatorname{RV}_d$ and $\operatorname{RV}_w$), with the unconstrained OLS solution $\hat{\bm{\beta}}_{\mathrm{OLS}}$ marked in red off in the upper-right. The regularized estimate is where the loss contour first meets the constraint region. **Left (ridge):** the constraint is a round $L_2$ ball $\lVert\bm{\beta}\rVert_2^2 \le t$ centred at the origin; because it is round, the tangency point ($\hat{\bm{\beta}}_{\mathrm{ridge}}$, green, at roughly $(0.62, 0.91)$) is generically off-axis, leaving both $\beta_d$ and $\beta_w$ nonzero, shrunk together. **Right (Lasso):** the constraint is an $L_1$ diamond $\lVert\bm{\beta}\rVert_1 \le t$ with sharp corners on the axes, and an elongated ellipse almost always touches a corner first, here the corner on the $\beta_w$ axis at $(0,1.1)$, setting $\beta_d = 0$. For collinear HAR components, that corner means dropping a whole time scale.]*
+
+> **Intuition: In Plain English**
+> Picture inflating the blue constraint region until it just kisses the orange loss contours.
+> A round ball gets kissed on its smooth side, so both coefficients keep some value.
+> A diamond gets kissed on a pointy corner, and the corners sit exactly on the axes where one coefficient is zero.
+> The kink in the $L_1$ penalty is what makes those corners, and the corners are what produce sparsity.
+> Ridge has no kink, no corners, and so no exact zeros.
+
+### Elastic Net: Sparsity with Grouping
+
+Ridge keeps every coefficient; the Lasso zeros many but mishandles correlated groups.
+The **elastic net** (Zou and Hastie, 2005) combines both penalties so you can select among exogenous HAR-X predictors *and* keep correlated terms grouped:
+
+$$\hat{\bm{\beta}}_{\mathrm{enet}} = \arg\min_{\bm{\beta}}\; \lVert \mathbf{y} - \mathbf{X}\bm{\beta} \rVert_2^2 + \lambda\Bigl[\underbrace{\alpha\,\lVert\bm{\beta}\rVert_1}_{\text{selection}} + \underbrace{\tfrac{1-\alpha}{2}\,\lVert\bm{\beta}\rVert_2^2}_{\text{grouping}}\Bigr]$$
+
+- $\alpha \in [0,1]$: the mixing parameter. At $\alpha = 1$ elastic net is pure Lasso; at $\alpha = 0$ it is pure ridge
+- $\lambda \geq 0$: the overall regularization strength, as in the ridge objective
+- $\alpha\,\lVert\bm{\beta}\rVert_1$: the $L_1$ component that zeros out weak exogenous predictors. The $L_1$ norm $\lVert\bm{\beta}\rVert_1 = \sum_j|\beta_j|$ adds up the absolute sizes of the coefficients (ignoring sign), whereas the $L_2$ norm $\lVert\bm{\beta}\rVert_2^2$ adds up their squares, the squaring is what makes $L_2$ punish one big coefficient far more
+- $\tfrac{1-\alpha}{2}\,\lVert\bm{\beta}\rVert_2^2$: the $L_2$ component that shrinks correlated coefficients toward each other; the factor $\tfrac{1}{2}$ is a conventional scaling that keeps the algebra tidy and does not change the behaviour
+
+> **Intuition: In Plain English**
+> Elastic net is a dial between the two behaviours.
+> The $L_1$ part still hunts down and switches off predictors that do not earn their keep, but the $L_2$ part insists that if two features are nearly the same, they should be kept or dropped *as a pair* with similar coefficients, instead of one randomly winning.
+> For HAR, that means you can let the model prune a long list of exogenous candidates while it refuses to break up the tightly correlated daily/weekly/monthly core.
+
+> **Key Idea: The Grouping Effect**
+> Zou and Hastie (2005) prove the **grouping effect**: if two features are highly correlated, elastic net assigns them nearly equal coefficients, rather than the Lasso's all-or-nothing pick.
+> The strength of the grouping is controlled by the $L_2$ weight $(1-\alpha)$: more $L_2$ means tighter grouping.
+> For HAR this is exactly right: the daily, weekly, and monthly $\operatorname{RV}$ terms form a natural correlated group that elastic net keeps intact while pruning useless exogenous regressors, the principled middle ground between ridge-HAR (no selection) and Lasso-HAR (group-blind selection).
+
+> **Project Connection: Why This Matters**
+> Elastic-net-HAR is the natural model when your HAR-X feature set mixes a small correlated core (the $\operatorname{RV}$ components, plus perhaps $RS^+,RS^-,C,J$ from the HAR-J and SHAR sections) with a long tail of speculative exogenous predictors (VIX innovations, macro surprises, cross-asset vol).
+> It prunes the tail while protecting the correlated core, giving you a sparse, interpretable linear forecaster that is still a fair baseline for the nonlinear models of [Chapter 11](ch11-tree-methods-vol.md).
+
+### Tuning and Diagnostics
+
+Ridge, Lasso, and elastic net all leave you with a tuning parameter $\lambda$ (and, for elastic net, the mix $\alpha$).
+The single most consequential decision in this whole section is *how* you choose them, because the wrong validation scheme silently leaks future volatility into the past.
+
+> **Warning: Tune $\lambda$ with Purged CV, Not i.i.d. K-Fold**
+> Standard $K$-fold CV assumes independent observations; realized variance violates this badly, it is highly persistent (the Heterogeneous Market Hypothesis section), and the HAR features $\operatorname{RV}^{(w)}_t,\operatorname{RV}^{(m)}_t$ are overlapping moving averages, so adjacent days share information by construction.
+> If day $t$ is in the training fold and day $t+1$ in the validation fold, the model has effectively already seen the answer, and the chosen $\lambda$ will be far too small (too little shrinkage), inflating in-sample fit and collapsing out-of-sample.
+> Tune $\lambda$ (and $\alpha$) with **purged $K$-fold CV with embargo** ([Chapter 16](ch16-forecast-evaluation.md), purged CV section), and size the embargo to cover the 22-day reach of the monthly average.
+> Generalized cross-validation (GCV) gives ridge a fast leave-one-out shortcut, but it inherits the i.i.d. assumption, so treat it only as a rough first pass and confirm with purged CV before trusting any reported improvement.
+
+> **Key Idea: Practical $\lambda$ Selection and Path Diagnostics**
+> Four habits make regularized HAR robust:
+> 1. **Log-spaced $\lambda$ grid.** Search $\lambda$ on a geometric grid. Log-spaced means the candidate $\lambda$ values grow by a constant multiple ($\ldots, 0.01, 0.1, 1, 10, \ldots$) rather than by constant steps, because $\lambda$ matters on a multiplicative scale; `np.logspace(-4, 4, 50)` is just "50 values from $0.0001$ to $10000$" in code. Refine around the minimum, and extend the grid if the optimum hits a boundary.
+> 2. **The one-standard-error rule.** Instead of the $\lambda$ that minimizes purged-CV error, pick the *largest* $\lambda$ whose CV error is within one standard error of the minimum. This yields a more heavily shrunk, simpler HAR that forecasts about as well and is far less prone to overfitting the validation noise.
+> 3. **The regularization path as a feature-importance diagnostic.** Plotting each coefficient as $\lambda$ increases from $0$ to $\infty$ shows which HAR features persist longest (most informative) and which shrink to zero first (noise). For Lasso/elastic-net-HAR the order in which exogenous predictors drop out is a free importance ranking.
+> 4. **Effective degrees of freedom.** Report model complexity as a continuous quantity, $\mathrm{df}(\lambda) = \sum_{j=1}^{p} d_j^2/(d_j^2 + \lambda)$ (the big $\sum$ means "add the following up across all $p$ directions"), which runs from $p$ at $\lambda = 0$ (full OLS-HAR) down to $0$ as $\lambda \to \infty$. Notice this is just the sum of the per-direction shrinkage factors $d_j^2/(d_j^2+\lambda)$ from the ridge SVD-shrinkage equation: each well-measured direction contributes nearly a whole knob, each damped collinear direction only a fraction, and adding them up gives the effective knob-count. It is the regularized analog of "number of parameters" and lets you compare HAR variants on equal footing.
+
+> **Intuition: In Plain English**
+> Think of $\mathrm{df}(\lambda)$ as "how many real knobs the model is still turning."
+> With no penalty, ridge-HAR uses all $p$ knobs; crank $\lambda$ up and the noisy collinear directions stop responding, so the *effective* number of knobs falls below $p$ even though the coefficient vector still has $p$ entries.
+> This is how you say "my regularized HAR is really only as complex as $2.3$ free parameters" and compare it fairly to a sparser model.
+
+> **Key Idea: Implementation Checklist for Ridge/Elastic-Net HAR**
+> 1. **Standardize before penalizing.** The $L_2$ and $L_1$ penalties are scale-dependent: a feature in raw $\operatorname{RV}$ units and one in percentage points are penalized unequally. Standardize every column to zero mean and unit variance *inside each training fold* (never on the full sample) before fitting.
+> 2. **Leave the intercept unpenalized.** You do not want to shrink the long-run mean of $\operatorname{RV}$ toward zero. Fit $\beta_0$ without penalty; standard libraries do this by default.
+> 3. **Use the CV wrappers, but supply your own splits.** `RidgeCV`, `LassoCV`, and `ElasticNetCV` automate the $\lambda$ (and $\alpha$) search, but their default i.i.d. folds are wrong for $\operatorname{RV}$. Pass a purged-CV splitter ([Chapter 16](ch16-forecast-evaluation.md)) so the tuning respects the time ordering.
+> 4. **Fit in logs.** As in the HAR Model section, estimating on $\ln\operatorname{RV}$ keeps residuals near-Gaussian and forecasts positive; the penalty and standardization arguments are unchanged.
+
+> **Project Connection: Why This Matters**
+> Ridge-HAR and elastic-net-HAR are the "Ridge/Lasso-HAR" baselines your project specification calls for, sitting between plain OLS-HAR and the tree/neural models of Chapters [11](ch11-tree-methods-vol.md)--[13](ch13-hybrid-ensemble.md).
+> Build them once, tune them with purged CV, and report them on every forecasting chart alongside HAR and HARQ.
+> If a nonlinear model cannot beat a properly tuned ridge-HAR on identical features and the same horizon, you have not found nonlinear structure; you have found a more expensive way to overfit.
+
+
 ## Why HAR Is Hard to Beat
 
 If HAR is so simple (three coefficients, OLS), why is it the benchmark rather than a stepping stone that ML quickly surpasses?

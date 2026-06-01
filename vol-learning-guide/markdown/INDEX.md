@@ -55,14 +55,15 @@ These markdown files are a faithful word-for-word conversion of `vol-learning-gu
 |-----|-------|---------|
 | [16](ch16-forecast-evaluation.md) | Forecast Evaluation | QLIKE, MSE, MAE loss functions. Diebold-Mariano test, Model Confidence Set. Purged CV, walk-forward. |
 | [17](ch17-applications-projects.md) | Applications and Projects | Vol-targeting, risk parity, momentum scaling. Practical applications of vol forecasts. |
+| [18](ch18-ivrv-straddle.md) | From Forecast to P&L: A Realistic, Evaluable IV--RV Straddle | Delta-hedged straddle on the IV-RV gap, gamma P&L identity, option/hedge transaction costs, Leland, discrete-hedging-error variance, realized kurtosis, deflated Sharpe. |
 
 ---
 
 ## Quick Reference
 
-**Chapters:** 18 (across 6 parts)
+**Chapters:** 19 files (across 6 parts; numbered 1-18 with a 12b)
 
-**Key progression:** Measurement (Ch 1-4) -> Classical forecasting (Ch 5-7) -> Options-implied info (Ch 8-9) -> ML methods (Ch 10-13) -> Multivariate/network (Ch 14-15) -> Evaluation (Ch 16-17)
+**Key progression:** Measurement (Ch 1-4) -> Classical forecasting (Ch 5-7) -> Options-implied info (Ch 8-9) -> ML methods (Ch 10-13) -> Multivariate/network (Ch 14-15) -> Evaluation and practice (Ch 16-18)
 
 **Baseline model:** HAR-RV (Ch 6) -- every ML model must beat this
 
