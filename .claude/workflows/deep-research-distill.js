@@ -262,8 +262,10 @@ const harvest = (await parallel(plan.facets.map(f => () =>
 You are HARVESTING the internet for ONE facet of this question.
 FACET: ${f.key}  (source type: ${f.sourceType})
 What a good hit looks like: ${f.lookFor}
-Run these searches (and reasonable variants): ${JSON.stringify(f.queries)}
+Run these searches (and reasonable variants): ${JSON.stringify(dateBiasedQueries(f.queries, YEAR, PREV_YEAR))}
 Also try to surface these named targets if relevant: ${JSON.stringify(plan.seminalTargets)}
+Bias HARD toward the current state of the art and the most recent credible work (${PREV_YEAR}-${YEAR}); older work is baseline/context only.
+We ALREADY HOLD these papers — do NOT propose them for download (you may still cite them as known baselines): ${JSON.stringify(plan.alreadyHave.map(h => h.title))}
 
 Use WebSearch to find sources, then WebFetch the most promising ones to read them. For 'code' facets, fetch GitHub repo pages / READMEs / raw files and capture whether the repo has a runnable HAR baseline, what data it uses, and the code link. For 'academic', capture effect sizes, data context, and method. For each source you keep, you MUST include snippetEvidence: the actual fetched text the key claim came from — do NOT report a claim you didn't see in fetched text. Mark access honestly (open / abstract-only / paywalled). Aim for 4-10 high-relevance sources; skip low-signal hits. Return only what you actually fetched.`,
     { label: `harvest:${f.key}`.slice(0, 40), phase: 'Harvest', agentType: 'Explore', schema: HARVEST_SCHEMA }
