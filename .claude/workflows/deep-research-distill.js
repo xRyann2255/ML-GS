@@ -280,7 +280,8 @@ const allSources = harvest.flatMap(h => h.sources).filter(s => {
   seen.add(k)
   return true
 })
-const toVerify = allSources.sort((a, b) => (b.relevance || 0) - (a.relevance || 0)).slice(0, TOP_N)
+const provisional = s => (s.relevance || 0) * harvestTierWeight(s.type)
+const toVerify = allSources.sort((a, b) => provisional(b) - provisional(a)).slice(0, TOP_N)
 log(`Harvested ${allSources.length} unique sources across ${harvest.length} facets; verifying top ${toVerify.length}`)
 
 // =====================================================================
@@ -294,6 +295,7 @@ const VERIFY_SCHEMA = {
     url: { type: 'string' },
     title: { type: 'string' },
     claimChecked: { type: 'string', description: 'the most load-bearing claim you tried to confirm' },
+    claimLocation: { type: 'string', description: 'where in the source the claim lives: e.g. "Table 4", "§4.1", "abstract", "p.12" — empty if not locatable' },
     grounded: { type: 'boolean', description: 'does the source actually support the claim (as fetched)?' },
     accessConfirmed: { type: 'string', enum: ['open', 'abstract-only', 'paywalled', 'dead-link'] },
     credibility: { type: 'string', enum: ['peer-reviewed', 'preprint', 'practitioner', 'unknown'] },
@@ -301,7 +303,7 @@ const VERIFY_SCHEMA = {
     keep: { type: 'boolean', description: 'keep this source in the distilled dossier?' },
     verifierNote: { type: 'string' },
   },
-  required: ['url', 'title', 'claimChecked', 'grounded', 'accessConfirmed', 'credibility', 'keep', 'verifierNote'],
+  required: ['url', 'title', 'claimChecked', 'claimLocation', 'grounded', 'accessConfirmed', 'credibility', 'keep', 'verifierNote'],
 }
 
 const verified = (await parallel(toVerify.map(s => () =>
@@ -311,7 +313,7 @@ const verified = (await parallel(toVerify.map(s => () =>
 ADVERSARIALLY VERIFY one harvested source. Default to skepticism.
 SOURCE: ${JSON.stringify({ title: s.title, url: s.url, type: s.type, keyClaims: s.keyClaims, reportedResults: s.reportedResults, access: s.access, snippetEvidence: s.snippetEvidence }, null, 1)}
 
-Re-fetch the URL (WebFetch). Check: (a) does the source actually contain the load-bearing claim / numbers reported? (b) is it really accessible, or abstract-only / paywalled / dead? (c) how credible is it (peer-reviewed > preprint > practitioner blog)? If the harvested claim is overstated or unsupported by what you can actually read, set grounded=false and give the correction. Only set keep=true for sources that materially help answer the question AND whose key claim you could ground (or that are clearly credible primary sources worth citing with a caveat).`,
+Re-fetch the URL (WebFetch). Check: (a) does the source actually contain the load-bearing claim / numbers reported, and WHERE (record claimLocation: the exact table/section/page where the number lives, so the brief can cite it precisely)? (b) is it really accessible, or abstract-only / paywalled / dead? (c) how credible is it (peer-reviewed > preprint > practitioner blog)? If the harvested claim is overstated or unsupported by what you can actually read, set grounded=false and give the correction. Only set keep=true for sources that materially help answer the question AND whose key claim you could ground (or that are clearly credible primary sources worth citing with a caveat).`,
     { label: `verify:${(s.title || s.url || '').slice(0, 30)}`, phase: 'Verify', agentType: 'Explore', schema: VERIFY_SCHEMA }
   )
 ))).filter(Boolean)
@@ -321,7 +323,10 @@ const dossier = toVerify.map(s => {
   const v = verdictByUrl.get((s.url || '').toLowerCase().replace(/\/+$/, ''))
   return { source: s, verdict: v || null }
 }).filter(x => !x.verdict || x.verdict.keep)
-log(`Verified ${verified.length}; ${dossier.length} sources kept for the dossier`)
+  .sort((a, b) =>
+    scoreSource(b.source.relevance, b.verdict && b.verdict.credibility) -
+    scoreSource(a.source.relevance, a.verdict && a.verdict.credibility))
+log(`Verified ${verified.length}; ${dossier.length} sources kept for the dossier (peer-review-first)`)
 
 // =====================================================================
 // PHASE 4 — DISTILL: synthesize the answer and write it into the repo
