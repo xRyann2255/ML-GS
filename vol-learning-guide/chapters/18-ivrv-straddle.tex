@@ -33,7 +33,7 @@ Two building blocks make the idea precise. A \textbf{straddle} is a package of o
 Selling a delta-hedged straddle is like selling insurance against large price moves. You collect a premium set by the market's implied volatility, then pay out whenever the underlying actually moves a lot (high realized volatility). You profit when the premium you charged exceeds the claims you pay, that is, when implied volatility was higher than the realized volatility that followed. Our forecast $\widehat{\RV}_t$ is the actuary: it tells us, before we write the policy, whether the premium on offer looks rich or cheap.
 \end{intuition}
 
-The signal that decides which way to trade is the gap between the implied volatility the market is charging at the close of the prior day, $\IVol_{t-1}$, and our model's forecast of the realized volatility that will actually occur, $\widehat{\RV}_t$. This gap is the \textbf{variance risk premium} viewed through a tradeable lens (\Cref{sec:vrp-definition}): when implied sits above forecast realized, we are paid to bear variance risk, so we sell; when implied sits below, we pay to hold it, so we buy.
+The signal that decides which way to trade is the gap between the implied volatility the market is charging at the close of the prior day, $\IVol_{t-1}$, and our model's forecast of the realized volatility that will actually occur, $\widehat{\RV}_t$. This gap is the \textbf{variance risk premium} viewed through a tradeable lens (\Cref{sec:vrp-definition}).
 
 \begin{keyidea}[The IV--RV Gap Trading Rule]
 On each day $t$, compare lagged implied volatility to the forecast of realized volatility:
@@ -72,7 +72,7 @@ The size of the bet can scale with the size of the gap. The quality of the forec
 \label{sec:ivrv:signal}
 % ═══════════════════════════════════════════════════
 
-The trade needs a single number, computed before we commit capital, that decides whether to be short or long the straddle. We have two raw ingredients: our model's forecast of the realized volatility that will occur over day $t$, written $\widehat{\RV}_t$, and the implied volatility the option market was charging at the close of the previous day, $\IVol_{t-1}$. The signal is some function of their gap.
+The trade needs a single number, computed before we commit capital, that decides whether to be short or long the straddle. We have two raw ingredients: our model's forecast of the realized volatility that will occur over day $t$, written $\widehat{\RV}_t$, and the implied volatility the option market was charging at the close of the previous day, $\IVol_{t-1}$. The signal is some function of their gap, following \citet{Pollok2025}.
 
 \begin{equation}
 \label{eq:ivrv:signal}
@@ -188,7 +188,7 @@ Each day you collect (or pay) one number: half the dollar gamma times how much t
 \Cref{eq:ivrv:daily-discrete} is literally the line of code at the heart of the backtest loop in \Cref{sec:ivrv:algorithm}. Every refinement still to come, transaction costs, hedging-error variance, kurtosis, modifies what surrounds this line; the line itself is the payoff of the forecast.
 \end{projectconnection}
 
-The dollar-gamma weight $S_t^2\Gamma_t$ is not constant: it is largest when the stock sits near the strike and falls away as the stock drifts into either wing (\Cref{fig:ivrv:dollar-gamma}). This is the source of the path dependence: the same average variance gap earns very different money depending on whether the stock spent the period parked at the strike (high weight) or trending away from it (low weight). The variance \emph{swap} removes this dependence entirely by replacing the single option with a static strip of options weighted $1/K^2$ (the log contract of \Cref{sec:var-swap}); a single straddle does not have that luxury, which is why \Cref{sec:ivrv:breaks} examines where its clean variance interpretation frays.
+The dollar-gamma weight $S_t^2\Gamma_t$ is not constant: it is largest when the stock sits near the strike and falls away as the stock drifts into either wing (\Cref{fig:ivrv:dollar-gamma}). This is the source of the path dependence: the same average variance gap earns very different money depending on whether the stock spent the period parked at the strike (high weight) or trending away from it (low weight). A single straddle cannot escape this path dependence, which is why \Cref{sec:ivrv:breaks} examines where its clean variance interpretation frays.
 
 \begin{figure}[ht]
 \centering
@@ -308,7 +308,7 @@ Option market makers quote a spread in volatility, and crossing it once costs yo
 This is the cost most likely to decide whether the strategy is real. A forecast edge of a few volatility points is easily swallowed by a spread of a few volatility points if you trade too often. Modelling $c_{\text{opt}}$ event-by-event, rather than as a flat daily haircut, is what lets the backtest reward a forecast that trades patiently and punish one that churns.
 \end{projectconnection}
 
-How large is the spread in practice, and does event-driven costing match reality? Two findings anchor the answer. First, \citet{MuravyevPearson2020} show that the cost actually paid depends enormously on execution: for the most liquid US equity options the average quoted half-spread corresponds to roughly $8.1$ cents, the conventional ``effective'' spread to about $6.2$ cents, but a timing-aware execution that waits for favourable quotes pays only about $1.3$ cents, roughly a fifth of the effective and a sixth of the quoted figure. The strategy-level consequence is stark: they document that a long--short straddle portfolio sorted on implied-minus-realized volatility earns about $22.7\%$ per month gross but collapses to about $3.9\%$ per month once the full quoted spread is charged. \emph{The sign of the conclusion flips with the cost assumption.}
+How large is the spread in practice, and does event-driven costing match reality? Two findings anchor the answer. First, \citet{MuravyevPearson2020} show that the cost actually paid depends enormously on execution: for the most liquid US equity options the average quoted spread is roughly $8.1$ cents, the conventional ``effective'' spread about $6.2$ cents, but a timing-aware execution that waits for favourable quotes pays only about $1.3$ cents, roughly a fifth of the effective and a sixth of the quoted figure. The strategy-level consequence is stark: they document that a long--short straddle portfolio sorted on implied-minus-realized volatility earns about $22.7\%$ per month gross but collapses to about $3.9\%$ per month once the full quoted spread is charged. \emph{The sign of the conclusion flips with the cost assumption.}
 
 \begin{warning}[Charge a Cost \emph{Band}, Not a Point Estimate]
 Because a plausible execution cost ranges from the full quoted half-spread (pessimistic) down to roughly a third of it (timing-aware), a single cost number is meaningless. Report the strategy's Sharpe across the whole band (\Cref{fig:ivrv:cost-band}). A strategy is only credible if it survives the pessimistic end, or at the very least the empirically grounded middle.
@@ -361,7 +361,7 @@ Maturity bucket & Effective spread (\% of premium) \\
 \label{sec:ivrv:leland}
 % ═══════════════════════════════════════════════════
 
-\Cref{sec:ivrv:option-costs} charged the spread on the option. But every time we rebalance the delta hedge we also trade the underlying, and that trade crosses a spread too. The classic way to fold this cost into the pricing, due to \citet{Leland1985}, is a beautiful sleight of hand: pretend you are hedging at a slightly \emph{higher} volatility, chosen so that the extra option premium exactly funds the expected hedging costs.
+\Cref{sec:ivrv:option-costs} charged the spread on the option. But every time we rebalance the delta hedge we also trade the underlying, and that trade crosses a spread too. The classic way to fold this cost into the pricing, due to \citet{Leland1985} (restated in this notation by \citealp{ZhaoZiemba2007}), is a beautiful sleight of hand: pretend you are hedging at a slightly \emph{higher} volatility, chosen so that the extra option premium exactly funds the expected hedging costs.
 
 \begin{equation}
 \label{eq:ivrv:leland-vol}
@@ -393,7 +393,7 @@ Use \Cref{eq:ivrv:leland-vol} as a transparent, deterministic way to charge hedg
 \label{sec:ivrv:hedging-error}
 % ═══════════════════════════════════════════════════
 
-Here is the subtlest cost of all, and the one most often mis-handled. Even with a perfect volatility forecast and zero transaction costs, hedging at discrete moments leaves a \emph{random} replication error every period. Its mean is zero, so it does not bias the P\&L, but its \emph{variance} is real risk that must inflate the denominator of any Sharpe ratio. If we forget it, we overstate the strategy's risk-adjusted return. The goal of this section is a closed form for that variance, attributed to exactly the right source.
+Here is the subtlest cost of all, and the one most often mis-handled. Even with a perfect volatility forecast and zero transaction costs, hedging at discrete moments leaves a \emph{random} replication error every period. Its mean is zero, so it does not bias the P\&L, but its \emph{variance} is real risk that must inflate the denominator of any Sharpe ratio. The goal of this section is a closed form for that variance, attributed to exactly the right source.
 
 Start with one rebalancing interval. Applying the Black--Scholes PDE and dropping higher-order terms, the hedging error accrued over a single step is
 
@@ -441,7 +441,7 @@ For a standardized per-step return with kurtosis $\kappa$,
 \end{keyresult}
 
 \begin{warning}[Do Not Attribute This to Ahmad--Wilmott]
-It is tempting to credit the $1/N$-and-kurtosis hedging-error variance to \citet{AhmadWilmott2005}, because they give a closed-form variance for delta-hedged P\&L. They do not. Their ``Result~2'' (their \S4.2, Eq.~10, p.~70) is the variance of \emph{continuous} hedging at implied volatility, a $G(S_0,t_0) - F(S_0,t_0)^2$ expression that arises from the path-dependence of the gamma profit under the real drift; it contains \emph{no} $1/N$ term and \emph{no} kurtosis term, because it is not about discrete rebalancing at all. The discrete-rebalancing variance is Boyle--Emanuel; the kurtosis inflation is the extension above.
+It is tempting to credit the $1/N$-and-kurtosis hedging-error variance to \citet{AhmadWilmott2005}, because they give a closed-form variance for delta-hedged P\&L. They do not. Their ``Result~2'' (their \S4.2, Eq.~3, p.~70) is the variance of \emph{continuous} hedging at implied volatility, a $G(S_0,t_0) - F(S_0,t_0)^2$ expression that arises from the path-dependence of the gamma profit under the real drift; it contains \emph{no} $1/N$ term and \emph{no} kurtosis term, because it is not about discrete rebalancing at all. The discrete-rebalancing variance is Boyle--Emanuel; the kurtosis inflation is the extension above.
 \end{warning}
 
 Practitioners often package the same idea in vega form: the hedging-error standard deviation of a delta-hedged option is sometimes written $\sigma_{\text{P\&L}} = \Vega\,\sigma\sqrt{\pi/(4N)}$ \citep[][context only]{Bennett2014}. Beware a coefficient ambiguity here: $\sqrt{\pi/4} \approx 0.886$ follows the half-normal mean-absolute convention, whereas the root-variance (L2) convention gives $1/\sqrt{2} \approx 0.707$; which is ``correct'' depends on whether you are reporting a mean-absolute error or a standard deviation. Match the convention to the quantity you put in the Sharpe denominator.
@@ -556,7 +556,7 @@ For each symbol and each trading day $t$:
   \node[align=center, font=\scriptsize, warnred] at (5.9,-0.45) {$-$ hedge\\ cost};
   \node[align=center, font=\scriptsize] at (8.2,-0.45) {Net\\ P\&L};
 \end{tikzpicture}
-\caption{P\&L attribution for the delta-hedged straddle. The gross gamma P\&L is reduced by the option transaction cost (\Cref{sec:ivrv:option-costs}) and the delta-hedge transaction cost (\Cref{sec:ivrv:leland}) to give the net mean P\&L. The discrete-hedging error of \Cref{sec:ivrv:hedging-error} is zero-mean, so it does not appear as a bar; instead it widens the risk around the net, shown as the blue band. Mean drag and risk inflation must be accounted separately.}
+\caption{P\&L attribution for the delta-hedged straddle. The gross gamma P\&L is reduced by the option transaction cost (\Cref{sec:ivrv:option-costs}) and the delta-hedge transaction cost (\Cref{sec:ivrv:leland}) to give the net mean P\&L. The discrete-hedging error of \Cref{sec:ivrv:hedging-error} is zero-mean, so it does not appear as a bar; instead it widens the risk around the net, shown as the blue band.}
 \label{fig:ivrv:waterfall}
 \end{figure}
 
