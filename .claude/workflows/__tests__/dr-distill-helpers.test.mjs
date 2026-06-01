@@ -113,6 +113,15 @@ function dateBiasedQueries(queries, year, prevYear) {
   if (base.length) out.push(`latest ${base[0]} state of the art ${year}`)
   return Array.from(new Set(out))
 }
+
+function buildReadmeRow(num, paperLabel, filename, status) {
+  const st = status === 'Essential' ? '**Essential**' : 'Recommended'
+  return `| ${num} | ${paperLabel} | \`${filename}\` | ${st} |`
+}
+
+function buildStillNeededLine(paperLabel) {
+  return `- ${paperLabel}`
+}
 // <<< DR-DISTILL HELPERS <<<
 
 test('deriveYear parses a YYYY-MM-DD slug prefix', () => {
@@ -229,4 +238,25 @@ test('dateBiasedQueries appends year-qualified variants and dedups', () => {
   assert.ok(out.includes('HAR QLIKE 2026'))
   assert.ok(out.includes('HAR QLIKE 2025 2026'))
   assert.strictEqual(new Set(out).size, out.length)
+})
+
+test('buildReadmeRow renders a markdown table row matching the index format', () => {
+  assert.strictEqual(
+    buildReadmeRow(20, 'Rough-Heston RV (2026) -- arXiv 2604.02743', 'newauthor-2026-rough-heston-rv.pdf', 'Recommended'),
+    '| 20 | Rough-Heston RV (2026) -- arXiv 2604.02743 | `newauthor-2026-rough-heston-rv.pdf` | Recommended |'
+  )
+})
+
+test('buildReadmeRow bolds Essential status', () => {
+  assert.strictEqual(
+    buildReadmeRow(21, 'Foundational Paper', 'x-2020-y.pdf', 'Essential'),
+    '| 21 | Foundational Paper | `x-2020-y.pdf` | **Essential** |'
+  )
+})
+
+test('buildStillNeededLine renders a bullet', () => {
+  assert.strictEqual(
+    buildStillNeededLine('Liu, Patton & Sheppard (2015) -- J. Econometrics'),
+    '- Liu, Patton & Sheppard (2015) -- J. Econometrics'
+  )
 })
