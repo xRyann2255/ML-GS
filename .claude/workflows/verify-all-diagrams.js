@@ -54,18 +54,23 @@ const DISCOVER_SCHEMA = {
 }
 
 const discovery = await agent(
-  `Enumerate every TikZ figure in these guides: ${JSON.stringify(GUIDES)}.
-For each guide root, Glob its chapter .tex files (<guide>/chapters/*.tex and <guide>/*.tex), Read each,
-and find every \\begin{tikzpicture}. For each occurrence, emit one flat array element:
+  `List every TikZ figure in these guides: ${JSON.stringify(GUIDES)} — efficiently, WITHOUT reading whole
+chapters (reading every file in full will blow your context; do not do it).
+For each guide root, use the Grep tool (ripgrep) with line numbers over the guide's .tex files
+(path = the guide root, glob "*.tex" — it recurses into chapters/) to get, in ONE pass, every line that
+matches the begin-tikzpicture command, the \\caption command, or the \\label command.
+From that line-numbered output alone, for each begin-tikzpicture hit emit one flat 'figures' element:
 - guide: the guide root (exactly one of the inputs)
 - file: the repo-relative .tex path
-- label: the \\label that belongs to THIS picture (the one that follows it, before the enclosing
-  \\end{figure} or the next \\begin{tikzpicture}); null if none
-- caption: the first ~80 chars of THIS picture's \\caption (same association rule); null if none
-- lineStart: the 1-based line number of its \\begin{tikzpicture}
+- label: the FIRST label command appearing AFTER this tikzpicture and BEFORE the next begin-tikzpicture
+  hit; null if none in that range
+- caption: the FIRST caption in that same range, truncated to ~80 chars; null if none
+- lineStart: the begin-tikzpicture line number
 - id: the label, or "<file>:<lineStart>" if unlabeled
-Do NOT attach a neighbouring figure's label/caption to a bare picture. Return a FLAT 'figures' array.`,
-  { label: 'discover:figures', phase: 'Discover', agentType: 'Explore', model: 'opus', schema: DISCOVER_SCHEMA }
+Only Read a SHORT slice of a file if a caption spans several lines and you must finish it — never read a
+whole chapter. Do NOT attach a neighbouring figure's label/caption to a bare picture.
+Return the FLAT 'figures' array by calling StructuredOutput.`,
+  { label: 'discover:figures', phase: 'Discover', model: 'opus', schema: DISCOVER_SCHEMA }
 )
 
 const figures = (discovery.figures || []).map(f => ({ ...f, locate: locateSubstr(f) }))
@@ -109,8 +114,9 @@ the deterministic checks are the hard floor and you add the visual judgement you
    Read ${group.guide}/.diagverify/inspection.json and VIEW ${group.guide}/.diagverify/crop.png (Read tool).
 3. Blocking defects = the JSON's blocking deterministic defects PLUS anything you can SEE in the crop as
    a first-time learner: overlapping/cramped/illegible text, ambiguous arrows, "does the concept read?".
-4. If there are blocking defects, edit ONLY this figure's TikZ in its .tex file, recompile (step 1),
-   re-inspect (step 2). Cap at 5 iterations.
+4. If there are blocking defects, edit ONLY this figure's TikZ in its .tex file with TARGETED Edits
+   (read just the figure's line range, not the whole chapter — keep your context small), recompile
+   (step 1), re-inspect (step 2). Cap at 5 iterations.
 5. Record per figure: status = already_clean | fixed | needs_human; file; blockingBefore/blockingAfter
    (count of blocking-severity defects in inspection.json, before any fix vs after); finalCrop = the last crop.png path.
 Do NOT git commit — leave edits in the working tree. Other guides are handled by parallel agents; touch
