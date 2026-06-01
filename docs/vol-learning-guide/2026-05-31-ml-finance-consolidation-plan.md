@@ -4,6 +4,7 @@
 **Goal:** Port the genuinely-useful, general ML methodology out of the archived `guides/ml-finance/` ("Risk as Alpha") guide into `vol-learning-guide`, then archive the old guide and all remaining risk-as-alpha material.
 **Source of plan:** gap-analysis workflow (`ml-finance-vol-gap-analysis`, 29 agents) comparing all 14 ml-finance chapters against the 18 vol-guide chapter files.
 **Execution mode (user-chosen):** draft ALL 9 sections, then a single review pass.
+**Status: COMPLETE (2026-06-01)** — all 9 sections drafted, reviewed, fixed, and verified (clean compile, 0 errors / 0 undefined refs); `guides/ml-finance/` archived to `archive/risk-as-alpha/`; references updated; 7 markdown twins regenerated; committed and synced to `main` + `docs-only`.
 
 ## Verdict
 
@@ -16,15 +17,15 @@
 
 | # | Target | Section added | Source (ml-finance) | Reframe | Priority | Status |
 |---|--------|---------------|---------------------|:------:|:------:|:------:|
-| 1 | ch06 har-model | Ridge + Elastic-Net HAR ("Ridge/Lasso-HAR" baseline; collinearity angle) | Ch5 | low | High | drafting |
-| 2 | ch11 tree-methods-vol | Tree Foundations (CART/bagging/RF) — fixes ch12 prereq gap | Ch6 | low | High | drafting |
-| 3 | ch16 forecast-evaluation | CPCV, PBO, Haircut/multiple-testing, cross-sectional CV leakage, 1-SE rule, trial-counting, survivorship | Ch5/8/9/11 | med | High | drafting |
-| 4 | ch11 tree-methods-vol | TreeSHAP + SHAP plot toolkit | Ch7/14 | low | Med | drafting |
-| 5 | ch10 feature-engineering | Incremental-info test, Spearman stability metric, signed-√ transform | Ch7/9 | med | Med | drafting |
-| 6 | ch13 hybrid-ensemble | GMM/EM/BIC + Markov-switching regime ID — fixes ch11 dangling ref | Ch13 | high | Med | drafting |
-| 7 | ch17 applications-projects | Transaction costs, turnover, net economic value — delivers ch16's promised cost test | Ch12 | med | Med | drafting |
-| 8 | ch15 spillovers-connectedness | Pooled panel forecasting across instruments | Ch8 | med | Low | drafting |
-| 9 | ch17 applications-projects | Communicating vol-forecasting results | Ch14 | med | Low | drafting |
+| 1 | ch06 har-model | Ridge + Elastic-Net HAR ("Ridge/Lasso-HAR" baseline; collinearity angle) | Ch5 | low | High | done |
+| 2 | ch11 tree-methods-vol | Tree Foundations (CART/bagging/RF) — fixes ch12 prereq gap | Ch6 | low | High | done |
+| 3 | ch16 forecast-evaluation | CPCV, PBO, Haircut/multiple-testing, cross-sectional CV leakage, 1-SE rule, trial-counting, survivorship | Ch5/8/9/11 | med | High | done |
+| 4 | ch11 tree-methods-vol | TreeSHAP + SHAP plot toolkit | Ch7/14 | low | Med | done |
+| 5 | ch10 feature-engineering | Incremental-info test, Spearman stability metric, signed-√ transform | Ch7/9 | med | Med | done |
+| 6 | ch13 hybrid-ensemble | GMM/EM/BIC + Markov-switching regime ID — fixes ch11 dangling ref | Ch13 | high | Med | done |
+| 7 | ch17 applications-projects | Transaction costs, turnover, net economic value — delivers ch16's promised cost test | Ch12 | med | Med | done |
+| 8 | ch15 spillovers-connectedness | Pooled panel forecasting across instruments | Ch8 | med | Low | done |
+| 9 | ch17 applications-projects | Communicating vol-forecasting results | Ch14 | med | Low | done |
 
 ### Internal inconsistencies this also fixes
 1. ch12's prereq box assumes ch11 taught CART/split/bagging — ch11 currently skips it → Task 2.
@@ -38,7 +39,7 @@
 - Task 4 (ch11 TreeSHAP) before Task 5 (ch10 stability metric references it).
 - Tasks 7+9 share ch17 — write in one pass (costs first, then communication). Tasks 2+4 share ch11.
 
-## Archive step (after drafting + review)
+## Archive step (after done + review)
 1. `git mv guides/ml-finance/ archive/risk-as-alpha/guides/ml-finance/`
 2. Update **live** references (leave historical logs as-is):
    - `.claude/skills/sync-docs/SKILL.md` — drop ml-finance from compile loop, commit, docs-only sync, "what stays" list.
