@@ -927,46 +927,39 @@ Figure~\ref{fig:estimator-flowchart} provides a practical decision tree.
 \centering
 \resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
-  node distance=1.2cm and 2.0cm,
   every node/.style={font=\small},
+  flowterm/.style={flowblock, text width=2.7cm, minimum height=1.1cm},
+  decq/.style={decisionblock, aspect=1.6},
+  elabel/.style={font=\scriptsize, fill=white, inner sep=1pt},
 ]
 
-% Start
-\node[decisionblock, text width=3.5cm] (q1) {Need tick-level accuracy?};
+% --- Bottom row of terminal nodes (evenly spaced across the page) ---
+\node[flowterm, fill=keyorange!15] (tsrv)  at (0,0)    {TSRV\\(slower rate, easy)};
+\node[flowterm, fill=defblue!10]  (msrv)   at (5,0)    {MSRV or QMLE\\(optimal rate)};
+\node[flowterm, fill=defblue!10]  (kernel) at (11,0)   {Realized kernel\\(most popular)};
+\node[flowterm, fill=examteal!10] (preavg) at (16,0)   {Pre-averaging\\(intuitive)};
 
-% No: 5-min RV
-\node[flowblock, right=2.5cm of q1, fill=intgreen!15] (fivemin) {Use 5-min RV\\(Chapter~\ref{ch:rv})};
+% --- Level-3 decision diamonds, centred above each pair ---
+\node[decq, text width=1.7cm] (q3) at (2.5,4.4)  {Need simplicity?};
+\node[decq, text width=1.7cm] (q4) at (13.5,4.4) {Kernel or averaging?};
 
-% Yes: next question
-\node[decisionblock, below=1.5cm of q1, text width=3.5cm] (q2) {Is noise roughly i.i.d.?};
+% --- Level-2 decision diamond, centred above q3 and q4 ---
+\node[decq, text width=1.7cm] (q2) at (8,8.8) {Is noise roughly i.i.d.?};
 
-% Yes to iid
-\node[decisionblock, below left=1.5cm and 2.0cm of q2, text width=3.2cm] (q3) {Need simplicity?};
+% --- Top decision and the 5-min RV exit branch ---
+\node[decq, text width=1.7cm] (q1) at (8,13.2) {Need tick-level accuracy?};
+\node[flowblock, text width=2.7cm, minimum height=1.1cm, fill=intgreen!15] (fivemin)
+  at (15,13.2) {Use 5-min RV\\(Chapter~\ref{ch:rv})};
 
-% Simple
-\node[flowblock, below left=1.2cm and 1.0cm of q3, fill=keyorange!15] (tsrv) {TSRV\\(slower rate, easy)};
-
-% Not simple
-\node[flowblock, below right=1.2cm and 1.0cm of q3, fill=defblue!10] (msrv) {MSRV or QMLE\\(optimal rate)};
-
-% No to iid (dependent noise)
-\node[decisionblock, below right=1.5cm and 2.0cm of q2, text width=3.5cm] (q4) {Prefer kernel or local averaging?};
-
-% Kernel
-\node[flowblock, below left=1.2cm and 1.0cm of q4, fill=defblue!10] (kernel) {Realized kernel\\(most popular)};
-
-% Pre-avg
-\node[flowblock, below right=1.2cm and 1.0cm of q4, fill=examteal!10] (preavg) {Pre-averaging\\(intuitive)};
-
-% Arrows
-\draw[arrow] (q1) -- node[above, font=\scriptsize] {No} (fivemin);
-\draw[arrow] (q1) -- node[right, font=\scriptsize] {Yes} (q2);
-\draw[arrow] (q2) -- node[above left, font=\scriptsize] {Yes} (q3);
-\draw[arrow] (q2) -- node[above right, font=\scriptsize] {No} (q4);
-\draw[arrow] (q3) -- node[left, font=\scriptsize] {Yes} (tsrv);
-\draw[arrow] (q3) -- node[right, font=\scriptsize] {No} (msrv);
-\draw[arrow] (q4) -- node[left, font=\scriptsize] {Kernel} (kernel);
-\draw[arrow] (q4) -- node[right, font=\scriptsize] {Averaging} (preavg);
+% --- Arrows (labels placed near the source diamond, clear of terminal boxes) ---
+\draw[arrow] (q1) -- node[elabel, above] {No} (fivemin);
+\draw[arrow] (q1) -- node[elabel, pos=0.5, right] {Yes} (q2);
+\draw[arrow] (q2) -- node[elabel, pos=0.4] {Yes} (q3);
+\draw[arrow] (q2) -- node[elabel, pos=0.4] {No} (q4);
+\draw[arrow] (q3) -- node[elabel, pos=0.35] {Yes} (tsrv);
+\draw[arrow] (q3) -- node[elabel, pos=0.35] {No} (msrv);
+\draw[arrow] (q4) -- node[elabel, pos=0.35] {Kernel} (kernel);
+\draw[arrow] (q4) -- node[elabel, pos=0.35] {Averaging} (preavg);
 
 \end{tikzpicture}%
 }

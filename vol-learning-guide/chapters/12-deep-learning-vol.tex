@@ -42,7 +42,7 @@ It uses three gates (forget, input, output) and a cell state $\mathbf{c}_t$ that
 
 \begin{center}
 \begin{tikzpicture}[
-  gate/.style={draw, rounded corners, minimum height=0.7cm, minimum width=1.4cm, align=center, font=\small},
+  gate/.style={draw, rounded corners, minimum height=0.85cm, minimum width=1.5cm, align=center, font=\small},
   op/.style={circle, draw, minimum size=0.5cm, font=\small},
   arr/.style={-{Stealth[length=2.5mm]}, thick},
   scale=0.95
@@ -55,44 +55,49 @@ It uses three gates (forget, input, output) and a cell state $\mathbf{c}_t$ that
   \draw[arr, line width=1.2pt, orange!70] (-1, 0) -- node[below, font=\small] {$\bh_{t-1}$} (0.5, 0);
   \draw[arr, line width=1.2pt, orange!70] (7, 0) -- node[below, font=\small] {$\bh_t$} (8, 0);
 
-  % Input
-  \node[font=\small] at (3.5, -1.5) {$\bx_t$};
-  \draw[arr] (3.5, -1.2) -- (3.5, -0.5);
+  % Gates
+  \node[gate, fill=red!10]    (fg) at (2, 0) {Forget\\$\mathbf{f}_t$};
+  \node[gate, fill=green!10]  (ig) at (4, 0) {Input\\$\mathbf{i}_t$};
+  \node[gate, fill=purple!10] (og) at (6, 0) {Output\\$\mathbf{o}_t$};
 
-  % Forget gate
-  \node[gate, fill=red!10] (fg) at (2, 0) {Forget\\$\mathbf{f}_t$};
-  \node[op] (fgmul) at (2, 3) {$\odot$};
+  % Candidate cell state (own lane between forget and input gates)
+  \node[gate, fill=blue!8] (cand) at (3, 1.6) {$\tilde{\mathbf{c}}_t$};
+
+  % Operator nodes
+  \node[op] (fgmul) at (2, 3)     {$\odot$};
+  \node[op] (igmul) at (4, 3)     {$\odot$};
+  \node[op] (add)   at (3, 3)     {$+$};
+  \node[op] (tanh)  at (5.5, 1.5) {$\tanh$};
+  \node[op] (ogmul) at (6.5, 1.5) {$\odot$};
+
+  % Input distribution bus (feeds all gates and the candidate)
+  \node[font=\small] (xin) at (4, -1.9) {$\bx_t$};
+  \draw[arr] (xin) -- (4, -1.0);
+  \draw[thick] (2, -1.0) -- (6, -1.0);
+  \draw[arr] (2, -1.0) -- (fg.south);
+  \draw[arr] (4, -1.0) -- (ig.south);
+  \draw[arr] (6, -1.0) -- (og.south);
+  \draw[arr] (3, -1.0) -- (cand.south);
+
+  % Forget path
   \draw[arr] (fg) -- (fgmul);
   \draw[arr] (0.5, 0) -- (fg);
 
-  % Input gate
-  \node[gate, fill=green!10] (ig) at (4, 0) {Input\\$\mathbf{i}_t$};
-  \node[gate, fill=blue!8] (cand) at (4, 1.5) {$\tilde{\mathbf{c}}_t$};
-  \node[op] (igmul) at (4, 3) {$\odot$};
-  \node[op] (add) at (3, 3) {$+$};
+  % Input path
   \draw[arr] (ig) -- (igmul);
   \draw[arr] (cand) -- (igmul);
   \draw[arr] (fgmul) -- (add);
   \draw[arr] (igmul) -- (add);
 
-  % Connect add to cell state out
+  % Cell state through the operators
   \draw[line width=1.2pt, blue!60] (1.5, 3) -- (fgmul);
   \draw[line width=1.2pt, blue!60] (add) -- (5.5, 3);
 
-  % Output gate
-  \node[gate, fill=purple!10] (og) at (6, 0) {Output\\$\mathbf{o}_t$};
-  \node[op] (tanh) at (5.5, 1.5) {$\tanh$};
-  \node[op] (ogmul) at (6.5, 1.5) {$\odot$};
+  % Output path
   \draw[arr] (og) -- (ogmul);
   \draw[arr] (5.5, 3) -- (tanh);
   \draw[arr] (tanh) -- (ogmul);
   \draw[arr] (ogmul) -- (7, 0);
-
-  % Connections from input
-  \draw[arr] (3.5, -0.5) -| (fg);
-  \draw[arr] (3.5, -0.5) -| (ig);
-  \draw[arr] (3.5, -0.5) -| (og);
-  \draw[arr] (3.5, -0.5) -| (cand);
 \end{tikzpicture}
 \end{center}
 

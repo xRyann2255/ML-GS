@@ -337,16 +337,21 @@ Maturity bucket & Effective spread (\% of premium) \\
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-  ybar, width=0.74\textwidth, height=5.2cm,
+  ybar, width=0.66\textwidth, height=5.2cm,
   ymin=0, ymax=1.6,
   symbolic x coords={Gross, Timing-aware, Effective, Quoted},
   xtick=data, x tick label style={font=\small},
   ylabel={Pooled Sharpe (illustrative)}, ylabel style={font=\small},
-  bar width=22pt, nodes near coords, nodes near coords style={font=\scriptsize},
+  bar width=22pt,
   enlarge x limits=0.18, ymajorgrids, axis lines=left,
   every axis plot/.append style={fill=examteal!55, draw=examteal},
 ]
   \addplot coordinates {(Gross,1.40) (Timing-aware,1.00) (Effective,0.55) (Quoted,0.10)};
+  % Manual value labels (Gross label shifted right to clear the y-axis "1.5" tick)
+  \node[font=\scriptsize, anchor=south, xshift=6pt] at (axis cs:Gross,1.40) {1.4};
+  \node[font=\scriptsize, anchor=south] at (axis cs:Timing-aware,1.00) {1};
+  \node[font=\scriptsize, anchor=south] at (axis cs:Effective,0.55) {0.55};
+  \node[font=\scriptsize, anchor=south east, xshift=-2pt, yshift=1pt] at (axis cs:Quoted,0.10) {0.1};
   \draw[dashed, warnred, thick] (axis cs:Gross,0.5) -- (axis cs:Quoted,0.5)
     node[above left, font=\scriptsize, warnred] {credibility floor};
 \end{axis}

@@ -662,18 +662,19 @@ Figure~\ref{fig:vix-vs-rv} shows the persistent gap between VIX and subsequent r
   height=8cm,
   xlabel={Year},
   ylabel={Annualized Volatility (\%)},
-  xmin=2004, xmax=2024,
-  ymin=0, ymax=85,
+  xmin=2003.5, xmax=2024.5,
+  ymin=0, ymax=98,
   xtick={2004, 2006, 2008, 2010, 2012, 2014, 2016, 2018, 2020, 2022, 2024},
-  xticklabel style={rotate=45, anchor=east, font=\scriptsize},
+  scaled x ticks=false,
+  xticklabel={\pgfmathprintnumber[1000 sep={}]{\tick}},
+  xticklabel style={rotate=45, anchor=north east, yshift=-1pt, font=\scriptsize},
   grid=major,
   grid style={gray!20},
   tick label style={font=\small},
   label style={font=\small},
   title style={font=\small\bfseries},
   title={VIX (Implied) vs.\ Subsequent 30-Day Realized Vol: The Persistent Gap},
-  legend pos=north west,
-  legend style={font=\small, fill=white, fill opacity=0.9, draw=gray},
+  legend style={at={(0.52,0.97)}, anchor=north, font=\small, fill=white, fill opacity=0.9, draw=gray},
 ]
 
 % VIX level (schematic monthly data points — key episodes)
@@ -707,9 +708,9 @@ Figure~\ref{fig:vix-vs-rv} shows the persistent gap between VIX and subsequent r
 \draw[<->, intgreen, thick] (axis cs:2013.3, 10) -- (axis cs:2013.3, 14)
   node[midway, right, font=\scriptsize, text=intgreen] {VRP};
 
-% Crisis label
-\node[anchor=south, font=\scriptsize, warnred, rotate=0] at (axis cs:2008.85, 82) {GFC};
-\node[anchor=south, font=\scriptsize, warnred, rotate=0] at (axis cs:2020.25, 84) {COVID};
+% Crisis labels (placed above the VIX peaks with headroom below the top frame)
+\node[anchor=south, font=\scriptsize, warnred] at (axis cs:2008.85, 82) {GFC};
+\node[anchor=south, font=\scriptsize, warnred] at (axis cs:2020.25, 84) {COVID};
 
 \end{axis}
 \end{tikzpicture}

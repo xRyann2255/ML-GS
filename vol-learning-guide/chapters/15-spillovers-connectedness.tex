@@ -243,7 +243,7 @@ $\widetilde{\theta}_{jk}^{(H)}$.
   \draw[spillarrow, line width=1.4pt, red!50]
     (EQ) -- node[midway, left, font=\scriptsize] {15\%} (FX);
   \draw[spillarrow, line width=1.6pt, red!55]
-    (CR) -- node[midway, above right, font=\scriptsize] {18\%} (FI);
+    (CR) -- node[pos=0.30, above=1.5pt, font=\scriptsize, fill=white, inner sep=1pt] {18\%} (FI);
   \draw[spillarrow, line width=1.0pt, red!40]
     (EQ) -- node[midway, right, font=\scriptsize] {10\%} (CO);
   \draw[spillarrow, line width=1.2pt, red!45]
@@ -251,7 +251,7 @@ $\widetilde{\theta}_{jk}^{(H)}$.
   \draw[spillarrow, line width=0.8pt, gray!60]
     (CO) -- node[midway, below left, font=\scriptsize] {6\%} (FX);
   \draw[spillarrow, line width=0.6pt, gray!50]
-    (FI) -- node[midway, above right=-1pt, font=\scriptsize] {4\%} (CR);
+    (FI) -- node[pos=0.70, below=1.5pt, font=\scriptsize, fill=white, inner sep=1pt] {4\%} (CR);
   \draw[spillarrow, line width=1.0pt, red!40]
     (EQ) -- node[near start, above right, font=\scriptsize] {11\%} (CR);
 
@@ -429,17 +429,17 @@ at least two window lengths to check robustness \citep{DieboldYilmaz2012}.
   };
 
   % Crisis annotations
-  \draw[warnred, thick, dashed] (axis cs:2008.7,20) -- (axis cs:2008.7,90);
-  \node[font=\scriptsize, warnred, rotate=90, anchor=south]
-    at (axis cs:2008.7,88) {Lehman (Sep 2008)};
+  \draw[warnred, thick, dashed] (axis cs:2008.7,20) -- (axis cs:2008.7,87);
+  \node[font=\scriptsize, warnred, rotate=90, anchor=east, xshift=-1pt]
+    at (axis cs:2008.7,86) {Lehman (Sep 2008)};
 
-  \draw[warnred, thick, dashed] (axis cs:2011.3,20) -- (axis cs:2011.3,90);
-  \node[font=\scriptsize, warnred, rotate=90, anchor=south]
-    at (axis cs:2011.3,88) {Euro debt crisis};
+  \draw[warnred, thick, dashed] (axis cs:2011.3,20) -- (axis cs:2011.3,87);
+  \node[font=\scriptsize, warnred, rotate=90, anchor=east, xshift=-1pt]
+    at (axis cs:2011.3,86) {Euro debt crisis};
 
-  \draw[warnred, thick, dashed] (axis cs:2020.2,20) -- (axis cs:2020.2,90);
-  \node[font=\scriptsize, warnred, rotate=90, anchor=south]
-    at (axis cs:2020.2,88) {COVID-19 (Mar 2020)};
+  \draw[warnred, thick, dashed] (axis cs:2020.2,20) -- (axis cs:2020.2,87);
+  \node[font=\scriptsize, warnred, rotate=90, anchor=east, xshift=-1pt]
+    at (axis cs:2020.2,86) {COVID-19 (Mar 2020)};
 
 \end{axis}
 \end{tikzpicture}
@@ -568,16 +568,19 @@ tranquil and stressed markets \citep{DemirerDieboldLiuYilmaz2018}.
     (-6.8, -1.5) rectangle (-3.2, 2.9);
 
   % === CRISIS PANEL (right) ===
-  \node[font=\small\bfseries] at (3.5, 3.2) {Crisis Period};
+  % Nodes laid out as an open pentagon so the dense cross-sector edges
+  % traverse the empty centre rather than overlapping any node.  E3 sits
+  % off the central axis (right side) to keep its label clear of arrows.
+  \node[font=\small\bfseries] at (3.7, 3.2) {Crisis Period};
 
-  % Sector 1: Equities
-  \node[crisisnode, fill=red!15] (kA1) at (2.0, 1.8)  {$\text{E}_1$};
-  \node[crisisnode, fill=red!15] (kA2) at (3.5, 2.2)  {$\text{E}_2$};
-  \node[crisisnode, fill=red!15] (kA3) at (3.0, 0.8)  {$\text{E}_3$};
+  % Sector 1: Equities (top row + right flank)
+  \node[crisisnode, fill=red!15] (kA1) at (2.0, 2.0)  {$\text{E}_1$};
+  \node[crisisnode, fill=red!15] (kA2) at (4.4, 2.0)  {$\text{E}_2$};
+  \node[crisisnode, fill=red!15] (kA3) at (5.2, 0.5)  {$\text{E}_3$};
 
-  % Sector 2: Bonds
-  \node[crisisnode, fill=red!15] (kB1) at (4.2, -0.5) {$\text{B}_1$};
-  \node[crisisnode, fill=red!15] (kB2) at (2.5, -0.8) {$\text{B}_2$};
+  % Sector 2: Bonds (bottom row)
+  \node[crisisnode, fill=red!15] (kB1) at (4.4, -1.0) {$\text{B}_1$};
+  \node[crisisnode, fill=red!15] (kB2) at (2.0, -1.0) {$\text{B}_2$};
 
   % All edges thick (high connectedness)
   \draw[crisisarrow, line width=1.4pt] (kA1) -- (kA2);
@@ -585,16 +588,12 @@ tranquil and stressed markets \citep{DemirerDieboldLiuYilmaz2018}.
   \draw[crisisarrow, line width=1.4pt] (kA1) -- (kA3);
   \draw[crisisarrow, line width=1.2pt] (kB1) -- (kB2);
 
-  % Cross-sector edges now thick and numerous
+  % Cross-sector edges now thick and numerous (route through open centre)
   \draw[crisisarrow, line width=1.2pt] (kA1) -- (kB1);
   \draw[crisisarrow, line width=1.0pt] (kA2) -- (kB2);
   \draw[crisisarrow, line width=1.0pt] (kA3) -- (kB1);
   \draw[crisisarrow, line width=0.8pt] (kA3) -- (kB2);
   \draw[crisisarrow, line width=0.8pt] (kA1) -- (kB2);
-
-  % Bounding box
-  \draw[gray!30, dashed, rounded corners]
-    (1.2, -1.5) rectangle (5.0, 2.9);
 
 \end{tikzpicture}
 \caption{Spillover networks during calm (left) and crisis (right) periods.
