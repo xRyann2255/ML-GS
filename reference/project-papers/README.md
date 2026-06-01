@@ -46,6 +46,28 @@ Papers curated for the GS internship project: ML-based forecasting of realized v
 | 18 | Cont & Das (2024), "Rough Volatility: Fact or Artefact?" -- *Sankhya B* | `cont-das-2024-rough-volatility-fact-or-artefact.pdf` | **Essential** |
 | 19 | Rosenbaum & Zhang (2022), "On the Universality of the Volatility Formation Process" -- arXiv 2206.14114 | `rosenbaum-zhang-2022-universality-volatility-formation.pdf` | Recommended |
 
+## F. Variance Risk Premium, Delta-Hedged Straddles & Discrete-Hedging Error
+
+| # | Paper | File | Status |
+|---|---|---|---|
+| 20 | Bertsimas, Kogan & Lo (2000), "When Is Time Continuous?" -- *J. Financial Economics* | `bertsimas-kogan-lo-2000-when-time-continuous.pdf` | **Essential** |
+| 21 | Carr & Madan (2002), "Towards a Theory of Volatility Trading" -- *Volatility (ed. Jarrow), Risk Books* | `carr-madan-2002-theory-volatility-trading.pdf` | **Essential** |
+| 22 | Bakshi & Kapadia (2003), "Delta-Hedged Gains and the Negative Market Volatility Risk Premium" -- *Review of Financial Studies* | `bakshi-kapadia-2003-delta-hedged-gains.pdf` | **Essential** |
+| 23 | Bailey & Lopez de Prado (2014), "The Deflated Sharpe Ratio" -- *J. Portfolio Management* | `bailey-lopezdeprado-2014-deflated-sharpe.pdf` | **Essential** |
+| 24 | Ahmad & Wilmott (2005), "Which Free Lunch Would You Like Today, Sir? Delta Hedging, Volatility Arbitrage and Optimal Portfolios" -- *Wilmott Magazine* | `ahmad-wilmott-2005-which-free-lunch.pdf` | **Essential** |
+| 25 | Kabanov & Safarian (1997), "On Leland's Strategy of Option Pricing with Transaction Costs" -- *Finance and Stochastics* | `kabanov-safarian-1997-leland-strategy.pdf` | **Essential** |
+| 26 | Lepinette & Kabanov (2010), "Mean Square Error for the Leland-Lott Hedging Strategy: Convex Pay-offs" -- *Finance and Stochastics* | `lepinette-kabanov-2010-leland-lott-mse.pdf` | Recommended |
+| 27 | Zhao et al. (2010), "On Leland's Option Hedging Strategy with Transaction Costs" -- working paper | `zhao-2010-leland-option-hedging-costs.pdf` | Recommended |
+| 28 | Anagnou & Hodges (2007), "Derivatives Hedging Errors and Volatility" (Boyle-Emanuel discrete-hedge variance) -- *EFMA Annual Meeting* | `anagnou-hodges-2007-derivatives-hedging-errors.pdf` | **Essential** |
+| 29 | Broden & Tankov (2010), "Tracking Errors from Discrete Hedging in Exponential Levy Models" -- arXiv 1003.0709 | `broden-tankov-2010-tracking-errors-levy.pdf` | Recommended |
+| 30 | Muravyev & Pearson (2015), "Option Trading Costs Are Lower Than You Think" -- working paper / later *RFS* | `muravyev-pearson-2015-option-trading-costs.pdf` | **Essential** |
+| 31 | Doshi, Pari & Shamsuddin (2025), "Risky Intraday Order Flow and Option Liquidity" -- working paper | `doshi-pari-shamsuddin-2025-order-flow-option-liquidity.pdf` | Recommended |
+| 32 | "Predicting Realized Variance Out of Sample: Can Anything Beat the Benchmark?" (2025) -- arXiv 2506.07928 | `predicting-realized-variance-benchmark-2025.pdf` | **Essential** |
+| 33 | Francois, Gauthier, Godin & Perez-Mendoza (2025), "Deep Hedging with Options Using the Implied Volatility Surface" -- arXiv 2504.06208 | `francois-et-al-2025-deep-hedging-iv-surface.pdf` | Recommended |
+| 34 | Arzel & Lehdili (2026), "Bridging Stochastic Control and Deep Hedging: Structural Priors for No-Transaction Band Networks" -- arXiv 2603.29994 | `arzel-lehdili-2026-stochastic-control-deep-hedging.pdf` | Recommended |
+| 35 | Brugiere & Turinici (2025), "Model-Free Deep Hedging with Transaction Costs and Light Data Requirements" -- arXiv 2505.22836 | `brugiere-turinici-2025-model-free-deep-hedging.pdf` | Recommended |
+| 36 | "Construction and Hedging of Equity Index Options Portfolios" (2024) -- arXiv 2407.13908 | `equity-index-options-portfolios-hedging-2024.pdf` | Recommended |
+
 ## Papers Still Needed (paywalled)
 
 - Branco, Rubesam & Zevallos (2024), "Forecasting RV: Does Anything Beat Linear Models?" -- *J. Empirical Finance*
@@ -54,6 +76,9 @@ Papers curated for the GS internship project: ML-based forecasting of realized v
 - Liu, Patton & Sheppard (2015), "Does Anything Beat 5-Minute RV?" -- *J. Econometrics*
 - Hansen, Lunde & Nason (2011), "The Model Confidence Set" -- *Econometrica*
 - Bollerslev, Tauchen & Zhou (2009), "Expected Stock Returns and Variance Risk Premia" -- *RFS*
+- Li, B. & Wu, C. (2026), "Beyond delta neutrality: Confidence-scaled hedging with machine learning forecasts" -- *Finance Research Letters*, vol. 87, art. 109098
+- Fouhy (2026), "Hierarchical Machine Learning for Variance Risk Premium Estimation: From VIX Forecasting to Options Trading" -- *SSRN 6570380*
+- "Effects of intervaling on high-frequency realized higher-order moments" (2020) -- *Quantitative Finance*, Vol. 20, No. 7
 
 ## Data Resources
 
