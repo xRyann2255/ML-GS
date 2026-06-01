@@ -260,3 +260,37 @@ test('buildStillNeededLine renders a bullet', () => {
     '- Liu, Patton & Sheppard (2015) -- J. Econometrics'
   )
 })
+
+test('harvestTierWeight covers dataset and docs tiers', () => {
+  assert.strictEqual(harvestTierWeight('dataset'), 0.7)
+  assert.strictEqual(harvestTierWeight('docs'), 0.6)
+})
+
+test('tierWeight returns the 0.6 default for undefined input', () => {
+  assert.strictEqual(tierWeight(undefined), 0.6)
+})
+
+test('scoreSource with unknown credibility tier uses the 0.6 default', () => {
+  assert.strictEqual(scoreSource(5, 'blog'), 3)
+})
+
+test('slugifyWords on an all-stopword title yields empty string', () => {
+  assert.strictEqual(slugifyWords('The Of And', 4), '')
+})
+
+test('isAlreadyHave matches when held entry supplies authorYear directly', () => {
+  const held = [{ authorYear: 'corsi-2009', id: '', title: '' }]
+  const candidate = { url: '', title: 'Unrelated', authors: 'Fulvio Corsi', year: '2009' }
+  assert.strictEqual(isAlreadyHave(candidate, held), true)
+})
+
+test('isAlreadyHave matches when candidate arXiv id lives only in codeLink', () => {
+  const held = [{ filename: 'x.pdf', id: '2406.08041', title: 'Held' }]
+  const candidate = { url: '', codeLink: 'https://github.com/foo (arXiv 2406.08041)', title: 'Different', authors: 'X', year: '2024' }
+  assert.strictEqual(isAlreadyHave(candidate, held), true)
+})
+
+test('looksLikePdf returns false for non-string truthy inputs', () => {
+  assert.strictEqual(looksLikePdf(123), false)
+  assert.strictEqual(looksLikePdf({}), false)
+})
