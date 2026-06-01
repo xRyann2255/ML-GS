@@ -77,3 +77,15 @@ def find_tiny(spans, min_pt=6.0):
                 "bbox": s["bbox"],
                 "detail": "label '%s' is %.1fpt" % (s["text"][:20], s["size"])})
     return out
+
+def find_node_overlaps(rects, frac=0.15):
+    out = []
+    for i in range(len(rects)):
+        for j in range(i + 1, len(rects)):
+            f = overlap_fraction(rects[i], rects[j])
+            if f > frac:
+                out.append({
+                    "type": "node_overlap", "severity": "blocking",
+                    "bbox": union_rect(rects[i], rects[j]),
+                    "detail": "two boxes overlap (%.0f%%)" % (f * 100)})
+    return out

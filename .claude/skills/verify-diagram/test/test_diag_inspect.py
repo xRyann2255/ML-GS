@@ -60,3 +60,8 @@ def test_find_tiny_warns_and_blocks():
     sev = sorted(x["severity"] for x in d)
     assert sev == ["blocking", "warn"]
     assert all(x["type"] == "tiny_font" for x in d)
+
+def test_find_node_overlaps():
+    rects = [[0, 0, 20, 20], [10, 10, 30, 30], [100, 100, 110, 110]]
+    d = di.find_node_overlaps(rects, frac=0.15)
+    assert len(d) == 1 and d[0]["type"] == "node_overlap" and d[0]["severity"] == "blocking"
