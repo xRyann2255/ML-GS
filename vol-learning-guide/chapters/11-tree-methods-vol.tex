@@ -127,6 +127,283 @@ XGBoost) typically wins on tabular data.
 
 
 % ──────────────────────────────────────────────────────────────
+% ──────────────────────────────────────────────────────────────
+\section{Tree Foundations: From One Tree to a Forest}\label{sec:trees:foundations}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[What a Tree Actually Is]
+The last section claimed trees ``discover threshold effects and interactions
+automatically.''  This section opens the box.  You need only one idea from
+Chapter~\ref{ch:har}: a forecast of tomorrow's $\RV$ is a function of
+today's feature vector $\bx_t$ (lagged RV averages, realized quarticity,
+VIX, jumps).  We ask: how does a tree turn that vector into a number, and
+why do we never use a single tree to do it?
+\end{prereq}
+
+The depth-2 tree drawn later in Section~\ref{sec:trees:gbm} (the one that
+splits on $\RV_{t-1} = 0.0004$) is a finished object; the next three
+subsections show how such a tree is built, why one tree is too unreliable to
+forecast with, and how an ensemble of many trees fixes that.
+
+\subsection{How a regression tree chooses its splits}
+
+A \textbf{regression tree} carves the feature space $\R^p$ (the space of all
+possible feature vectors with $p$ features) into $J$
+non-overlapping rectangular boxes $R_1, \ldots, R_J$, called \textbf{leaves},
+and predicts a single constant inside each box \citep{Breiman1984}.  The
+constant is just the average target of the training observations that landed
+in that box:
+\begin{equation}\label{eq:trees:cart_pred}
+  \hat{f}(\bx) \;=\; \sum_{j=1}^{J}
+  \underbrace{c_j}_{\text{leaf mean}}\,
+  \underbrace{\mathbf{1}(\bx \in R_j)}_{\text{which box?}},
+  \qquad
+  c_j \;=\; \frac{1}{|R_j|}\sum_{t:\,\bx_t \in R_j} \RV_t,
+\end{equation}
+where:
+\begin{itemize}[leftmargin=1.8em]
+  \item $R_j$ is the $j$-th rectangular leaf region,
+  \item $c_j$ is the \textbf{leaf value}: the mean realized volatility of
+        the training days that fall in $R_j$.  Here $|R_j|$ is the count of
+        training days inside box $R_j$ (the vertical bars mean ``how many,''
+        not absolute value), and the subscript $t:\,\bx_t \in R_j$ means
+        ``take every day $t$ whose features land in this box,''
+  \item $\mathbf{1}(\bx \in R_j)$ is the indicator, an on/off switch that
+        equals $1$ when the day's feature vector $\bx$ lands inside box $R_j$
+        and $0$ otherwise (the symbol $\in$ means ``is inside''), so exactly
+        one leaf fires per observation and only one term in the sum survives,
+  \item $\sum_{j=1}^{J}$ means add up across all $J$ leaves, and the hat on
+        $\hat{f}$ marks it as the model's estimate,
+  \item $J$ is the number of leaves.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+A tree is a lookup table with smart boundaries.  To forecast tomorrow's
+$\RV$, you walk down the tree answering yes/no questions about today's
+features (``is $\RV_{t-1}$ below $0.0004$?''), arrive at one leaf, and read
+off the average $\RV$ of all the historical days that ended up in that same
+leaf.  The prediction is piecewise constant: every day inside a given box
+gets the identical forecast, no matter where in the box it sits.  In symbols,
+that whole equation just says: find your one box, read off its stored
+average $c_j$.
+\end{intuition}
+
+The boxes are not handed to the tree; it builds them \emph{greedily} (it
+grabs the single best split available right now and never goes back to
+reconsider it) by \textbf{recursive binary splitting} (it then repeats the
+very same procedure inside each new child group).  Start with all training
+days in one root node.  Consider every feature $j$ and every candidate
+threshold $s$, and pick the single split $(j, s)$ that most reduces the sum
+of squared residuals (SSR) across the two children that the split would
+create.  A \textbf{residual} is how far a day's actual $\RV$ sits from the
+box's predicted average (actual minus predicted):
+\begin{equation}\label{eq:trees:cart_split}
+  \min_{j,\,s}\;
+  \Bigg[\;
+  \underbrace{\sum_{t:\,x_{tj}\le s}(\RV_t - c_L)^2}_{\text{left-child SSR}}
+  \;+\;
+  \underbrace{\sum_{t:\,x_{tj}> s}(\RV_t - c_R)^2}_{\text{right-child SSR}}
+  \;\Bigg],
+\end{equation}
+where:
+\begin{itemize}[leftmargin=1.8em]
+  \item $x_{tj}$ is the value of feature $j$ on day $t$ (e.g.\ $\RV_{t-1}$),
+  \item $s$ is the split threshold being tested,
+  \item $c_L,\,c_R$ are the means of the left and right children that the
+        split produces.
+\end{itemize}
+The $\min_{j,\,s}[\cdots]$ means: try every feature $j$ and every cut-point
+$s$, and pick the single pair that makes the total spread in the bracket as
+small as possible.  The winning split becomes a node; the algorithm then recurses into each
+child and repeats, stopping when a child is too small
+(\texttt{min\_child\_samples}), too deep (\texttt{max\_depth}), or no split
+reduces SSR enough.  Minimising the SSR is identical to maximising the
+\textbf{variance reduction} of the target, which is why this rule is often
+called the variance-reduction (or MSE-reduction) criterion.  (You can skip
+the next sentence: volatility forecasting is regression, so SSR is the
+criterion throughout this chapter.)  For a classification target the same
+machinery swaps SSR for an impurity measure such as \textbf{Gini impurity}
+$G = \sum_k \hat{p}_k(1-\hat{p}_k)$ or \textbf{entropy}
+$H = -\sum_k \hat{p}_k \log_2 \hat{p}_k$, where $k$ indexes the classes and
+$\hat{p}_k$ is the estimated share of a node's days in class $k$.
+
+\begin{intuition}[In Plain English]
+The tree is a relentless optimiser with one move: ``which yes/no question,
+asked right now, splits the remaining days into two groups whose $\RV$
+values are each as tightly clustered as possible?''  It tries every feature
+at every threshold, keeps the best, and then asks the same question again
+inside each resulting group.  This is exactly how the
+$\RV_{t-1} = 0.0004$ boundary in the Section~\ref{sec:trees:gbm} diagram was
+chosen: it was the single threshold that most reduced the spread of next-day
+$\RV$ at the root.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+Equation~\ref{eq:trees:cart_split} is where a tree's two headline strengths
+from Section~\ref{sec:trees:why} come from.  A split on VIX followed by a
+split on $\RV_{t-1}$ inside one branch encodes the lagged-RV$\,\times\,$VIX
+interaction that HAR (Chapter~\ref{ch:har}) can only capture by hand-crafting
+a product term, and a split at $\RV_{t-1} = 0.0004$ encodes a volatility
+regime boundary that a linear model can only approximate.  No interaction
+term is specified; the SSR criterion finds it.
+\end{projectconnection}
+
+\subsection{Why one fully grown tree is too unreliable}
+
+Let the tree grow with no stopping rule and it will keep splitting until each
+leaf holds a single training day.  Training error is then exactly zero: the
+tree has memorised the sample.  But the structure it learned is a fragile
+accident of \emph{this} particular sample.  A single tree is a
+\textbf{high-variance estimator} (its output swings wildly if the training
+data changes even a little, an instability unrelated to the volatility we are
+forecasting): perturb the training data slightly
+(drop a week, add a month) and the chosen thresholds, and even which feature
+splits at the root, can change completely, producing a different forecast
+function.
+
+\begin{warning}[A Single Tree Will Memorise Volatility Noise]
+Volatility data is short ($\sim$1{,}250 daily rows), heavy-tailed, and highly
+autocorrelated (Section~\ref{sec:trees:hyperparams}).  An unconstrained tree
+will carve a dedicated leaf around a single crisis week and predict that
+week's $\RV$ perfectly in-sample while generalising terribly out-of-sample.
+This is why nobody forecasts $\RV$ with one tree, and why every result in
+this chapter uses an \emph{ensemble} of trees.
+\end{warning}
+
+There are two ways to tame this variance: average many independent trees
+(bagging and random forests, below) or add small trees sequentially
+(gradient boosting, Section~\ref{sec:trees:gbm}).
+
+\subsection{Bagging: averaging away the variance}
+
+\textbf{Bagging} (bootstrap aggregating) reduces variance by training many
+trees on resampled copies of the data and averaging them.  A
+\textbf{bootstrap sample} draws $n$ rows from the $n$ training days
+\emph{with replacement}, so some days appear several times and others not at
+all.  The fraction of \emph{unique} original days that land in a given
+bootstrap sample converges to
+\begin{equation}\label{eq:trees:bootstrap632}
+  1 - \underbrace{\left(1 - \tfrac{1}{n}\right)^{n}}_{\text{prob.\ a row is}\atop\text{never drawn}}
+  \;\xrightarrow[\;n\to\infty\;]{}\;
+  1 - e^{-1} \;\approx\; 0.632,
+\end{equation}
+where:
+\begin{itemize}[leftmargin=1.8em]
+  \item $n$ is the number of training observations,
+  \item $(1-\tfrac{1}{n})^n$ is the probability that a specific day is
+        missed by all $n$ draws,
+  \item the arrow with $n\to\infty$ underneath means ``as the dataset grows,
+        this fraction settles at the value on the right''; $e$ is Euler's
+        constant ($\approx 2.718$), so $e^{-1}\approx 0.368$,
+  \item $0.632$ is the limiting \textbf{in-bag} fraction; the remaining
+        $\approx 36.8\%$ are the \textbf{out-of-bag} (OOB) days for that tree,
+        which become the free validation set used in the OOB subsection below.
+\end{itemize}
+Bagging then fits a tree $h_b$ to each of $B$ bootstrap samples and averages:
+$\hat{f}_{\text{bag}}(\bx) = \tfrac{1}{B}\sum_{b=1}^{B} h_b(\bx)$, i.e.\ just
+take the plain average of the forecasts of all $B$ trees, where $h_b(\bx)$ is
+tree $b$'s forecast.
+
+\begin{intuition}[In Plain English]
+Drawing $n$ rows with replacement is like building each tree from a slightly
+different reshuffling of history: roughly two-thirds of the real days appear
+(some duplicated), one-third sit out.  Each tree is still high-variance on
+its own, but their errors are partly independent, so averaging them cancels
+much of the noise, the same reason an average of noisy measurements is more
+precise than any single reading.  That two-thirds/one-third split is exactly
+what the $0.632$ formula above says.
+\end{intuition}
+
+The catch: averaging only helps to the extent the trees disagree.  If one
+feature dominates, every bagged tree splits on it first and the trees end up
+nearly identical, so the variance barely falls.
+
+\subsection{Random forests: decorrelating the trees}
+
+A \textbf{random forest} adds one decisive twist to bagging: at \emph{each}
+split, the tree may only consider a random subset of $m$ of the $p$ features
+as split candidates.  This forces different trees to build around different
+features, breaking the correlation that limits bagging.  The variance of the
+forest average makes the payoff precise:
+
+\begin{keyidea}[Random Feature Subsets Decorrelate the Forest]
+For a forest of $B$ trees, each with single-tree variance $\sigma^2$ and
+average pairwise correlation $\rho$ between trees, the variance of the
+averaged forecast is
+\begin{equation}\label{eq:trees:rf_variance}
+  \Var\!\big(\hat{f}_{\text{RF}}\big)
+  \;=\;
+  \underbrace{\rho\,\sigma^2}_{\text{irreducible floor}}
+  \;+\;
+  \underbrace{\frac{1-\rho}{B}\,\sigma^2}_{\text{vanishes as }B\to\infty}.
+\end{equation}
+\begin{itemize}[leftmargin=1.8em]
+  \item $\Var(\cdots)$: how much the forecast wobbles from sample to sample,
+  \item $\sigma^2$: that wobble for a single tree (this $\sigma$ is the
+        spread of tree forecasts, \emph{not} the volatility we are
+        forecasting),
+  \item $\rho$: how similar the trees' answers are
+        ($0=$ totally different, $1=$ identical copies),
+  \item $B$: the number of trees in the forest.
+\end{itemize}
+Adding trees ($B\to\infty$) kills the second term but never the first: the
+variance floor is $\rho\sigma^2$.  The only way below that floor is to lower
+$\rho$ itself, which is exactly what the random $m$-feature restriction does.
+Smaller $m$ means more decorrelated trees (lower $\rho$) at the price of
+slightly higher individual-tree bias.  The standard defaults are
+$m = \lfloor p/3 \rfloor$ for regression and $m = \lfloor \sqrt{p}\,\rfloor$
+for classification, where the $\lfloor\,\cdot\,\rfloor$ brackets mean ``round
+down to a whole number'' (so with $p = 45$ features you try about $15$ at
+each split).
+\end{keyidea}
+
+\begin{intuition}[In Plain English]
+Equation~\ref{eq:trees:rf_variance} says you cannot average your way to zero
+variance if all the trees agree.  Restricting each split to a random handful
+of features is a deliberate sabotage: it stops every tree from leaning on the
+same dominant predictor, so the trees make \emph{different} mistakes, and
+different mistakes average out.  More trees help only up to the correlation
+floor; decorrelation is what lowers the floor.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+In $\RV$ forecasting the dominant predictor is overwhelmingly the lagged
+daily $\RV$ (Chapter~\ref{ch:har}), so an unrestricted forest would split on
+it in nearly every tree and decorrelate poorly.  The random-feature trick is
+what lets the other feature families from Chapter~\ref{ch:features} (RQ,
+signed semivariances, VIX, jumps) actually enter the ensemble.  The same
+logic reappears as \texttt{colsample\_bytree} for gradient boosting in
+Section~\ref{sec:trees:hyperparams}: feature subsampling there decorrelates
+boosted trees for precisely this reason.
+\end{projectconnection}
+
+\subsection{Out-of-bag error, and why it lies on time series}
+
+Because each tree omits its $\approx 36.8\%$ out-of-bag days
+(Equation~\ref{eq:trees:bootstrap632}), a forest comes with a free,
+built-in validation set: score each day using only the trees that did
+\emph{not} see it, and the resulting \textbf{out-of-bag (OOB) error}
+approximates leave-one-out cross-validation (test on each day in turn while
+training on all the others) with no separate holdout needed.
+That is genuinely useful, for cross-sectional, exchangeable data.
+
+\begin{warning}[OOB Error Is Invalid for Volatility Time Series]
+OOB error assumes the observations are \textbf{exchangeable}
+(i.i.d.\ -- independent and identically distributed; the order of the rows
+does not matter).
+Volatility is not: if day $t{+}1$ is in a tree's bootstrap sample while day
+$t$ is out-of-bag, scoring day $t$ on that tree lets it ``predict the past
+from the future,'' because adjacent $\RV$ values are nearly identical
+(Section~\ref{sec:trees:hyperparams}).  OOB error therefore looks far better
+than true out-of-sample performance.  Use it only as a quick development
+sanity check, never as your selection metric.  For honest model selection,
+use purged $K$-fold cross-validation with an embargo
+(Section~\ref{sec:eval-purgedcv} of Chapter~\ref{ch:evaluation}), which
+removes the leakage that breaks OOB.
+\end{warning}
+
+
+
 \section{LightGBM and XGBoost}\label{sec:trees:gbm}
 % ──────────────────────────────────────────────────────────────
 
@@ -371,7 +648,7 @@ gives recommended ranges calibrated for volatility forecasting.
 \end{tabular}
 \end{center}
 
-\begin{workedexample}{Tuning LightGBM on 5 Years of SPY RV}
+\begin{workedexample}[Tuning LightGBM on 5 Years of SPY RV]
 You have 1,258 daily observations of $\RV$ for SPY, with 45 features from
 Chapter~\ref{ch:features}.  You reserve the last 6 months (126 days) as a
 holdout (never touched until final evaluation).  The remaining 1,132 days
@@ -410,6 +687,282 @@ set is contaminated by lookahead.
 
 
 % ──────────────────────────────────────────────────────────────
+% ──────────────────────────────────────────────────────────────
+\section{Interpreting Tree Models: TreeSHAP and the SHAP Plot Toolkit}\label{sec:trees:treeshap}
+% ──────────────────────────────────────────────────────────────
+
+\begin{prereq}[SHAP, MDA, and MDI from Chapter~\ref{ch:features}]
+Section~\ref{sec:feat-importance} introduced three feature-importance ideas
+you will reuse here: \textbf{SHAP} values, which decompose a single
+prediction additively into per-feature contributions
+(Equation~\ref{eq:shap}); \textbf{MDA} (mean decrease in accuracy), the
+permutation-based global importance; and \textbf{MDI} (mean decrease in
+impurity), the fast-but-biased split-based importance.  It also introduced
+\textbf{ALE} plots (Equation~\ref{eq:ale}).  This section answers the
+question that Section left open: \emph{how} do you compute SHAP for a tree
+ensemble cheaply, and \emph{which} plot do you reach for when?
+\end{prereq}
+
+You have a tuned LightGBM forecasting next-day log-$\RV$ on the feature
+matrix from Chapter~\ref{ch:features} (lagged RV transforms, realized
+quarticity, VIX, jumps).  It beats HAR by 7.7\% in $\QLIKE$
+(Section~\ref{sec:trees:hyperparams}).  Your sponsor's first question is not
+``what is the $\QLIKE$?'' but ``\emph{why} did the model forecast a vol spike
+for next Tuesday?''  Equation~\ref{eq:shap} promises an exact additive answer
+per day, but computing it honestly looks hopeless.
+
+\subsection{The exponential cost that TreeSHAP defeats}
+
+The SHAP value of feature $i$ (recall from Chapter~\ref{ch:features}: feature
+$i$'s fair share of the forecast) averages its \emph{marginal contribution}
+(how much adding $i$ changes the prediction) over \emph{every} subset of the
+other features.  With $p$ features that is $2^p$ \textbf{coalitions} to
+evaluate, \emph{for every observation} (``coalition'' and ``subset of
+features'' mean the same thing here).  The notation $2^p$ means $2$
+multiplied by itself $p$ times, so every extra feature \emph{doubles} the
+number of subsets.  On the Chapter~\ref{ch:features} matrix with, say,
+$p = 20$ features, that already gives $2^{20} \approx 10^6$ (about a million)
+model evaluations per day, times $\sim$1{,}250 days,
+far too slow for a generic model.  This exponential wall is exactly why
+\citet{Lundberg2017} introduced model-specific shortcuts.
+
+\textbf{TreeSHAP} \citep{Lundberg2020} exploits the structure of decision
+trees to compute the \emph{exact} same Shapley values in polynomial time.  In
+the cost formula below, $O(\cdots)$ is shorthand for how fast the computation
+time grows as the inputs grow: bigger inside the parentheses means slower.
+\begin{equation}\label{eq:trees:treeshap_cost}
+  \underbrace{O\!\big(T \, L \, D^2\big)}_{\text{TreeSHAP}}
+  \quad\text{instead of}\quad
+  \underbrace{O\!\big(T \, L \, 2^{p}\big)}_{\text{naive Shapley}},
+\end{equation}
+where:
+\begin{itemize}[leftmargin=1.8em]
+  \item $T$ is the number of trees in the ensemble,
+  \item $L$ is the maximum number of leaves per tree,
+  \item $D$ is the maximum tree depth,
+  \item $p$ is the number of features.
+\end{itemize}
+In plain terms: TreeSHAP's cost grows with trees $\times$ leaves $\times$
+depth-squared (manageable), while the naive method's cost grows with $2^p$,
+which doubles every time you add one feature (hopeless) -- so TreeSHAP is fast
+enough to run and the naive method is not.
+
+\begin{intuition}[In Plain English]
+The naive method asks ``what happens to the prediction under all $2^p$
+ways of hiding features?''  TreeSHAP notices that a depth-$D$ tree only ever
+splits on at most $D$ features along any root-to-leaf path, so the only
+subsets that can possibly change a leaf's reachability number $O(2^D)$, not
+$O(2^p)$.  It pushes probability mass down the tree once and reads off the
+exact attributions, turning an exponential count over \emph{features} into a
+polynomial count over \emph{tree depth}.  Because of the additivity axiom
+(a guarantee that the per-tree contributions add up cleanly), the ensemble's
+SHAP value for a feature is simply the sum of its values across all trees.
+\end{intuition}
+
+\begin{workedexample}[How Much Faster Is TreeSHAP?]
+Take the tuned model from Section~\ref{sec:trees:hyperparams}: depth $D = 4$,
+so the tree has at most $2^4 = 16$ leaves (each level can double the number
+of branches, just as the depth-2 tree drawn earlier in
+Section~\ref{sec:trees:gbm} had $2^2 = 4$ leaves), with $p = 20$ features.
+The naive Shapley sum visits $2^{p} = 2^{20} \approx 1{,}050{,}000$ feature
+subsets per observation.  TreeSHAP replaces the $2^p$ factor with
+$D^2 = 16$, a speedup of roughly $2^{20}/16 \approx 66{,}000\times$
+\emph{per tree}, and it returns the exact answer, not a sample, so the
+output is identical to the intractable enumeration at no cost in accuracy.
+Concretely, SHAP values for all 1{,}250
+training days take seconds rather than the hours a generic
+sampling-based explainer would need.
+\end{workedexample}
+
+\begin{projectconnection}[Why This Matters]
+TreeSHAP makes the SHAP feature-importance plot in
+Figure~\ref{fig:feature-importance} (Chapter~\ref{ch:features}) a one-line,
+seconds-long computation on your LightGBM forecaster:
+\texttt{shap.TreeExplainer(model).shap\_values(X)}.  Because it is exact, it
+removes a confound when you compare importance across purged-CV folds for
+stability, any ranking changes you see are real instability, not Monte-Carlo
+noise from the explainer.
+\end{projectconnection}
+
+\begin{warning}[TreeSHAP: Interventional vs.\ Path-Dependent]
+TreeSHAP ships in two modes.  The default \textbf{path-dependent} mode is
+faster but uses the tree's internal node-coverage counts to marginalise
+missing features, which can assign small nonzero SHAP values to features the
+model never split on.  The \textbf{interventional} mode marginalises against
+a background dataset, which is theoretically cleaner but slower.  Both are
+still TreeSHAP (exact for their respective games) and differ from
+\textbf{KernelSHAP}, a model-agnostic \emph{sampling} approximation usable on
+any model but noisy and orders of magnitude slower.  For $\RV$ work: use
+path-dependent mode for fast exploration, switch to interventional with an
+$\RV$-feature background sample for the numbers you put on a slide.
+\end{warning}
+
+\subsection{The four SHAP plots: a read-and-use taxonomy}
+
+The \texttt{shap} library produces four core plot types.  Each answers a
+different question about your $\RV$ forecaster; the table is your
+lookup for which to reach for.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{2.6cm}p{2.4cm}p{4.0cm}p{4.2cm}@{}}
+\toprule
+\textbf{Plot} & \textbf{Scope} & \textbf{What it shows} & \textbf{Use it to\ldots} \\
+\midrule
+\textbf{Beeswarm} (summary)
+  & Global, all days
+  & One dot per day per feature; $x$ = SHAP value, colour = feature value
+    (red high, blue low); features sorted by mean $|\phi_j|$
+  & See which features drive forecasts overall and in which direction
+    (does high lagged $\RV$ push the forecast up?) \\[4pt]
+\textbf{Dependence}
+  & Per-observation scatter
+  & One feature's value ($x$) vs.\ its SHAP value ($y$), coloured by the
+    most-interacting feature
+  & Reveal nonlinearity/thresholds in a feature's effect and two-way
+    interactions (e.g.\ lagged $\RV$ $\times$ implied vol) \\[4pt]
+\textbf{Waterfall}
+  & Single day
+  & Bars walking from the base value $\E[f(\bx)]$ to the day's forecast,
+    red up / blue down
+  & Explain \emph{one} prediction as an additive story; the presentation
+    chart \\[4pt]
+\textbf{Force}
+  & Single day
+  & The same decomposition as the waterfall, in a compact horizontal bar
+  & Embed a one-line explanation in a dashboard or monitor \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two symbols in the table: $\E[f(\bx)]$ is the \textbf{base value}, the model's
+average prediction over all days, i.e.\ its starting guess before any feature
+nudges it up or down; and $\phi_j$ is the SHAP contribution of feature $j$
+(from Chapter~\ref{ch:features}), so $|\phi_j|$ is its size ignoring whether
+it pushed the forecast up or down.
+
+\begin{keyidea}[Dependence Plot vs.\ ALE: Two Views of the Same Feature]
+The SHAP \textbf{dependence} plot and the \textbf{ALE} (Accumulated Local
+Effects) plot
+(Equation~\ref{eq:ale}, Chapter~\ref{ch:features}) answer related but
+distinct questions about, say, lagged $\RV$.  ALE gives the
+\emph{marginal shape} (the average effect of this feature once you average
+over all the other features): a single smooth curve summarising ``as lagged
+$\RV$ rises, does the forecast rise, fall, or flatten?'', averaged within the
+observed data range.  The dependence plot gives the \emph{per-observation
+scatter}: every day is a dot, exposing the spread around that average shape,
+and its colour axis surfaces the dominant \emph{interaction} (e.g.\ the
+lagged-$\RV$ effect is amplified on high-VIX days).  Read ALE for the
+functional form; read the dependence plot for heterogeneity and
+interactions.  They are complements, not substitutes.
+\end{keyidea}
+
+\subsection{SHAP vs.\ MDI vs.\ MDA: when to use which}
+
+All three measures answer ``which features matter?'' but at different
+granularity, and they occasionally disagree.  The reconciliation rule below
+is what you actually apply during $\RV$ model development.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{2.0cm}p{2.2cm}p{4.6cm}p{4.4cm}@{}}
+\toprule
+\textbf{Measure} & \textbf{Granularity} & \textbf{Strength / weakness} & \textbf{When to use} \\
+\midrule
+\textbf{SHAP}
+  & Local (per day), sums to the prediction
+  & Richest information; exact via TreeSHAP; can be unstable across
+    correlated features (Section~\ref{sec:feat-importance})
+  & Presentation charts, debugging single forecasts, detecting
+    nonlinearity \\[4pt]
+\textbf{MDA}
+  & Global, in units of $\QLIKE$/MSE drop
+  & Model-agnostic, unbiased under independence (gives the right ranking when
+    features are not correlated with each other); costs $p$ extra passes;
+    \emph{must} use held-out data
+  & Primary aggregate importance and cross-fold stability checks \\[4pt]
+\textbf{MDI}
+  & Global, free byproduct of training
+  & Biased toward high-cardinality features (those with many distinct values,
+    hence many possible split points -- a continuous $\RV$ vs.\ a yes/no jump
+    flag) \citep{StroblBoulesteixZeileisHothorn2007}
+  & Quick sanity check only; never a reported result \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+In practice you compute all three on your $\RV$ model and reconcile:
+\begin{itemize}[leftmargin=1.8em]
+  \item \textbf{All three agree} on the top features (typically lagged
+        $\RV$ then $\sqrt{\operatorname{RQ}}$): robust evidence, proceed.
+  \item \textbf{SHAP and MDA agree but MDI disagrees}: trust SHAP/MDA -- this
+        is the MDI cardinality bias (see the warning below); ignore MDI.
+  \item \textbf{SHAP and MDA disagree}: the importance is likely driven by a
+        few extreme days (vol spikes) that SHAP attributes per-observation
+        but MDA averages away, inspect a SHAP dependence plot to locate
+        them.
+\end{itemize}
+
+\begin{warning}[Do Not Report MDI as a Final Importance Result]
+MDI systematically over-credits features with many possible split points.
+A continuous feature such as lagged $\RV$ or VIX has hundreds of candidate
+thresholds, so the tree has more chances to split on it by luck alone, while
+a binary jump-day dummy has one.  \citet{StroblBoulesteixZeileisHothorn2007}
+show this rigorously: in simulations MDI assigned nonzero importance to
+continuous \emph{noise} features.  Use MDI to glance during development; use
+SHAP or MDA for anything you write down.
+\end{warning}
+
+\subsection{Presenting SHAP to the desk}
+
+The interpretation work only pays off if a non-technical audience believes
+it.  Three rules, all of which trade rigor for being understood:
+
+\begin{enumerate}[leftmargin=1.8em]
+\item \textbf{Read the bars, not the math.}  Say ``this chart breaks the
+  forecast into the contribution of each input; red bars pushed the
+  predicted vol up, blue bars pushed it down, and the biggest bar is what
+  mattered most that day.''  Do not say ``Shapley'' unless asked, then
+  explain the fair-credit game-theory idea
+  (Equation~\ref{eq:shap}, Chapter~\ref{ch:features}).
+\item \textbf{Show exactly three waterfalls,} each illustrating a different
+  mechanism, never twenty.
+\item \textbf{Keep the global beeswarm in an appendix.}  The summary plot is
+  methodology, not a result; lead with the three stories and have the
+  beeswarm as backup.
+\end{enumerate}
+
+The three waterfalls to pick for an $\RV$ forecaster:
+\begin{enumerate}[leftmargin=1.8em]
+  \item \textbf{A correct vol-spike forecast.}  ``The model predicted
+        next-day $\RV$ roughly double its average.  The drivers were a high
+        lagged daily $\RV$ ($+$), a detected jump the prior session ($+$),
+        and an elevated VIX ($+$).  Realized vol spiked as forecast.''
+  \item \textbf{A missed forecast from an unseen event.}  ``The model
+        predicted a calm day from low lagged $\RV$ and a flat VIX, but an
+        unscheduled macro announcement triggered a spike.  SHAP shows the
+        forecast rested entirely on backward-looking RV features, the model
+        cannot see a surprise that is not in its inputs.''
+  \item \textbf{A tree-vs-HAR disagreement.}  ``HAR forecast a mild rise;
+        the tree forecast a sharp one.  SHAP shows the gap came from an
+        interaction between lagged $\RV$ and implied volatility, the
+        HARQ-type effect (Chapter~\ref{ch:har}) the tree captures but linear
+        HAR cannot, motivating the HAR$+$tree blend in
+        Section~\ref{sec:trees:ensemble}.''
+\end{enumerate}
+
+\begin{projectconnection}[Why This Matters]
+The waterfall is the single most persuasive chart in a volatility-model
+review because it mirrors the additive P\&L attribution risk committees
+already use.  ``Lagged $\RV$ contributed $+$X, the jump term $+$Y, VIX $+$Z''
+is a sentence a portfolio manager can challenge on economic grounds, which is
+exactly the scrutiny that separates a real signal from an overfit one.  The
+disagreement waterfall does double duty: it is both an explanation and the
+argument for the ensemble of Section~\ref{sec:trees:ensemble}.
+\end{projectconnection}
+
+
+
 \section{The Christensen--Siggaard--Veliyev Evidence}\label{sec:trees:csv}
 % ──────────────────────────────────────────────────────────────
 
@@ -685,7 +1238,7 @@ natural way to incorporate the VIX regime indicator from
 Chapter~\ref{ch:features} into the forecast combination step.
 \end{projectconnection}
 
-\begin{workedexample}{HAR + LightGBM Ensemble}
+\begin{workedexample}[HAR + LightGBM Ensemble]
 Continuing the SPY example from Section~\ref{sec:trees:hyperparams}.  On
 the 126-day holdout:
 

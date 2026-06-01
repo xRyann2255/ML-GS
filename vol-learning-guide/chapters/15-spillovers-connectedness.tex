@@ -268,7 +268,7 @@ net transmitter (red) vs.\ net receiver (blue).  Data are illustrative.}
 
 \subsection{Worked Example: 3-Asset VAR(1)}
 
-\begin{workedexample}{Computing Spillover Indices}
+\begin{workedexample}[Computing Spillover Indices]
 Consider three assets (Equity, Bonds, FX) with the following normalized 10-step
 GFEVD table (each row sums to 100\%):
 
@@ -667,6 +667,359 @@ your effective sample size and reduces overfitting.  Even for a univariate HAR-b
 forecast, pooling across assets with shared features (same lags, same jump indicators)
 can improve out-of-sample QLIKE.
 \end{projectconnection}
+
+
+\subsection{Pooled Panel Forecasting Across Instruments}\label{sec:universality-panel}
+
+Pooling raises a concrete question the box above left open:
+how do you feed RV histories for all $34$ instruments in your project into a single
+HAR regression or a single LightGBM, without (a) drowning the few liquid index
+futures under the $30$ mega-cap equities, (b) letting the model confuse a
+structurally high-vol name with a structurally low-vol one, or (c) leaking
+information across instruments on a crisis day?  This subsection answers those
+questions for the two model classes you actually use as baselines --- pooled
+linear/HAR and pooled trees.  It stays on forecasting; it does not wander into
+causal questions like ``did asset A's vol \emph{cause} asset B's'' --- that is a
+separate topic.
+
+\begin{prereq}[Panel Data]
+Until now this guide has treated each instrument as its own time series: one
+column of $\RV_t$, fit a HAR, repeat $34$ times.  A \textbf{panel} (or
+\textbf{longitudinal}) data set instead tracks multiple \textbf{entities}
+$i = 1, \ldots, N$ over multiple time periods $t = 1, \ldots, T$, with each
+observation indexed by the pair $(i,t)$.  Here the entities are the $N = 34$
+instruments (the $30$ mega-cap equities plus $4$ sector/index ETFs and the
+E-mini S\&P~500 future from Chapter~\ref{ch:features}), the time index $t$ runs
+over trading days, and the
+target $y_{it}$ is next-day (or $h$-day) realized volatility for instrument $i$.
+When every instrument is observed on every date the panel is \textbf{balanced};
+when some $(i,t)$ cells are missing it is \textbf{unbalanced} (treated at the end
+of this subsection).
+\end{prereq}
+
+Fitting $34$ separate HARs throws away an obvious resource: the instruments share
+dynamics.  Chapter~\ref{ch:rough} and the universality results above
+\citep{SirignanoCont2019,RosenbaumZhang2022} argue that the \emph{shape} of
+volatility dynamics --- HAR decay structure, jump sensitivity, the leverage tilt
+--- is broadly common across liquid assets.  If that is even approximately true,
+then stacking the $34$ instruments into one $(i,t)$ panel lets a single set of
+coefficients borrow strength from every series at once.
+
+\begin{intuition}[Why stacking grows the sample]
+A single instrument with five years of daily data gives you $T \approx 1{,}250$
+rows --- a thin sample for a flexible model.  Stack $N = 34$ instruments and the
+pooled panel has up to $N \times T \approx 42{,}500$ rows.  You have not invented
+new information about any one stock, but you \emph{have} given the model $34$
+independent realizations of the same volatility-formation process to estimate the
+\emph{shared} parameters from.  That is exactly the lever a univariate HAR cannot
+pull.
+\end{intuition}
+
+\subsubsection*{A pooled HAR baseline, and why naive pooling fails}
+
+The naive move is to stack every instrument's HAR \textbf{design matrix} --- just
+the table of feature values, one row per $(\text{instrument},\text{day})$ and one
+column per feature --- and run one OLS (\textbf{ordinary least squares}, the
+standard best-fit-line procedure).  Stacking means literally laying each
+instrument's feature table on top of the next into one tall table.  The problem is
+\textbf{instrument-specific heterogeneity}: a high-beta growth name
+lives at a structurally higher average $\RV$ than a defensive utility, and a
+single common \textbf{intercept} (the baseline level the line starts from) cannot
+represent both.  Forcing one intercept makes the
+pooled fit chase the cross-instrument \emph{level} differences instead of the
+volatility \emph{dynamics} you actually want to learn.  The fix is an
+\textbf{entity fixed effect}: one intercept per instrument.  Because each
+instrument carries many features rather than one, the single slope $m$ of a
+straight line $y=mx+b$ becomes a \textbf{slope vector} $\bbeta$ with one slope per
+feature.
+
+The entity fixed-effects model gives each instrument its own
+baseline volatility level while sharing one common slope vector across all of
+them:
+
+\begin{equation}\label{eq:panel-fe}
+  y_{it} = \underbrace{\alpha_i}_{\text{instrument level}}
+           + \bx_{it}'\bbeta + \varepsilon_{it},
+\end{equation}
+The notation $\bx_{it}'\bbeta$ (read ``$x$-transpose-$\bbeta$''; the raised tick
+mark $'$ is the \emph{transpose}, which here just turns the column of features into
+a row so the next step is a sum) is shorthand for multiplying each of the $K$
+features by its matching coefficient in $\bbeta$ and adding them into a single
+predicted number --- the same $\beta_1\,\text{feature}_1 + \beta_2\,\text{feature}_2
++ \cdots$ you saw in the HAR regression of Chapter~\ref{ch:features}.
+\begin{itemize}[nosep]
+  \item $y_{it}$: the forecast target for instrument $i$ on day $t$ (next-day
+        $\RV_{i,t+1}$, or a log/$\sqrt{}$ transform of it as in
+        Chapter~\ref{ch:features}),
+  \item $\alpha_i$: the \emph{instrument-specific intercept}, absorbing every
+        time-invariant difference across instruments (a name's average vol level,
+        its sector's baseline turbulence),
+  \item $\bx_{it}$: the $K\times1$ vector (a single column of the $K$ HAR-type
+        features, where $K$ is simply however many predictors you stacked) for
+        instrument $i$ on day $t$ --- the same HAR-type features defined in
+        Chapter~\ref{ch:features}: daily, weekly, and monthly lagged $\RV$, the
+        jump and semivariance splits, $\VRP$, and so on,
+  \item $\bbeta$: the $K\times1$ slope vector, \emph{common across all
+        instruments} (one HAR decay structure for the whole panel),
+  \item $\varepsilon_{it}$: the idiosyncratic error --- the leftover the model
+        cannot explain --- assumed to average to zero,
+        $\E[\varepsilon_{it}\mid\alpha_i,\bx_{it}] = 0$.  That statement reads:
+        averaging ($\E[\cdot]$) over everything, given ($\mid$) the instrument and
+        its feature values, the leftover error is zero no matter which instrument
+        we look at or what its features are --- i.e.\ the model is unbiased.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Equation~\eqref{eq:panel-fe} says: ``Let every instrument sit at its own resting
+volatility level $\alpha_i$, but make them all obey the \emph{same} rule for how
+yesterday's, last week's, and last month's vol map into tomorrow's.''  The
+fixed effect quarantines the boring, permanent level differences into $\alpha_i$
+so that the interesting, shared dynamics live entirely in $\bbeta$.  You estimate
+one HAR for the whole desk instead of $34$ noisy ones.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+This is the pooled-HAR baseline your project should beat before reaching for
+trees or nets.  It is the panel analogue of the single-instrument HAR of
+\citet{Corsi2009}: identical features, but the slope $\bbeta$ is now estimated
+from $34\times$ the data, which sharply tightens the $\QLIKE$ (the volatility
+forecast-accuracy score from Chapter~\ref{ch:evaluation}; lower is better) on
+short-history names that could never support a stable HAR on their own.  Report its
+out-of-sample $\QLIKE$ against the per-instrument HARs; the pooled fit usually wins on the
+thin-history instruments and roughly ties on the data-rich index lines.
+\end{projectconnection}
+
+You do not have to literally add $34$ dummy columns.  The algebraically
+identical \textbf{within estimator} subtracts each instrument's own time-series
+mean from both sides, cancelling $\alpha_i$.
+
+Demeaning each instrument's series removes its fixed effect,
+leaving a clean regression for $\bbeta$:
+
+\begin{equation}\label{eq:panel-within}
+  \underbrace{(y_{it} - \bar{y}_i)}_{\text{demeaned target}}
+  = (\bx_{it} - \bar{\bx}_i)'\bbeta + (\varepsilon_{it} - \bar{\varepsilon}_i),
+  \qquad
+  \bar{y}_i = \frac{1}{T_i}\sum_{t} y_{it},
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $\bar{y}_i,\ \bar{\bx}_i$ (read ``$y$-bar-$i$'', ``$x$-bar-$i$''): the
+        time-series \emph{averages} of the target and the features \emph{within
+        instrument $i$} --- simply instrument $i$'s own average vol and average
+        features over its $T_i$ observed days, where $T_i$ is the number of trading
+        days instrument $i$ is observed,
+  \item the entity effect $\alpha_i$ cancels because it is constant over $t$ for
+        each $i$, so demeaning subtracts it from itself,
+  \item running OLS (the standard best-fit-line procedure) on the demeaned data
+        yields what panel-data texts call the \textbf{within} estimate of $\bbeta$
+        --- so named because it uses only the variation \emph{within} each
+        instrument over time \citep{Wooldridge2010}.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Demeaning re-expresses every variable as a \emph{deviation from that
+instrument's own average}.  Instead of asking ``is this stock's vol high?'' (a
+level question contaminated by which stock it is), the regression now asks ``is
+this stock's vol high \emph{relative to its own normal}, given that its lagged
+vol is high relative to its own normal?''  That deviation-based question has the
+same answer for every instrument, which is exactly why one shared $\bbeta$ is
+legitimate.
+\end{intuition}
+
+\begin{workedexample}[Demeaning two instruments by hand]
+Two instruments, three days each, raw $\RV$ (annualized \%).  Subtract each
+instrument's own average ($\bar{y}_i$) from every value to get the demeaned
+target $y_{it}-\bar{y}_i$:
+
+\begin{center}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Instrument} & & \textbf{Day 1} & \textbf{Day 2} & \textbf{Day 3} \\
+\midrule
+High-vol name $A$ & raw $\RV$          & 40 & 50 & 45 \\
+($\bar{y}_A = 45$) & demeaned          & $-5$ & $+5$ & $0$ \\[4pt]
+Low-vol name $B$  & raw $\RV$          & 12 & 18 & 15 \\
+($\bar{y}_B = 15$) & demeaned          & $-3$ & $+3$ & $0$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The raw rows live at completely different levels ($45$ vs.\ $15$), but after
+demeaning both sit around zero and only the day-to-day \emph{deviations} remain.
+The structural level gap has vanished, so a single shared $\bbeta$ can now learn
+the common dynamics from $A$ and $B$ on equal footing.
+\end{workedexample}
+
+\begin{projectconnection}[Why This Matters]
+Demeaning is the panel version of the per-instrument $z$-scoring already in the
+Chapter~\ref{ch:features} pipeline (subtracting each instrument's mean and
+dividing by its standard deviation so all names sit on a comparable scale): if
+your features are already $z$-scored within instrument, the entity fixed effect is
+largely redundant for the \emph{features} --- but keep it (or a demeaned target)
+so the \emph{intercept} does not chase level differences.
+\end{projectconnection}
+
+\begin{warning}[Within estimation discards cross-instrument level information]
+The within estimator uses only \emph{within-instrument} variation over time; it
+throws away the \emph{between-instrument} variation in average levels entirely.
+That is deliberate --- the level differences are the heterogeneity you wanted to
+control for --- but it has a consequence: you cannot identify the effect of any
+\emph{instrument-constant} feature (sector label, ``is-an-index'' flag) inside a
+fixed-effects regression, because such a feature has zero within variation and
+is indistinguishable from $\alpha_i$ --- the instrument's intercept already
+captures anything that never changes for that instrument, so a sector label adds
+no new information the regression can separate out.  If you need those level
+effects, carry them as
+separate dummy features in the tree model below rather than the FE regression.
+\end{warning}
+
+\subsubsection*{Time fixed effects: absorbing market-wide crisis days}
+
+Section~\ref{sec:tv-spillovers} showed that on crisis days --- Lehman, the euro
+crisis, the March~2020 COVID selloff --- \emph{every} instrument's vol spikes at
+once.  In a pooled panel those common-shock days act like $34$ correlated
+duplicate observations of the same event, and they can dominate the fit.  A
+\textbf{time fixed effect} $\delta_t$ absorbs whatever is common to all
+instruments on a given day.
+
+Adding a per-day intercept on top of the per-instrument
+intercept strips out market-wide volatility shocks:
+
+\begin{equation}\label{eq:panel-twoway-fe}
+  y_{it} = \alpha_i
+           + \underbrace{\delta_t}_{\text{market-wide day shock}}
+           + \bx_{it}'\bbeta + \varepsilon_{it},
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $\delta_t$: the \emph{time-specific intercept}, common to all $N$
+        instruments on day $t$, absorbing aggregate vol spikes, macro releases,
+        and the contagion days quantified by the total-spillover index $S^{(H)}_t$
+        from Section~\ref{sec:dy-spillover} (a single number near $30$--$40\%$ in
+        calm markets and $70$--$85\%$ in crises that tracks how much of the market
+        is moving together),
+  \item all other symbols are as in Equation~\eqref{eq:panel-fe}; with both
+        $\alpha_i$ and $\delta_t$ present this is a \textbf{two-way fixed-effects}
+        model.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+The entity effect $\alpha_i$ asks ``which instrument is this?'' and removes it.
+The time effect $\delta_t$ asks ``what was the whole market doing today?'' and
+removes that too.  What survives is the \emph{relative} signal: on a day when
+market vol is elevated, which names are even \emph{more} elevated than the
+average, and is that excess predictable from their own lagged-vol features?
+$\delta_t$ is, in effect, the regression-coefficient cousin of the
+total-spillover regime indicator $S^{(H)}_t$ --- both soak up the shared crisis
+component so the model can focus on cross-sectional differences.
+\end{intuition}
+
+\begin{projectconnection}[Why This Matters]
+There is a real trade-off here for an RV forecaster.  If your deliverable is the
+\emph{absolute} level of each instrument's vol (the input to a vol-targeting
+strategy --- one that scales position size up when forecast vol is low and down
+when it is high, so it needs the absolute level), do \emph{not} include time
+effects: $\delta_t$ absorbs the common vol signal that is precisely what such a
+strategy needs to size positions.  Include time effects only when you care about
+the \emph{cross-sectional} question --- which names will be relatively more
+volatile --- e.g.\ for a dispersion or relative-value trade, which only bets on
+which names are \emph{more} volatile than others and so needs the cross-sectional
+ranking rather than the absolute level.  A practical compromise that
+keeps the absolute signal is to drop $\delta_t$ but add the
+Section~\ref{sec:spillover-features} spillover features as columns, letting the
+model condition on the regime rather than differencing it away.
+\end{projectconnection}
+
+\subsubsection*{Encoding instrument identity for a pooled LightGBM}
+
+A tree model does not demean.  To pool $34$ instruments in LightGBM you instead
+give the tree the instrument identity \emph{as a feature} and let it split on it.
+With only $N = 34$ instruments, identity is \textbf{low-cardinality} --- there are
+only $34$ distinct values, a small number of categories.  You encode it with
+\textbf{one-hot dummy} columns: one yes/no ($1$/$0$) column per instrument that
+equals $1$ only on that instrument's rows (drop one to avoid redundancy; see the
+\texttt{is\_AAPL} example below).  These are cheap and LightGBM handles them
+natively \citep{Ke2017}.
+
+\begin{keyidea}[Instrument dummies recover instrument-specific dynamics for free]
+When the tree splits on \texttt{is\_AAPL = 1} and then splits on the weekly-$\RV$
+feature beneath that branch, it has effectively estimated a \emph{different} HAR
+slope for that instrument --- a feature$\times$instrument \emph{interaction} (a
+rule that lets the slope on a feature differ by instrument), and via a first split
+on identity alone it also reproduces the per-instrument level $\alpha_i$ --- which
+the single shared $\bbeta$ of Equation~\eqref{eq:panel-fe} can only get through
+explicit interaction terms.  Pooling in a tree therefore gives you the
+sample-size benefit of the panel \emph{and} per-instrument flexibility, without
+fitting $34$ separate models.
+\end{keyidea}
+
+\begin{warning}[Never target-encode the instrument ID --- it leaks the future]
+The tempting shortcut is \textbf{target encoding}: replace the instrument ID with
+that instrument's mean target (its average $\RV$).  In a panel time series this
+is a temporal-leakage trap.  The instrument mean computed over the \emph{whole}
+sample includes future days, so encoding instrument $i$ on day $t$ with a mean
+that already ``knows'' $\RV_{i,t+5}$ smuggles the answer into the feature.  The
+damage is silent: cross-validation scores look excellent and live performance
+collapses.  With only $34$ low-cardinality instruments there is \emph{no reason}
+to target-encode --- plain one-hot dummies carry the same information with zero
+leakage.  Reserve any encoding-by-statistic for genuinely high-cardinality
+categoricals, and even then compute the statistic only on data strictly prior to
+$t$.
+\end{warning}
+
+\begin{projectconnection}[Why This Matters]
+This leakage is the cross-sectional cousin of the standard look-ahead bias from
+Chapter~\ref{ch:evaluation}.  The same panel structure that grows your sample
+also multiplies the ways the future can leak into the past, and the most
+dangerous one is at the \emph{fold} level: a random $K$-fold split scatters rows
+from the same date across train and test, so the model sees other instruments'
+day-$t$ behaviour while predicting instrument $i$ on day $t$.  Use the
+time-blocked purged CV of Section~\ref{sec:eval-purgedcv}, and follow the
+cross-sectional leakage rule in \Cref{sec:ch16:xsection-leakage}: entire
+\emph{dates} go to train or test as a block, never split across folds.
+\end{projectconnection}
+
+\subsubsection*{Unbalanced panels and short-history instruments}
+
+Your panel will almost certainly be \textbf{unbalanced}: a name added to the
+index two years ago has half the history of the index future, and a recent IPO
+has a few hundred days at most.  Both the within estimator and a tree handle this
+without special pleading --- demeaning in Equation~\eqref{eq:panel-within} uses
+whatever $T_i$ days exist for instrument $i$, and a tree simply sees fewer rows
+for that name --- but two cautions apply specifically to RV forecasting.
+
+\begin{warning}[Short histories distort a pooled fit two ways]
+First, a short-history instrument whose entire window happens to sit inside a
+calm (or a crisis) regime contributes a biased view of the shared dynamics;
+check that your pooled $\bbeta$ and $\QLIKE$ are not driven by the longest series
+alone by re-fitting on the balanced sub-panel of full-history instruments.
+Second, in a \emph{dynamic} pooled panel where the target depends on its own lag
+(as HAR does), demeaning a very short series induces a small finite-sample bias
+that shrinks as the history $T_i$ grows \citep{Nickell1981}.  Intuitively, because
+the lagged target is part of what you averaged away, the demeaned lag and the
+demeaned error end up slightly linked, nudging the estimated persistence a touch
+too low --- the Nickell bias.  At $T_i \approx 1{,}000$ daily
+observations this bias is negligible, but it becomes material if you aggregate to
+weekly or monthly targets on a name with only a year or two of data.
+\end{warning}
+
+The practical recipe for the pooled RV panel:
+\begin{enumerate}[nosep]
+  \item Stack the $34$ instruments into an $(i,t)$ panel; $z$-score every feature
+        \emph{within instrument} using a trailing window
+        (Chapter~\ref{ch:features}).
+  \item For the linear baseline, use entity fixed effects
+        (Equation~\eqref{eq:panel-fe}); add time effects only if the target is
+        cross-sectional rather than absolute.
+  \item For the tree, add $N-1$ one-hot instrument dummies; \emph{never}
+        target-encode the ID.
+  \item Validate with date-blocked purged CV (Section~\ref{sec:eval-purgedcv};
+        \Cref{sec:ch16:xsection-leakage}), so whole dates, not random
+        rows, define the folds.
+  \item Sanity-check robustness by re-fitting on the balanced full-history
+        sub-panel; report $\QLIKE$ for both.
+\end{enumerate}
 
 
 % ──────────────────────────────────────────────────────────────

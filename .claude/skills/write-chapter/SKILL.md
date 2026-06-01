@@ -11,7 +11,7 @@ Write a complete LaTeX chapter using a staged quality pipeline: source extractio
 
 The user specifies:
 - **Topic**: what the chapter covers
-- **Guide**: which guide it belongs to (`ml-finance`, `quant-trading`, or a new one)
+- **Guide**: which guide it belongs to (`vol-learning-guide`, `quant-trading`, `vol-project-ref`, or a new one)
 - **Source papers**: specific papers from `reference/` to read in Pass 0. For each paper, specify which pages/sections to extract (e.g., "Xin et al. 2022 pp.3-7: Rashomon set definition, enumeration algorithm")
 
 ## Learning Style Requirements

@@ -16,7 +16,7 @@ Use `$ROOT` = the repo root absolute path (e.g. `/c/Users/ryanv/Documents/Projec
 Run a single Bash call that checks each guide for source changes (`.tex`, `.bib`, `preamble.tex`) since its PDF was last committed:
 
 ```bash
-cd $ROOT && for guide in vol-learning-guide guides/ml-finance guides/quant-trading guides/vol-project-ref; do
+cd $ROOT && for guide in vol-learning-guide guides/quant-trading guides/vol-project-ref; do
   changed=$(git diff --name-only HEAD -- "$guide" | grep -E '\.(tex|bib)$' | head -1)
   untracked=$(git ls-files --others --exclude-standard -- "$guide" | grep -E '\.(tex|bib)$' | head -1)
   if [ -n "$changed" ] || [ -n "$untracked" ]; then
@@ -27,7 +27,7 @@ cd $ROOT && for guide in vol-learning-guide guides/ml-finance guides/quant-tradi
 done
 ```
 
-If ALL four say SKIP, jump directly to Step 3 (deliverables/notes may still need syncing).
+If ALL three say SKIP, jump directly to Step 3 (deliverables/notes may still need syncing).
 
 ### Step 2 — Compile ONLY changed guides in PARALLEL
 
@@ -36,11 +36,6 @@ Launch one Bash tool call per guide that needs compilation. Set timeout to 30000
 **vol-learning-guide** (if needed):
 ```bash
 cd $ROOT/vol-learning-guide && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && echo "DONE: $(pdfinfo main.pdf 2>/dev/null | grep Pages || grep 'Output written on' main.log | tail -1)"
-```
-
-**guides/ml-finance** (if needed — no bibtex, has no references.bib):
-```bash
-cd $ROOT/guides/ml-finance && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && echo "DONE: $(pdfinfo main.pdf 2>/dev/null | grep Pages || grep 'Output written on' main.log | tail -1)"
 ```
 
 **guides/quant-trading** (if needed):
@@ -56,7 +51,7 @@ cd $ROOT/guides/vol-project-ref && pdflatex -interaction=nonstopmode main.tex &&
 ### Step 3 — Commit PDFs to main (if changed)
 
 ```bash
-cd $ROOT && git add vol-learning-guide/main.pdf guides/ml-finance/main.pdf guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf && git diff --cached --quiet && echo "No PDF changes" || git commit -m "chore: recompile guide PDFs" && git push
+cd $ROOT && git add vol-learning-guide/main.pdf guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf && git diff --cached --quiet && echo "No PDF changes" || git commit -m "chore: recompile guide PDFs" && git push
 ```
 
 ### Step 4 — Update docs-only branch
@@ -64,7 +59,7 @@ cd $ROOT && git add vol-learning-guide/main.pdf guides/ml-finance/main.pdf guide
 First stash any uncommitted work so the branch switch doesn't destroy it, then sync and return to main:
 
 ```bash
-cd $ROOT && git stash && git checkout docs-only && git checkout main -- vol-learning-guide/main.pdf vol-learning-guide/markdown/ guides/ml-finance/main.pdf guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/ && git add -A && git diff --cached --quiet && echo "No changes to sync" || (git commit -m "chore: sync compiled PDFs, markdown, and notes from main" && git push) && git checkout main && git stash pop
+cd $ROOT && git stash && git checkout docs-only && git checkout main -- vol-learning-guide/main.pdf vol-learning-guide/markdown/ guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/ && git add -A && git diff --cached --quiet && echo "No changes to sync" || (git commit -m "chore: sync compiled PDFs, markdown, and notes from main" && git push) && git checkout main && git stash pop
 ```
 
 If the stash pop reports conflicts, resolve them — the stashed changes are the user's working copy and take priority.
@@ -76,7 +71,6 @@ Page counts for each compiled PDF + which guides were skipped + confirmation of 
 ## What stays on `docs-only`
 
 - `vol-learning-guide/main.pdf` (volatility forecasting guide)
-- `guides/ml-finance/main.pdf` (ML for finance guide)
 - `guides/quant-trading/main.pdf` (quant trading guide)
 - `guides/vol-project-ref/main.pdf` (volatility project reference guide)
 - `vol-learning-guide/markdown/` (markdown conversion of learning guide, with Mermaid diagrams)

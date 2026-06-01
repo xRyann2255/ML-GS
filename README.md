@@ -6,9 +6,9 @@ Internship project repo: planning, research, and learning guides for a Goldman S
 
 | Guide | Pages | Topic |
 |-------|-------|-------|
-| `vol-learning-guide/main.pdf` | 213 | RV estimation, forecasting, and applications (17 chapters) |
-| `guides/ml-finance/main.pdf` | — | ML methods for finance (14 chapters) |
+| `vol-learning-guide/main.pdf` | 374 | RV estimation, forecasting, and ML (18 chapters) |
 | `guides/quant-trading/main.pdf` | — | Quant trading fundamentals (38 chapters) |
+| `guides/vol-project-ref/main.pdf` | — | Realized-vol project reference |
 
 ## Repository Structure
 
@@ -19,9 +19,10 @@ ML-GS/
 │   ├── project-plans/     # internship project directions
 │   ├── vol-learning-guide/# learning guide specs and plans
 │   └── claude-code-optimization/
+├── archive/               # archived work (risk-as-alpha, incl. old ml-finance guide)
 ├── guides/
-│   ├── ml-finance/        # ML for finance LaTeX guide
-│   └── quant-trading/     # quant trading LaTeX guide
+│   ├── quant-trading/     # quant trading LaTeX guide
+│   └── vol-project-ref/   # realized-vol project reference LaTeX guide
 ├── notes/                 # project notes (volatility.md, glossary, faq)
 ├── reference/             # books, papers, course materials
 ├── vol-learning-guide/    # volatility forecasting LaTeX guide
