@@ -107,3 +107,89 @@ def figure_bbox(draw_rects, spans, page_rect, expand=30.0, pad=8.0):
     bb = [bb[0] - pad, bb[1] - pad, bb[2] + pad, bb[3] + pad]
     return [max(bb[0], page_rect[0]), max(bb[1], page_rect[1]),
             min(bb[2], page_rect[2]), min(bb[3], page_rect[3])]
+
+import os as _os, json as _json, argparse as _argparse
+
+def _spans_in(page, clip):
+    import fitz
+    spans, line_id = [], 0
+    d = page.get_text("dict", clip=fitz.Rect(*clip)) if clip else page.get_text("dict")
+    for blk in d.get("blocks", []):
+        for ln in blk.get("lines", []):
+            line_id += 1
+            for sp in ln.get("spans", []):
+                spans.append({"bbox": list(sp["bbox"]), "text": sp.get("text", ""),
+                              "size": float(sp.get("size", 0.0)),
+                              "font": sp.get("font", ""), "line_id": line_id})
+    return spans
+
+def _node_rects(page):
+    rects = []
+    for dr in page.get_drawings():
+        r = dr["rect"]
+        if (r.width > 10 and r.height > 8 and dr.get("type") in ("s", "f", "fs")):
+            rects.append([r.x0, r.y0, r.x1, r.y1])
+    return rects
+
+def _draw_rects(page):
+    out = []
+    for dr in page.get_drawings():
+        r = dr["rect"]
+        if r.width > 1 and r.height > 1:
+            out.append([r.x0, r.y0, r.x1, r.y1])
+    return out
+
+def locate_page(doc, substr):
+    for i, page in enumerate(doc):
+        if substr in page.get_text():
+            return i
+    return None
+
+def inspect(pdf_path, locate, out_dir, dpi=300, min_font=6.0, overlap_frac=0.20,
+            whole_guide=True):
+    import fitz
+    _os.makedirs(out_dir, exist_ok=True)
+    doc = fitz.open(pdf_path)
+    pi = locate_page(doc, locate)
+    if pi is None:
+        doc.close()
+        return {"located": False, "error": "figure text '%s' not found in %s" % (locate, pdf_path)}
+    page = doc[pi]
+    page_rect = [page.rect.x0, page.rect.y0, page.rect.x1, page.rect.y1]
+    draws = _draw_rects(page)
+    all_spans = _spans_in(page, None)
+    bb = figure_bbox(draws, all_spans, page_rect) if whole_guide else page_rect
+    spans = _spans_in(page, bb)
+    nodes = _node_rects(page)
+    defects = (find_overlaps(spans, overlap_frac) + find_node_text_spill(spans, nodes)
+               + find_tiny(spans, min_font) + find_node_overlaps(nodes))
+    crop_path = _os.path.join(out_dir, "crop.png")
+    page.get_pixmap(dpi=dpi, clip=fitz.Rect(*bb)).save(crop_path)
+    result = {
+        "located": True, "page": pi + 1, "bbox": [round(v, 1) for v in bb],
+        "crop": crop_path, "tiles": [],
+        "metrics": {"n_spans": len(spans),
+                    "min_font_pt": round(min((s["size"] for s in spans if s["text"].strip()),
+                                             default=0.0), 1)},
+        "defects": defects,
+    }
+    doc.close()
+    return result
+
+def main(argv=None):
+    p = _argparse.ArgumentParser(description="Inspect a TikZ diagram for geometric defects.")
+    p.add_argument("--pdf", required=True)
+    p.add_argument("--locate", required=True, help="unique caption/label substring on the figure's page")
+    p.add_argument("--out", required=True)
+    p.add_argument("--dpi", type=int, default=300)
+    p.add_argument("--min-font", type=float, default=6.0)
+    p.add_argument("--overlap-frac", type=float, default=0.20)
+    a = p.parse_args(argv)
+    res = inspect(a.pdf, a.locate, a.out, a.dpi, a.min_font, a.overlap_frac)
+    with open(_os.path.join(a.out, "inspection.json"), "w", encoding="utf-8") as f:
+        _json.dump(res, f, indent=2)
+    print(_json.dumps(res, indent=2))
+    return 0 if res.get("located") else 2
+
+if __name__ == "__main__":
+    raise SystemExit(main())

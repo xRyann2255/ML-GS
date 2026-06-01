@@ -79,3 +79,25 @@ def test_figure_bbox_clamps_to_page():
     page = [0, 0, 50, 50]
     bb = di.figure_bbox([[5, 5, 45, 45]], [], page, expand=30.0, pad=8.0)
     assert bb == [0, 0, 50, 50]
+
+import fitz, json, tempfile
+
+def test_inspect_pdf_end_to_end(tmp_path):
+    pdf = tmp_path / "doc.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=300, height=200)
+    page.insert_text((50, 100), "MARKER Alpha", fontsize=9)
+    page.insert_text((90, 104), "Beta", fontsize=9)            # overlaps Alpha region
+    page.draw_rect(fitz.Rect(40, 80, 200, 120))
+    doc.save(pdf); doc.close()
+    out = tmp_path / "out"
+    res = di.inspect(str(pdf), locate="MARKER", out_dir=str(out), dpi=200)
+    assert res["located"] is True
+    assert os.path.exists(res["crop"])
+    assert any(d["type"] == "overlap" for d in res["defects"])
+
+def test_inspect_reports_not_located(tmp_path):
+    pdf = tmp_path / "doc.pdf"
+    doc = fitz.open(); doc.new_page(); doc.save(pdf); doc.close()
+    res = di.inspect(str(pdf), locate="NOPE", out_dir=str(tmp_path / "o"))
+    assert res["located"] is False and "error" in res
