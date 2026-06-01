@@ -1,12 +1,13 @@
 export const meta = {
   name: 'deep-research-distill',
-  description: 'One question in: sweep the internet (arXiv/SSRN papers, GitHub repos, practitioner web), adversarially verify, and distill into this repo as a direct answer + key insights + an ingest list',
-  whenToUse: 'When you want to deeply research one question by harvesting external sources and persisting a verified, distilled brief into notes/deep-research/. Pass args="the question" or args={question, slug}.',
+  description: 'One question in: sweep the internet for the state of the art (arXiv/SSRN papers, GitHub repos, practitioner web), adversarially verify, DOWNLOAD the relevant open-access papers into reference/project-papers/, and distill a fully source-traced brief into the repo',
+  whenToUse: 'When you want to deeply research one question on the current state of the art, harvest + DOWNLOAD the relevant papers (deduped against what we already hold, recovering open versions of paywalled journals), and persist a verified, distilled brief into notes/deep-research/. Pass args="the question" or args={question, slug}.',
   phases: [
-    { title: 'Scope', detail: 'read the local corpus + decompose the question into source-typed search facets' },
-    { title: 'Harvest', detail: 'parallel agents sweep arXiv/SSRN, GitHub, and practitioner web per facet' },
-    { title: 'Verify', detail: 'adversarially ground the top claims against their sources; dedup; rate credibility' },
-    { title: 'Distill', detail: 'synthesize the direct answer + evidence table + ingest list and write it into the repo' },
+    { title: 'Scope', detail: 'read the local corpus, inventory held PDFs, decompose into source-typed facets incl. a frontier facet' },
+    { title: 'Harvest', detail: 'parallel agents sweep arXiv/SSRN, GitHub, and practitioner web per facet, date-biased to recent work' },
+    { title: 'Verify', detail: 'adversarially ground the top claims against their sources; record claim location; dedup; rate credibility' },
+    { title: 'Acquire', detail: 'download open-access PDFs (recovering open versions of paywalled journals) and auto-update the README index' },
+    { title: 'Distill', detail: 'synthesize the SOTA answer + fully-traced evidence table + acquired-papers manifest and write it into the repo' },
   ],
 }
 
