@@ -1,6 +1,6 @@
 # Tree-Based Methods for Volatility
 
-> **Application: **
+> **Application**
 > This chapter is where ML meets volatility forecasting for the first time.
 > Tree-based methods (LightGBM, XGBoost) are the workhorse models for tabular
 > volatility data, just as they dominate Kaggle competitions and quantitative
@@ -59,27 +59,40 @@ Both are used in volatility forecasting, but gradient boosting (LightGBM,
 XGBoost) typically wins on tabular data.
 
 ```mermaid
-flowchart TB
-    subgraph RF["Random Forest (independent / parallel)"]
-        direction TB
-        T1["Tree 1"] --> AVG["Average"]
-        T2["Tree 2"] --> AVG
-        TB["Tree B"] --> AVG
-        AVG --> RFOUT["ŷ = (1/B) Σ h_b(x)"]
+flowchart TD
+    subgraph RF["Random Forest (independent, parallel)"]
+        rf1["Tree 1"]
+        rf2["Tree 2"]
+        rf3["Tree B"]
+        rfavg["Average"]
+        rfout["y&#770; = (1/B) &sum; h_b(x)"]
+        rf1 --> rfavg
+        rf2 --> rfavg
+        rf3 --> rfavg
+        rfavg --> rfout
     end
-
-    subgraph GB["Gradient Boosting (sequential / corrective)"]
-        direction LR
-        G1["Tree 1\n(fit y)"] -->|"residual"| G2["Tree 2\n(fit r₁)"]
-        G2 -->|"residual"| GM["Tree M\n(fit r_{M-1})"]
-        G1 --> GBSUM["Sum (shrunk)"]
-        G2 --> GBSUM
-        GM --> GBSUM
-        GBSUM --> GBOUT["ŷ = Σ η h_m(x)"]
+    subgraph GB["Gradient Boosting (sequential, corrective)"]
+        gb1["Tree 1"]
+        gb2["Tree 2"]
+        gb3["Tree M"]
+        gbsum["Sum (shrunk)"]
+        gbout["y&#770; = &sum; &eta; h_m(x)"]
+        gb1 -. residual .-> gb2
+        gb2 -. residual .-> gb3
+        gb1 --> gbsum
+        gb2 --> gbsum
+        gb3 --> gbsum
+        gbsum --> gbout
     end
+    classDef tree fill:#d6e4f0,stroke:#1a5276;
+    classDef avg fill:#d4efdf,stroke:#1e8449;
+    classDef seq fill:#fae5d3,stroke:#e67e22;
+    class rf1,rf2,rf3,gb1,gb2,gb3 tree;
+    class rfavg avg;
+    class gbsum seq;
 ```
 
-*Two tree ensemble strategies. Left: a random forest builds Tree 1, Tree 2, ..., Tree B independently (in parallel) on bootstrap samples and averages them, $\hat{y} = \frac{1}{B}\sum h_b(\mathbf{x})$. Right: gradient boosting builds Tree 1, Tree 2, ..., Tree M sequentially (correctively), each tree fitting the residual of the running ensemble, then sums the shrunk contributions, $\hat{y} = \sum \eta\, h_m(\mathbf{x})$.*
+*Two tree ensemble strategies. The random forest (left) trains trees independently in parallel on bootstrapped samples and averages them; gradient boosting (right) trains trees sequentially, each fitting the residual left by the ensemble so far, then sums their shrunken contributions.*
 
 ## Tree Foundations: From One Tree to a Forest
 
@@ -91,7 +104,7 @@ flowchart TB
 > VIX, jumps). We ask: how does a tree turn that vector into a number, and
 > why do we never use a single tree to do it?
 
-The depth-2 tree drawn later in the LightGBM and XGBoost section (the one that
+The depth-2 tree drawn later in the LightGBM and XGBoost section below (the one that
 splits on $\operatorname{RV}_{t-1} = 0.0004$) is a finished object; the next three
 subsections show how such a tree is built, why one tree is too unreliable to
 forecast with, and how an ensemble of many trees fixes that.
@@ -105,11 +118,13 @@ and predicts a single constant inside each box (Breiman et al., 1984). The
 constant is just the average target of the training observations that landed
 in that box:
 
-$$\hat{f}(\mathbf{x}) \;=\; \sum_{j=1}^{J}
-\underbrace{c_j}_{\text{leaf mean}}\,
-\underbrace{\mathbf{1}(\mathbf{x} \in R_j)}_{\text{which box?}},
-\qquad
-c_j \;=\; \frac{1}{|R_j|}\sum_{t:\,\mathbf{x}_t \in R_j} \operatorname{RV}_t,$$
+$$
+  \hat{f}(\mathbf{x}) \;=\; \sum_{j=1}^{J}
+  \underbrace{c_j}_{\text{leaf mean}}\,
+  \underbrace{\mathbf{1}(\mathbf{x} \in R_j)}_{\text{which box?}},
+  \qquad
+  c_j \;=\; \frac{1}{|R_j|}\sum_{t:\,\mathbf{x}_t \in R_j} \operatorname{RV}_t,
+$$
 
 where:
 
@@ -147,12 +162,14 @@ of squared residuals (SSR) across the two children that the split would
 create. A **residual** is how far a day's actual $\operatorname{RV}$ sits from the
 box's predicted average (actual minus predicted):
 
-$$\min_{j,\,s}\;
-\Bigg[\;
-\underbrace{\sum_{t:\,x_{tj}\le s}(\operatorname{RV}_t - c_L)^2}_{\text{left-child SSR}}
-\;+\;
-\underbrace{\sum_{t:\,x_{tj}> s}(\operatorname{RV}_t - c_R)^2}_{\text{right-child SSR}}
-\;\Bigg],$$
+$$
+  \min_{j,\,s}\;
+  \Bigg[\;
+  \underbrace{\sum_{t:\,x_{tj}\le s}(\operatorname{RV}_t - c_L)^2}_{\text{left-child SSR}}
+  \;+\;
+  \underbrace{\sum_{t:\,x_{tj}> s}(\operatorname{RV}_t - c_R)^2}_{\text{right-child SSR}}
+  \;\Bigg],
+$$
 
 where:
 
@@ -182,13 +199,13 @@ $\hat{p}_k$ is the estimated share of a node's days in class $k$.
 > values are each as tightly clustered as possible?" It tries every feature
 > at every threshold, keeps the best, and then asks the same question again
 > inside each resulting group. This is exactly how the
-> $\operatorname{RV}_{t-1} = 0.0004$ boundary in the LightGBM and XGBoost diagram was
-> chosen: it was the single threshold that most reduced the spread of next-day
-> $\operatorname{RV}$ at the root.
+> $\operatorname{RV}_{t-1} = 0.0004$ boundary in the single-tree diagram of the LightGBM
+> and XGBoost section was chosen: it was the single threshold that most
+> reduced the spread of next-day $\operatorname{RV}$ at the root.
 
 > **Project Connection: Why This Matters**
-> The split-selection equation above is where a tree's two headline strengths
-> from the Why Trees for Volatility section come from. A split on VIX followed by a
+> The split criterion above is where a tree's two headline strengths
+> from the opening section come from. A split on VIX followed by a
 > split on $\operatorname{RV}_{t-1}$ inside one branch encodes the lagged-RV$\,\times\,$VIX
 > interaction that HAR ([Chapter 6](ch06-har-model.md)) can only capture by hand-crafting
 > a product term, and a split at $\operatorname{RV}_{t-1} = 0.0004$ encodes a volatility
@@ -210,7 +227,7 @@ function.
 
 > **Warning: A Single Tree Will Memorise Volatility Noise**
 > Volatility data is short ($\sim$1,250 daily rows), heavy-tailed, and highly
-> autocorrelated (see the Hyperparameters for Volatility Data section). An unconstrained tree
+> autocorrelated (see the hyperparameters section below). An unconstrained tree
 > will carve a dedicated leaf around a single crisis week and predict that
 > week's $\operatorname{RV}$ perfectly in-sample while generalising terribly out-of-sample.
 > This is why nobody forecasts $\operatorname{RV}$ with one tree, and why every result in
@@ -218,7 +235,7 @@ function.
 
 There are two ways to tame this variance: average many independent trees
 (bagging and random forests, below) or add small trees sequentially
-(gradient boosting, the LightGBM and XGBoost section).
+(gradient boosting, in the LightGBM and XGBoost section).
 
 ### Bagging: averaging away the variance
 
@@ -229,9 +246,11 @@ trees on resampled copies of the data and averaging them. A
 all. The fraction of *unique* original days that land in a given
 bootstrap sample converges to
 
-$$1 - \underbrace{\left(1 - \tfrac{1}{n}\right)^{n}}_{\substack{\text{prob. a row is}\\\text{never drawn}}}
-\;\xrightarrow[\;n\to\infty\;]{}\;
-1 - e^{-1} \;\approx\; 0.632,$$
+$$
+  1 - \underbrace{\left(1 - \tfrac{1}{n}\right)^{n}}_{\substack{\text{prob.\ a row is}\\\text{never drawn}}}
+  \;\xrightarrow[\;n\to\infty\;]{}\;
+  1 - e^{-1} \;\approx\; 0.632,
+$$
 
 where:
 
@@ -276,11 +295,13 @@ forest average makes the payoff precise:
 > average pairwise correlation $\rho$ between trees, the variance of the
 > averaged forecast is
 >
-> $$\operatorname{Var}\!\big(\hat{f}_{\text{RF}}\big)
-> \;=\;
-> \underbrace{\rho\,\sigma^2}_{\text{irreducible floor}}
-> \;+\;
-> \underbrace{\frac{1-\rho}{B}\,\sigma^2}_{\text{vanishes as }B\to\infty}.$$
+> $$
+>   \operatorname{Var}\!\big(\hat{f}_{\text{RF}}\big)
+>   \;=\;
+>   \underbrace{\rho\,\sigma^2}_{\text{irreducible floor}}
+>   \;+\;
+>   \underbrace{\frac{1-\rho}{B}\,\sigma^2}_{\text{vanishes as }B\to\infty}.
+> $$
 >
 > - $\operatorname{Var}(\cdots)$: how much the forecast wobbles from sample to sample,
 > - $\sigma^2$: that wobble for a single tree (this $\sigma$ is the
@@ -301,7 +322,7 @@ forest average makes the payoff precise:
 > each split).
 
 > **Intuition: In Plain English**
-> The random-forest variance equation says you cannot average your way to zero
+> The forest variance formula says you cannot average your way to zero
 > variance if all the trees agree. Restricting each split to a random handful
 > of features is a deliberate sabotage: it stops every tree from leaning on the
 > same dominant predictor, so the trees make *different* mistakes, and
@@ -314,14 +335,14 @@ forest average makes the payoff precise:
 > it in nearly every tree and decorrelate poorly. The random-feature trick is
 > what lets the other feature families from [Chapter 10](ch10-feature-engineering.md) (RQ,
 > signed semivariances, VIX, jumps) actually enter the ensemble. The same
-> logic reappears as `colsample_bytree` for gradient boosting in
-> the Hyperparameters for Volatility Data section: feature subsampling there decorrelates
+> logic reappears as `colsample_bytree` for gradient boosting in the
+> hyperparameters section below: feature subsampling there decorrelates
 > boosted trees for precisely this reason.
 
 ### Out-of-bag error, and why it lies on time series
 
 Because each tree omits its $\approx 36.8\%$ out-of-bag days
-(see the bootstrap fraction equation above), a forest comes with a free,
+(from the bootstrap fraction above), a forest comes with a free,
 built-in validation set: score each day using only the trees that did
 *not* see it, and the resulting **out-of-bag (OOB) error**
 approximates leave-one-out cross-validation (test on each day in turn while
@@ -335,11 +356,11 @@ That is genuinely useful, for cross-sectional, exchangeable data.
 > Volatility is not: if day $t{+}1$ is in a tree's bootstrap sample while day
 > $t$ is out-of-bag, scoring day $t$ on that tree lets it "predict the past
 > from the future," because adjacent $\operatorname{RV}$ values are nearly identical
-> (see the Hyperparameters for Volatility Data section). OOB error therefore looks far better
+> (see the hyperparameters section below). OOB error therefore looks far better
 > than true out-of-sample performance. Use it only as a quick development
 > sanity check, never as your selection metric. For honest model selection,
 > use purged $K$-fold cross-validation with an embargo
-> (the Purged Cross-Validation section of [Chapter 16](ch16-forecast-evaluation.md)), which
+> ([Chapter 16](ch16-forecast-evaluation.md)), which
 > removes the leakage that breaks OOB.
 
 ## LightGBM and XGBoost
@@ -365,16 +386,28 @@ predicting tomorrow's $\operatorname{RV}$ from yesterday's value.
 
 ```mermaid
 flowchart TD
-    ROOT["RV_{t-1} < 0.0004?"]
-    ROOT -->|Yes| L1["RV_{t-1} < 0.0001?"]
-    ROOT -->|No| R1["RV_{t-1} < 0.0012?"]
-    L1 -->|Yes| LL["Predict 0.00007"]
-    L1 -->|No| LR["Predict 0.00022"]
-    R1 -->|Yes| RL["Predict 0.00065"]
-    R1 -->|No| RR["Predict 0.0018"]
+    root["RV(t-1) &lt; 0.0004?"]
+    n1["RV(t-1) &lt; 0.0001?"]
+    n2["RV(t-1) &lt; 0.0012?"]
+    l1["Predict 0.00007"]
+    l2["Predict 0.00022"]
+    l3["Predict 0.00065"]
+    l4["Predict 0.0018"]
+    root -- Yes --> n1
+    root -- No --> n2
+    n1 -- Yes --> l1
+    n1 -- No --> l2
+    n2 -- Yes --> l3
+    n2 -- No --> l4
+    classDef split fill:#d6e4f0,stroke:#1a5276;
+    classDef mid fill:#fae5d3,stroke:#e67e22;
+    classDef leaf fill:#d4efdf,stroke:#1e8449;
+    class root split;
+    class n1,n2 mid;
+    class l1,l2,l3,l4 leaf;
 ```
 
-*A depth-2 regression tree. The root splits on $\operatorname{RV}_{t-1} < 0.0004$. The left child splits again on $\operatorname{RV}_{t-1} < 0.0001$ (leaves predict $0.00007$ for Yes, $0.00022$ for No); the right child splits on $\operatorname{RV}_{t-1} < 0.0012$ (leaves predict $0.00065$ for Yes, $0.0018$ for No).*
+*A depth-2 regression tree forecasting next-day $\operatorname{RV}$ from yesterday's value. Each yes/no split on $\operatorname{RV}_{t-1}$ routes the day to one of four leaves, each returning a constant prediction.*
 
 The tree partitions the feature space into four leaves, each returning a
 constant prediction. This is piecewise-constant approximation. A single
@@ -387,18 +420,28 @@ sequentially. Each tree fits the residual errors of the ensemble so far.
 
 ```mermaid
 flowchart LR
-    T1["Tree 1\n(fit y)"] -->|"η·h₁(x)"| S1("+")
-    S1 -->|"residual r₁"| T2["Tree 2\n(fit r₁)"]
-    T2 -->|"η·h₂(x)"| S2("+")
-    S2 -->|"···"| TM["Tree M\n(fit r_{M-1})"]
-    TM --> OUT["ŷ = Σ_{m=1}^{M} η h_m(x)"]
+    t1["Tree 1 (fit y)"]
+    s1(("+"))
+    t2["Tree 2 (fit r_1)"]
+    s2(("+"))
+    tm["Tree M (fit r_(M-1))"]
+    out["y&#770; = &sum; (m=1 to M) &eta; h_m(x)"]
+    t1 -- "&eta; &middot; h_1(x)" --> s1
+    s1 -- "residual r_1" --> t2
+    t2 -- "&eta; &middot; h_2(x)" --> s2
+    s2 -- "&hellip;" --> tm
+    tm --> out
+    classDef tree fill:#d6e4f0,stroke:#1a5276;
+    class t1,t2,tm tree;
 ```
 
-*Gradient boosting builds its forecast sequentially. Tree 1 fits $y$ and contributes $\eta \cdot h_1(\mathbf{x})$ to a running sum; the residual $r_1$ is passed to Tree 2, which fits it and contributes $\eta \cdot h_2(\mathbf{x})$; and so on through Tree M (fitting $r_{M-1}$). The final forecast is $\hat{y} = \sum_{m=1}^{M} \eta\, h_m(\mathbf{x})$.*
+*Gradient boosting builds its forecast sequentially. Tree 1 fits the target $y$; each later tree fits the residual $r$ left by the running ensemble. The shrunken tree outputs $\eta\,h_m(\mathbf{x})$ accumulate into the final forecast.*
 
 The ensemble prediction is:
 
-$$\hat{y}_t \;=\; \sum_{m=1}^{M} \eta \, h_m(\mathbf{x}_t),$$
+$$
+  \hat{y}_t \;=\; \sum_{m=1}^{M} \eta \, h_m(\mathbf{x}_t),
+$$
 
 where:
 
@@ -429,8 +472,10 @@ $\mathcal{L}_{\text{MSE}} = \frac{1}{N}\sum_t (\operatorname{RV}_t - \hat{y}_t)^
 But [Chapter 16](ch16-forecast-evaluation.md) showed that $\operatorname{QLIKE}$ is the preferred loss
 for volatility forecasting (Audrino and Knaus, 2016):
 
-$$\mathcal{L}_{\operatorname{QLIKE}} \;=\; \frac{1}{N}\sum_{t=1}^{N}
-\left(\frac{\operatorname{RV}_t}{\hat{y}_t} - \ln\frac{\operatorname{RV}_t}{\hat{y}_t} - 1\right).$$
+$$
+  \mathcal{L}_{\operatorname{QLIKE}} \;=\; \frac{1}{N}\sum_{t=1}^{N}
+  \left(\frac{\operatorname{RV}_t}{\hat{y}_t} - \ln\frac{\operatorname{RV}_t}{\hat{y}_t} - 1\right).
+$$
 
 - $\operatorname{RV}_t$: the realized volatility actually observed on day $t$,
 - $\hat{y}_t$: the model's forecast for day $t$,
@@ -456,11 +501,14 @@ $$\mathcal{L}_{\operatorname{QLIKE}} \;=\; \frac{1}{N}\sum_{t=1}^{N}
 Neither LightGBM nor XGBoost provides $\operatorname{QLIKE}$ natively, but both accept
 custom objective functions. You supply the gradient and Hessian:
 
-$$g_t = \frac{\partial \mathcal{L}_{\operatorname{QLIKE}}}{\partial \hat{y}_t}
-       = -\frac{\operatorname{RV}_t}{\hat{y}_t^2} + \frac{1}{\hat{y}_t},$$
-
-$$h_t = \frac{\partial^2 \mathcal{L}_{\operatorname{QLIKE}}}{\partial \hat{y}_t^2}
-       = \frac{2\,\operatorname{RV}_t}{\hat{y}_t^3} - \frac{1}{\hat{y}_t^2}.$$
+$$
+\begin{aligned}
+  g_t &= \frac{\partial \mathcal{L}_{\operatorname{QLIKE}}}{\partial \hat{y}_t}
+       = -\frac{\operatorname{RV}_t}{\hat{y}_t^2} + \frac{1}{\hat{y}_t}, \\
+  h_t &= \frac{\partial^2 \mathcal{L}_{\operatorname{QLIKE}}}{\partial \hat{y}_t^2}
+       = \frac{2\,\operatorname{RV}_t}{\hat{y}_t^3} - \frac{1}{\hat{y}_t^2}.
+\end{aligned}
+$$
 
 - $g_t$: the gradient tells each tree which direction to adjust
   predictions,
@@ -522,7 +570,7 @@ data has three properties that make default hyperparameters dangerous:
 > With 1,250 daily observations, defaults will memorize noise. The table below
 > gives recommended ranges calibrated for volatility forecasting.
 
-| **Parameter** | **Default** | **Vol Range** | **Rationale** |
+| Parameter | Default | Vol Range | Rationale |
 |---|---|---|---|
 | `max_depth` | 6--8 | 3--5 | Shallow trees limit memorization |
 | `min_child_samples` | 20 | 50--200 | Forces each leaf to generalize |
@@ -545,20 +593,19 @@ data has three properties that make default hyperparameters dangerous:
 > **Prereq: SHAP, MDA, and MDI from Chapter 10**
 > The feature-importance section of [Chapter 10](ch10-feature-engineering.md) introduced three feature-importance ideas
 > you will reuse here: **SHAP** values, which decompose a single
-> prediction additively into per-feature contributions
-> (the SHAP equation); **MDA** (mean decrease in accuracy), the
-> permutation-based global importance; and **MDI** (mean decrease in
-> impurity), the fast-but-biased split-based importance. It also introduced
-> **ALE** plots (the ALE equation). This section answers the
+> prediction additively into per-feature contributions; **MDA** (mean
+> decrease in accuracy), the permutation-based global importance; and **MDI**
+> (mean decrease in impurity), the fast-but-biased split-based importance.
+> It also introduced **ALE** plots. This section answers the
 > question that section left open: *how* do you compute SHAP for a tree
 > ensemble cheaply, and *which* plot do you reach for when?
 
 You have a tuned LightGBM forecasting next-day log-$\operatorname{RV}$ on the feature
 matrix from [Chapter 10](ch10-feature-engineering.md) (lagged RV transforms, realized
 quarticity, VIX, jumps). It beats HAR by 7.7% in $\operatorname{QLIKE}$
-(see the Hyperparameters for Volatility Data section). Your sponsor's first question is not
+(see the hyperparameters section above). Your sponsor's first question is not
 "what is the $\operatorname{QLIKE}$?" but "*why* did the model forecast a vol spike
-for next Tuesday?" The SHAP equation promises an exact additive answer
+for next Tuesday?" The SHAP decomposition promises an exact additive answer
 per day, but computing it honestly looks hopeless.
 
 ### The exponential cost that TreeSHAP defeats
@@ -581,9 +628,11 @@ trees to compute the *exact* same Shapley values in polynomial time. In
 the cost formula below, $O(\cdots)$ is shorthand for how fast the computation
 time grows as the inputs grow: bigger inside the parentheses means slower.
 
-$$\underbrace{O\!\big(T \, L \, D^2\big)}_{\text{TreeSHAP}}
-\quad\text{instead of}\quad
-\underbrace{O\!\big(T \, L \, 2^{p}\big)}_{\text{naive Shapley}},$$
+$$
+  \underbrace{O\!\big(T \, L \, D^2\big)}_{\text{TreeSHAP}}
+  \quad\text{instead of}\quad
+  \underbrace{O\!\big(T \, L \, 2^{p}\big)}_{\text{naive Shapley}},
+$$
 
 where:
 
@@ -609,7 +658,7 @@ enough to run and the naive method is not.
 > SHAP value for a feature is simply the sum of its values across all trees.
 
 > **Project Connection: Why This Matters**
-> TreeSHAP makes the SHAP feature-importance plot in the feature-importance figure of
+> TreeSHAP makes the SHAP feature-importance plot from
 > [Chapter 10](ch10-feature-engineering.md) a one-line,
 > seconds-long computation on your LightGBM forecaster:
 > `shap.TreeExplainer(model).shap_values(X)`. Because it is exact, it
@@ -635,7 +684,7 @@ The `shap` library produces four core plot types. Each answers a
 different question about your $\operatorname{RV}$ forecaster; the table is your
 lookup for which to reach for.
 
-| **Plot** | **Scope** | **What it shows** | **Use it to...** |
+| Plot | Scope | What it shows | Use it to... |
 |---|---|---|---|
 | **Beeswarm** (summary) | Global, all days | One dot per day per feature; $x$ = SHAP value, colour = feature value (red high, blue low); features sorted by mean $\|\phi_j\|$ | See which features drive forecasts overall and in which direction (does high lagged $\operatorname{RV}$ push the forecast up?) |
 | **Dependence** | Per-observation scatter | One feature's value ($x$) vs. its SHAP value ($y$), coloured by the most-interacting feature | Reveal nonlinearity/thresholds in a feature's effect and two-way interactions (e.g. lagged $\operatorname{RV}$ $\times$ implied vol) |
@@ -651,7 +700,7 @@ it pushed the forecast up or down.
 > **Key Idea: Dependence Plot vs. ALE: Two Views of the Same Feature**
 > The SHAP **dependence** plot and the **ALE** (Accumulated Local
 > Effects) plot
-> (the ALE equation, [Chapter 10](ch10-feature-engineering.md)) answer related but
+> ([Chapter 10](ch10-feature-engineering.md)) answer related but
 > distinct questions about, say, lagged $\operatorname{RV}$. ALE gives the
 > *marginal shape* (the average effect of this feature once you average
 > over all the other features): a single smooth curve summarising "as lagged
@@ -669,9 +718,9 @@ All three measures answer "which features matter?" but at different
 granularity, and they occasionally disagree. The reconciliation rule below
 is what you actually apply during $\operatorname{RV}$ model development.
 
-| **Measure** | **Granularity** | **Strength / weakness** | **When to use** |
+| Measure | Granularity | Strength / weakness | When to use |
 |---|---|---|---|
-| **SHAP** | Local (per day), sums to the prediction | Richest information; exact via TreeSHAP; can be unstable across correlated features (the feature-importance section of [Chapter 10](ch10-feature-engineering.md)) | Presentation charts, debugging single forecasts, detecting nonlinearity |
+| **SHAP** | Local (per day), sums to the prediction | Richest information; exact via TreeSHAP; can be unstable across correlated features (see [Chapter 10](ch10-feature-engineering.md)) | Presentation charts, debugging single forecasts, detecting nonlinearity |
 | **MDA** | Global, in units of $\operatorname{QLIKE}$/MSE drop | Model-agnostic, unbiased under independence (gives the right ranking when features are not correlated with each other); costs $p$ extra passes; *must* use held-out data | Primary aggregate importance and cross-fold stability checks |
 | **MDI** | Global, free byproduct of training | Biased toward high-cardinality features (those with many distinct values, hence many possible split points, a continuous $\operatorname{RV}$ vs. a yes/no jump flag) (Strobl et al., 2007) | Quick sanity check only; never a reported result |
 
@@ -705,7 +754,7 @@ it. Three rules, all of which trade rigor for being understood:
    predicted vol up, blue bars pushed it down, and the biggest bar is what
    mattered most that day." Do not say "Shapley" unless asked, then
    explain the fair-credit game-theory idea
-   (the SHAP equation, [Chapter 10](ch10-feature-engineering.md)).
+   ([Chapter 10](ch10-feature-engineering.md)).
 2. **Show exactly three waterfalls,** each illustrating a different
    mechanism, never twenty.
 3. **Keep the global beeswarm in an appendix.** The summary plot is
@@ -727,8 +776,7 @@ The three waterfalls to pick for an $\operatorname{RV}$ forecaster:
    the tree forecast a sharp one. SHAP shows the gap came from an
    interaction between lagged $\operatorname{RV}$ and implied volatility, the
    HARQ-type effect ([Chapter 6](ch06-har-model.md)) the tree captures but linear
-   HAR cannot, motivating the HAR$+$tree blend in
-   the Ensemble with HAR section."
+   HAR cannot, motivating the HAR$+$tree blend in the ensemble section below."
 
 > **Project Connection: Why This Matters**
 > The waterfall is the single most persuasive chart in a volatility-model
@@ -737,7 +785,7 @@ The three waterfalls to pick for an $\operatorname{RV}$ forecaster:
 > is a sentence a portfolio manager can challenge on economic grounds, which is
 > exactly the scrutiny that separates a real signal from an overfit one. The
 > disagreement waterfall does double duty: it is both an explanation and the
-> argument for the ensemble of the Ensemble with HAR section.
+> argument for the ensemble in the section below.
 
 ## The Christensen--Siggaard--Veliyev Evidence
 
@@ -823,7 +871,29 @@ This is the most important section in the chapter. The evidence above might
 suggest that trees always win. They do not. Here is a regime-by-regime
 summary of when ML adds value, grounded in the literature.
 
-*A 2x2 matrix of when ML adds value, with feature richness on the horizontal axis (Sparse to Rich) and horizon on the vertical axis (Daily on top, Intraday on bottom). Top-left (RV lags only + daily horizon): **HAR wins or ties**, 0--5% QLIKE gain, often not significant. Top-right (Rich features + daily horizon): **Trees win**, 5--20% QLIKE gain, significant by DM test. Bottom-left (RV lags only + intraday horizon): **Trees help**, HAR not designed for intraday. Bottom-right (Rich features + intraday horizon): **Trees dominate**, Optiver evidence, clear winner.*
+```mermaid
+flowchart TD
+    subgraph daily["Daily horizon"]
+        tl["RV lags only + daily horizon<br/><b>HAR wins or ties</b><br/>0-5% QLIKE gain<br/>Often not significant"]
+        tr["Rich features + daily horizon<br/><b>Trees win</b><br/>5-20% QLIKE gain<br/>Significant by DM test"]
+    end
+    subgraph intraday["Intraday horizon"]
+        bl["RV lags only + intraday horizon<br/><b>Trees help</b><br/>HAR not designed for intraday"]
+        br["Rich features + intraday horizon<br/><b>Trees dominate</b><br/>Optiver evidence<br/>Clear winner"]
+    end
+    tl -.- tr
+    bl -.- br
+    classDef harwin fill:#f5b7b1,stroke:#c0392b;
+    classDef treewin fill:#abebc6,stroke:#1e8449;
+    classDef treehelp fill:#fae5d3,stroke:#e67e22;
+    classDef treedom fill:#7dcea0,stroke:#1e8449;
+    class tl harwin;
+    class tr treewin;
+    class bl treehelp;
+    class br treedom;
+```
+
+*When does ML add value? The matrix crosses feature richness (sparse RV lags vs. rich features, left to right) with forecast horizon (daily vs. intraday, top to bottom). HAR is competitive only in the sparse-feature daily cell; trees win or dominate everywhere feature richness or intraday horizons enter.*
 
 ### Daily horizon, RV-only features: HAR is extremely competitive
 
@@ -834,7 +904,7 @@ Diebold--Mariano test ([Chapter 16](ch16-forecast-evaluation.md)). HAR already c
 the dominant autoregressive structure. Trees can only add nonlinear kinks,
 which are small and unstable on 1,250 observations.
 
-Bollerslev, Medeiros, Patton, and Quaedvlieg (2024) demonstrate that a rolling-window HAR with properly
+Bollerslev et al. (2024) demonstrate that a rolling-window HAR with properly
 selected window length matches or beats off-the-shelf ML models. The key
 insight: HAR's advantage comes from its parsimonious structure (3 parameters),
 which is well-suited to small, noisy, autocorrelated data.
@@ -869,7 +939,7 @@ extreme leaves are based on very few training observations.
 Rahimikia and Poon (2020) document this explicitly: their ML model beats HAR
 on 90% of out-of-sample days, but fails catastrophically on the remaining
 10%, which are precisely the days that matter most for risk management.
-The Ensemble with HAR section addresses this.
+The ensemble section below addresses this.
 
 ### Does anything beat linear models?
 
@@ -890,7 +960,7 @@ tuning), the gap shrinks or disappears for daily RV with standard features.
 
 ## Ensemble with HAR
 
-The Honest Assessment section revealed a tension: trees win most days but
+The honest-assessment section revealed a tension: trees win most days but
 fail in stress. HAR is robust in stress but misses nonlinear patterns in
 calm periods. The natural solution: combine them.
 
@@ -904,9 +974,11 @@ standalone models.
 
 The simplest combination:
 
-$$\hat{\sigma}^2_{\text{combo},t}
+$$
+  \hat{\sigma}^2_{\text{combo},t}
   = w \cdot \hat{\sigma}^2_{\text{HAR},t}
-  + (1-w) \cdot \hat{\sigma}^2_{\text{tree},t},$$
+  + (1-w) \cdot \hat{\sigma}^2_{\text{tree},t},
+$$
 
 where $w \in [0,1]$ is estimated by minimizing $\operatorname{QLIKE}$ on a purged
 validation set. Typical values: $w \in [0.2, 0.4]$, giving the tree model
@@ -939,9 +1011,11 @@ A more sophisticated version: let $w$ depend on the current regime. Define
 a "stress indicator" $s_t$ (e.g., $s_t = \mathbf{1}[\text{VIX}_t > 30]$ or
 a GMM-based regime probability). Then:
 
-$$\hat{\sigma}^2_{\text{combo},t}
+$$
+  \hat{\sigma}^2_{\text{combo},t}
   = w(s_t) \cdot \hat{\sigma}^2_{\text{HAR},t}
-  + [1 - w(s_t)] \cdot \hat{\sigma}^2_{\text{tree},t},$$
+  + [1 - w(s_t)] \cdot \hat{\sigma}^2_{\text{tree},t},
+$$
 
 with $w(s_t)$ increasing during stress (rely more on HAR when volatility is
 elevated). This connects directly to the regime overlay in
@@ -972,14 +1046,14 @@ elevated). This connects directly to the regime overlay in
 
 ## DART: Dropout Regularization for Boosted Trees
 
-The Hyperparameters for Volatility Data section covered the standard regularization
+The hyperparameters section covered the standard regularization
 toolkit for gradient boosting: shallow trees, subsampling, and slow learning
 rates. There is one more technique worth understanding, and it addresses a
 subtle failure mode that the standard controls do not.
 
 ### The over-specialization problem
 
-Recall from the ensemble prediction equation that standard gradient boosting
+Recall from the ensemble-prediction equation above that standard gradient boosting
 shrinks every tree's contribution by the same learning rate $\eta$. Early
 trees see large residuals (the raw signal), so they learn the dominant
 pattern: the strong autoregressive relationship between lagged $\operatorname{RV}$ and
@@ -1017,8 +1091,10 @@ tree indices dropped at round $m$, chosen by including each tree
 independently with **drop rate** $p$. The prediction used to compute
 residuals becomes:
 
-$$\hat{y}^{(\text{drop})}_t
-  \;=\; \sum_{k \notin \mathcal{D}} h_k(\mathbf{x}_t),$$
+$$
+  \hat{y}^{(\text{drop})}_t
+  \;=\; \sum_{k \notin \mathcal{D}} h_k(\mathbf{x}_t),
+$$
 
 where:
 
@@ -1048,11 +1124,13 @@ After fitting the new tree $h_m$, DART must normalize the ensemble so that
 adding the new tree does not inflate predictions. The dropped trees and the
 new tree are rescaled so the ensemble stays calibrated:
 
-$$\hat{y}_t
+$$
+  \hat{y}_t
   \;=\; \sum_{k \notin \mathcal{D}} h_k(\mathbf{x}_t)
   \;+\; \frac{|\mathcal{D}|}{|\mathcal{D}| + 1}\,
   \sum_{k \in \mathcal{D}} h_k(\mathbf{x}_t)
-  \;+\; \frac{1}{|\mathcal{D}| + 1}\, h_m(\mathbf{x}_t),$$
+  \;+\; \frac{1}{|\mathcal{D}| + 1}\, h_m(\mathbf{x}_t),
+$$
 
 where:
 
@@ -1098,8 +1176,8 @@ because the dropout itself provides regularization.
 >
 > In LightGBM, enable DART by setting `boosting_type='dart'`. The key
 > hyperparameter is the drop rate: start with
-> `drop_rate` $\in [0.05, 0.15]$ and tune via purged CV
-> (the Hyperparameters for Volatility Data section). Higher drop rates increase diversity
+> `drop_rate`$\,\in [0.05, 0.15]$ and tune via purged CV
+> (see the hyperparameters section above). Higher drop rates increase diversity
 > but slow convergence; lower rates approach standard GBDT behavior. Note that
 > DART disables early stopping (because the loss is non-monotone due to random
 > dropping), so you must set `num_iterations` explicitly rather than
@@ -1120,10 +1198,10 @@ because the dropout itself provides regularization.
    interactions and threshold effects.
 
 2. Gradient boosting builds the forecast sequentially: each tree corrects
-   the residual errors of the ensemble so far (the ensemble prediction equation).
+   the residual errors of the ensemble so far (the ensemble-prediction equation).
 
 3. For volatility forecasting, use a custom $\operatorname{QLIKE}$ loss
-   (the QLIKE loss and its gradient/Hessian equations), not the
+   (the QLIKE loss and its gradient/Hessian), not the
    default MSE loss.
 
 4. Default hyperparameters overfit on small volatility samples. Use
@@ -1151,11 +1229,11 @@ because the dropout itself provides regularization.
 10. During extreme stress, tree models tend to underperform HAR because
     they extrapolate poorly from calm-period training data.
 
-11. Combining HAR and tree forecasts (the weighted-average combination equation)
+11. Combining HAR and tree forecasts (the weighted-average combination)
     captures the best of both: the tree's nonlinear skill in calm markets
     and HAR's robustness in stress (Rahimikia and Poon, 2020).
 
-12. Branco, Rubesam, and Zevallos (2024) and Bollerslev, Medeiros, Patton, and Quaedvlieg (2024) caution
+12. Branco, Rubesam, and Zevallos (2024) and Bollerslev et al. (2024) caution
     that many ML-beats-HAR claims reflect unfair comparisons. When both
     models are properly tuned, the gap is smaller than headline numbers
     suggest.
@@ -1171,14 +1249,12 @@ because the dropout itself provides regularization.
     from nonlinear modeling of the same three RV lags. [Chapter 12b](ch12b-deep-learning-vol.md)
     explores whether deep learning changes this conclusion.
 
----
-
-| **Paper** | **Key Result** | **Relevance** |
+| Paper | Key Result | Relevance |
 |---|---|---|
-| Christensen, Siggaard, and Veliyev (2023) | Trees among best for daily RV; gains grow with feature richness and horizon length | Primary evidence for the CSV Evidence and Honest Assessment sections |
-| Branco, Rubesam, and Zevallos (2024) | Linear models competitive when comparison is fair | Calibrates expectations in the Honest Assessment section |
-| Bollerslev, Medeiros, Patton, and Quaedvlieg (2024) | Rolling-window HAR with proper window matches off-the-shelf ML | Strongest HAR defense |
-| Rahimikia and Poon (2020) | ML beats HAR 90% of days, fails in stress; ensemble solves it | Motivates the Ensemble with HAR section |
+| Christensen, Siggaard, and Veliyev (2023) | Trees among best for daily RV; gains grow with feature richness and horizon length | Primary evidence for the Christensen--Siggaard--Veliyev and honest-assessment sections |
+| Branco, Rubesam, and Zevallos (2024) | Linear models competitive when comparison is fair | Calibrates expectations in the honest-assessment section |
+| Bollerslev et al. (2024) | Rolling-window HAR with proper window matches off-the-shelf ML | Strongest HAR defense |
+| Rahimikia and Poon (2020) | ML beats HAR 90% of days, fails in stress; ensemble solves it | Motivates the ensemble-with-HAR section |
 | Audrino and Knaus (2016) | QLIKE-optimized trees outperform MSE-optimized trees for RV | Justifies custom loss in the LightGBM and XGBoost section |
 | Gu, Kelly, and Xiu (2020) | Trees and neural nets dominate linear models in cross-sectional return prediction with rich features | Canonical ML horse-race; context for tree methods |
 | Vinayak and Gilad-Bachrach (2015) | Dropout for boosted trees reduces over-specialization; each tree learns more independently | Regularization technique in the DART section |
