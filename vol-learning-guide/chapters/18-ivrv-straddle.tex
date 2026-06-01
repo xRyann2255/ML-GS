@@ -557,3 +557,75 @@ For each symbol and each trading day $t$:
 \caption{P\&L attribution for the delta-hedged straddle. The gross gamma P\&L is reduced by the option transaction cost (\Cref{sec:ivrv:option-costs}) and the delta-hedge transaction cost (\Cref{sec:ivrv:leland}) to give the net mean P\&L. The discrete-hedging error of \Cref{sec:ivrv:hedging-error} is zero-mean, so it does not appear as a bar; instead it widens the risk around the net, shown as the blue band. Mean drag and risk inflation must be accounted separately.}
 \label{fig:ivrv:waterfall}
 \end{figure}
+
+% ═══════════════════════════════════════════════════
+\section{Evaluation: From QLIKE to a Deflated Sharpe}
+\label{sec:ivrv:evaluation}
+% ═══════════════════════════════════════════════════
+
+We now have a panel of net daily P\&L, one number per symbol per day, and a risk term to go with it. The final task is to turn this panel into a verdict that is honest about both the cross-section and the multiple-testing trap, and to connect it back to the forecast accuracy we started from.
+
+The first decision is how to pool. We could compute one Sharpe ratio per symbol and average them, or pool all (symbol, day) observations into a single Sharpe. The two answers differ, and the difference is informative rather than cosmetic. Pooling inflates the effective sample size and quietly assumes observations are independent, but on a common-volatility day every symbol's straddle tends to win or lose together, so the cross-sectional correlation is large; pooling that day's hundreds of observations as if independent overstates significance. Averaging per-symbol Sharpes respects that each name is one bet but discards information about how the strategy behaves across the cross-section.
+
+\begin{keyidea}[Report Both, and Bootstrap by Day]
+Compute the pooled (symbol, day) Sharpe \emph{and} the average per-symbol Sharpe. For significance, \textbf{block-bootstrap by day}, not by observation: resample whole trading days (all symbols together) so the resampling preserves the cross-sectional dependence that pooling would otherwise ignore. If the two Sharpes disagree sharply, the strategy's apparent edge is concentrated in a few common-vol days, which is itself a finding.
+\end{keyidea}
+
+Whichever Sharpe we report, it must be \emph{deflated} for the number of strategy variants we tried before settling on this one. The deflated Sharpe ratio was built in \Cref{sec:eval-dsr}; we restate it only to flag the traps specific to this application. From \Cref{eq:dsr},
+\begin{equation}
+\label{eq:ivrv:dsr-restate}
+\DSR = \Phi\!\left(\frac{(\widehat{\SR} - \SR_0)\sqrt{T-1}}{\sqrt{\,1 - \gamma_3\,\widehat{\SR} + \tfrac{\gamma_4 - 1}{4}\,\widehat{\SR}^2\,}}\right),
+\qquad
+\SR_0 = \sqrt{\Var[\widehat{\SR}_n]}\,\Big[(1-\gamma_{\!E})\,Z^{-1}\!\big(1 - \tfrac1N\big) + \gamma_{\!E}\,Z^{-1}\!\big(1 - \tfrac1{Ne}\big)\Big],
+\end{equation}
+\begin{itemize}
+  \item $\widehat{\SR}$: the observed Sharpe of the chosen strategy; $T$: the number of return observations.
+  \item $\gamma_3, \gamma_4$: the skewness and \emph{kurtosis} of the strategy's returns (note: distinct from the hedging-error $\kappa$).
+  \item $\SR_0$: the expected maximum Sharpe under the null that none of the $N$ trials has skill; $Z^{-1}$ is the inverse standard normal CDF.
+  \item $\gamma_{\!E} \approx 0.5772$: the Euler--Mascheroni constant (distinct from $\gamma_3, \gamma_4$); $N$: the number of strategy configurations tried.
+\end{itemize}
+
+\begin{warning}[Three Traps in Applying the Deflated Sharpe Here]
+(1) The \emph{denominator} of \Cref{eq:ivrv:dsr-restate} uses the \emph{observed} $\widehat{\SR}$, not $\SR_0$; a well-known web summary places $\SR_0$ there and is wrong. (2) Feed \emph{non-annualized} inputs at the native frequency, with $T$ the raw observation count; annualizing first double-counts. (3) Be honest about $N$: if you tried $20$ forecast or sizing variants, the simple approximation gives $\SR_0 \approx \sqrt{2\ln 20} = 2.45$ (\Cref{eq:expected-max-sr}), a high bar your reported Sharpe must clear. And do not confuse the Euler--Mascheroni $\gamma_{\!E}$ with the return-kurtosis $\gamma_4$ sharing the symbol family.
+\end{warning}
+
+Finally, the thread back to forecasting. Does a better QLIKE actually produce a better strategy? \citet{Pollok2025} provides the most direct published evidence for this exact pipeline: marginal improvements in standard forecast-error measures can translate into economically significant gains in a delta-hedged straddle portfolio, even though it is hard to beat the benchmark on QLIKE alone, so the economic test separates models that the statistical loss cannot. Crucially, Pollok's statistical toolkit is MSE/MAE/QLIKE and Mincer--Zarnowitz $R^2$; it does \emph{not} include a Diebold--Mariano test or a Model Confidence Set. So there is no published theorem guaranteeing that a DM-significant or MCS-surviving QLIKE gain (\Cref{sec:eval-dm,sec:eval-mcs}) maps to a guaranteed P\&L gain. That bridge is ours to build and test (\Cref{sec:ivrv:experiments}).
+
+\begin{application}[The Whole Point, in One Line]
+The economic foundation underneath all of this is the negative variance risk premium: \citet{BakshiKapadia2003} show the mean delta-hedged gain on equity options is negative, larger in magnitude in high-volatility regimes, and robust to jump controls, which is why a disciplined short-vol strategy is paid on average (\Cref{ch:vrp}). Our forecast's job is to time \emph{when} that premium is rich enough to harvest and when it is a trap. The deflated Sharpe is the judge of whether the forecast does that job better than chance.
+\end{application}
+
+% ═══════════════════════════════════════════════════
+\section{What to Compute on Our Data}
+\label{sec:ivrv:experiments}
+% ═══════════════════════════════════════════════════
+
+The literature cited in this chapter is almost entirely daily-frequency and drawn from 1993--2023; none of it validates the intraday, 5-minute mechanics we have assembled. The following four experiments are the ones that would turn this chapter from a design into a result on our own data, each with an explicit pass criterion.
+
+\begin{projectconnection}[Four Experiments, Four Verdicts]
+\begin{enumerate}
+  \item \textbf{Hedging-error floor.} Run a full path-dependent, bar-by-bar 5-minute hedging simulation for a near-ATM index straddle at $N \in \{1, 2, \dots, 26\}$ rebalances; fit $\Var(\text{error}) = a/N + b$. \emph{Pass:} if the floor $b$ is materially positive (the jump regime of \Cref{fig:ivrv:error-vs-n}), report the \emph{simulated} variance in the Sharpe denominator, not the analytic \Cref{eq:ivrv:kappa-inflation}. Resolve $\kappa$ first from \Cref{eq:ivrv:realized-kurtosis}, and check that the deflated Sharpe is stable across $\kappa \in \{3,4,6\}$.
+  \item \textbf{Cost-band Sharpe.} Recompute the pooled Sharpe under (a) the full quoted half-spread, (b) the maturity-resolved effective spread of \Cref{tab:ivrv:cost-schedule}, and (c) a timing-aware cost of roughly one-third the quoted. \emph{Pass:} the strategy survives at least (b), and ideally (a).
+  \item \textbf{Statistical-to-economic link.} Regress per-(symbol, day) P\&L on the realized gap $(\RV - \IVol^2/252)$ and on the forecast error $(\RV - \widehat{\RV})$. \emph{Pass:} the QLIKE-better model's residual edge is Diebold--Mariano significant \emph{and} that DM statistic predicts the cross-sectional Sharpe, the bridge Pollok gestures at but does not prove.
+  \item \textbf{Sharpe definition and deflation.} Report pooled and per-symbol Sharpe, block-bootstrapped by day, with the deflated Sharpe computed for the honest number $N$ of configurations tried. \emph{Pass:} the deflated Sharpe clears $\SR_0$ for the true $N$, not for $N=1$.
+\end{enumerate}
+\end{projectconnection}
+
+% ═══════════════════════════════════════════════════
+\section{Summary}
+\label{sec:ivrv:summary}
+% ═══════════════════════════════════════════════════
+
+\begin{keyresult}[What to Carry Forward]
+\begin{itemize}
+  \item The strategy trades the IV--RV gap through a delta-hedged straddle; the signal $X_{t-1} = f(\widehat{\RV}_t, \IVol_{t-1})$ is the only place the forecast enters (\Cref{eq:ivrv:signal}), measured before 3:55\,pm to avoid lookahead.
+  \item Its engine is the gamma identity $\text{PnL}_t \approx \tfrac12\Gamma_t S_t^2(\RV_t - \IVol^2/252)$ (\Cref{eq:ivrv:daily-discrete}); it is exact only for a near-ATM, jump-free, continuously hedged diffusion, and frays through vanna, volga, and jumps (\Cref{sec:ivrv:breaks}).
+  \item Charge the option spread per event in vega terms (\Cref{eq:ivrv:vega-cost}) as a cost \emph{band}; charge the hedge spread through Leland's modified volatility (\Cref{eq:ivrv:leland-vol}), a baseline, not the optimal policy.
+  \item The discrete hedge injects a zero-mean, $1/N$-scaling variance, Boyle--Emanuel plus our kurtosis extension $\Var(HE) \propto \sigma^4(\kappa-1)/N$ (\Cref{eq:ivrv:kappa-inflation}), \emph{not} Ahmad--Wilmott's continuous-hedging variance; under jumps it is a lower bound.
+  \item Judge the panel with a deflated Sharpe (\Cref{eq:ivrv:dsr-restate}) computed honestly (observed $\widehat{\SR}$ in the denominator, non-annualized inputs, true $N$), and tie it back to QLIKE through the experiments of \Cref{sec:ivrv:experiments}.
+\end{itemize}
+\end{keyresult}
+
+\begin{warning}[The One Caveat That Dominates the Rest]
+Every economic-value result cited in this chapter is daily-frequency and from the 1993--2023 era. The intraday, 5-minute hedging-error and cost mechanics that make our version ``realistic'' are precisely the parts no cited paper validates. Treat the closed forms here as scaffolding to be confirmed by our own bar-by-bar simulation, not as borrowed truth. The chapter's value is that it tells you exactly which numbers you still have to earn.
+\end{warning}
