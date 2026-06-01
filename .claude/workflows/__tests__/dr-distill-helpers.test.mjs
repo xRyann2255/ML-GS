@@ -60,6 +60,39 @@ function paperSlugName(authors, year, title) {
   const t = slugifyWords(title, 4) || 'paper'
   return `${a}-${y}-${t}.pdf`
 }
+
+function extractArxivId(text) {
+  const m = String(text || '').match(/(\d{4}\.\d{4,5})/)
+  return m ? m[1] : null
+}
+
+function normalizeTitle(t) {
+  return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function authorYearFromFilename(filename) {
+  const m = String(filename || '').match(/^([a-z0-9]+)-(20\d{2})/i)
+  return m ? `${m[1].toLowerCase()}-${m[2]}` : null
+}
+
+function authorYearKey(authors, year) {
+  const y = (String(year || '').match(/20\d{2}/) || [''])[0]
+  return `${firstAuthorLast(authors)}-${y}`
+}
+
+function isAlreadyHave(candidate, alreadyHave) {
+  const list = Array.isArray(alreadyHave) ? alreadyHave : []
+  const candId = extractArxivId(candidate.url) || extractArxivId(candidate.codeLink) || extractArxivId(candidate.title)
+  const candTitle = normalizeTitle(candidate.title)
+  const candKey = authorYearKey(candidate.authors, candidate.year)
+  return list.some(h => {
+    if (candId && h.id && extractArxivId(h.id) === candId) return true
+    if (candTitle && h.title && normalizeTitle(h.title) === candTitle) return true
+    const hKey = h.authorYear || authorYearFromFilename(h.filename)
+    if (candKey && hKey && hKey === candKey && /-20\d{2}$/.test(candKey)) return true
+    return false
+  })
+}
 // <<< DR-DISTILL HELPERS <<<
 
 test('deriveYear parses a YYYY-MM-DD slug prefix', () => {
@@ -117,4 +150,43 @@ test('paperSlugName builds firstauthor-year-shorttitle.pdf', () => {
 
 test('paperSlugName degrades gracefully on missing fields', () => {
   assert.strictEqual(paperSlugName('', '', ''), 'unknown-nd-paper.pdf')
+})
+
+test('extractArxivId pulls the id from a url or text', () => {
+  assert.strictEqual(extractArxivId('https://arxiv.org/abs/2406.08041'), '2406.08041')
+  assert.strictEqual(extractArxivId('arXiv 2505.11163v2'), '2505.11163')
+  assert.strictEqual(extractArxivId('no id here'), null)
+})
+
+test('normalizeTitle collapses to lowercase alphanumeric words', () => {
+  assert.strictEqual(normalizeTitle('HARd to Beat: Rolling Windows!'), 'hard to beat rolling windows')
+})
+
+test('authorYearFromFilename reads the author-year prefix', () => {
+  assert.strictEqual(authorYearFromFilename('corsi-2009-har-realized-volatility.pdf'), 'corsi-2009')
+  assert.strictEqual(authorYearFromFilename('README.md'), null)
+})
+
+test('authorYearKey builds a surname-year key from metadata', () => {
+  assert.strictEqual(authorYearKey('Fulvio Corsi', '2009'), 'corsi-2009')
+})
+
+test('isAlreadyHave matches by arxiv id', () => {
+  const have = [{ filename: 'x.pdf', id: '2406.08041', title: 'HARd to Beat' }]
+  assert.strictEqual(isAlreadyHave({ url: 'https://arxiv.org/abs/2406.08041', title: 'Different', authors: 'X', year: '2024' }, have), true)
+})
+
+test('isAlreadyHave matches by normalized title', () => {
+  const have = [{ filename: 'x.pdf', id: '', title: 'HARd to Beat' }]
+  assert.strictEqual(isAlreadyHave({ url: '', title: 'HARd to beat!', authors: 'X', year: '2024' }, have), true)
+})
+
+test('isAlreadyHave matches by filename author-year prefix', () => {
+  const have = [{ filename: 'corsi-2009-har-realized-volatility.pdf', id: '', title: 'Something else' }]
+  assert.strictEqual(isAlreadyHave({ url: '', title: 'Unrelated', authors: 'Fulvio Corsi', year: '2009' }, have), true)
+})
+
+test('isAlreadyHave returns false for a genuinely new paper', () => {
+  const have = [{ filename: 'corsi-2009-har.pdf', id: '2406.08041', title: 'HARd to Beat' }]
+  assert.strictEqual(isAlreadyHave({ url: 'https://arxiv.org/abs/2604.02743', title: 'Rough Heston RV', authors: 'New Author', year: '2026' }, have), false)
 })
