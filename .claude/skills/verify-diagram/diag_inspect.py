@@ -23,3 +23,22 @@ def overlap_fraction(a, b):
         return 0.0
     denom = min(rect_area(a), rect_area(b))
     return inter / denom if denom else 0.0
+
+def find_overlaps(spans, frac=0.20):
+    out = []
+    for i in range(len(spans)):
+        for j in range(i + 1, len(spans)):
+            si, sj = spans[i], spans[j]
+            if si.get("line_id") == sj.get("line_id"):
+                continue                                   # same line: adjacent / sub-superscripts
+            if not si["text"].strip() or not sj["text"].strip():
+                continue
+            f = overlap_fraction(si["bbox"], sj["bbox"])
+            if f > frac:
+                out.append({
+                    "type": "overlap", "severity": "blocking",
+                    "bbox": union_rect(si["bbox"], sj["bbox"]),
+                    "detail": "text '%s' overlaps '%s' (%.0f%%)" % (
+                        si["text"][:20], sj["text"][:20], f * 100),
+                })
+    return out
