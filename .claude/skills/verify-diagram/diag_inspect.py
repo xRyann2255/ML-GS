@@ -1,0 +1,25 @@
+"""Deterministic TikZ-diagram inspector: locate, crop, and flag geometric defects.
+
+Pure functions (no LaTeX, no PDF) are tested in test/test_diag_inspect.py.
+I/O wrappers (PyMuPDF) and the CLI are exercised by test/test_fixtures.py.
+"""
+
+def rect_area(r):
+    return max(0.0, r[2] - r[0]) * max(0.0, r[3] - r[1])
+
+def rect_intersection_area(a, b):
+    x0, y0 = max(a[0], b[0]), max(a[1], b[1])
+    x1, y1 = min(a[2], b[2]), min(a[3], b[3])
+    if x1 <= x0 or y1 <= y0:
+        return 0.0
+    return (x1 - x0) * (y1 - y0)
+
+def union_rect(a, b):
+    return [min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3])]
+
+def overlap_fraction(a, b):
+    inter = rect_intersection_area(a, b)
+    if inter <= 0:
+        return 0.0
+    denom = min(rect_area(a), rect_area(b))
+    return inter / denom if denom else 0.0
