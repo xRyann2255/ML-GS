@@ -65,3 +65,17 @@ def test_find_node_overlaps():
     rects = [[0, 0, 20, 20], [10, 10, 30, 30], [100, 100, 110, 110]]
     d = di.find_node_overlaps(rects, frac=0.15)
     assert len(d) == 1 and d[0]["type"] == "node_overlap" and d[0]["severity"] == "blocking"
+
+def test_figure_bbox_unions_drawings_and_nearby_text():
+    page = [0, 0, 600, 800]
+    draws = [[100, 100, 200, 150], [220, 100, 320, 150]]      # two boxes
+    spans = [_span([110, 160, 190, 170], "label", line_id=1), # just below box 1 (within expand)
+             _span([10, 10, 40, 20], "header", line_id=2)]    # far away -> excluded
+    bb = di.figure_bbox(draws, spans, page, expand=30.0, pad=8.0)
+    # union of boxes is [100,100,320,150]; label extends bottom to 170; pad 8
+    assert bb[0] == 92 and bb[1] == 92 and bb[2] == 328 and bb[3] == 178
+
+def test_figure_bbox_clamps_to_page():
+    page = [0, 0, 50, 50]
+    bb = di.figure_bbox([[5, 5, 45, 45]], [], page, expand=30.0, pad=8.0)
+    assert bb == [0, 0, 50, 50]

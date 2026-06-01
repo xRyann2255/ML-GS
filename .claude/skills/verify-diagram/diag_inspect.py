@@ -89,3 +89,21 @@ def find_node_overlaps(rects, frac=0.15):
                     "bbox": union_rect(rects[i], rects[j]),
                     "detail": "two boxes overlap (%.0f%%)" % (f * 100)})
     return out
+
+def figure_bbox(draw_rects, spans, page_rect, expand=30.0, pad=8.0):
+    rects = [r for r in draw_rects if (r[2] - r[0]) > 1 and (r[3] - r[1]) > 1]
+    if rects:
+        bb = list(rects[0])
+        for r in rects[1:]:
+            bb = union_rect(bb, r)
+    elif spans:
+        bb = list(spans[0]["bbox"])
+    else:
+        return list(page_rect)
+    exp = [bb[0] - expand, bb[1] - expand, bb[2] + expand, bb[3] + expand]
+    for s in spans:
+        if rect_intersection_area(s["bbox"], exp) > 0:
+            bb = union_rect(bb, s["bbox"])
+    bb = [bb[0] - pad, bb[1] - pad, bb[2] + pad, bb[3] + pad]
+    return [max(bb[0], page_rect[0]), max(bb[1], page_rect[1]),
+            min(bb[2], page_rect[2]), min(bb[3], page_rect[3])]
