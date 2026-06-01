@@ -101,3 +101,22 @@ def test_inspect_reports_not_located(tmp_path):
     doc = fitz.open(); doc.new_page(); doc.save(pdf); doc.close()
     res = di.inspect(str(pdf), locate="NOPE", out_dir=str(tmp_path / "o"))
     assert res["located"] is False and "error" in res
+
+
+def test_extract_figure_body_grabs_resizebox_tikz():
+    tex = r"""
+\begin{figure}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}
+\node {A};
+\end{tikzpicture}}
+\caption{Cap}
+\label{fig:demo}
+\end{figure}
+"""
+    import standalone_wrapper as sw
+    body = sw.extract_figure_body(tex, "fig:demo")
+    assert "\\begin{tikzpicture}" in body and "\\end{tikzpicture}" in body
+    assert "\\caption" not in body and "\\label" not in body
+    assert body.strip().startswith("\\resizebox")
