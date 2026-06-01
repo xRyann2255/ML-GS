@@ -26,6 +26,132 @@ const DEPTH = (isObj && A.depth) || 'standard'   // 'standard' (~15 verified sou
 const TOP_N = DEPTH === 'deep' ? 25 : 15
 const OUT = `notes/deep-research/${SLUG}.md`
 
+// >>> DR-DISTILL HELPERS (mirror of __tests__/dr-distill-helpers.test.mjs) >>>
+// Pure, dependency-free helpers shared with .claude/workflows/deep-research-distill.js.
+// EDIT HERE ONLY. Task 7 mirrors this block verbatim into the workflow.
+
+function deriveYear(slug, fallback) {
+  const m = String(slug || '').match(/(20\d{2})/)
+  const year = m ? m[1] : (fallback || '2025')
+  const prevYear = String(Number(year) - 1)
+  return { year, prevYear }
+}
+
+function tierWeight(credibility) {
+  switch (credibility) {
+    case 'peer-reviewed': return 1.0
+    case 'preprint': return 0.8
+    case 'practitioner': return 0.5
+    default: return 0.6
+  }
+}
+
+function scoreSource(relevance, credibility) {
+  return (Number(relevance) || 0) * tierWeight(credibility)
+}
+
+function harvestTierWeight(type) {
+  switch (type) {
+    case 'paper': return 1.0
+    case 'repo': return 0.8
+    case 'dataset': return 0.7
+    case 'docs': return 0.6
+    case 'blog': return 0.5
+    default: return 0.5
+  }
+}
+
+const STOPWORDS = new Set(['a','an','the','of','for','and','or','to','in','on','with','via','using','at','by'])
+
+function slugifyWords(text, maxWords) {
+  return String(text || '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(w => w && !STOPWORDS.has(w))
+    .slice(0, maxWords)
+    .join('-')
+}
+
+function firstAuthorLast(authors) {
+  const first = String(authors || '').split(/,|;|&|\band\b/)[0].trim()
+  const parts = first.split(/\s+/).filter(Boolean)
+  const last = parts.length ? parts[parts.length - 1] : ''
+  return last.toLowerCase().replace(/[^a-z0-9]/g, '') || 'unknown'
+}
+
+function paperSlugName(authors, year, title) {
+  const a = firstAuthorLast(authors)
+  const y = (String(year || '').match(/20\d{2}/) || ['nd'])[0]
+  const t = slugifyWords(title, 4) || 'paper'
+  return `${a}-${y}-${t}.pdf`
+}
+
+function extractArxivId(text) {
+  const m = String(text || '').match(/(\d{4}\.\d{4,5})/)
+  return m ? m[1] : null
+}
+
+function normalizeTitle(t) {
+  return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function authorYearFromFilename(filename) {
+  const m = String(filename || '').match(/^([a-z0-9]+)-(20\d{2})/i)
+  return m ? `${m[1].toLowerCase()}-${m[2]}` : null
+}
+
+function authorYearKey(authors, year) {
+  const y = (String(year || '').match(/20\d{2}/) || [''])[0]
+  return `${firstAuthorLast(authors)}-${y}`
+}
+
+function isAlreadyHave(candidate, alreadyHave) {
+  const list = Array.isArray(alreadyHave) ? alreadyHave : []
+  const candId = extractArxivId(candidate.url) || extractArxivId(candidate.codeLink) || extractArxivId(candidate.title)
+  const candTitle = normalizeTitle(candidate.title)
+  const candKey = authorYearKey(candidate.authors, candidate.year)
+  return list.some(h => {
+    if (candId && h.id && extractArxivId(h.id) === candId) return true
+    if (candTitle && h.title && normalizeTitle(h.title) === candTitle) return true
+    const hKey = h.authorYear || authorYearFromFilename(h.filename)
+    if (candKey && hKey && hKey === candKey && /-20\d{2}$/.test(candKey)) return true
+    return false
+  })
+}
+
+function arxivPdfUrl(urlOrId) {
+  const id = extractArxivId(urlOrId)
+  return id ? `https://arxiv.org/pdf/${id}` : null
+}
+
+function looksLikePdf(headerText) {
+  return typeof headerText === 'string' && headerText.startsWith('%PDF')
+}
+
+function dateBiasedQueries(queries, year, prevYear) {
+  const base = Array.isArray(queries) ? queries : []
+  const out = [...base]
+  for (const q of base) {
+    out.push(`${q} ${year}`)
+    out.push(`${q} ${prevYear} ${year}`)
+  }
+  if (base.length) out.push(`latest ${base[0]} state of the art ${year}`)
+  return Array.from(new Set(out))
+}
+
+function buildReadmeRow(num, paperLabel, filename, status) {
+  const st = status === 'Essential' ? '**Essential**' : 'Recommended'
+  return `| ${num} | ${paperLabel} | \`${filename}\` | ${st} |`
+}
+
+function buildStillNeededLine(paperLabel) {
+  return `- ${paperLabel}`
+}
+// <<< DR-DISTILL HELPERS <<<
+
+const BASELINE_YEAR = '2026'
+const { year: YEAR, prevYear: PREV_YEAR } = deriveYear(SLUG, BASELINE_YEAR)
+
 const CONTEXT = `
 PROJECT: Goldman Sachs ML internship — forecasting REALIZED VOLATILITY. Research-first repo (notes, papers, LaTeX guides). Modeling/data live on a SEPARATE machine; THIS repo synthesizes knowledge. Evaluation vocabulary: QLIKE (primary), MSE, Diebold-Mariano, Model Confidence Set, purged k-fold CV. Baselines: HAR, HAR-J/CJ, SHAR, HARQ, Realized GARCH, Ridge/Lasso-HAR. The user is a sophisticated quant who wants rigour over hype, quantitative framing (bps QLIKE deltas, Sharpe), honest "where ML wins vs loses", and zero fluff.
 

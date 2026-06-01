@@ -1,5 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 
 // >>> DR-DISTILL HELPERS (mirror of __tests__/dr-distill-helpers.test.mjs) >>>
 // Pure, dependency-free helpers shared with .claude/workflows/deep-research-distill.js.
@@ -293,4 +296,23 @@ test('isAlreadyHave matches when candidate arXiv id lives only in codeLink', () 
 test('looksLikePdf returns false for non-string truthy inputs', () => {
   assert.strictEqual(looksLikePdf(123), false)
   assert.strictEqual(looksLikePdf({}), false)
+})
+
+function extractHelperBlock(text) {
+  const start = text.indexOf('// >>> DR-DISTILL HELPERS')
+  const end = text.indexOf('// <<< DR-DISTILL HELPERS')
+  if (start === -1 || end === -1) return null
+  return text.slice(start, end).trim()
+}
+
+test('workflow helper block is byte-identical to the tested canonical block', () => {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const workflowPath = join(here, '..', 'deep-research-distill.js')
+  const testSrc = readFileSync(fileURLToPath(import.meta.url), 'utf8')
+  const wfSrc = readFileSync(workflowPath, 'utf8')
+  const canonical = extractHelperBlock(testSrc)
+  const mirrored = extractHelperBlock(wfSrc)
+  assert.ok(canonical, 'canonical helper block not found in test file')
+  assert.ok(mirrored, 'helper block not found in workflow file')
+  assert.strictEqual(mirrored, canonical)
 })
