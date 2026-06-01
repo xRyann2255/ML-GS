@@ -40,3 +40,14 @@ def test_find_overlaps_ignores_blank_and_below_threshold():
     spans = [_span([0, 0, 20, 10], "a", line_id=1),
              _span([19, 0, 39, 10], "b", line_id=2)]         # 1/20 = 5% < 20%
     assert di.find_overlaps(spans, frac=0.20) == []
+
+def test_node_text_spill_flags_overflow():
+    node = [0, 0, 30, 12]
+    spans = [_span([-4, 1, 34, 11], "wide_label", line_id=1)]   # center inside, x overflows
+    d = di.find_node_text_spill(spans, [node], margin=1.0)
+    assert len(d) == 1 and d[0]["type"] == "node_text_spill" and d[0]["severity"] == "warn"
+
+def test_node_text_spill_ok_when_contained():
+    node = [0, 0, 30, 12]
+    spans = [_span([3, 2, 27, 10], "fits", line_id=1)]
+    assert di.find_node_text_spill(spans, [node], margin=1.0) == []

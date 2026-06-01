@@ -42,3 +42,25 @@ def find_overlaps(spans, frac=0.20):
                         si["text"][:20], sj["text"][:20], f * 100),
                 })
     return out
+
+def find_node_text_spill(spans, node_rects, margin=1.0):
+    out = []
+    for s in spans:
+        if not s["text"].strip():
+            continue
+        # associate the span with the node box it overlaps most (robust even when the
+        # label overflows so far that its centre falls outside the box)
+        best, best_ov = None, 0.0
+        for r in node_rects:
+            ov = rect_intersection_area(s["bbox"], r)
+            if ov > best_ov:
+                best_ov, best = ov, r
+        if best is None or best_ov <= 0:
+            continue
+        b = s["bbox"]
+        if (b[0] < best[0] - margin or b[2] > best[2] + margin or
+                b[1] < best[1] - margin or b[3] > best[3] + margin):
+            out.append({
+                "type": "node_text_spill", "severity": "warn", "bbox": b,
+                "detail": "label '%s' overflows its box" % s["text"][:20]})
+    return out
