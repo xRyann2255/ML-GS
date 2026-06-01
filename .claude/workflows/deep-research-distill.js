@@ -155,6 +155,8 @@ const { year: YEAR, prevYear: PREV_YEAR } = deriveYear(SLUG, BASELINE_YEAR)
 const CONTEXT = `
 PROJECT: Goldman Sachs ML internship — forecasting REALIZED VOLATILITY. Research-first repo (notes, papers, LaTeX guides). Modeling/data live on a SEPARATE machine; THIS repo synthesizes knowledge. Evaluation vocabulary: QLIKE (primary), MSE, Diebold-Mariano, Model Confidence Set, purged k-fold CV. Baselines: HAR, HAR-J/CJ, SHAR, HARQ, Realized GARCH, Ridge/Lasso-HAR. The user is a sophisticated quant who wants rigour over hype, quantitative framing (bps QLIKE deltas, Sharpe), honest "where ML wins vs loses", and zero fluff.
 
+RESEARCH LENS: Prioritise the CURRENT STATE OF THE ART and the methodologies in ACTIVE USE TODAY. Favour the most recent credible work (target year ${YEAR}; ${PREV_YEAR}-${YEAR} window) and treat older work as baselines/context unless it is seminal.
+
 THE QUESTION TO RESEARCH:
 """${Q}"""
 `
@@ -169,6 +171,19 @@ const PLAN_SCHEMA = {
   properties: {
     interpretation: { type: 'string', description: 'the question restated and scoped — what a complete answer must cover' },
     alreadyKnown: { type: 'array', items: { type: 'string' }, description: 'what THIS repo already covers (from notes/ and reference/bibliography.md), so harvest targets the gaps' },
+    alreadyHave: {
+      type: 'array',
+      description: 'every PDF already in reference/project-papers/ (so harvest/acquire never duplicate)',
+      items: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          filename: { type: 'string' },
+          id: { type: 'string', description: 'arXiv id if derivable from filename/README, else empty' },
+          title: { type: 'string' },
+        },
+        required: ['filename', 'title'],
+      },
+    },
     facets: {
       type: 'array',
       items: {
@@ -184,7 +199,7 @@ const PLAN_SCHEMA = {
     },
     seminalTargets: { type: 'array', items: { type: 'string' }, description: 'specific known papers/authors/repos to hunt for by name' },
   },
-  required: ['interpretation', 'alreadyKnown', 'facets', 'seminalTargets'],
+  required: ['interpretation', 'alreadyKnown', 'alreadyHave', 'facets', 'seminalTargets'],
 }
 
 const plan = await agent(
@@ -193,14 +208,15 @@ const plan = await agent(
 You are SCOPING this research question before the external sweep.
 
 1. Read the local corpus to learn what we ALREADY know: Glob/Read across notes/ (esp. volatility.md, research-journal.md, notes/features/*.md) and reference/bibliography.md. Summarize what's already covered so the harvest doesn't waste effort re-finding it.
-2. Decompose the question into 5-8 search FACETS spanning three source types: 'academic' (arXiv, SSRN, journals, Google Scholar style), 'code' (GitHub repos, Papers-with-Code, Kaggle), and 'web' (practitioner blogs, docs, talks). Give each facet 3-5 concrete search queries and what a good hit looks like.
-3. Name specific seminal papers/authors/repos to hunt for by name.
+2. INVENTORY what we already HOLD as PDFs: Glob 'reference/project-papers/*.pdf' and Read 'reference/project-papers/README.md'. For EVERY pdf, return an alreadyHave entry { filename, id (the arXiv id like 2406.08041 if it appears in the filename or README, else ""), title (from the README row if present, else inferred from the filename) }. This list is used downstream to guarantee we never re-download a paper we already have.
+3. Decompose the question into 5-8 search FACETS spanning three source types: 'academic' (arXiv, SSRN, journals, Google Scholar style), 'code' (GitHub repos, Papers-with-Code, Kaggle), and 'web' (practitioner blogs, docs, talks). Give each facet 3-5 concrete search queries and what a good hit looks like. You MUST include one dedicated 'frontier' facet (sourceType 'academic') aimed at the NEWEST preprints / working papers from the last ~18 months that define the current state of the art.
+4. Name specific seminal papers/authors/repos to hunt for by name, AND the newest method families currently considered state-of-the-art for this question.
 
-Be concrete and finance-vol-aware. Return the plan.`,
+Lead with the current state of the art and the methodologies in active use today. Be concrete and finance-vol-aware. Return the plan.`,
   { label: 'scope:plan', phase: 'Scope', agentType: 'Explore', schema: PLAN_SCHEMA }
 )
 
-log(`Scoped into ${plan.facets.length} facets; ${plan.alreadyKnown.length} things already in repo`)
+log(`Scoped into ${plan.facets.length} facets; ${plan.alreadyKnown.length} things already known; ${plan.alreadyHave.length} PDFs already held`)
 
 // =====================================================================
 // PHASE 2 — HARVEST: parallel internet sweep, one agent per facet
