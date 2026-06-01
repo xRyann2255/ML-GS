@@ -329,7 +329,93 @@ const dossier = toVerify.map(s => {
 log(`Verified ${verified.length}; ${dossier.length} sources kept for the dossier (peer-review-first)`)
 
 // =====================================================================
-// PHASE 4 — DISTILL: synthesize the answer and write it into the repo
+// PHASE 4 — ACQUIRE: download the relevant open-access papers into the repo
+// =====================================================================
+phase('Acquire')
+
+// Only primary sources (papers/preprints) are download candidates; never blogs/docs/datasets.
+// Drop anything we already hold (id / title / author-year match against the Scope inventory).
+const acquireTargets = dossier
+  .map(d => d.source)
+  .filter(s => s.type === 'paper' || s.type === 'preprint')
+  .filter(s => !isAlreadyHave(s, plan.alreadyHave))
+
+const ACQUIRE_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  properties: {
+    downloaded: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          filename: { type: 'string' },
+          fromUrl: { type: 'string', description: 'the actual open-access PDF url downloaded' },
+          title: { type: 'string' },
+          category: { type: 'string', description: 'README section A-E it was filed under' },
+          status: { type: 'string', enum: ['Essential', 'Recommended'] },
+        },
+        required: ['filename', 'fromUrl', 'title'],
+      },
+    },
+    openAccessRecovered: { type: 'array', items: { type: 'string' }, description: 'paywalled papers for which an open version was found: "title — open url used"' },
+    alreadyPresent: { type: 'array', items: { type: 'string' }, description: 'candidates skipped because already in the folder' },
+    paywalledStillNeeded: { type: 'array', items: { type: 'string' }, description: 'no open route found; added to README "Papers Still Needed"' },
+    failed: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false,
+        properties: { title: { type: 'string' }, reason: { type: 'string' } },
+        required: ['title', 'reason'],
+      },
+    },
+    readmeUpdated: { type: 'boolean' },
+  },
+  required: ['downloaded', 'openAccessRecovered', 'alreadyPresent', 'paywalledStillNeeded', 'failed', 'readmeUpdated'],
+}
+
+let acquire = { downloaded: [], openAccessRecovered: [], alreadyPresent: [], paywalledStillNeeded: [], failed: [], readmeUpdated: false }
+
+if (acquireTargets.length === 0) {
+  log('Acquire: no new primary sources to download (all already held or none qualified).')
+} else {
+  acquire = await agent(
+    `${CONTEXT}
+
+You are ACQUIRING the relevant papers and filing them into the repo. Work on the Windows box from the repo root.
+
+CANDIDATES (verified primary sources NOT already held; download as many as you can get open-access):
+${JSON.stringify(acquireTargets.map(s => ({ title: s.title, url: s.url, year: s.year, authors: s.authors, venue: s.venue, type: s.type, access: s.access, codeLink: s.codeLink })), null, 1)}
+
+ALREADY HELD (never re-download these): ${JSON.stringify(plan.alreadyHave.map(h => ({ filename: h.filename, id: h.id, title: h.title })))}
+
+For EACH candidate:
+1. DEDUP first. Glob 'reference/project-papers/*.pdf'. If a file with the same arXiv id or the same first-author+year already exists, record it under alreadyPresent and SKIP.
+2. RESOLVE an open-access PDF url:
+   - arXiv: convert any abs/id to https://arxiv.org/pdf/<id> .
+   - Direct open publisher / working-paper PDFs are fine.
+   - If the only source is PAYWALLED (journal DOI, locked SSRN), ACTIVELY HUNT for an open equivalent via WebSearch/WebFetch: the arXiv / SSRN / RePEc / NBER working-paper version, the author's homepage PDF, or a Semantic Scholar / OpenReview open PDF. If you find one, use it and add the paper to openAccessRecovered ("title — open url used").
+   - If NO open route exists, add it to paywalledStillNeeded and SKIP the download.
+3. NAME the file 'firstauthor-year-shorttitle.pdf' (lowercase, hyphenated, ~3-4 title words, stopwords dropped), matching the existing convention in reference/project-papers/.
+4. DOWNLOAD with: curl -L -s -o "reference/project-papers/<name>" "<pdf-url>"
+5. VALIDATE: confirm the file exists, is more than ~10 KB, and begins with the bytes "%PDF" (e.g. head -c 4). If not a real PDF, delete it and record under failed { title, reason }.
+6. On success, record under downloaded { filename, fromUrl, title, category (which README section A-E it belongs to: A foundational/HAR, B ML-core, C deep-learning/foundation, D multivariate/graph, E rough-vol), status ('Essential' only if clearly foundational, else 'Recommended') }.
+
+THEN UPDATE 'reference/project-papers/README.md' with the Edit tool (idempotent — never add a filename that already appears):
+- For each downloaded paper, append a new numbered row to the matching category table, format EXACTLY:
+  | <next #> | <Author(s) (Year), "Title" -- venue> | \`<filename>\` | <**Essential** or Recommended> |
+- For each paywalledStillNeeded paper, append a bullet under "## Papers Still Needed (paywalled)":
+  - <Author(s) (Year), "Title" -- venue>
+Set readmeUpdated=true if you edited the README.
+
+DO NOT git add or git commit anything — leave all changes staged in the working tree for the user to review. Return the manifest.`,
+    { label: 'acquire:download', phase: 'Acquire', schema: ACQUIRE_SCHEMA }
+  )
+}
+
+log(`Acquire: ${acquire.downloaded.length} downloaded, ${acquire.openAccessRecovered.length} open-recovered, ${acquire.alreadyPresent.length} already-present, ${acquire.paywalledStillNeeded.length} still paywalled, ${acquire.failed.length} failed`)
+
+// =====================================================================
+// PHASE 5 — DISTILL: synthesize the answer and write it into the repo
 // =====================================================================
 phase('Distill')
 
