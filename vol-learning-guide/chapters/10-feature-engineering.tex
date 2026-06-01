@@ -27,34 +27,35 @@ You do not need all of them for every project; the tree is a menu, not a checkli
 \begin{figure}[ht]
 \centering
 \begin{tikzpicture}[
-  level 1/.style={sibling distance=5.8cm, level distance=1.6cm},
-  level 2/.style={sibling distance=2.4cm, level distance=1.8cm},
-  rootnode/.style={block, fill=defblue!15, minimum width=3.5cm, font=\bfseries\small},
-  l1node/.style={block, fill=keyorange!15, minimum width=2.6cm, font=\small},
-  l2node/.style={block, fill=green!8, minimum width=2cm, font=\footnotesize},
+  grow=right,
+  level 1/.style={sibling distance=2.2cm, level distance=3.4cm},
+  level 2/.style={sibling distance=1.05cm, level distance=3.6cm},
+  rootnode/.style={block, fill=defblue!15, minimum width=2.6cm, minimum height=0.8cm, font=\bfseries\footnotesize},
+  l1node/.style={block, fill=keyorange!15, minimum width=2.2cm, minimum height=0.7cm, font=\footnotesize},
+  l2node/.style={block, fill=green!8, minimum width=2.6cm, minimum height=0.62cm, font=\scriptsize},
   edge from parent/.style={arrow, thick}
 ]
 \node[rootnode] {Volatility Features}
+  child { node[l1node] {Calendar \& Sentiment}
+    child { node[l2node] {News sentiment} }
+    child { node[l2node] {FOMC, NFP, expiry} }
+  }
+  child { node[l1node] {Cross-Asset}
+    child { node[l2node] {Spillover indices} }
+    child { node[l2node] {Multi-asset RV} }
+  }
+  child { node[l1node] {Microstructure}
+    child { node[l2node] {WAP, volume profiles} }
+    child { node[l2node] {Spread, OBI, VPIN} }
+  }
+  child { node[l1node] {Options-Implied}
+    child { node[l2node] {VRP, VIX, VVIX} }
+    child { node[l2node] {IV, skew, term slope} }
+  }
   child { node[l1node] {Price-Based}
-    child { node[l2node] {Lagged RV\\transforms} }
-    child { node[l2node] {Quarticity\\(RQ)} }
-    child { node[l2node] {Signed \&\\asymmetric} }
-  }
-  child { node[l1node] {Options-\\Implied}
-    child { node[l2node] {IV, skew,\\term slope} }
-    child { node[l2node] {VRP, VIX,\\VVIX} }
-  }
-  child { node[l1node] {Micro-\\structure}
-    child { node[l2node] {Spread,\\OBI, VPIN} }
-    child { node[l2node] {WAP, volume\\profiles} }
-  }
-  child { node[l1node] {Cross-\\Asset}
-    child { node[l2node] {Multi-asset\\RV} }
-    child { node[l2node] {Spillover\\indices} }
-  }
-  child { node[l1node] {Calendar \&\\Sentiment}
-    child { node[l2node] {FOMC, NFP,\\expiry} }
-    child { node[l2node] {News\\sentiment} }
+    child { node[l2node] {Signed \& asymmetric} }
+    child { node[l2node] {Quarticity (RQ)} }
+    child { node[l2node] {Lagged RV transforms} }
   };
 \end{tikzpicture}
 \caption{Feature taxonomy for volatility forecasting. Price-based features (left) are available for any asset with intraday data. Options-implied features require a liquid derivatives market. Microstructure features need tick-level LOB data. Cross-asset and calendar/sentiment features supplement any core set.}
@@ -462,7 +463,7 @@ When computing RV from LOB data, use WAP-based log returns rather than midprice 
 \draw[askbar] (0,4.6) rectangle (2.0,4.9);
 \draw[askbar] (0,5.0) rectangle (1.0,5.3);
 
-% Labels
+% Labels (placed clear of the volume braces)
 \node[left] at (-3.4,3.15) {Best bid};
 \node[right] at (1.7,3.55) {Best ask};
 
@@ -470,11 +471,13 @@ When computing RV from LOB data, use WAP-based log returns rather than midprice 
 \draw[<->, thick, keyorange] (4.0,3.3) -- (4.0,3.4);
 \node[right, keyorange, font=\scriptsize] at (4.1,3.35) {Spread};
 
-% OBI annotation
+% OBI annotation: braces sit on the bars, labels routed outward to empty space
 \draw[decorate, decoration={brace, amplitude=4pt, mirror}, intgreen, thick]
-  (-3.2,2.85) -- (-3.2,3.35) node[midway, left=6pt, intgreen, font=\scriptsize, align=right] {$V^{\text{bid}}$\\(large)};
+  (-3.25,2.95) -- (-3.25,3.35);
+\node[intgreen, font=\scriptsize, align=center] at (-3.7,2.45) {$V^{\text{bid}}$\\(large)};
 \draw[decorate, decoration={brace, amplitude=4pt}, warnred, thick]
-  (1.5,3.35) -- (1.5,3.75) node[midway, right=6pt, warnred, font=\scriptsize, align=left] {$V^{\text{ask}}$\\(small)};
+  (1.55,3.35) -- (1.55,3.75);
+\node[warnred, font=\scriptsize, align=center] at (2.6,3.0) {$V^{\text{ask}}$\\(small)};
 \node[intgreen, font=\scriptsize] at (0, -0.7) {OBI $> 0$: more bid volume $\Rightarrow$ buying pressure};
 \end{tikzpicture}
 \caption{Limit order book snapshot with feature annotations. The spread (orange) is the gap between best bid and best ask. OBI compares bid volume (blue, left) to ask volume (red, right). In this snapshot, OBI is positive (more resting bid volume), suggesting net buying pressure.}
@@ -1214,7 +1217,7 @@ Proximity features provide 1--2\% incremental QLIKE improvement over binary dumm
 
 % Dashed line showing information boundary
 \draw[dashed, thick, keyorange] (3.5, -1.6) -- (3.5, 1.6);
-\node[keyorange, font=\scriptsize\bfseries, right] at (3.7, 1.4) {Information boundary};
+\node[keyorange, font=\scriptsize\bfseries, left, align=right] at (3.3, 1.35) {Information\\boundary};
 \end{tikzpicture}
 \caption{Temporal alignment for feature engineering. Features used to predict $\RV_{t+1}$ must be computed from data available at or before time $t{-}1$ (the close of trading on the day before the forecast is made). Using same-day or future data introduces lookahead bias. The orange dashed line marks the information boundary.}
 \label{fig:temporal-alignment}

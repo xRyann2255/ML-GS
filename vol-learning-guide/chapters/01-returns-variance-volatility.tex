@@ -571,15 +571,21 @@ When the dots curve away from the line at the extremes, it means the tails of yo
 };
 
 % Annotations
-\node[anchor=west, font=\small, warnred] at (axis cs: 2.4, 5.5) {Upper tail: heavier};
-\node[anchor=west, font=\small, warnred] at (axis cs: 2.4, 5.0) {than normal};
-\draw[-{Stealth}, warnred, thick] (axis cs: 2.3, 5.2) -- (axis cs: 3.3, 5.6);
+% Upper-tail label sits in the empty upper-left region; arrow points
+% out to the upper-right tail data without crossing its own text.
+\node[anchor=west, align=left, font=\footnotesize, warnred]
+  at (axis cs: -3.7, 4.4) {Upper tail:\\heavier than normal};
+\draw[-{Stealth}, warnred, thick]
+  (axis cs: -1.2, 4.4) .. controls (axis cs: 1.6, 5.0) .. (axis cs: 3.2, 5.3);
 
-\node[anchor=east, font=\small, warnred] at (axis cs: -2.3, -5.5) {Lower tail: heavier};
-\node[anchor=east, font=\small, warnred] at (axis cs: -2.3, -6.0) {than normal};
-\draw[-{Stealth}, warnred, thick] (axis cs: -2.4, -5.3) -- (axis cs: -3.3, -5.6);
+% Lower-tail label sits in the empty lower-right region; arrow points
+% out to the lower-left tail data without crossing its own text.
+\node[anchor=east, align=right, font=\footnotesize, warnred]
+  at (axis cs: 3.7, -4.4) {Lower tail:\\heavier than normal};
+\draw[-{Stealth}, warnred, thick]
+  (axis cs: 1.2, -4.4) .. controls (axis cs: -1.6, -5.0) .. (axis cs: -3.2, -5.3);
 
-\node[anchor=south, font=\small, gray] at (axis cs: 0.8, -1.5) {Normal reference line};
+\node[anchor=south, font=\footnotesize, gray] at (axis cs: 0.9, -1.6) {Normal reference line};
 \end{axis}
 \end{tikzpicture}
 \caption{Q--Q plot of representative daily equity returns against a normal distribution.
@@ -758,9 +764,10 @@ The gap between the two is what makes volatility modeling interesting.
 \addlegendentry{Unconditional $\sigma$ (long-run average)}
 
 % Annotations
-\node[font=\small, anchor=west] at (axis cs: 92, 43) {Crisis spike};
-\draw[-{Stealth}, gray] (axis cs: 100, 42) -- (axis cs: 100, 41.5);
-\node[font=\small, anchor=south] at (axis cs: 50, 9.5) {Calm regime};
+\node[font=\small, anchor=west] at (axis cs: 150, 38) {Crisis spike};
+\draw[-{Stealth}, gray] (axis cs: 149, 38) -- (axis cs: 104, 40);
+\node[font=\small, anchor=north] at (axis cs: 50, 7) {Calm regime};
+\draw[-{Stealth}, gray] (axis cs: 50, 7.5) -- (axis cs: 50, 9.5);
 \end{axis}
 \end{tikzpicture}
 \caption{The unconditional volatility (dashed red) is a single long-run average: it tells you nothing about which regime you're in today.
