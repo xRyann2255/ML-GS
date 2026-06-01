@@ -93,6 +93,26 @@ function isAlreadyHave(candidate, alreadyHave) {
     return false
   })
 }
+
+function arxivPdfUrl(urlOrId) {
+  const id = extractArxivId(urlOrId)
+  return id ? `https://arxiv.org/pdf/${id}` : null
+}
+
+function looksLikePdf(headerText) {
+  return typeof headerText === 'string' && headerText.startsWith('%PDF')
+}
+
+function dateBiasedQueries(queries, year, prevYear) {
+  const base = Array.isArray(queries) ? queries : []
+  const out = [...base]
+  for (const q of base) {
+    out.push(`${q} ${year}`)
+    out.push(`${q} ${prevYear} ${year}`)
+  }
+  if (base.length) out.push(`latest ${base[0]} state of the art ${year}`)
+  return Array.from(new Set(out))
+}
 // <<< DR-DISTILL HELPERS <<<
 
 test('deriveYear parses a YYYY-MM-DD slug prefix', () => {
@@ -189,4 +209,24 @@ test('isAlreadyHave matches by filename author-year prefix', () => {
 test('isAlreadyHave returns false for a genuinely new paper', () => {
   const have = [{ filename: 'corsi-2009-har.pdf', id: '2406.08041', title: 'HARd to Beat' }]
   assert.strictEqual(isAlreadyHave({ url: 'https://arxiv.org/abs/2604.02743', title: 'Rough Heston RV', authors: 'New Author', year: '2026' }, have), false)
+})
+
+test('arxivPdfUrl normalizes an abs/id to a pdf url', () => {
+  assert.strictEqual(arxivPdfUrl('https://arxiv.org/abs/2406.08041'), 'https://arxiv.org/pdf/2406.08041')
+  assert.strictEqual(arxivPdfUrl('2505.11163'), 'https://arxiv.org/pdf/2505.11163')
+  assert.strictEqual(arxivPdfUrl('https://academic.oup.com/jfec/article/22/2/492'), null)
+})
+
+test('looksLikePdf detects the %PDF header only', () => {
+  assert.strictEqual(looksLikePdf('%PDF-1.7\n...'), true)
+  assert.strictEqual(looksLikePdf('<!DOCTYPE html>'), false)
+  assert.strictEqual(looksLikePdf(null), false)
+})
+
+test('dateBiasedQueries appends year-qualified variants and dedups', () => {
+  const out = dateBiasedQueries(['HAR QLIKE'], '2026', '2025')
+  assert.ok(out.includes('HAR QLIKE'))
+  assert.ok(out.includes('HAR QLIKE 2026'))
+  assert.ok(out.includes('HAR QLIKE 2025 2026'))
+  assert.strictEqual(new Set(out).size, out.length)
 })
