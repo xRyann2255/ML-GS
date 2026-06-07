@@ -68,6 +68,23 @@ Papers curated for the GS internship project: ML-based forecasting of realized v
 | 35 | Brugiere & Turinici (2025), "Model-Free Deep Hedging with Transaction Costs and Light Data Requirements" -- arXiv 2505.22836 | `brugiere-turinici-2025-model-free-deep-hedging.pdf` | Recommended |
 | 36 | "Construction and Hedging of Equity Index Options Portfolios" (2024) -- arXiv 2407.13908 | `equity-index-options-portfolios-hedging-2024.pdf` | Recommended |
 
+## G. Variance-Swap Replication Theory & 0DTE / Short-Variance Strategies
+
+| # | Paper | File | Status |
+|---|---|---|---|
+| 37 | Demeterfi, Derman, Kamal & Zou (1999), "More Than You Ever Wanted To Know About Volatility Swaps" -- *Goldman Sachs Quantitative Strategies Research Notes* | `demeterfi-derman-1999-volatility-swaps.pdf` | **Essential** |
+| 38 | Carr & Lee (2009), "Volatility Derivatives" -- *Annual Review of Financial Economics* 1:319-339 | `carr-lee-2009-volatility-derivatives.pdf` | **Essential** |
+| 39 | Carr & Wu (2009), "Variance Risk Premiums" -- *Review of Financial Studies* 22(3):1311-1341 (NYU working-paper PDF) | `carr-wu-2009-variance-risk-premia.pdf` | **Essential** |
+| 40 | Carr & Lee (2009), "Robust Replication of Volatility Derivatives" -- *University of Chicago working paper* | `carr-lee-2009-robust-replication.pdf` | **Essential** |
+| 41 | Aschakulporn & Zhang (2019), "Bakshi, Kapadia, and Madan (2003) Risk-Neutral Moment Estimators" -- *University of Otago working paper* | `aschakulporn-zhang-2019-bkm-moment-estimators.pdf` | Recommended |
+| 42 | Du & Kapadia (2012), "Tail and Volatility Indices from Option Prices" -- *University of Massachusetts Amherst working paper* | `du-kapadia-2012-tail-volatility-index.pdf` | **Essential** |
+| 43 | Le Floc'h (2018), "Variance Swap Replication: Discrete or Continuous?" -- *J. Risk and Financial Management* 11(1):11 | `lefloch-2018-variance-swap-replication.pdf` | Recommended |
+| 44 | Almeida, Freire & Hizmeri (2024), "0DTE Asset Pricing" -- *Princeton / Erasmus Rotterdam / Liverpool working paper (SSRN 4701401)* | `almeida-freire-hizmeri-2024-0dte-asset-pricing.pdf` | **Essential** |
+| 45 | Bandi, Fusari & Renò (2024), "0DTE Option Pricing" -- *forthcoming Journal of Finance (SSRN 4503344)* | `bandi-fusari-reno-2024-0dte-option-pricing.pdf` | **Essential** |
+| 46 | Beckmeyer, Branger & Gayda (2023), "Retail Traders Love 0DTE Options... But Should They?" -- *University of Münster working paper (FoFI 2024)* | `beckmeyer-branger-gayda-2023-retail-0dte.pdf` | **Essential** |
+| 47 | Yang (2024), "Volatility-Managed Volatility Trading" -- *PHBS Working Paper Series WP 20240604, Peking University HSBC Business School* | `yang-2024-volatility-managed-vol-trading.pdf` | **Essential** |
+| 48 | Dim, Eraker & Vilkov (2024), "0DTEs: Trading, Gamma Risk and Volatility Propagation" -- *Western Finance Association working paper (SSRN 4692190)* | `dim-eraker-vilkov-2024-0dte-gamma-risk.pdf` | Recommended |
+
 ## Papers Still Needed (paywalled)
 
 - Branco, Rubesam & Zevallos (2024), "Forecasting RV: Does Anything Beat Linear Models?" -- *J. Empirical Finance*
@@ -79,6 +96,8 @@ Papers curated for the GS internship project: ML-based forecasting of realized v
 - Li, B. & Wu, C. (2026), "Beyond delta neutrality: Confidence-scaled hedging with machine learning forecasts" -- *Finance Research Letters*, vol. 87, art. 109098
 - Fouhy (2026), "Hierarchical Machine Learning for Variance Risk Premium Estimation: From VIX Forecasting to Options Trading" -- *SSRN 6570380*
 - "Effects of intervaling on high-frequency realized higher-order moments" (2020) -- *Quantitative Finance*, Vol. 20, No. 7
+- Vilkov (2024), "0DTE Trading Rules" -- *SSRN 4641356* (SSRN-only; no arXiv/RePEc/NBER/homepage open version found)
+- Adams, Dim, Eraker, Fontaine, Ornthanalai & Vilkov (2025), "Do S&P500 Options Increase Market Volatility? Evidence from 0DTEs" -- *SSRN 5641974, submitted to Review of Financial Studies* (SSRN-only; no open version found)
 
 ## Data Resources
 

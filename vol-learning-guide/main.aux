@@ -2380,166 +2380,325 @@
 \@writefile{toc}{\contentsline {section}{\numberline {19.12}Summary}{381}{section.19.12}\protected@file@percent }
 \newlabel{sec:ivrv:summary}{{19.12}{381}{Summary}{section.19.12}{}}
 \newlabel{sec:ivrv:summary@cref}{{[section][12][19]19.12}{[1][381][]381}{}{}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {20}Predicting Drawdowns of a Daily Variance-Swap Seller: The GSVIVS01 Index}{383}{chapter.20}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{ch:gsvivs}{{20}{383}{Predicting Drawdowns of a Daily Variance-Swap Seller: The GSVIVS01 Index}{chapter.20}{}}
+\newlabel{ch:gsvivs@cref}{{[chapter][20][]20}{[1][383][]383}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.1}The Strategy in One Picture}{384}{section.20.1}\protected@file@percent }
+\newlabel{sec:gsvivs:picture}{{20.1}{384}{The Strategy in One Picture}{section.20.1}{}}
+\newlabel{sec:gsvivs:picture@cref}{{[section][1][20]20.1}{[1][384][]384}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {20.1}{\ignorespaces The GSVIVS01 pipeline. Act~1 (top row) is the real product: harvest the variance risk premium by selling a $1/K^2$ strip of 0DTE options, delta-hedge with E-mini futures, and compound the daily profit and loss into an index. Act~2 (bottom row, this project) compares a realized-volatility forecast $\setbox \z@ \hbox {\mathsurround \z@ $\textstyle \operatorname  {RV}$}\mathaccent "0362{\operatorname  {RV}}_t$ against the variance-swap strike $K_{\mathrm  {var}}$ the strip is selling, and overlays a flat-or-short position to side-step the index's drawdowns.}}{384}{figure.20.1}\protected@file@percent }
+\newlabel{fig:gsvivs:pipeline}{{20.1}{384}{The GSVIVS01 pipeline. Act~1 (top row) is the real product: harvest the variance risk premium by selling a $1/K^2$ strip of 0DTE options, delta-hedge with E-mini futures, and compound the daily profit and loss into an index. Act~2 (bottom row, this project) compares a realized-volatility forecast $\widehat {\RV }_t$ against the variance-swap strike $\Kvar $ the strip is selling, and overlays a flat-or-short position to side-step the index's drawdowns}{figure.20.1}{}}
+\newlabel{fig:gsvivs:pipeline@cref}{{[figure][1][20]20.1}{[1][384][]384}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.2}What a Variance Swap Pays}{385}{section.20.2}\protected@file@percent }
+\newlabel{sec:gsvivs:varswap-payoff}{{20.2}{385}{What a Variance Swap Pays}{section.20.2}{}}
+\newlabel{sec:gsvivs:varswap-payoff@cref}{{[section][2][20]20.2}{[1][385][]385}{}{}{}}
+\newlabel{eq:gsvivs:varswap-payoff}{{20.1}{385}{What a Variance Swap Pays}{equation.20.1}{}}
+\newlabel{eq:gsvivs:varswap-payoff@cref}{{[equation][1][20]20.1}{[1][385][]385}{}{}{}}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\@writefile{toc}{\contentsline {section}{\numberline {20.3}The Fair Strike: Model-Free Implied Variance}{386}{section.20.3}\protected@file@percent }
+\newlabel{sec:gsvivs:fair-strike}{{20.3}{386}{The Fair Strike: Model-Free Implied Variance}{section.20.3}{}}
+\newlabel{sec:gsvivs:fair-strike@cref}{{[section][3][20]20.3}{[1][386][]386}{}{}{}}
+\newlabel{eq:gsvivs:logcontract}{{20.2}{386}{Step 1: realized variance is a log contract}{equation.20.2}{}}
+\newlabel{eq:gsvivs:logcontract@cref}{{[equation][2][20]20.2}{[1][386][]386}{}{}{}}
+\citation{Demeterfi1999}
+\citation{CarrMadan2002}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\newlabel{eq:gsvivs:strip}{{20.3}{387}{Step 2: the log contract is a $1/K^2$ strip of options}{equation.20.3}{}}
+\newlabel{eq:gsvivs:strip@cref}{{[equation][3][20]20.3}{[1][387][]387}{}{}{}}
+\newlabel{eq:gsvivs:kvar}{{20.4}{387}{Step 2: the log contract is a $1/K^2$ strip of options}{equation.20.4}{}}
+\newlabel{eq:gsvivs:kvar@cref}{{[equation][4][20]20.4}{[1][387][]387}{}{}{}}
+\citation{CarrWu2009}
+\citation{Demeterfi1999}
+\newlabel{eq:gsvivs:skew}{{20.5}{388}{Step 3: why $1/K^2$, and why the strike beats at-the-money implied vol}{equation.20.5}{}}
+\newlabel{eq:gsvivs:skew@cref}{{[equation][5][20]20.5}{[1][388][]388}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {20.2}{\ignorespaces The $1/K^2$ replication weight as a function of strike. Low strikes (out-of-the-money puts) carry far more weight than high strikes, so the strip loads up on exactly the options where the equity skew makes implied volatility highest. This is why the variance-swap strike $K_{\mathrm  {var}}$ exceeds at-the-money implied volatility, the skew premium of \Cref  {eq:gsvivs:skew}.}}{388}{figure.20.2}\protected@file@percent }
+\newlabel{fig:gsvivs:weight}{{20.2}{388}{The $1/K^2$ replication weight as a function of strike. Low strikes (out-of-the-money puts) carry far more weight than high strikes, so the strip loads up on exactly the options where the equity skew makes implied volatility highest. This is why the variance-swap strike $\Kvar $ exceeds at-the-money implied volatility, the skew premium of \Cref {eq:gsvivs:skew}}{figure.20.2}{}}
+\newlabel{fig:gsvivs:weight@cref}{{[figure][2][20]20.2}{[1][388][]388}{}{}{}}
+\citation{CarrLee2009}
+\citation{DuKapadia2012}
+\citation{Demeterfi1999}
+\@writefile{toc}{\contentsline {section}{\numberline {20.4}From Integral to Traded Strip: The CBOE Discrete Formula}{389}{section.20.4}\protected@file@percent }
+\newlabel{sec:gsvivs:cboe-discrete}{{20.4}{389}{From Integral to Traded Strip: The CBOE Discrete Formula}{section.20.4}{}}
+\newlabel{sec:gsvivs:cboe-discrete@cref}{{[section][4][20]20.4}{[1][388][]389}{}{}{}}
+\newlabel{eq:gsvivs:cboe}{{20.6}{389}{From Integral to Traded Strip: The CBOE Discrete Formula}{equation.20.6}{}}
+\newlabel{eq:gsvivs:cboe@cref}{{[equation][6][20]20.6}{[1][389][]389}{}{}{}}
+\citation{Demeterfi1999}
+\@writefile{toc}{\contentsline {section}{\numberline {20.5}How GSVIVS01 Trades It: 0DTE Replication}{390}{section.20.5}\protected@file@percent }
+\newlabel{sec:gsvivs:replication}{{20.5}{390}{How GSVIVS01 Trades It: 0DTE Replication}{section.20.5}{}}
+\newlabel{sec:gsvivs:replication@cref}{{[section][5][20]20.5}{[1][389][]390}{}{}{}}
+\newlabel{eq:gsvivs:quantity}{{20.7}{390}{How GSVIVS01 Trades It: 0DTE Replication}{equation.20.7}{}}
+\newlabel{eq:gsvivs:quantity@cref}{{[equation][7][20]20.7}{[1][390][]390}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {20.1}{\ignorespaces Selected trades from the real GSVIVS01 strip of 26 May 2022 (source: \texttt  {GSVIVS01.md}, \texttt  {output.json}). Interior strikes hold $|q_i|\,K_i^2$ constant at about $86{,}700$; the edge strikes carry half-weight (single-sided $\Delta K$) and the forward strike is split between a put and a call.}}{390}{table.20.1}\protected@file@percent }
+\newlabel{tab:gsvivs:strip}{{20.1}{390}{Selected trades from the real GSVIVS01 strip of 26 May 2022 (source: \texttt {GSVIVS01.md}, \texttt {output.json}). Interior strikes hold $|q_i|\,K_i^2$ constant at about $86{,}700$; the edge strikes carry half-weight (single-sided $\Delta K$) and the forward strike is split between a put and a call}{table.20.1}{}}
+\newlabel{tab:gsvivs:strip@cref}{{[table][1][20]20.1}{[1][390][]390}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {20.3}{\ignorespaces Dollar variance exposure $|q_i|\,K_i^2$ across the real 26 May 2022 strikes. The interior strikes form a flat plateau (constant variance exposure regardless of where spot goes); the two edge bars are half-height because their strike spacing is single-sided. Compare \Cref  {ch:ivrv-straddle}'s single delta-hedged straddle (\Cref  {fig:ivrv:dollar-gamma}), whose exposure spikes at one strike and decays in the wings. The flat plateau is what makes GSVIVS01 the clean variance instrument the straddle could not be.}}{391}{figure.20.3}\protected@file@percent }
+\newlabel{fig:gsvivs:flatgamma}{{20.3}{391}{Dollar variance exposure $|q_i|\,K_i^2$ across the real 26 May 2022 strikes. The interior strikes form a flat plateau (constant variance exposure regardless of where spot goes); the two edge bars are half-height because their strike spacing is single-sided. Compare \Cref {ch:ivrv-straddle}'s single delta-hedged straddle (\Cref {fig:ivrv:dollar-gamma}), whose exposure spikes at one strike and decays in the wings. The flat plateau is what makes GSVIVS01 the clean variance instrument the straddle could not be}{figure.20.3}{}}
+\newlabel{fig:gsvivs:flatgamma@cref}{{[figure][3][20]20.3}{[1][390][]391}{}{}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {20.2}{\ignorespaces The GSVIVS01 daily schedule (Eastern Time), from \texttt  {GSVIVS01.md}. The 13:10 signal-generation time defines the information cutoff for any forecast that drives the strategy.}}{391}{table.20.2}\protected@file@percent }
+\newlabel{tab:gsvivs:schedule}{{20.2}{391}{The GSVIVS01 daily schedule (Eastern Time), from \texttt {GSVIVS01.md}. The 13:10 signal-generation time defines the information cutoff for any forecast that drives the strategy}{table.20.2}{}}
+\newlabel{tab:gsvivs:schedule@cref}{{[table][2][20]20.2}{[1][390][]391}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.6}Delta Hedging and the Index}{391}{section.20.6}\protected@file@percent }
+\newlabel{sec:gsvivs:hedge-index}{{20.6}{391}{Delta Hedging and the Index}{section.20.6}{}}
+\newlabel{sec:gsvivs:hedge-index@cref}{{[section][6][20]20.6}{[1][391][]391}{}{}{}}
+\newlabel{eq:gsvivs:dailypnl}{{20.8}{391}{Delta Hedging and the Index}{equation.20.8}{}}
+\newlabel{eq:gsvivs:dailypnl@cref}{{[equation][8][20]20.8}{[1][391][]391}{}{}{}}
+\citation{Demeterfi1999}
+\@writefile{lot}{\contentsline {table}{\numberline {20.3}{\ignorespaces The real GSVIVS01 index over its first week (source: \texttt  {GSVIVS01.md}, \texttt  {output.json}). The $-27.69$ bps drawdown on 1 June nearly wipes out the four preceding gains, the canonical short-variance pattern.}}{392}{table.20.3}\protected@file@percent }
+\newlabel{tab:gsvivs:index}{{20.3}{392}{The real GSVIVS01 index over its first week (source: \texttt {GSVIVS01.md}, \texttt {output.json}). The $-27.69$ bps drawdown on 1 June nearly wipes out the four preceding gains, the canonical short-variance pattern}{table.20.3}{}}
+\newlabel{tab:gsvivs:index@cref}{{[table][3][20]20.3}{[1][392][]392}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.7}The Risk Profile: Short Gamma, Short Vega, Long Theta}{392}{section.20.7}\protected@file@percent }
+\newlabel{sec:gsvivs:risk-profile}{{20.7}{392}{The Risk Profile: Short Gamma, Short Vega, Long Theta}{section.20.7}{}}
+\newlabel{sec:gsvivs:risk-profile@cref}{{[section][7][20]20.7}{[1][392][]392}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {20.4}{\ignorespaces The short-variance signature of the GSVIVS01 index (stylized, matching the real first-week shape of \Cref  {tab:gsvivs:index}). A long run of small daily gains from positive theta is interrupted by a sharp drawdown on the one day realized variance overshoots the strike. Act~2 aims to flatten the position across the red day while staying invested through the green run.}}{393}{figure.20.4}\protected@file@percent }
+\newlabel{fig:gsvivs:indexpath}{{20.4}{393}{The short-variance signature of the GSVIVS01 index (stylized, matching the real first-week shape of \Cref {tab:gsvivs:index}). A long run of small daily gains from positive theta is interrupted by a sharp drawdown on the one day realized variance overshoots the strike. Act~2 aims to flatten the position across the red day while staying invested through the green run}{figure.20.4}{}}
+\newlabel{fig:gsvivs:indexpath@cref}{{[figure][4][20]20.4}{[1][393][]393}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.8}The Drawdown Mechanism: When Realized Variance Beats the Strike}{393}{section.20.8}\protected@file@percent }
+\newlabel{sec:gsvivs:drawdown-mechanism}{{20.8}{393}{The Drawdown Mechanism: When Realized Variance Beats the Strike}{section.20.8}{}}
+\newlabel{sec:gsvivs:drawdown-mechanism@cref}{{[section][8][20]20.8}{[1][393][]393}{}{}{}}
+\newlabel{eq:gsvivs:drawdown}{{20.9}{393}{The Drawdown Mechanism: When Realized Variance Beats the Strike}{equation.20.9}{}}
+\newlabel{eq:gsvivs:drawdown@cref}{{[equation][9][20]20.9}{[1][393][]393}{}{}{}}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{CarrLee2009}
+\newlabel{eq:gsvivs:jumploss}{{20.10}{394}{Why the losses are asymmetric: the down-jump cubic}{equation.20.10}{}}
+\newlabel{eq:gsvivs:jumploss@cref}{{[equation][10][20]20.10}{[1][394][]394}{}{}{}}
+\newlabel{eq:gsvivs:cubic}{{20.11}{394}{Why the losses are asymmetric: the down-jump cubic}{equation.20.11}{}}
+\newlabel{eq:gsvivs:cubic@cref}{{[equation][11][20]20.11}{[1][394][]394}{}{}{}}
+\citation{Demeterfi1999}
+\citation{Demeterfi1999}
+\citation{DuKapadia2012}
+\@writefile{lof}{\contentsline {figure}{\numberline {20.5}{\ignorespaces The down-jump asymmetry of a short variance position (the $1/T$ scaling dropped for clarity). The symmetric $J^2$ parabola (grey dashed) is what a direction-blind view of variance predicts; the actual loss $J^2 + \tfrac  23 J^3$ (red) lies \emph  {above} it for downward jumps and below for upward ones. A $15\%$ down-gap costs the short more than a $15\%$ up-move, which is why GSVIVS01's worst days are crashes \citep  [Table~5, p.~32]{Demeterfi1999}.}}{395}{figure.20.5}\protected@file@percent }
+\newlabel{fig:gsvivs:cubic}{{20.5}{395}{The down-jump asymmetry of a short variance position (the $1/T$ scaling dropped for clarity). The symmetric $J^2$ parabola (grey dashed) is what a direction-blind view of variance predicts; the actual loss $J^2 + \tfrac 23 J^3$ (red) lies \emph {above} it for downward jumps and below for upward ones. A $15\%$ down-gap costs the short more than a $15\%$ up-move, which is why GSVIVS01's worst days are crashes \citep [Table~5, p.~32]{Demeterfi1999}}{figure.20.5}{}}
+\newlabel{fig:gsvivs:cubic@cref}{{[figure][5][20]20.5}{[1][395][]395}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.9}The Signal: A Variance-Risk-Premium Gap on the Forecast}{395}{section.20.9}\protected@file@percent }
+\newlabel{sec:gsvivs:signal}{{20.9}{395}{The Signal: A Variance-Risk-Premium Gap on the Forecast}{section.20.9}{}}
+\newlabel{sec:gsvivs:signal@cref}{{[section][9][20]20.9}{[1][395][]395}{}{}{}}
+\newlabel{eq:gsvivs:vrpgap}{{20.12}{395}{The Signal: A Variance-Risk-Premium Gap on the Forecast}{equation.20.12}{}}
+\newlabel{eq:gsvivs:vrpgap@cref}{{[equation][12][20]20.12}{[1][395][]395}{}{}{}}
+\citation{Vilkov2024}
+\citation{AlmeidaFreireHizmeri2024}
+\citation{Yang2024}
+\citation{BandiFusariReno2024}
+\newlabel{eq:gsvivs:signalrule}{{20.13}{396}{The Signal: A Variance-Risk-Premium Gap on the Forecast}{equation.20.13}{}}
+\newlabel{eq:gsvivs:signalrule@cref}{{[equation][13][20]20.13}{[1][396][]396}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.10}Drawdown Prediction as Cost-Sensitive Classification}{397}{section.20.10}\protected@file@percent }
+\newlabel{sec:gsvivs:classification}{{20.10}{397}{Drawdown Prediction as Cost-Sensitive Classification}{section.20.10}{}}
+\newlabel{sec:gsvivs:classification@cref}{{[section][10][20]20.10}{[1][397][]397}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {20.6}{\ignorespaces The cost-sensitive structure of drawdown classification. The four outcomes carry wildly different payoffs: a false negative (predicting safety into a crash) costs a full drawdown, while a false positive (a needless flat day) costs only one day's forgone premium. With drawdowns at roughly $12$--$15\%$ of days and this cost ratio, the decision threshold must be tuned to minimize expected cost, not classification error.}}{397}{figure.20.6}\protected@file@percent }
+\newlabel{fig:gsvivs:costmatrix}{{20.6}{397}{The cost-sensitive structure of drawdown classification. The four outcomes carry wildly different payoffs: a false negative (predicting safety into a crash) costs a full drawdown, while a false positive (a needless flat day) costs only one day's forgone premium. With drawdowns at roughly $12$--$15\%$ of days and this cost ratio, the decision threshold must be tuned to minimize expected cost, not classification error}{figure.20.6}{}}
+\newlabel{fig:gsvivs:costmatrix@cref}{{[figure][6][20]20.6}{[1][397][]397}{}{}{}}
+\citation{LiWu2026}
+\@writefile{lot}{\contentsline {table}{\numberline {20.4}{\ignorespaces Feature layers for the drawdown classifier (source: \texttt  {GSVIVS01.md} \S  4.6), each cross-referenced to its home chapter. The jump and leverage layers are highlighted because the drawdown mechanism of \Cref  {sec:gsvivs:drawdown-mechanism} is specifically down-jump driven.}}{398}{table.20.4}\protected@file@percent }
+\newlabel{tab:gsvivs:features}{{20.4}{398}{Feature layers for the drawdown classifier (source: \texttt {GSVIVS01.md} \S 4.6), each cross-referenced to its home chapter. The jump and leverage layers are highlighted because the drawdown mechanism of \Cref {sec:gsvivs:drawdown-mechanism} is specifically down-jump driven}{table.20.4}{}}
+\newlabel{tab:gsvivs:features@cref}{{[table][4][20]20.4}{[1][398][]398}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.11}From Prediction to Position: The Overlay}{398}{section.20.11}\protected@file@percent }
+\newlabel{sec:gsvivs:overlay}{{20.11}{398}{From Prediction to Position: The Overlay}{section.20.11}{}}
+\newlabel{sec:gsvivs:overlay@cref}{{[section][11][20]20.11}{[1][398][]398}{}{}{}}
+\newlabel{eq:gsvivs:position}{{20.14}{398}{From Prediction to Position: The Overlay}{equation.20.14}{}}
+\newlabel{eq:gsvivs:position@cref}{{[equation][14][20]20.14}{[1][398][]398}{}{}{}}
+\citation{Yang2024}
+\citation{Vilkov2024}
+\@writefile{toc}{\contentsline {section}{\numberline {20.12}Evaluation: The Project's Metric}{399}{section.20.12}\protected@file@percent }
+\newlabel{sec:gsvivs:evaluation}{{20.12}{399}{Evaluation: The Project's Metric}{section.20.12}{}}
+\newlabel{sec:gsvivs:evaluation@cref}{{[section][12][20]20.12}{[1][399][]399}{}{}{}}
+\citation{BakshiKapadia2003}
+\citation{BeckmeyerBrangerGayda2023}
+\citation{Vilkov2024,AlmeidaFreireHizmeri2024}
+\citation{Yang2024}
+\citation{BandiFusariReno2024}
+\citation{DuKapadia2012}
+\@writefile{lof}{\contentsline {figure}{\numberline {20.7}{\ignorespaces The evaluation metric, schematically. Buy-and-hold GSVIVS01 (grey) drips upward and then surrenders the gains on each drawdown day; the forecast overlay (green) stays invested through the calm runs but goes flat on the days the model predicts $\operatorname  {RV}>K_{\mathrm  {var}}$, compounding a higher, smoother path. The metric is the difference between the two: deflated Sharpe, maximum-drawdown reduction, and Calmar. Shape is illustrative; the magnitude is what \Cref  {sec:gsvivs:experiments} must establish on real data.}}{400}{figure.20.7}\protected@file@percent }
+\newlabel{fig:gsvivs:overlay}{{20.7}{400}{The evaluation metric, schematically. Buy-and-hold GSVIVS01 (grey) drips upward and then surrenders the gains on each drawdown day; the forecast overlay (green) stays invested through the calm runs but goes flat on the days the model predicts $\RV >\Kvar $, compounding a higher, smoother path. The metric is the difference between the two: deflated Sharpe, maximum-drawdown reduction, and Calmar. Shape is illustrative; the magnitude is what \Cref {sec:gsvivs:experiments} must establish on real data}{figure.20.7}{}}
+\newlabel{fig:gsvivs:overlay@cref}{{[figure][7][20]20.7}{[1][400][]400}{}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {20.13}What to Compute on Our Data}{400}{section.20.13}\protected@file@percent }
+\newlabel{sec:gsvivs:experiments}{{20.13}{400}{What to Compute on Our Data}{section.20.13}{}}
+\newlabel{sec:gsvivs:experiments@cref}{{[section][13][20]20.13}{[1][400][]400}{}{}{}}
+\citation{Vilkov2024}
+\citation{Yang2024}
+\@writefile{toc}{\contentsline {section}{\numberline {20.14}Summary}{401}{section.20.14}\protected@file@percent }
+\newlabel{sec:gsvivs:summary}{{20.14}{401}{Summary}{section.20.14}{}}
+\newlabel{sec:gsvivs:summary@cref}{{[section][14][20]20.14}{[1][401][]401}{}{}{}}
 \bibstyle{plainnat}
 \bibdata{references}
 \bibcite{AhadzieJeyasreedharan2020}{{1}{2020}{{Ahadzie and Jeyasreedharan}}{{}}}
 \bibcite{AhmadWilmott2005}{{2}{2005}{{Ahmad and Wilmott}}{{}}}
 \bibcite{AitSahaliaJacod2009}{{3}{2009}{{A\"{\i }t-Sahalia and Jacod}}{{}}}
 \bibcite{AitSahaliaMyklandZhang2005}{{4}{2005}{{A\"{\i }t-Sahalia et~al.}}{{A\"{\i }t-Sahalia, Mykland, and Zhang}}}
-\bibcite{AmayaEtAl2015}{{5}{2015}{{Amaya et~al.}}{{Amaya, Christoffersen, Jacobs, and Vasquez}}}
-\bibcite{Amihud2002}{{6}{2002}{{Amihud}}{{}}}
-\bibcite{AnagnouHodges2007}{{7}{2007}{{Anagnou and Hodges}}{{}}}
-\bibcite{andersen1998}{{8}{1998}{{Andersen and Bollerslev}}{{}}}
-\bibcite{ABDL2001}{{9}{2001}{{Andersen et~al.}}{{Andersen, Bollerslev, Diebold, and Labys}}}
-\bibcite{ABDL2003}{{10}{2003}{{Andersen et~al.}}{{Andersen, Bollerslev, Diebold, and Labys}}}
-\bibcite{ABD2007}{{11}{2007}{{Andersen et~al.}}{{Andersen, Bollerslev, and Diebold}}}
-\bibcite{AntonakakisChatziantoniouGabauer2020}{{12}{2020}{{Antonakakis et~al.}}{{Antonakakis, Chatziantoniou, and Gabauer}}}
-\bibcite{ArzelLehdili2026}{{13}{2026}{{Arzel and Lehdili}}{{}}}
-\bibcite{AudrinoKnaus2016}{{14}{2016}{{Audrino and Knaus}}{{}}}
-\bibcite{AudrinoSignristBallinari2020}{{15}{2020}{{Audrino et~al.}}{{Audrino, Sigrist, and Ballinari}}}
-\bibcite{BabbarEtAl2025}{{16}{2025}{{Babbar et~al.}}{{Babbar, McTavish, Rudin, and Seltzer}}}
-\bibcite{Bailey2014DSR}{{17}{2014}{{Bailey and de~Prado}}{{}}}
-\bibcite{Bailey2014PBO}{{18}{2014}{{Bailey et~al.}}{{Bailey, Borwein, de~Prado, and Zhu}}}
-\bibcite{baillie1996}{{19}{1996}{{Baillie et~al.}}{{Baillie, Bollerslev, and Mikkelsen}}}
-\bibcite{BakshiKapadia2003}{{20}{2003}{{Bakshi and Kapadia}}{{}}}
-\bibcite{BNS2002}{{21}{2002}{{Barndorff-Nielsen and Shephard}}{{}}}
-\bibcite{BNS2004}{{22}{2004}{{Barndorff-Nielsen and Shephard}}{{}}}
-\bibcite{BNS2006}{{23}{2006}{{Barndorff-Nielsen and Shephard}}{{}}}
-\bibcite{BNHLS2008}{{24}{2008}{{Barndorff-Nielsen et~al.}}{{Barndorff-Nielsen, Hansen, Lunde, and Shephard}}}
-\bibcite{BarndorffNielsenHansenLundeShephard2011}{{25}{2011}{{Barndorff-Nielsen et~al.}}{{Barndorff-Nielsen, Hansen, Lunde, and Shephard}}}
-\bibcite{BFG2016}{{26}{2016}{{Bayer et~al.}}{{Bayer, Friz, and Gatheral}}}
-\bibcite{BekaertHoerova2014}{{27}{2014}{{Bekaert and Hoerova}}{{}}}
-\bibcite{BLP2022}{{28}{2022}{{Bennedsen et~al.}}{{Bennedsen, Lunde, and Pakkanen}}}
-\bibcite{Bennett2014}{{29}{2014}{{Bennett}}{{}}}
-\bibcite{BertsimasKoganLo2000}{{30}{2000}{{Bertsimas et~al.}}{{Bertsimas, Kogan, and Lo}}}
-\bibcite{Bishop2006}{{31}{2006}{{Bishop}}{{}}}
-\bibcite{Black1976}{{32}{1976}{{Black}}{{}}}
-\bibcite{Black1973}{{33}{1973}{{Black and Scholes}}{{}}}
-\bibcite{bollerslev1986}{{34}{1986}{{Bollerslev}}{{}}}
-\bibcite{BollerslevTodorov2015}{{35}{2011}{{Bollerslev and Todorov}}{{}}}
-\bibcite{BKT2015}{{36}{2009{a}}{{Bollerslev et~al.}}{{Bollerslev, Kretschmer, Pigorsch, and Tauchen}}}
-\bibcite{BTZ2009}{{37}{2009{b}}{{Bollerslev et~al.}}{{Bollerslev, Tauchen, and Zhou}}}
-\bibcite{BPQ2016}{{38}{2016{a}}{{Bollerslev et~al.}}{{Bollerslev, Patton, and Quaedvlieg}}}
-\bibcite{BollerslevPattonQuaedvlieg2016HARQ}{{39}{2016{b}}{{Bollerslev et~al.}}{{Bollerslev, Patton, and Quaedvlieg}}}
-\bibcite{BollerslevEtAl2018}{{40}{2018{a}}{{Bollerslev et~al.}}{{Bollerslev, Hood, Huss, and Pedersen}}}
-\bibcite{BollerslevPattonQuaedvlieg2018}{{41}{2018{b}}{{Bollerslev et~al.}}{{Bollerslev, Patton, and Quaedvlieg}}}
-\bibcite{BollerslevLiPattonQuaedvlieg2020}{{42}{2020}{{Bollerslev et~al.}}{{Bollerslev, Li, Patton, and Quaedvlieg}}}
-\bibcite{HARdToBeat2024}{{43}{2024}{{Bollerslev et~al.}}{{Bollerslev, Medeiros, Patton, and Quaedvlieg}}}
-\bibcite{BoyleEmanuel1980}{{44}{1980}{{Boyle and Emanuel}}{{}}}
-\bibcite{BrancoRubesamZevallos2024}{{45}{2024}{{Branco et~al.}}{{Branco, Rubesam, and Zevallos}}}
-\bibcite{Breiman1984}{{46}{1984}{{Breiman et~al.}}{{Breiman, Friedman, Olshen, and Stone}}}
-\bibcite{BrennerSubrahmanyam1988}{{47}{1988}{{Brenner and Subrahmanyam}}{{}}}
-\bibcite{BrittenJones2000}{{48}{2000}{{Britten-Jones and Neuberger}}{{}}}
-\bibcite{BrodenTankov2010}{{49}{2010}{{Brod{\'e}n and Tankov}}{{}}}
-\bibcite{BrugiereTurinici2025}{{50}{2025}{{Brugi{\`e}re and Turinici}}{{}}}
-\bibcite{Bucci2020}{{51}{2020}{{Bucci}}{{}}}
-\bibcite{CarrLee2009}{{52}{2009}{{Carr and Lee}}{{}}}
-\bibcite{Carr2009}{{53}{2009}{{Carr and Wu}}{{}}}
-\bibcite{CarteaJaimungalPenalva2015}{{54}{2015}{{Cartea et~al.}}{{Cartea, Jaimungal, and Penalva}}}
-\bibcite{CBOE2019}{{55}{2019}{{Cboe Exchange}}{{}}}
-\bibcite{ChenRobert2022}{{56}{2022}{{Chen and Roberts}}{{}}}
-\bibcite{ChiriacVoev2011}{{57}{2011}{{Chiriac and Voev}}{{}}}
-\bibcite{ChristensenSiggaardVeliyev2023}{{58}{2023}{{Christensen et~al.}}{{Christensen, Siggaard, and Veliyev}}}
-\bibcite{Cont2001}{{59}{2001}{{Cont}}{{}}}
-\bibcite{Cont2002}{{60}{2002}{{Cont and da~Fonseca}}{{}}}
-\bibcite{ContDas2024}{{61}{2024}{{Cont and Das}}{{}}}
-\bibcite{ContKukanovStoikov2014}{{62}{2014}{{Cont et~al.}}{{Cont, Kukanov, and Stoikov}}}
-\bibcite{Corsi2009}{{63}{2009}{{Corsi}}{{}}}
-\bibcite{CorsiPirinoReno2010}{{64}{2010}{{Corsi et~al.}}{{Corsi, Pirino, and Ren\`{o}}}}
-\bibcite{GINN2024}{{65}{2024}{{Cuch\'{i}ero et~al.}}{{Cuch\'{i}ero, Heiss, Khosrawi, and Spoida}}}
-\bibcite{LopezdePrado2018}{{66}{2018}{{de~Prado}}{{}}}
-\bibcite{DemirerDieboldLiuYilmaz2018}{{67}{2018}{{Demirer et~al.}}{{Demirer, Diebold, Liu, and Yilmaz}}}
-\bibcite{DempsterLairdRubin1977}{{68}{1977}{{Dempster et~al.}}{{Dempster, Laird, and Rubin}}}
-\bibcite{DieboldMariano1995}{{69}{1995}{{Diebold and Mariano}}{{}}}
-\bibcite{DieboldYilmaz2009}{{70}{2009}{{Diebold and Yilmaz}}{{}}}
-\bibcite{DieboldYilmaz2012}{{71}{2012}{{Diebold and Yilmaz}}{{}}}
-\bibcite{DieboldYilmaz2014}{{72}{2014}{{Diebold and Yilmaz}}{{}}}
-\bibcite{DingLuCheung2025}{{73}{2025}{{Ding et~al.}}{{Ding, Lu, and Cheung}}}
-\bibcite{DongRudin2020}{{74}{2020}{{Dong and Rudin}}{{}}}
-\bibcite{DonnellyEtAl2023}{{75}{2023}{{Donnelly et~al.}}{{Donnelly, Katta, Rudin, and Browne}}}
-\bibcite{DoshiPariShamsuddin2025}{{76}{2025}{{Doshi et~al.}}{{Doshi, Pari, and Shamsuddin}}}
-\bibcite{DrechslerYaron2011}{{77}{2011}{{Drechsler and Yaron}}{{}}}
-\bibcite{DuMoriyamaTanakaIshii2023}{{78}{2023}{{Du et~al.}}{{Du, Moriyama, Tanaka, and ichi Ishii}}}
-\bibcite{Dupire1994}{{79}{1994}{{Dupire}}{{}}}
-\bibcite{EasleyLopezOHara2012}{{80}{2012}{{Easley et~al.}}{{Easley, de~Prado, and O'Hara}}}
-\bibcite{Engle1982}{{81}{1982}{{Engle}}{{}}}
-\bibcite{Engle2002DCC}{{82}{2002}{{Engle}}{{}}}
-\bibcite{engle1986}{{83}{1986}{{Engle and Bollerslev}}{{}}}
-\bibcite{Fama1965}{{84}{1965}{{Fama}}{{}}}
-\bibcite{Fouhy2024}{{85}{2024}{{Fouhy}}{{}}}
-\bibcite{FrancoisEtAl2025}{{86}{2025}{{Fran{\c c}ois et~al.}}{{Fran{\c c}ois, Gauthier, Godin, and P{\'e}rez-Mendoza}}}
-\bibcite{GatheralJacquier2014}{{87}{2014}{{Gatheral and Jacquier}}{{}}}
-\bibcite{GJR2018}{{88}{2018}{{Gatheral et~al.}}{{Gatheral, Jaisson, and Rosenbaum}}}
-\bibcite{GlostenMilgrom1985}{{89}{1985}{{Glosten and Milgrom}}{{}}}
-\bibcite{gjr1993}{{90}{1993}{{Glosten et~al.}}{{Glosten, Jagannathan, and Runkle}}}
-\bibcite{Gu2020}{{91}{2020{a}}{{Gu et~al.}}{{Gu, Kelly, and Xiu}}}
-\bibcite{GuKellyXiu2020}{{92}{2020{b}}{{Gu et~al.}}{{Gu, Kelly, and Xiu}}}
-\bibcite{Hamilton1989}{{93}{1989}{{Hamilton}}{{}}}
-\bibcite{HansenLunde2006}{{94}{2006}{{Hansen and Lunde}}{{}}}
-\bibcite{HansenLundeNason2011}{{95}{2011}{{Hansen et~al.}}{{Hansen, Lunde, and Nason}}}
-\bibcite{hansen2005forecast}{{96}{2005}{{Hansen and Lunde}}{{}}}
-\bibcite{hansen2012realized}{{97}{2012}{{Hansen et~al.}}{{Hansen, Huang, and Shek}}}
-\bibcite{HarveyLiu2015}{{98}{2015}{{Harvey and Liu}}{{}}}
-\bibcite{HarveyLiuZhu2016}{{99}{2016}{{Harvey et~al.}}{{Harvey, Liu, and Zhu}}}
-\bibcite{HarveyLeybourneNewbold1997}{{100}{1997}{{Harvey et~al.}}{{Harvey, Leybourne, and Newbold}}}
-\bibcite{HayashiYoshida2005}{{101}{2005}{{Hayashi and Yoshida}}{{}}}
-\bibcite{HeileBabbar2025}{{102}{2025}{{Heile et~al.}}{{Heile, Babbar, McTavish, and Rudin}}}
-\bibcite{HoerlKennard1970}{{103}{1970}{{Hoerl and Kennard}}{{}}}
-\bibcite{HuangTauchen2005}{{104}{2005}{{Huang and Tauchen}}{{}}}
-\bibcite{JacodLiMyklandPodolskijVetter2009}{{105}{2009}{{Jacod et~al.}}{{Jacod, Li, Mykland, Podolskij, and Vetter}}}
-\bibcite{KabanovSafarian1997}{{106}{1997}{{Kabanov and Safarian}}{{}}}
-\bibcite{Ke2017}{{107}{2017}{{Ke et~al.}}{{Ke, Meng, Finley, Wang, Chen, Ma, Ye, and Liu}}}
-\bibcite{Kidger2021NeuralSDE}{{108}{2021}{{Kidger}}{{}}}
-\bibcite{Kyle1985}{{109}{1985}{{Kyle}}{{}}}
-\bibcite{LeeMykland2008}{{110}{2008}{{Lee and Mykland}}{{}}}
-\bibcite{Leland1985}{{111}{1985}{{Leland}}{{}}}
-\bibcite{LepinetteKabanov2010}{{112}{2010}{{L{\'e}pinette and Kabanov}}{{}}}
-\bibcite{LiWu2026}{{113}{2026}{{Li and Wu}}{{}}}
-\bibcite{LPS2015}{{114}{2015}{{Liu et~al.}}{{Liu, Patton, and Sheppard}}}
-\bibcite{LopezdePrado2018AFML}{{115}{2018}{{Lopez~de Prado}}{{}}}
-\bibcite{Lundberg2017}{{116}{2017}{{Lundberg and Lee}}{{}}}
-\bibcite{Lundberg2020}{{117}{2020}{{Lundberg et~al.}}{{Lundberg, Erion, Chen, DeGrave, Prutkin, Nair, Katz, Himmelfarb, Bansal, and Lee}}}
-\bibcite{MalliavinMancino2002}{{118}{2002}{{Malliavin and Mancino}}{{}}}
-\bibcite{MalliavinMancino2009}{{119}{2009}{{Malliavin and Mancino}}{{}}}
-\bibcite{Mancini2009}{{120}{2009}{{Mancini}}{{}}}
-\bibcite{Mandelbrot1963}{{121}{1963}{{Mandelbrot}}{{}}}
-\bibcite{MandelbrotVanNess1968}{{122}{1968}{{Mandelbrot and Van~Ness}}{{}}}
-\bibcite{Markowitz1952}{{123}{1952}{{Markowitz}}{{}}}
-\bibcite{MincerZarnowitz1969}{{124}{1969}{{Mincer and Zarnowitz}}{{}}}
-\bibcite{MoreiraMuir2017}{{125}{2017}{{Moreira and Muir}}{{}}}
-\bibcite{MorenoPinoZohren2022DeepVol}{{126}{2022}{{Moreno-Pino and Zohren}}{{}}}
-\bibcite{MoskowitzOoiPedersen2012}{{127}{2012}{{Moskowitz et~al.}}{{Moskowitz, Ooi, and Pedersen}}}
-\bibcite{Muller1993}{{128}{1993}{{M{\"u}ller et~al.}}{{M{\"u}ller, Dacorogna, Dav{\'e}, Olsen, Pictet, and von Weizs{\"a}cker}}}
-\bibcite{MuravyevPearson2020}{{129}{2020}{{Muravyev and Pearson}}{{}}}
-\bibcite{nelson1991}{{130}{1991}{{Nelson}}{{}}}
-\bibcite{Nickell1981}{{131}{1981}{{Nickell}}{{}}}
-\bibcite{Optiver2021}{{132}{2021}{{Optiver}}{{}}}
-\bibcite{Patton2011}{{133}{2011}{{Patton}}{{}}}
-\bibcite{PSS2015}{{134}{2015{a}}{{Patton and Sheppard}}{{}}}
-\bibcite{PattonSheppard2015}{{135}{2015{b}}{{Patton and Sheppard}}{{}}}
-\bibcite{PesaranShin1998}{{136}{1998}{{Pesaran and Shin}}{{}}}
-\bibcite{Pollok2025}{{137}{2025}{{Pollok}}{{}}}
-\bibcite{RahimikiaPoon2020}{{138}{2020}{{Rahimikia and Poon}}{{}}}
-\bibcite{RahimikiaZohrenPoon2021}{{139}{2021{a}}{{Rahimikia et~al.}}{{Rahimikia, Zohren, and Poon}}}
-\bibcite{RahimikiaZohrenPoon2021NLP}{{140}{2021{b}}{{Rahimikia et~al.}}{{Rahimikia, Zohren, and Poon}}}
-\bibcite{Rebonato2004}{{141}{2004}{{Rebonato}}{{}}}
-\bibcite{RosenbaumZhang2022}{{142}{2022}{{Rosenbaum and Zhang}}{{}}}
-\bibcite{Schwarz1978}{{143}{1978}{{Schwarz}}{{}}}
-\bibcite{shephard2010heavy}{{144}{2010}{{Shephard and Sheppard}}{{}}}
-\bibcite{SirignanoCont2019}{{145}{2019}{{Sirignano and Cont}}{{}}}
-\bibcite{StroblBoulesteixZeileisHothorn2007}{{146}{2007}{{Strobl et~al.}}{{Strobl, Boulesteix, Zeileis, and Hothorn}}}
-\bibcite{VanDenBosEtAl2024}{{147}{2024}{{van~den Bos et~al.}}{{van~den Bos, van~der Linden, and Demirovi\'{c}}}}
-\bibcite{VinayakGilad2015}{{148}{2015}{{Vinayak and Gilad-Bachrach}}{{}}}
-\bibcite{Wooldridge2010}{{149}{2010}{{Wooldridge}}{{}}}
-\bibcite{WysockiSlepaczuk2024}{{150}{2024}{{Wysocki and {\'S}lepaczuk}}{{}}}
-\bibcite{XinEtAl2022}{{151}{2022}{{Xin et~al.}}{{Xin, Zhong, Chen, Takagi, Seltzer, and Rudin}}}
-\bibcite{Xiu2010}{{152}{2010}{{Xiu}}{{}}}
-\bibcite{XuChen2021}{{153}{2021}{{Xu and Chen}}{{}}}
-\bibcite{ZhangCucuringuDong2023}{{154}{2023}{{Zhang et~al.}}{{Zhang, Cucuringu, and Dong}}}
-\bibcite{ZhangPuCucuringuDong2024}{{155}{2024}{{Zhang et~al.}}{{Zhang, Pu, Cucuringu, and Dong}}}
-\bibcite{Zhang2006}{{156}{2006}{{Zhang}}{{}}}
-\bibcite{ZhangMyklandAitSahalia2005}{{157}{2005}{{Zhang et~al.}}{{Zhang, Mykland, and A\"{\i }t-Sahalia}}}
-\bibcite{ZhangZohrenRoberts2019DeepLOB}{{158}{2019}{{Zhang et~al.}}{{Zhang, Zohren, and Roberts}}}
-\bibcite{ZhaoZiemba2007}{{159}{2003}{{Zhao and Ziemba}}{{}}}
-\bibcite{ZouHastie2005}{{160}{2005}{{Zou and Hastie}}{{}}}
-\gdef \@abspage@last{393}
+\bibcite{AlmeidaFreireHizmeri2024}{{5}{2024}{{Almeida et~al.}}{{Almeida, Freire, and Hizmeri}}}
+\bibcite{AmayaEtAl2015}{{6}{2015}{{Amaya et~al.}}{{Amaya, Christoffersen, Jacobs, and Vasquez}}}
+\bibcite{Amihud2002}{{7}{2002}{{Amihud}}{{}}}
+\bibcite{AnagnouHodges2007}{{8}{2007}{{Anagnou and Hodges}}{{}}}
+\bibcite{andersen1998}{{9}{1998}{{Andersen and Bollerslev}}{{}}}
+\bibcite{ABDL2001}{{10}{2001}{{Andersen et~al.}}{{Andersen, Bollerslev, Diebold, and Labys}}}
+\bibcite{ABDL2003}{{11}{2003}{{Andersen et~al.}}{{Andersen, Bollerslev, Diebold, and Labys}}}
+\bibcite{ABD2007}{{12}{2007}{{Andersen et~al.}}{{Andersen, Bollerslev, and Diebold}}}
+\bibcite{AntonakakisChatziantoniouGabauer2020}{{13}{2020}{{Antonakakis et~al.}}{{Antonakakis, Chatziantoniou, and Gabauer}}}
+\bibcite{ArzelLehdili2026}{{14}{2026}{{Arzel and Lehdili}}{{}}}
+\bibcite{AudrinoKnaus2016}{{15}{2016}{{Audrino and Knaus}}{{}}}
+\bibcite{AudrinoSignristBallinari2020}{{16}{2020}{{Audrino et~al.}}{{Audrino, Sigrist, and Ballinari}}}
+\bibcite{BabbarEtAl2025}{{17}{2025}{{Babbar et~al.}}{{Babbar, McTavish, Rudin, and Seltzer}}}
+\bibcite{Bailey2014DSR}{{18}{2014}{{Bailey and de~Prado}}{{}}}
+\bibcite{Bailey2014PBO}{{19}{2014}{{Bailey et~al.}}{{Bailey, Borwein, de~Prado, and Zhu}}}
+\bibcite{baillie1996}{{20}{1996}{{Baillie et~al.}}{{Baillie, Bollerslev, and Mikkelsen}}}
+\bibcite{BakshiKapadia2003}{{21}{2003}{{Bakshi and Kapadia}}{{}}}
+\bibcite{BandiFusariReno2024}{{22}{2024}{{Bandi et~al.}}{{Bandi, Fusari, and Ren{\`o}}}}
+\bibcite{BNS2002}{{23}{2002}{{Barndorff-Nielsen and Shephard}}{{}}}
+\bibcite{BNS2004}{{24}{2004}{{Barndorff-Nielsen and Shephard}}{{}}}
+\bibcite{BNS2006}{{25}{2006}{{Barndorff-Nielsen and Shephard}}{{}}}
+\bibcite{BNHLS2008}{{26}{2008}{{Barndorff-Nielsen et~al.}}{{Barndorff-Nielsen, Hansen, Lunde, and Shephard}}}
+\bibcite{BarndorffNielsenHansenLundeShephard2011}{{27}{2011}{{Barndorff-Nielsen et~al.}}{{Barndorff-Nielsen, Hansen, Lunde, and Shephard}}}
+\bibcite{BFG2016}{{28}{2016}{{Bayer et~al.}}{{Bayer, Friz, and Gatheral}}}
+\bibcite{BeckmeyerBrangerGayda2023}{{29}{2023}{{Beckmeyer et~al.}}{{Beckmeyer, Branger, and Gayda}}}
+\bibcite{BekaertHoerova2014}{{30}{2014}{{Bekaert and Hoerova}}{{}}}
+\bibcite{BLP2022}{{31}{2022}{{Bennedsen et~al.}}{{Bennedsen, Lunde, and Pakkanen}}}
+\bibcite{Bennett2014}{{32}{2014}{{Bennett}}{{}}}
+\bibcite{BertsimasKoganLo2000}{{33}{2000}{{Bertsimas et~al.}}{{Bertsimas, Kogan, and Lo}}}
+\bibcite{Bishop2006}{{34}{2006}{{Bishop}}{{}}}
+\bibcite{Black1976}{{35}{1976}{{Black}}{{}}}
+\bibcite{Black1973}{{36}{1973}{{Black and Scholes}}{{}}}
+\bibcite{bollerslev1986}{{37}{1986}{{Bollerslev}}{{}}}
+\bibcite{BollerslevTodorov2015}{{38}{2011}{{Bollerslev and Todorov}}{{}}}
+\bibcite{BKT2015}{{39}{2009{a}}{{Bollerslev et~al.}}{{Bollerslev, Kretschmer, Pigorsch, and Tauchen}}}
+\bibcite{BTZ2009}{{40}{2009{b}}{{Bollerslev et~al.}}{{Bollerslev, Tauchen, and Zhou}}}
+\bibcite{BPQ2016}{{41}{2016{a}}{{Bollerslev et~al.}}{{Bollerslev, Patton, and Quaedvlieg}}}
+\bibcite{BollerslevPattonQuaedvlieg2016HARQ}{{42}{2016{b}}{{Bollerslev et~al.}}{{Bollerslev, Patton, and Quaedvlieg}}}
+\bibcite{BollerslevEtAl2018}{{43}{2018{a}}{{Bollerslev et~al.}}{{Bollerslev, Hood, Huss, and Pedersen}}}
+\bibcite{BollerslevPattonQuaedvlieg2018}{{44}{2018{b}}{{Bollerslev et~al.}}{{Bollerslev, Patton, and Quaedvlieg}}}
+\bibcite{BollerslevLiPattonQuaedvlieg2020}{{45}{2020}{{Bollerslev et~al.}}{{Bollerslev, Li, Patton, and Quaedvlieg}}}
+\bibcite{HARdToBeat2024}{{46}{2024}{{Bollerslev et~al.}}{{Bollerslev, Medeiros, Patton, and Quaedvlieg}}}
+\bibcite{BoyleEmanuel1980}{{47}{1980}{{Boyle and Emanuel}}{{}}}
+\bibcite{BrancoRubesamZevallos2024}{{48}{2024}{{Branco et~al.}}{{Branco, Rubesam, and Zevallos}}}
+\bibcite{Breiman1984}{{49}{1984}{{Breiman et~al.}}{{Breiman, Friedman, Olshen, and Stone}}}
+\bibcite{BrennerSubrahmanyam1988}{{50}{1988}{{Brenner and Subrahmanyam}}{{}}}
+\bibcite{BrittenJones2000}{{51}{2000}{{Britten-Jones and Neuberger}}{{}}}
+\bibcite{BrodenTankov2010}{{52}{2010}{{Brod{\'e}n and Tankov}}{{}}}
+\bibcite{BrugiereTurinici2025}{{53}{2025}{{Brugi{\`e}re and Turinici}}{{}}}
+\bibcite{Bucci2020}{{54}{2020}{{Bucci}}{{}}}
+\bibcite{CarrLee2009}{{55}{2009}{{Carr and Lee}}{{}}}
+\bibcite{CarrMadan2002}{{56}{2002}{{Carr and Madan}}{{}}}
+\bibcite{Carr2009}{{57}{2009{a}}{{Carr and Wu}}{{}}}
+\bibcite{CarrWu2009}{{58}{2009{b}}{{Carr and Wu}}{{}}}
+\bibcite{CarteaJaimungalPenalva2015}{{59}{2015}{{Cartea et~al.}}{{Cartea, Jaimungal, and Penalva}}}
+\bibcite{CBOE2019}{{60}{2019}{{Cboe Exchange}}{{}}}
+\bibcite{ChenRobert2022}{{61}{2022}{{Chen and Roberts}}{{}}}
+\bibcite{ChiriacVoev2011}{{62}{2011}{{Chiriac and Voev}}{{}}}
+\bibcite{ChristensenSiggaardVeliyev2023}{{63}{2023}{{Christensen et~al.}}{{Christensen, Siggaard, and Veliyev}}}
+\bibcite{Cont2001}{{64}{2001}{{Cont}}{{}}}
+\bibcite{Cont2002}{{65}{2002}{{Cont and da~Fonseca}}{{}}}
+\bibcite{ContDas2024}{{66}{2024}{{Cont and Das}}{{}}}
+\bibcite{ContKukanovStoikov2014}{{67}{2014}{{Cont et~al.}}{{Cont, Kukanov, and Stoikov}}}
+\bibcite{Corsi2009}{{68}{2009}{{Corsi}}{{}}}
+\bibcite{CorsiPirinoReno2010}{{69}{2010}{{Corsi et~al.}}{{Corsi, Pirino, and Ren\`{o}}}}
+\bibcite{GINN2024}{{70}{2024}{{Cuch\'{i}ero et~al.}}{{Cuch\'{i}ero, Heiss, Khosrawi, and Spoida}}}
+\bibcite{LopezdePrado2018}{{71}{2018}{{de~Prado}}{{}}}
+\bibcite{Demeterfi1999}{{72}{1999}{{Demeterfi et~al.}}{{Demeterfi, Derman, Kamal, and Zou}}}
+\bibcite{DemirerDieboldLiuYilmaz2018}{{73}{2018}{{Demirer et~al.}}{{Demirer, Diebold, Liu, and Yilmaz}}}
+\bibcite{DempsterLairdRubin1977}{{74}{1977}{{Dempster et~al.}}{{Dempster, Laird, and Rubin}}}
+\bibcite{DieboldMariano1995}{{75}{1995}{{Diebold and Mariano}}{{}}}
+\bibcite{DieboldYilmaz2009}{{76}{2009}{{Diebold and Yilmaz}}{{}}}
+\bibcite{DieboldYilmaz2012}{{77}{2012}{{Diebold and Yilmaz}}{{}}}
+\bibcite{DieboldYilmaz2014}{{78}{2014}{{Diebold and Yilmaz}}{{}}}
+\bibcite{DingLuCheung2025}{{79}{2025}{{Ding et~al.}}{{Ding, Lu, and Cheung}}}
+\bibcite{DongRudin2020}{{80}{2020}{{Dong and Rudin}}{{}}}
+\bibcite{DonnellyEtAl2023}{{81}{2023}{{Donnelly et~al.}}{{Donnelly, Katta, Rudin, and Browne}}}
+\bibcite{DoshiPariShamsuddin2025}{{82}{2025}{{Doshi et~al.}}{{Doshi, Pari, and Shamsuddin}}}
+\bibcite{DrechslerYaron2011}{{83}{2011}{{Drechsler and Yaron}}{{}}}
+\bibcite{DuKapadia2012}{{84}{2012}{{Du and Kapadia}}{{}}}
+\bibcite{DuMoriyamaTanakaIshii2023}{{85}{2023}{{Du et~al.}}{{Du, Moriyama, Tanaka, and ichi Ishii}}}
+\bibcite{Dupire1994}{{86}{1994}{{Dupire}}{{}}}
+\bibcite{EasleyLopezOHara2012}{{87}{2012}{{Easley et~al.}}{{Easley, de~Prado, and O'Hara}}}
+\bibcite{Engle1982}{{88}{1982}{{Engle}}{{}}}
+\bibcite{Engle2002DCC}{{89}{2002}{{Engle}}{{}}}
+\bibcite{engle1986}{{90}{1986}{{Engle and Bollerslev}}{{}}}
+\bibcite{Fama1965}{{91}{1965}{{Fama}}{{}}}
+\bibcite{Fouhy2024}{{92}{2024}{{Fouhy}}{{}}}
+\bibcite{FrancoisEtAl2025}{{93}{2025}{{Fran{\c c}ois et~al.}}{{Fran{\c c}ois, Gauthier, Godin, and P{\'e}rez-Mendoza}}}
+\bibcite{GatheralJacquier2014}{{94}{2014}{{Gatheral and Jacquier}}{{}}}
+\bibcite{GJR2018}{{95}{2018}{{Gatheral et~al.}}{{Gatheral, Jaisson, and Rosenbaum}}}
+\bibcite{GlostenMilgrom1985}{{96}{1985}{{Glosten and Milgrom}}{{}}}
+\bibcite{gjr1993}{{97}{1993}{{Glosten et~al.}}{{Glosten, Jagannathan, and Runkle}}}
+\bibcite{Gu2020}{{98}{2020{a}}{{Gu et~al.}}{{Gu, Kelly, and Xiu}}}
+\bibcite{GuKellyXiu2020}{{99}{2020{b}}{{Gu et~al.}}{{Gu, Kelly, and Xiu}}}
+\bibcite{Hamilton1989}{{100}{1989}{{Hamilton}}{{}}}
+\bibcite{HansenLunde2006}{{101}{2006}{{Hansen and Lunde}}{{}}}
+\bibcite{HansenLundeNason2011}{{102}{2011}{{Hansen et~al.}}{{Hansen, Lunde, and Nason}}}
+\bibcite{hansen2005forecast}{{103}{2005}{{Hansen and Lunde}}{{}}}
+\bibcite{hansen2012realized}{{104}{2012}{{Hansen et~al.}}{{Hansen, Huang, and Shek}}}
+\bibcite{HarveyLiu2015}{{105}{2015}{{Harvey and Liu}}{{}}}
+\bibcite{HarveyLiuZhu2016}{{106}{2016}{{Harvey et~al.}}{{Harvey, Liu, and Zhu}}}
+\bibcite{HarveyLeybourneNewbold1997}{{107}{1997}{{Harvey et~al.}}{{Harvey, Leybourne, and Newbold}}}
+\bibcite{HayashiYoshida2005}{{108}{2005}{{Hayashi and Yoshida}}{{}}}
+\bibcite{HeileBabbar2025}{{109}{2025}{{Heile et~al.}}{{Heile, Babbar, McTavish, and Rudin}}}
+\bibcite{HoerlKennard1970}{{110}{1970}{{Hoerl and Kennard}}{{}}}
+\bibcite{HuangTauchen2005}{{111}{2005}{{Huang and Tauchen}}{{}}}
+\bibcite{JacodLiMyklandPodolskijVetter2009}{{112}{2009}{{Jacod et~al.}}{{Jacod, Li, Mykland, Podolskij, and Vetter}}}
+\bibcite{KabanovSafarian1997}{{113}{1997}{{Kabanov and Safarian}}{{}}}
+\bibcite{Ke2017}{{114}{2017}{{Ke et~al.}}{{Ke, Meng, Finley, Wang, Chen, Ma, Ye, and Liu}}}
+\bibcite{Kidger2021NeuralSDE}{{115}{2021}{{Kidger}}{{}}}
+\bibcite{Kyle1985}{{116}{1985}{{Kyle}}{{}}}
+\bibcite{LeeMykland2008}{{117}{2008}{{Lee and Mykland}}{{}}}
+\bibcite{Leland1985}{{118}{1985}{{Leland}}{{}}}
+\bibcite{LepinetteKabanov2010}{{119}{2010}{{L{\'e}pinette and Kabanov}}{{}}}
+\bibcite{LiWu2026}{{120}{2026}{{Li and Wu}}{{}}}
+\bibcite{LPS2015}{{121}{2015}{{Liu et~al.}}{{Liu, Patton, and Sheppard}}}
+\bibcite{LopezdePrado2018AFML}{{122}{2018}{{Lopez~de Prado}}{{}}}
+\bibcite{Lundberg2017}{{123}{2017}{{Lundberg and Lee}}{{}}}
+\bibcite{Lundberg2020}{{124}{2020}{{Lundberg et~al.}}{{Lundberg, Erion, Chen, DeGrave, Prutkin, Nair, Katz, Himmelfarb, Bansal, and Lee}}}
+\bibcite{MalliavinMancino2002}{{125}{2002}{{Malliavin and Mancino}}{{}}}
+\bibcite{MalliavinMancino2009}{{126}{2009}{{Malliavin and Mancino}}{{}}}
+\bibcite{Mancini2009}{{127}{2009}{{Mancini}}{{}}}
+\bibcite{Mandelbrot1963}{{128}{1963}{{Mandelbrot}}{{}}}
+\bibcite{MandelbrotVanNess1968}{{129}{1968}{{Mandelbrot and Van~Ness}}{{}}}
+\bibcite{Markowitz1952}{{130}{1952}{{Markowitz}}{{}}}
+\bibcite{MincerZarnowitz1969}{{131}{1969}{{Mincer and Zarnowitz}}{{}}}
+\bibcite{MoreiraMuir2017}{{132}{2017}{{Moreira and Muir}}{{}}}
+\bibcite{MorenoPinoZohren2022DeepVol}{{133}{2022}{{Moreno-Pino and Zohren}}{{}}}
+\bibcite{MoskowitzOoiPedersen2012}{{134}{2012}{{Moskowitz et~al.}}{{Moskowitz, Ooi, and Pedersen}}}
+\bibcite{Muller1993}{{135}{1993}{{M{\"u}ller et~al.}}{{M{\"u}ller, Dacorogna, Dav{\'e}, Olsen, Pictet, and von Weizs{\"a}cker}}}
+\bibcite{MuravyevPearson2020}{{136}{2020}{{Muravyev and Pearson}}{{}}}
+\bibcite{nelson1991}{{137}{1991}{{Nelson}}{{}}}
+\bibcite{Nickell1981}{{138}{1981}{{Nickell}}{{}}}
+\bibcite{Optiver2021}{{139}{2021}{{Optiver}}{{}}}
+\bibcite{Patton2011}{{140}{2011}{{Patton}}{{}}}
+\bibcite{PSS2015}{{141}{2015{a}}{{Patton and Sheppard}}{{}}}
+\bibcite{PattonSheppard2015}{{142}{2015{b}}{{Patton and Sheppard}}{{}}}
+\bibcite{PesaranShin1998}{{143}{1998}{{Pesaran and Shin}}{{}}}
+\bibcite{Pollok2025}{{144}{2025}{{Pollok}}{{}}}
+\bibcite{RahimikiaPoon2020}{{145}{2020}{{Rahimikia and Poon}}{{}}}
+\bibcite{RahimikiaZohrenPoon2021}{{146}{2021{a}}{{Rahimikia et~al.}}{{Rahimikia, Zohren, and Poon}}}
+\bibcite{RahimikiaZohrenPoon2021NLP}{{147}{2021{b}}{{Rahimikia et~al.}}{{Rahimikia, Zohren, and Poon}}}
+\bibcite{Rebonato2004}{{148}{2004}{{Rebonato}}{{}}}
+\bibcite{RosenbaumZhang2022}{{149}{2022}{{Rosenbaum and Zhang}}{{}}}
+\bibcite{Schwarz1978}{{150}{1978}{{Schwarz}}{{}}}
+\bibcite{shephard2010heavy}{{151}{2010}{{Shephard and Sheppard}}{{}}}
+\bibcite{SirignanoCont2019}{{152}{2019}{{Sirignano and Cont}}{{}}}
+\bibcite{StroblBoulesteixZeileisHothorn2007}{{153}{2007}{{Strobl et~al.}}{{Strobl, Boulesteix, Zeileis, and Hothorn}}}
+\bibcite{VanDenBosEtAl2024}{{154}{2024}{{van~den Bos et~al.}}{{van~den Bos, van~der Linden, and Demirovi\'{c}}}}
+\bibcite{Vilkov2024}{{155}{2024}{{Vilkov}}{{}}}
+\bibcite{VinayakGilad2015}{{156}{2015}{{Vinayak and Gilad-Bachrach}}{{}}}
+\bibcite{Wooldridge2010}{{157}{2010}{{Wooldridge}}{{}}}
+\bibcite{WysockiSlepaczuk2024}{{158}{2024}{{Wysocki and {\'S}lepaczuk}}{{}}}
+\bibcite{XinEtAl2022}{{159}{2022}{{Xin et~al.}}{{Xin, Zhong, Chen, Takagi, Seltzer, and Rudin}}}
+\bibcite{Xiu2010}{{160}{2010}{{Xiu}}{{}}}
+\bibcite{XuChen2021}{{161}{2021}{{Xu and Chen}}{{}}}
+\bibcite{Yang2024}{{162}{2024}{{Yang}}{{}}}
+\bibcite{ZhangCucuringuDong2023}{{163}{2023}{{Zhang et~al.}}{{Zhang, Cucuringu, and Dong}}}
+\bibcite{ZhangPuCucuringuDong2024}{{164}{2024}{{Zhang et~al.}}{{Zhang, Pu, Cucuringu, and Dong}}}
+\bibcite{Zhang2006}{{165}{2006}{{Zhang}}{{}}}
+\bibcite{ZhangMyklandAitSahalia2005}{{166}{2005}{{Zhang et~al.}}{{Zhang, Mykland, and A\"{\i }t-Sahalia}}}
+\bibcite{ZhangZohrenRoberts2019DeepLOB}{{167}{2019}{{Zhang et~al.}}{{Zhang, Zohren, and Roberts}}}
+\bibcite{ZhaoZiemba2007}{{168}{2003}{{Zhao and Ziemba}}{{}}}
+\bibcite{ZouHastie2005}{{169}{2005}{{Zou and Hastie}}{{}}}
+\gdef \@abspage@last{413}
