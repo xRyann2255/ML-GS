@@ -1,11 +1,4 @@
-# Returns, Variance, and Why Volatility Matters
-
-> **Application: Why This Chapter**
->
-> Volatility is the central quantity in quantitative finance.
-> Options pricing, risk management, portfolio construction, and trade execution all depend on accurate volatility estimates.
-> Every chapter in this guide builds on the concepts introduced here.
-> Your internship project, forecasting realized volatility with progressive feature layering and ML ([Chapter 17](ch17-applications-projects.md)), starts from the returns and variance foundations covered in this chapter.
+# Chapter 1. Returns, Variance, and Why Volatility Matters
 
 Financial markets produce a stream of prices.
 To do anything quantitative with those prices, you first need to convert them into *returns*, measure how much those returns vary, and understand *why* that variation matters.
@@ -16,9 +9,6 @@ This chapter covers that ground.
 A stock price on its own tells you almost nothing about performance.
 Knowing that Apple closed at \$187 today is useless without knowing where it closed yesterday.
 *Returns* solve this: they express price changes as fractions (or percentages), making different assets and time periods comparable.
-
-To compare price movements across different assets and time periods, we need to express changes as fractions rather than absolute dollar amounts.
-There are two standard ways to do this.
 
 > **Prereq: Natural Logarithm Properties**
 >
@@ -34,47 +24,25 @@ There are two standard ways to do this.
 We want a single number that tells us "what fraction of my investment did I gain or lose in one period?"
 The simple (arithmetic) return does exactly this:
 
-$$R_t = \frac{P_t - P_{t-1}}{P_{t-1}}$$
+$$
+  R_t = \frac{P_t - P_{t-1}}{P_{t-1}}
+$$
 
 - $R_t$: simple return from period $t-1$ to $t$
 - $P_t$: price at the end of period $t$
 - $P_{t-1}$: price at the end of the previous period
-
-> **Intuition: In Plain English**
->
-> This equation says: "take the price change (today minus yesterday) and divide by yesterday's price to get the fractional change."
-> The result is a dimensionless number: 0.02 means a 2\% gain, $-0.03$ means a 3\% loss.
-> It's the same calculation as "what percentage did my investment grow?"
-
-> **Project Connection: Why This Matters**
->
-> Returns are the raw input to everything in this project.
-> Realized volatility is computed by summing *squared* returns, so every RV estimate you build in later chapters starts from this quantity.
-> If you don't understand what a return measures, the entire volatility pipeline won't make sense.
-
-A simple return of $0.05$ means the price rose by 5\%.
 
 ### Log Returns
 
 The simple return works fine in many contexts, but for volatility research we almost always use a different version: the log return.
 Instead of computing the fractional change directly, we take the natural logarithm of the price ratio:
 
-$$r_t = \ln\!\left(\frac{P_t}{P_{t-1}}\right) = \ln P_t - \ln P_{t-1}$$
+$$
+  r_t = \ln\!\left(\frac{P_t}{P_{t-1}}\right) = \ln P_t - \ln P_{t-1}
+$$
 
 - $r_t$: log return from period $t-1$ to $t$
 - $\ln(\cdot)$: natural logarithm
-
-> **Intuition: In Plain English**
->
-> This equation says: "take the ratio of today's price to yesterday's price, then take the natural log of that ratio."
-> For small price changes (under ~5\%), the log return is almost identical to the simple return.
-> The reason we use it instead is purely mathematical convenience: log returns add up over time, which makes the math for volatility much cleaner.
-
-> **Project Connection: Why This Matters**
->
-> Every volatility model in this guide uses log returns as its input.
-> When you compute realized volatility in [Chapter 2](ch02-realized-volatility.md), you will square log returns and sum them.
-> The time-additivity property below is what makes realized volatility estimators mathematically valid.
 
 > **Key Idea: Why Log Returns?**
 >
@@ -110,25 +78,15 @@ Variance answers this by measuring the average squared deviation from the mean r
 > Given $T$ log returns $r_1, r_2, \ldots, r_T$ with sample mean $\bar{r} = \frac{1}{T}\sum_{t=1}^T r_t$, we want a single number that captures "how spread out are these returns?"
 > The sample variance answers this by measuring the average squared distance of each return from the mean:
 >
-> $$\hat{\sigma}^2 = \frac{1}{T-1}\sum_{t=1}^{T}\bigl(r_t - \bar{r}\bigr)^2$$
+> $$
+>   \hat{\sigma}^2 = \frac{1}{T-1}\sum_{t=1}^{T}\bigl(r_t - \bar{r}\bigr)^2
+> $$
 >
 > - $\hat{\sigma}^2$: sample variance (the hat denotes an estimate)
 > - $T$: number of observations
 > - $r_t$: log return at time $t$
 > - $\bar{r}$: sample mean of returns
 > - $T-1$: Bessel's correction (dividing by $T-1$ instead of $T$ gives an unbiased estimate)
->
-> > **Intuition: In Plain English**
-> >
-> > This equation says: "for each return, measure how far it is from the average return, square that distance (so negatives don't cancel positives), then average all those squared distances."
-> > A large variance means returns are spread far from the mean (volatile); a small variance means they cluster tightly around the mean (calm).
-> > Squaring is what makes this sensitive to outliers: one large move contributes disproportionately.
->
-> > **Project Connection: Why This Matters**
-> >
-> > Variance is the quantity you are forecasting in this entire project.
-> > Realized volatility ([Chapter 2](ch02-realized-volatility.md)) is essentially this formula applied to high-frequency returns within a single day.
-> > Every model from GARCH to deep learning is trying to predict tomorrow's version of this number.
 >
 > The sample standard deviation is $\hat{\sigma} = \sqrt{\hat{\sigma}^2}$.
 
@@ -146,28 +104,22 @@ The key insight: if daily returns are independent, variances add.
 The $n$-day return is $r_1 + r_2 + \cdots + r_n$ (time additivity), and for independent random variables, $\operatorname{Var}(r_1 + r_2 + \cdots + r_n) = \operatorname{Var}(r_1) + \operatorname{Var}(r_2) + \cdots + \operatorname{Var}(r_n) = n\sigma^2$.
 Taking the square root: the $n$-day standard deviation is $\sqrt{n}\,\sigma$.
 
-$$\hat{\sigma}_{\text{annual}} = \hat{\sigma}_{\text{daily}} \times \sqrt{252}$$
+$$
+  \hat{\sigma}_{\text{annual}} = \hat{\sigma}_{\text{daily}} \times \sqrt{252}
+$$
 
 - $252$: approximate number of trading days per year in U.S. equity markets
 - $\sqrt{252} \approx 15.87$
 
-> **Intuition: In Plain English**
->
-> This equation says: "multiply the daily volatility by about 16 to get the annual volatility."
-> The $\sqrt{252}$ comes from the fact that if daily returns are independent, variances add over time (252 trading days), so standard deviations scale by the square root.
-> A stock with 1\% daily volatility has roughly 16\% annual volatility.
-
 > **Project Connection: Why This Matters**
 >
-> Practitioners quote volatility in annualized terms.
-> When someone says "the VIX is at 20," they mean 20\% annualized volatility.
-> Your model's output (daily RV forecasts) will need to be converted to this scale for comparison with implied volatility and industry benchmarks.
+> Your model's output (daily RV forecasts) will need to be converted to the annualized scale for comparison with implied volatility and industry benchmarks.
 
 > **Warning: The Square-Root-of-Time Rule**
 >
 > The $\sqrt{252}$ scaling assumes returns are independent and identically distributed.
-> When volatility clusters (see the stylized facts section below), this assumption fails, and multi-day volatility may be higher or lower than the square-root rule predicts.
-> The GARCH ([Chapter 5](ch05-garch-family.md)) and HAR ([Chapter 6](ch06-har-model.md)) chapters develop models that handle this.
+> When volatility clusters (see the Stylized Facts section below), this assumption fails, and multi-day volatility may be higher or lower than the square-root rule predicts.
+> [Chapter 5](ch05-garch-family.md) and [Chapter 6](ch06-har-model.md) develop models that handle this.
 
 ## Why Volatility Matters
 
@@ -190,7 +142,7 @@ If your volatility estimate is wrong, your price is wrong.
 **Risk management.**
 Value-at-Risk ($\operatorname{VaR}$) estimates the worst-case loss over a holding period at a given confidence level.
 In the simplest version, VaR is directly proportional to volatility: if volatility doubles, your risk bound roughly doubles.
-For a 99\% daily VaR, the worst expected loss is about 2.33 times the daily volatility (e.g., if daily vol is 1\%, the worst-case daily loss at 99\% confidence is roughly 2.33\%).
+For a 99% daily VaR, the worst expected loss is about 2.33 times the daily volatility (e.g., if daily vol is 1%, the worst-case daily loss at 99% confidence is roughly 2.33%).
 
 **Portfolio construction.**
 Mean-variance optimization (Markowitz, 1952) and risk-parity strategies both require a covariance matrix as input.
@@ -203,7 +155,7 @@ The participation rate (fraction of daily volume per time slice) depends on intr
 
 > **Key Idea: What Makes Volatility Special**
 >
-> Volatility is one of the few quantities in finance that is (a) directly observable from intraday data ([Chapter 2](ch02-realized-volatility.md)), (b) economically central to pricing, hedging, and risk control, and (c) forecastable with meaningful accuracy ([Chapter 5](ch05-garch-family.md) through [Chapter 13](ch13-hybrid-ensemble.md)).
+> Volatility is one of the few quantities in finance that is (a) directly observable from intraday data, (b) economically central to pricing, hedging, and risk control, and (c) forecastable with meaningful accuracy.
 > That combination makes it the right place to apply ML carefully.
 
 > **Prereq: Preview: What Is Realized Volatility?**
@@ -257,14 +209,14 @@ Engle (1982) formalized this observation with the ARCH model: the variance of ne
 > This "long memory" is why simple models that only look at yesterday fail.
 > The HAR model ([Chapter 6](ch06-har-model.md)) addresses this by explicitly including weekly and monthly vol averages as predictors.
 
-The simulated-returns figure below shows volatility clustering visually: returns alternate between calm and turbulent stretches.
+In the simulated-returns figure below, returns visibly alternate between calm and turbulent stretches.
 
-*[Figure: Simulated daily log returns exhibiting volatility clustering, over 500 trading days (daily log return in \% on the $y$-axis, range $\pm 5\%$). Calm periods (blue: days 1-100, 221-350, 421-500) have returns within $\pm 0.5\%$; turbulent periods (red: days 101-220, 351-420) reach $\pm 3\%$. The clustering is visible by eye: large returns beget large returns.]*
+*Figure: Simulated daily log returns exhibiting volatility clustering. Calm periods (blue, days 1-100, 221-350, 421-500) have returns within $\pm 0.5\%$; turbulent periods (red, days 101-220, 351-420) reach $\pm 3\%$. The clustering is visible by eye: large returns beget large returns. The series oscillates around zero throughout, but the amplitude switches abruptly between the two regimes: sub-half-percent wiggles during calm stretches versus roughly $\pm 1.5\%$ to $\pm 3\%$ swings during turbulent ones, illustrating that volatility, not direction, is what persists.*
 
-The autocorrelation-function figure below quantifies this.
+The autocorrelation-function comparison below quantifies this.
 Return autocorrelations hover near zero at all lags, but squared-return autocorrelations remain positive for many lags, confirming that volatility is persistent.
 
-*[Figure: Two side-by-side bar charts of autocorrelation functions, based on representative daily equity index data, lags 1 to 20. Left panel (returns $r_t$): all bars hover near zero (between about $-0.04$ and $+0.03$), within the dashed 95\% significance bands at $\pm 0.063$, so returns show no significant autocorrelation at any lag. Right panel (squared returns $r_t^2$): strong autocorrelation starting at about 0.38 at lag 1 and decaying slowly to about 0.06 by lag 20, staying above the significance bands. The contrast reflects volatility clustering.]*
+*Figure: Autocorrelation functions for returns (left) and squared returns (right), based on representative daily equity index data. Returns show no significant autocorrelation at any lag, with all bars within the dashed 95% significance bands (roughly $\pm 0.063$): the return autocorrelations bounce randomly between about $-0.04$ and $+0.03$ across lags 1-20. Squared returns, by contrast, start at about $0.38$ at lag 1 and decay slowly (about $0.31$, $0.27$, $0.24$, $0.21$ at lags 2-5, still about $0.13$ at lag 10 and $0.06$ at lag 20), staying above the significance band for many lags. This slow, persistent decay reflects volatility clustering.*
 
 ### Fact 3: Fat Tails
 
@@ -280,7 +232,9 @@ Fama (1965) confirmed the finding for stock returns, observing leptokurtic (heav
 > We need a way to measure "how fat are the tails?" compared to a normal distribution.
 > Kurtosis does this by looking at the fourth power of deviations (which amplifies extreme values even more than squaring):
 >
-> $$\kappa = \frac{\mathbb{E}\bigl[(r_t - \mu)^4\bigr]}{\bigl(\mathbb{E}\bigl[(r_t - \mu)^2\bigr]\bigr)^2}$$
+> $$
+>   \kappa = \frac{\mathbb{E}\bigl[(r_t - \mu)^4\bigr]}{\bigl(\mathbb{E}\bigl[(r_t - \mu)^2\bigr]\bigr)^2}
+> $$
 >
 > - $\kappa$: kurtosis
 > - $\mu = \mathbb{E}[r_t]$: population mean
@@ -289,7 +243,6 @@ Fama (1965) confirmed the finding for stock returns, observing leptokurtic (heav
 >
 > > **Intuition: In Plain English**
 > >
-> > This equation says: "take each return's deviation from the mean, raise it to the 4th power (which massively amplifies outliers), average those, and normalize by the squared variance."
 > > The 4th power is the key: if extreme returns are rare (thin tails), raising them to the 4th power doesn't add much.
 > > If extreme returns are common (fat tails), the 4th power blows them up and the ratio exceeds 3.
 > > The further above 3, the fatter the tails.
@@ -301,19 +254,19 @@ Fama (1965) confirmed the finding for stock returns, observing leptokurtic (heav
 >
 > Typical daily equity index returns have excess kurtosis in the range 5-10 (Cont, 2001).
 
-The Q-Q plot figure below illustrates fat tails with a **Q-Q (quantile-quantile) plot**.
+The Q-Q plot below illustrates fat tails with a **Q-Q (quantile-quantile) plot**.
 Here is how it works: sort your actual returns from smallest to largest, then ask "if these returns *were* normally distributed, what values would I expect at each position in the sorted list?"
 Plot the expected-if-normal values on the $x$-axis and the actual values on the $y$-axis.
 If the data is truly normal, expected equals actual at every point, so you get a straight diagonal line.
 When the dots curve away from the line at the extremes, it means the tails of your actual distribution are fatter than normal: extreme moves happen more often than the bell curve predicts.
 
-*[Figure: Q-Q plot of representative daily equity returns against a normal distribution. Normal theoretical quantiles on the $x$-axis (about $-4$ to $4$), sample quantiles of daily returns (\%) on the $y$-axis (about $-6$ to $6$). A dashed gray normal reference line runs through the center. The plotted points form an S-shaped curve that departs from the reference line at both ends: the upper tail is heavier than normal (points rise above the line at the upper right) and the lower tail is heavier than normal (points fall below the line at the lower left). This S-shaped departure, first documented by Fama (1965), shows that both tails of the empirical distribution are heavier than normal: extreme moves (positive and negative) occur much more often than a Gaussian model predicts.]*
+*Figure: Q-Q plot of representative daily equity returns against a normal distribution. If returns were Gaussian, the dots would lie on the dashed diagonal reference line. Instead the data traces an S-shaped curve: near the center (theoretical quantiles between about $-1$ and $+1$) the points hug the line, but in both tails they bend away from it. In the lower tail the sample quantiles fall below the line (e.g., at a theoretical quantile of $-3.5$ the sample value is about $-5.8\%$ rather than the roughly $-3.9\%$ the line predicts), and in the upper tail they rise above it (at $+3.5$ the sample value is about $+5.8\%$). This S-shaped departure, first documented by Fama (1965), shows that both tails of the empirical distribution are heavier than normal: extreme moves (positive and negative) occur much more often than a Gaussian model predicts.*
 
 > **Warning: Why Fat Tails Matter for Models**
 >
 > Any model that assumes normally distributed returns will underestimate the probability of large moves.
 > This affects risk management (VaR breaches), option pricing (mispricing of out-of-the-money options), and backtesting (understating drawdowns).
-> The jumps ([Chapter 4](ch04-jumps-continuous-variation.md)) and GARCH ([Chapter 5](ch05-garch-family.md)) chapters introduce models that accommodate fat tails.
+> [Chapter 4](ch04-jumps-continuous-variation.md) and [Chapter 5](ch05-garch-family.md) introduce models that accommodate fat tails.
 
 ### Fact 4: The Leverage Effect
 
@@ -324,17 +277,13 @@ Black (1976) first noted this asymmetry and proposed a mechanism: when a stock p
 >
 > The leverage effect is the negative correlation between an asset's return and changes in its subsequent volatility:
 >
-> $$\operatorname{Corr}(r_t,\, \sigma_{t+1}^2) < 0$$
+> $$
+>   \operatorname{Corr}(r_t,\, \sigma_{t+1}^2) < 0
+> $$
 >
 > - $r_t$: return at time $t$
 > - $\sigma_{t+1}^2$: conditional variance at time $t+1$
 > - The negative sign means: price drops $\to$ volatility rises
->
-> > **Intuition: In Plain English**
-> >
-> > This equation says: "when today's return is negative (a price drop), tomorrow's volatility tends to be higher; when today's return is positive (a price rise), tomorrow's volatility tends to be lower."
-> > The relationship is asymmetric: markets get more volatile when they fall, but don't calm down as much when they rise.
-> > Think of it as "fear is louder than greed": a crash makes everyone nervous, but a rally doesn't make everyone equally calm.
 >
 > > **Project Connection: Why This Matters**
 > >
@@ -371,13 +320,17 @@ That is the *conditional* volatility.
 >
 > **Unconditional variance:**
 >
-> $$\sigma^2 = \operatorname{Var}(r_t)$$
+> $$
+>   \sigma^2 = \operatorname{Var}(r_t)
+> $$
 >
 > A single number, constant over time. It is the long-run average variance.
 >
 > **Conditional variance:**
 >
-> $$\sigma_t^2 = \operatorname{Var}(r_t \mid \mathcal{F}_{t-1})$$
+> $$
+>   \sigma_t^2 = \operatorname{Var}(r_t \mid \mathcal{F}_{t-1})
+> $$
 >
 > - $\sigma_t^2$: variance of the return at time $t$, conditional on past information
 > - $\mathcal{F}_{t-1}$: the **information set** available at time $t-1$.
@@ -393,25 +346,15 @@ That is the *conditional* volatility.
 > Conditional volatility is the weather forecast: it uses recent data (yesterday's pressure, today's cloud cover) to predict tomorrow's conditions.
 > This guide is about building the forecast, not computing the average.
 
-> **Project Connection: Why This Matters**
->
-> Your entire project is about forecasting *conditional* variance: given everything you know up to today, what will volatility be tomorrow?
-> The unconditional variance is just a naive baseline (always predict the long-run average).
-> Every model you build, from HAR to neural networks, is trying to produce a better estimate of $\sigma_t^2$ than that naive baseline by using the information in $\mathcal{F}_{t-1}$.
-
 The unconditional variance and conditional variance are connected by a standard probability result called the **law of total variance**.
 You do not need to derive it; just understand what it says about how the long-run average relates to the time-varying quantity:
 
-$$\sigma^2 = \mathbb{E}[\sigma_t^2] + \operatorname{Var}\bigl(\mathbb{E}[r_t \mid \mathcal{F}_{t-1}]\bigr)$$
+$$
+  \sigma^2 = \mathbb{E}[\sigma_t^2] + \operatorname{Var}\bigl(\mathbb{E}[r_t \mid \mathcal{F}_{t-1}]\bigr)
+$$
 
 - $\mathbb{E}[\sigma_t^2]$: average of the conditional variances over time
 - $\operatorname{Var}\bigl(\mathbb{E}[r_t \mid \mathcal{F}_{t-1}]\bigr)$: variance of the conditional mean (small for equities, since expected returns are nearly constant at daily frequency)
-
-> **Intuition: In Plain English**
->
-> This equation says: "the long-run average variance equals the average of all the daily conditional variances, plus a small correction for the fact that expected returns also fluctuate slightly."
-> For equities at daily frequency, the second term is negligible because expected returns barely change day to day.
-> So in practice: the unconditional variance is just what you get if you average all the conditional variances over a long period.
 
 > **Project Connection: Why This Matters**
 >
@@ -422,7 +365,7 @@ $$\sigma^2 = \mathbb{E}[\sigma_t^2] + \operatorname{Var}\bigl(\mathbb{E}[r_t \mi
 When the conditional mean is approximately constant (a reasonable assumption for daily equity returns), the unconditional variance is simply the time average of the conditional variances.
 The gap between the two is what makes volatility modeling interesting.
 
-*[Figure: Conditional vs. unconditional volatility over 250 trading days (\% annualized on the $y$-axis, range 0 to 45). The unconditional volatility (dashed red) is a flat line at about 17\%: a single long-run average that tells you nothing about which regime you're in today. The conditional volatility (solid blue) varies over time, starting around 12-14\%, dropping to a calm regime near 10\%, then spiking to a crisis peak of about 41\% around day 100 before mean-reverting back toward the long-run level. Your project's goal is to forecast the blue line one step ahead, not just know the red line.]*
+*Figure: The unconditional volatility (dashed red) is a single long-run average, held flat at about 17% annualized; it tells you nothing about which regime you're in today. The conditional volatility (solid blue) varies over time: it sits near 10-14% during calm stretches, climbs to a crisis spike of about 41% annualized around day 100, then mean-reverts back toward the long-run level before smaller oscillations later in the sample. Your project's goal is to forecast the blue line one step ahead, not just know the red line.*
 
 > **Key Idea: The Central Goal of This Guide**
 >
@@ -462,10 +405,10 @@ The gap between the two is what makes volatility modeling interesting.
 
 - Engle (1982) introduced ARCH, the first formal model of time-varying conditional variance, covered in [Chapter 5](ch05-garch-family.md).
 
-### Key results referenced in this chapter
+### Key Results Referenced in This Chapter
 
 | Paper | Result | Relevance |
-|---|---|---|
+|-------|--------|-----------|
 | Mandelbrot (1963) | Daily commodity returns follow a stable Paretian (fat-tailed) distribution, not Gaussian; sample variance does not converge. | First evidence that normal-distribution assumptions fail for financial data. |
 | Fama (1965) | Confirmed fat tails (leptokurtosis) in daily U.S. stock returns via S-shaped Q-Q departures from normality. | Extended Mandelbrot's finding to equities; supported the stable distribution hypothesis. |
 | Black (1976) | Documented negative correlation between stock returns and subsequent volatility changes (the leverage effect). | Motivates asymmetric volatility models (GJR-GARCH, EGARCH) in [Chapter 5](ch05-garch-family.md). |
