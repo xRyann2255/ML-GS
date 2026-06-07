@@ -4,7 +4,7 @@
 
 Ryan Vincent
 
-These markdown files are a faithful word-for-word conversion of `vol-learning-guide/main.pdf`, with TikZ diagrams recreated as Mermaid. Worked examples are omitted. Intended for LLM consumption on restricted machines.
+These markdown files are a faithful word-for-word conversion of `guides/vol-learning-guide/main.pdf`, with TikZ diagrams recreated as Mermaid. Worked examples are omitted. Intended for LLM consumption on restricted machines.
 
 ---
 

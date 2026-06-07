@@ -56,6 +56,7 @@ ML/
 │   ├── project-papers/          # papers specific to the vol project (32 curated)
 │   └── bibliography.md
 ├── guides/                      # LaTeX learning guides
+│   ├── vol-learning-guide/      # realized-vol estimation, forecasting & ML (20 chapters)
 │   ├── quant-trading/           # quant trading (38 chapters)
 │   └── vol-project-ref/         # realized-vol project reference
 └── archive/                     # archived work (risk-as-alpha, incl. old ml-finance guide)
@@ -73,7 +74,7 @@ The project direction is ML forecasting for realized volatility. Before locking 
 
 ## Writing Learning Guides
 
-New guides go in `guides/<guide-name>/`. Follow existing conventions from `guides/quant-trading/` and the root `vol-learning-guide/`.
+New guides go in `guides/<guide-name>/`. Follow existing conventions from `guides/quant-trading/` and `guides/vol-learning-guide/`.
 
 ### Setup
 - **Class**: `memoir` `[11pt, openany, a4paper, oneside]` or `report` `[11pt, a4paper]`
@@ -109,7 +110,7 @@ The `docs-only` branch contains only compiled PDFs, deliverables, and markdown n
 
 1. Compile all guides that have changed:
    ```bash
-   cd vol-learning-guide && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && cd ..
+   cd guides/vol-learning-guide && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && cd ../..
    cd guides/quant-trading && pdflatex -interaction=nonstopmode main.tex && cd ../..
    cd guides/vol-project-ref && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && cd ../..
    ```
@@ -117,15 +118,15 @@ The `docs-only` branch contains only compiled PDFs, deliverables, and markdown n
 3. Switch to docs-only and reset it from main, keeping only the target files:
    ```bash
    git checkout docs-only
-   git checkout main -- vol-learning-guide/main.pdf vol-learning-guide/markdown/ guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/
+   git checkout main -- guides/vol-learning-guide/main.pdf guides/vol-learning-guide/markdown/ guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/
    git commit -m "chore: sync compiled PDFs, markdown, and notes from main"
    git push
    git checkout main
    ```
 
 **What stays on `docs-only`:**
-- `vol-learning-guide/main.pdf`, `guides/quant-trading/main.pdf`, `guides/vol-project-ref/main.pdf`
-- `vol-learning-guide/markdown/` (markdown conversion of learning guide, with Mermaid diagrams, for LLM consumption)
+- `guides/vol-learning-guide/main.pdf`, `guides/quant-trading/main.pdf`, `guides/vol-project-ref/main.pdf`
+- `guides/vol-learning-guide/markdown/` (markdown conversion of learning guide, with Mermaid diagrams, for LLM consumption)
 - `guides/vol-project-ref/markdown/` (markdown conversion of project reference, with Mermaid diagrams, for LLM consumption)
 - `deliverables/` (all .md and .html)
 - `notes/` (all .md)

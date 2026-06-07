@@ -63,7 +63,7 @@ const P = (rel) => (ROOT === '.' ? rel : `${ROOT}/${rel}`)
 const guideArg = A.guide != null ? A.guide : A.guides
 const GUIDES = guideArg && String(guideArg).trim()
   ? [String(guideArg).trim()]
-  : ['guides/vol-project-ref', 'guides/quant-trading', 'vol-learning-guide']
+  : ['guides/vol-project-ref', 'guides/quant-trading', 'guides/vol-learning-guide']
 
 // ===================== Phase 1: Prepare (discover + compile, in parallel) =====================
 phase('Prepare')
@@ -103,9 +103,9 @@ For each guide, use the Grep tool (ripgrep) with line numbers over that guide's 
 (it recurses into chapters/), to get, in ONE pass, every line matching the begin-tikzpicture command, the
 \\caption command, or the \\label command.
 From that line-numbered output alone, for each begin-tikzpicture hit emit one flat 'figures' element:
-- guide: the guide's repo-relative name (the "guide" field above, e.g. "vol-learning-guide")
+- guide: the guide's repo-relative name (the "guide" field above, e.g. "guides/vol-learning-guide")
 - file: the .tex path RELATIVE to the repo root — it MUST begin with the guide name (e.g.
-  "vol-learning-guide/chapters/06-har-model.tex"). If you grepped an absolute "path", strip everything up to
+  "guides/vol-learning-guide/chapters/06-har-model.tex"). If you grepped an absolute "path", strip everything up to
   and including the guide name so the result is repo-relative. NEVER return an absolute path.
 - label: the FIRST label command AFTER this tikzpicture and BEFORE the next begin-tikzpicture hit; null if none
 - caption: the FIRST caption in that same range, truncated to ~80 chars; null if none

@@ -11,8 +11,8 @@ Faithful word-for-word conversion of a LaTeX chapter into GitHub-flavored markdo
 
 The skill expects these details (ask if not provided):
 
-- **Source file:** path to the `.tex` chapter (e.g., `vol-learning-guide/chapters/06-har-model.tex`)
-- **Output file:** path for the `.md` file (e.g., `vol-learning-guide/markdown/ch06-har-model.md`)
+- **Source file:** path to the `.tex` chapter (e.g., `guides/vol-learning-guide/chapters/06-har-model.tex`)
+- **Output file:** path for the `.md` file (e.g., `guides/vol-learning-guide/markdown/ch06-har-model.md`)
 - **Preamble:** path to the guide's `preamble.tex` (needed for custom macro expansion)
 - **Omissions:** any content to skip (e.g., worked examples, specific subsections)
 

@@ -6,7 +6,7 @@ Internship project repo: planning, research, and learning guides for a Goldman S
 
 | Guide | Pages | Topic |
 |-------|-------|-------|
-| `vol-learning-guide/main.pdf` | 374 | RV estimation, forecasting, and ML (18 chapters) |
+| `guides/vol-learning-guide/main.pdf` | 371 | RV estimation, forecasting, and ML (20 chapters) |
 | `guides/quant-trading/main.pdf` | — | Quant trading fundamentals (38 chapters) |
 | `guides/vol-project-ref/main.pdf` | — | Realized-vol project reference |
 
@@ -21,11 +21,11 @@ ML-GS/
 │   └── claude-code-optimization/
 ├── archive/               # archived work (risk-as-alpha, incl. old ml-finance guide)
 ├── guides/
+│   ├── vol-learning-guide/# volatility forecasting LaTeX guide (20 chapters)
 │   ├── quant-trading/     # quant trading LaTeX guide
 │   └── vol-project-ref/   # realized-vol project reference LaTeX guide
 ├── notes/                 # project notes (volatility.md, glossary, faq)
 ├── reference/             # books, papers, course materials
-├── vol-learning-guide/    # volatility forecasting LaTeX guide
 └── .claude/skills/        # Claude Code slash commands (see below)
 ```
 
@@ -136,4 +136,4 @@ The vol-learning-guide draws on ~45 papers. Core ones:
 - Local vol: Dupire (1994)
 - Microstructure: Glosten & Milgrom (1985), Kyle (1985)
 
-Full bibliography in `vol-learning-guide/references.bib`.
+Full bibliography in `guides/vol-learning-guide/references.bib`.

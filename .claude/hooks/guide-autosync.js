@@ -3,7 +3,7 @@
 // when the chapter SOURCE has changed since the last sync.
 //
 // Design (loop-safe, fires once per committed source change):
-//   - signature = sha256 of all vol-learning-guide/chapters/*.tex contents
+//   - signature = sha256 of all guides/vol-learning-guide/chapters/*.tex contents
 //   - marker file stores the last-synced signature
 //   - fires (blocks the Stop, instructing Claude to run the two skills) only when
 //     signature != marker AND the chapter source is committed (clean working tree).
@@ -17,7 +17,7 @@ const crypto = require('crypto')
 const { execSync } = require('child_process')
 
 const ROOT = 'C:/Users/RyanPC/Documents/Projects/ML-GS'
-const CHAPTERS = path.join(ROOT, 'vol-learning-guide', 'chapters')
+const CHAPTERS = path.join(ROOT, 'guides', 'vol-learning-guide', 'chapters')
 const MARKER = path.join(ROOT, '.claude', '.guide-sync-marker')
 
 function done(obj) {
@@ -48,7 +48,7 @@ try {
 
   // only act on COMMITTED changes (a task that wrapped up), not mid-edit
   let dirty = ''
-  try { dirty = execSync('git status --porcelain -- vol-learning-guide/chapters', { cwd: ROOT, encoding: 'utf8' }).trim() } catch (e) { done() }
+  try { dirty = execSync('git status --porcelain -- guides/vol-learning-guide/chapters', { cwd: ROOT, encoding: 'utf8' }).trim() } catch (e) { done() }
   if (dirty) done() // source edits not yet committed; wait
 
   // fire once: record the new signature so the upcoming sync does not re-trigger

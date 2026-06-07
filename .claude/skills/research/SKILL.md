@@ -25,7 +25,7 @@ Prompt:
 > Search the ML-GS repository for existing coverage of "[query]". Check:
 > - `notes/volatility.md` — the main scoping document
 > - `reference/project-papers/README.md` — the paper index
-> - Any existing guide chapters in `vol-learning-guide/chapters/` and `guides/quant-trading/chapters/`
+> - Any existing guide chapters in `guides/vol-learning-guide/chapters/` and `guides/quant-trading/chapters/`
 > - `notes/` for any other relevant files
 >
 > Report what we already know about this topic, with file paths and line numbers. Be specific — quote relevant passages. Under 300 words.
