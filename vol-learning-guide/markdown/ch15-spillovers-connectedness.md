@@ -1,10 +1,10 @@
-# Chapter 15: Volatility Spillovers and Connectedness
+# Chapter 15. Volatility Spillovers and Connectedness
 
 > **Application**
 >
 > [Chapter 14](ch14-multivariate-volatility.md) built tools for forecasting the full covariance matrix. This chapter focuses on a specific question: how does volatility transmit from one asset (or market) to another? Spillover indices and connectedness measures are both diagnostic tools (understanding contagion) and predictive features ([Chapter 10](ch10-feature-engineering.md)). Project 3 relies heavily on this framework.
 
-## 15.1 Diebold-Yilmaz Spillover Indices
+## Diebold-Yilmaz Spillover Indices
 
 In [Chapter 14](ch14-multivariate-volatility.md) you learned to model the joint dynamics of multiple assets. Now we zoom in on a sharper question: when one asset's volatility jumps, how much of that shock spills over into other assets?
 
@@ -17,17 +17,9 @@ In [Chapter 14](ch14-multivariate-volatility.md) you learned to model the joint 
 Stack the realized volatilities of $N$ assets into a vector $\mathbf{y}_t = (\operatorname{RV}_{1,t}, \ldots, \operatorname{RV}_{N,t})'$ and fit a VAR($p$):
 
 $$
-\mathbf{y}_t = \bm{c} + \sum_{\ell=1}^{p} \bm{A}_\ell \, \mathbf{y}_{t-\ell} + \bm{u}_t,
-\qquad \bm{u}_t \sim (0, \bm{\Sigma}),
+  \mathbf{y}_t = \bm{c} + \sum_{\ell=1}^{p} \bm{A}_\ell \, \mathbf{y}_{t-\ell} + \bm{u}_t,
+  \qquad \bm{u}_t \sim (0, \bm{\Sigma}),
 $$
-
-> **Intuition: In Plain English**
->
-> Today's vector of realized volatilities across all assets is a linear combination of the past $p$ days' volatility vectors, plus a surprise term. Each coefficient matrix $\bm{A}_\ell$ captures how yesterday's (or day-before's) vol in *every* asset feeds into today's vol for *every* asset. This is the multivariate extension of the HAR idea: past vol predicts future vol, but now cross-asset effects are explicitly modeled.
-
-> **Project Connection: Why This Matters**
->
-> The VAR on RVs is the backbone of the Diebold-Yilmaz framework. For your project, the off-diagonal entries of $\bm{A}_\ell$ are cross-asset predictive features: they tell you how much of asset $j$'s vol is predictable from asset $k$'s recent vol. This directly extends the univariate HAR baseline with cross-asset lags.
 
 where:
 
@@ -39,16 +31,12 @@ where:
 The key output is the *moving-average representation* obtained by inverting the VAR:
 
 $$
-\mathbf{y}_t = \bm{\mu} + \sum_{h=0}^{\infty} \bm{\Phi}_h \, \bm{u}_{t-h},
+  \mathbf{y}_t = \bm{\mu} + \sum_{h=0}^{\infty} \bm{\Phi}_h \, \bm{u}_{t-h},
 $$
 
 > **Intuition: In Plain English**
 >
-> This rewrites the system so that today's volatility is expressed as a sum of all past shocks, weighted by how much each shock persists over time. The matrix $\bm{\Phi}_h$ is the "memory kernel": entry $(j,k)$ tells you how much a surprise in asset $k$'s vol $h$ days ago still echoes in asset $j$'s vol today. It is the multivariate impulse-response function.
-
-> **Project Connection: Why This Matters**
->
-> The MA representation is what lets you decompose forecast errors into contributions from each asset. In your project, the impulse-response matrices $\bm{\Phi}_h$ underpin the Diebold-Yilmaz spillover index that enters Layer 4 of your feature pipeline. The total spillover index $S^{(H)}_t$ becomes a scalar regime indicator for LightGBM, while directional spillovers identify which assets are currently transmitting or receiving volatility shocks.
+> The matrix $\bm{\Phi}_h$ is the "memory kernel": entry $(j,k)$ tells you how much a surprise in asset $k$'s vol $h$ days ago still echoes in asset $j$'s vol today. It is the multivariate impulse-response function.
 
 where the $N \times N$ matrices $\bm{\Phi}_h$ are the impulse-response coefficients at horizon $h$. Entry $(\bm{\Phi}_h)_{jk}$ tells you how a unit shock to asset $k$ today affects asset $j$ at horizon $h$.
 
@@ -61,46 +49,38 @@ The next step decomposes the $H$-step forecast error variance of each asset into
 > The fraction of asset $j$'s $H$-step forecast-error variance attributable to shocks originating in asset $k$ is:
 >
 > $$
-> \theta_{jk}^{(H)}
-> = \frac{
->     \sigma_{kk}^{-1} \sum_{h=0}^{H-1}
->       \bigl(\bm{e}_j' \, \bm{\Phi}_h \, \bm{\Sigma} \, \bm{e}_k \bigr)^2
->   }{
->     \sum_{h=0}^{H-1}
->       \bm{e}_j' \, \bm{\Phi}_h \, \bm{\Sigma} \, \bm{\Phi}_h' \, \bm{e}_j
->   },
+>   \theta_{jk}^{(H)}
+>   = \frac{
+>       \sigma_{kk}^{-1} \sum_{h=0}^{H-1}
+>         \bigl(\bm{e}_j' \, \bm{\Phi}_h \, \bm{\Sigma} \, \bm{e}_k \bigr)^2
+>     }{
+>       \sum_{h=0}^{H-1}
+>         \bm{e}_j' \, \bm{\Phi}_h \, \bm{\Sigma} \, \bm{\Phi}_h' \, \bm{e}_j
+>     },
 > $$
 >
 > where:
 >
 > - $\sigma_{kk}$: the $(k,k)$ entry of $\bm{\Sigma}$ (variance of shock $k$),
 > - $\bm{e}_j$: the $j$-th column of the $N \times N$ identity matrix,
-> - $\bm{\Phi}_h$: the impulse-response matrix at horizon $h$ from the moving-average representation,
+> - $\bm{\Phi}_h$: the impulse-response matrix at horizon $h$ from the moving-average representation above,
 > - $H$: forecast horizon (typically 10 days).
 
 > **Intuition: In Plain English**
 >
 > This formula answers a simple question: of all the uncertainty in asset $j$'s volatility forecast $H$ days ahead, what fraction was caused by a shock to asset $k$? The numerator isolates the contribution of shock $k$ (scaled by its own variance), and the denominator is the total forecast uncertainty for asset $j$. When $j = k$, you get the "own" contribution; when $j \neq k$, you get the spillover from $k$ to $j$.
 
-> **Project Connection: Why This Matters**
->
-> The GFEVD is the core building block for spillover features. Each off-diagonal entry $\theta_{jk}^{(H)}$ is a direct measure of cross-asset vol predictability: it tells you how much of asset $j$'s vol surprise came from asset $k$. These entries feed the Diebold-Yilmaz decomposition that produces your Layer 4 spillover features for LightGBM.
-
 Because GFEVD rows do not sum to one in general, normalize each row:
 
 $$
-\widetilde{\theta}_{jk}^{(H)}
-= \frac{\theta_{jk}^{(H)}}{\sum_{k=1}^{N} \theta_{jk}^{(H)}},
-\qquad \text{so that } \sum_{k=1}^{N} \widetilde{\theta}_{jk}^{(H)} = 1.
+  \widetilde{\theta}_{jk}^{(H)}
+  = \frac{\theta_{jk}^{(H)}}{\sum_{k=1}^{N} \theta_{jk}^{(H)}},
+  \qquad \text{so that } \sum_{k=1}^{N} \widetilde{\theta}_{jk}^{(H)} = 1.
 $$
 
 > **Intuition: In Plain English**
 >
-> The raw GFEVD fractions for a given asset do not necessarily add up to 100% because the generalized approach allows shocks to be correlated. This normalization simply rescales each row so that the contributions from all assets (including itself) sum to one. After normalization, you can read each entry as a percentage: "$X$% of asset $j$'s vol forecast error is attributable to shocks from asset $k$."
-
-> **Project Connection: Why This Matters**
->
-> Normalized entries are directly interpretable as edge weights in the spillover network. For your feature matrix, these percentages can be used as-is: the "directional FROM" feature for each asset is just the sum of its off-diagonal row entries.
+> The raw GFEVD fractions for a given asset do not necessarily add up to 100% because the generalized approach allows shocks to be correlated. After normalization, you can read each entry as a percentage: "$X$% of asset $j$'s vol forecast error is attributable to shocks from asset $k$."
 
 ### Spillover Measures
 
@@ -111,38 +91,38 @@ From the normalized decomposition table $\widetilde{\bm{\Theta}}^{(H)}$, three s
 > **Total spillover index.** The fraction of total forecast-error variance due to cross-asset shocks:
 >
 > $$
-> S^{(H)} = \frac{1}{N} \sum_{\substack{j,k=1 \\ j \neq k}}^{N}
->   \widetilde{\theta}_{jk}^{(H)} \times 100.
+>   S^{(H)} = \frac{1}{N} \sum_{\substack{j,k=1 \\ j \neq k}}^{N}
+>     \widetilde{\theta}_{jk}^{(H)} \times 100.
 > $$
 >
 > **Directional FROM.** How much volatility asset $j$ *receives* from all others:
 >
 > $$
-> S_{j \leftarrow \bullet}^{(H)}
-> = \frac{1}{N} \sum_{\substack{k=1 \\ k \neq j}}^{N}
->   \widetilde{\theta}_{jk}^{(H)} \times 100.
+>   S_{j \leftarrow \bullet}^{(H)}
+>   = \frac{1}{N} \sum_{\substack{k=1 \\ k \neq j}}^{N}
+>     \widetilde{\theta}_{jk}^{(H)} \times 100.
 > $$
 >
 > **Directional TO.** How much volatility asset $j$ *transmits* to all others:
 >
 > $$
-> S_{j \rightarrow \bullet}^{(H)}
-> = \frac{1}{N} \sum_{\substack{k=1 \\ k \neq j}}^{N}
->   \widetilde{\theta}_{kj}^{(H)} \times 100.
+>   S_{j \rightarrow \bullet}^{(H)}
+>   = \frac{1}{N} \sum_{\substack{k=1 \\ k \neq j}}^{N}
+>     \widetilde{\theta}_{kj}^{(H)} \times 100.
 > $$
 >
 > **Net spillover.** Transmitters minus receivers:
 >
 > $$
-> S_j^{\text{net},(H)}
-> = S_{j \rightarrow \bullet}^{(H)} - S_{j \leftarrow \bullet}^{(H)}.
+>   S_j^{\text{net},(H)}
+>   = S_{j \rightarrow \bullet}^{(H)} - S_{j \leftarrow \bullet}^{(H)}.
 > $$
 >
 > A positive net spillover means asset $j$ is a *net transmitter* of volatility; negative means *net receiver*.
 
 > **Project Connection: Why This Matters**
 >
-> These four measures are the feature engineering payoff of the DY framework. Total spillover $S^{(H)}_t$ is a regime indicator (high = crisis = different vol dynamics). Directional FROM measures how "vulnerable" an asset is to imported vol. Net spillover identifies transmitters vs. receivers. All three become columns in your Layer 4 feature matrix, entering LightGBM as scalar cross-asset signals. Their value is concentrated in regime transitions, precisely the forecasts where single-asset features alone break down.
+> Their value is concentrated in regime transitions, precisely the forecasts where single-asset features alone break down.
 
 The framework evolved across three papers: Diebold and Yilmaz (2009) introduced the total index using a Cholesky decomposition, Diebold and Yilmaz (2012) added directional measures and switched to GFEVD, and Diebold and Yilmaz (2014) refined the generalized VAR approach and applied it to a broader set of markets.
 
@@ -151,57 +131,49 @@ The framework evolved across three papers: Diebold and Yilmaz (2009) introduced 
 The variance decomposition table maps directly onto a weighted directed graph: each asset is a node, and the edge from $k$ to $j$ carries weight $\widetilde{\theta}_{jk}^{(H)}$.
 
 ```mermaid
-flowchart TD
-    EQ["Equity<br/>net +18"]
-    CR["Credit<br/>net +6"]
-    CO["Commod<br/>net +1"]
-    FI["Bonds<br/>net -12"]
-    FX["FX<br/>net -8"]
+flowchart LR
+    EQ["Equity<br/>net +18"]:::transmitter
+    FI["Bonds<br/>net -12"]:::receiver
+    FX["FX<br/>net -8"]:::receiver
+    CO["Commod<br/>net +1"]:::neutral
+    CR["Credit<br/>net +6"]:::transmitter
 
-    EQ ==>|"22%"| FI
-    EQ ==>|"15%"| FX
-    CR ==>|"18%"| FI
+    EQ -->|"22%"| FI
+    EQ -->|"15%"| FX
+    CR -->|"18%"| FI
     EQ -->|"10%"| CO
-    CR ==>|"12%"| FX
+    CR -->|"12%"| FX
     CO -->|"6%"| FX
     FI -->|"4%"| CR
     EQ -->|"11%"| CR
 
-    classDef transmitter fill:#f8d0d0,stroke:#c0392b,stroke-width:2px;
-    classDef receiver fill:#d0e0f8,stroke:#1a5276,stroke-width:2px;
-    classDef neutral fill:#e8e8e8,stroke:#555,stroke-width:2px;
-    class EQ,CR transmitter;
-    class FI,FX receiver;
-    class CO neutral;
+    classDef transmitter fill:#f8cccc,stroke:#333;
+    classDef receiver fill:#cce0f5,stroke:#333;
+    classDef neutral fill:#e8e8e8,stroke:#333;
 ```
 
-*Figure: Spillover network for five asset classes. Edge labels show the percentage of $j$'s forecast-error variance explained by shocks from $k$. Node color indicates net transmitter (red) vs. net receiver (blue). Data are illustrative.*
-
-### Decomposition of Total Connectedness
+*Spillover network for five asset classes. Edge labels show the percentage of $j$'s forecast-error variance explained by shocks from $k$. Node color indicates net transmitter (red) vs. net receiver (blue). Data are illustrative.*
 
 ```mermaid
 flowchart TD
-    total["Total Spillover S^(H)<br/>System-wide connectedness<br/>= (1/N) Σ over j≠k of θ̃_jk"]
-    from["FROM  S_(j←•)<br/>Vol received<br/>(sum off-diag row)"]
-    to["TO  S_(j→•)<br/>Vol transmitted<br/>(sum off-diag col)"]
-    net["Net = TO − FROM<br/>Transmitter (+) or Receiver (−)"]
+    total["Total Spillover S^(H)<br/>System-wide connectedness"]:::topblock
+    from["FROM S_(j from all)<br/>Vol received"]:::midblock
+    to["TO S_(j to all)<br/>Vol transmitted"]:::midblock
+    net["Net = TO - FROM<br/>Transmitter (+) or Receiver (-)"]:::botblock
 
-    total --> from
+    total -->|"= (1/N) sum over j != k of theta-tilde_jk"| from
     total --> to
-    from --> net
-    to --> net
+    from -->|"sum off-diag row"| net
+    to -->|"sum off-diag col"| net
 
-    classDef topblock fill:#d0e0f0,stroke:#1a5276,stroke-width:2px;
-    classDef midblock fill:#fce5cd,stroke:#e67e22,stroke-width:2px;
-    classDef botblock fill:#d9ead3,stroke:#1e8449,stroke-width:2px;
-    class total topblock;
-    class from,to midblock;
-    class net botblock;
+    classDef topblock fill:#d6e4f0,stroke:#1a5276;
+    classDef midblock fill:#fce8d5,stroke:#e67e22;
+    classDef botblock fill:#d8f0d8,stroke:#1e8449;
 ```
 
-*Figure: Decomposition of the Diebold-Yilmaz spillover measures. The total index summarizes system-wide connectedness. Directional FROM and TO break it down per asset, and the net spillover identifies transmitters vs. receivers.*
+*Decomposition of the Diebold-Yilmaz spillover measures. The total index summarizes system-wide connectedness. Directional FROM and TO break it down per asset, and the net spillover identifies transmitters vs. receivers.*
 
-## 15.2 Time-Varying Spillovers
+## Time-Varying Spillovers
 
 The static spillover table in the previous section gives you a single snapshot. In practice, connectedness changes dramatically over time: calm markets have low spillovers, crises have high ones. This section covers two methods to capture the dynamics.
 
@@ -220,7 +192,7 @@ The simplest method: re-estimate the VAR and GFEVD on a rolling window of $w$ da
 >
 > The rolling-window approach introduces a hyperparameter $w$ that affects both level and smoothness. Too short ($w < 100$): noisy, unstable VAR estimates. Too long ($w > 300$): sluggish, crises get averaged out. Always report results for at least two window lengths to check robustness (Diebold and Yilmaz, 2012).
 
-*[Figure: Stylized total spillover index (200-day rolling window, $H = 10$) across five major asset classes, plotted by year over 2005 to 2024. The index sits near 33--38% in calm periods and spikes sharply during stress. It rises to roughly 78--83% at the 2008 financial crisis (Lehman, September 2008), to about 58--62% during the 2011 euro debt crisis, and to a peak near 82% during the March 2020 COVID-19 selloff. Between crises it reverts toward the 35--45% range. Three vertical dashed markers flag Lehman (September 2008), the euro debt crisis (2011), and COVID-19 (March 2020). The pattern reflects volatility contagion across markets concentrating during crises.]*
+*Figure (stylized time-series plot): the total spillover index (200-day rolling window, $H = 10$) across five major asset classes, plotted over 2005--2024 on a 20--90% scale. The index sits around 33--42% in calm years, then spikes to roughly 83% during the 2008 financial crisis (Lehman, Sep 2008), climbs to around 62% during the 2011 euro debt crisis, and jumps to about 82% in the March 2020 COVID-19 selloff before reverting toward the mid-30s%. Vertical dashed markers annotate Lehman (Sep 2008), the Euro debt crisis, and COVID-19 (Mar 2020). The index spikes sharply during the 2008 financial crisis and the March 2020 COVID selloff, reflecting contagion across markets.*
 
 ### TVP-VAR Connectedness
 
@@ -229,19 +201,15 @@ Antonakakis, Chatziantoniou, and Gabauer (2020) replace the rolling-window VAR w
 The TVP-VAR model allows coefficients to drift:
 
 $$
-\mathbf{y}_t = \bm{c}_t + \sum_{\ell=1}^{p} \bm{A}_{\ell,t} \, \mathbf{y}_{t-\ell}
-        + \bm{u}_t,
-\qquad
-\operatorname{vec}(\bm{A}_t) = \operatorname{vec}(\bm{A}_{t-1}) + \bm{\eta}_t,
+  \mathbf{y}_t = \bm{c}_t + \sum_{\ell=1}^{p} \bm{A}_{\ell,t} \, \mathbf{y}_{t-\ell}
+          + \bm{u}_t,
+  \qquad
+  \operatorname{vec}(\bm{A}_t) = \operatorname{vec}(\bm{A}_{t-1}) + \bm{\eta}_t,
 $$
 
 > **Intuition: In Plain English**
 >
-> This is the same VAR as before, but now the coefficient matrices $\bm{A}_{\ell,t}$ are allowed to change every day. The second equation says that today's coefficients equal yesterday's plus a small random drift $\bm{\eta}_t$. The Kalman filter estimates the evolving coefficients without needing a rolling window, so the spillover index updates smoothly each day rather than jumping when observations enter or leave a fixed window.
-
-> **Project Connection: Why This Matters**
->
-> TVP-VAR connectedness responds faster to regime changes than rolling-window estimates, making it a better real-time feature for your ML model. When the connectedness index spikes, your model knows that vol dynamics have shifted to "crisis mode" with higher persistence and stronger cross-asset effects. This is a natural conditioning variable for the HAR baseline: interact HAR lags with a high-connectedness indicator to let the model adapt its decay structure in real time.
+> The Kalman filter estimates the evolving coefficients without needing a rolling window, so the spillover index updates smoothly each day rather than jumping when observations enter or leave a fixed window.
 
 where:
 
@@ -254,7 +222,7 @@ At each $t$, the Kalman filter produces updated coefficient estimates, and you c
 >
 > Antonakakis, Chatziantoniou, and Gabauer (2020) show that TVP-VAR connectedness is smoother than rolling-window estimates, avoids the abrupt "entry/exit" artifacts when extreme observations enter or leave the window, and responds faster to genuine structural breaks. Both methods agree on the broad pattern: spillovers spike during crises and monetary-policy surprises, but the TVP-VAR resolves timing more sharply.
 
-## 15.3 Network Visualization and Interpretation
+## Network Visualization and Interpretation
 
 The GFEVD table is a matrix of numbers. Networks make that matrix readable at a glance. This section covers the visual conventions and the patterns you should look for.
 
@@ -274,16 +242,11 @@ The most striking pattern in spillover networks is the structural shift between 
 ```mermaid
 flowchart LR
     subgraph CALM["Calm Period"]
-        direction TB
-        subgraph CEQ["Equities"]
-            cA1["E1"]
-            cA2["E2"]
-            cA3["E3"]
-        end
-        subgraph CBO["Bonds"]
-            cB1["B1"]
-            cB2["B2"]
-        end
+        cA1["E1"]:::calmeq
+        cA2["E2"]:::calmeq
+        cA3["E3"]:::calmeq
+        cB1["B1"]:::calmbond
+        cB2["B2"]:::calmbond
         cA1 --- cA2
         cA2 --- cA3
         cA1 --- cA3
@@ -292,32 +255,28 @@ flowchart LR
     end
 
     subgraph CRISIS["Crisis Period"]
-        direction TB
-        kA1["E1"]
-        kA2["E2"]
-        kA3["E3"]
-        kB1["B1"]
-        kB2["B2"]
-        kA1 === kA2
-        kA2 === kA3
-        kA1 === kA3
-        kB1 === kB2
-        kA1 === kB1
-        kA2 === kB2
-        kA3 === kB1
-        kA3 === kB2
-        kA1 === kB2
+        kA1["E1"]:::crisis
+        kA2["E2"]:::crisis
+        kA3["E3"]:::crisis
+        kB1["B1"]:::crisis
+        kB2["B2"]:::crisis
+        kA1 ==> kA2
+        kA2 ==> kA3
+        kA1 ==> kA3
+        kB1 ==> kB2
+        kA1 ==> kB1
+        kA2 ==> kB2
+        kA3 ==> kB1
+        kA3 ==> kB2
+        kA1 ==> kB2
     end
 
-    classDef calmEq fill:#d6e4f5,stroke:#333;
-    classDef calmBo fill:#d9ead3,stroke:#333;
-    classDef crisisN fill:#f8d0d0,stroke:#c0392b,stroke-width:2px;
-    class cA1,cA2,cA3 calmEq;
-    class cB1,cB2 calmBo;
-    class kA1,kA2,kA3,kB1,kB2 crisisN;
+    classDef calmeq fill:#e6eeff,stroke:#333;
+    classDef calmbond fill:#e6f5e6,stroke:#333;
+    classDef crisis fill:#f8cccc,stroke:#333;
 ```
 
-*Figure: Spillover networks during calm (left) and crisis (right) periods. In calm markets, connectedness is largely within-sector (equity-to-equity, bond-to-bond), with sparse cross-sector links. During crises, cross-sector edges thicken and multiply: everything becomes connected to everything. After Demirer, Diebold, Liu, and Yilmaz (2018).*
+*Spillover networks during calm (left) and crisis (right) periods. In calm markets, connectedness is largely within-sector (equity-to-equity, bond-to-bond), with sparse cross-sector links. During crises, cross-sector edges thicken and multiply: everything becomes connected to everything. After Demirer, Diebold, Liu, and Yilmaz (2018).*
 
 > **Key Idea: Calm-Crisis Network Transition**
 >
@@ -327,9 +286,9 @@ flowchart LR
 > 2. **Crises**: cross-sector connectedness surges. The network topology shifts from clustered to nearly fully connected. Total spillover jumps to 70--85%.
 > 3. **Net transmitter identity shifts**: in calm markets, commodity shocks are often isolated; during crises, equity and credit become dominant transmitters (Diebold and Yilmaz, 2014).
 
-## 15.4 Cross-Asset Universality
+## Cross-Asset Universality
 
-The high cross-sector connectedness during crises hints at something deeper: maybe volatility dynamics are not just correlated but fundamentally *similar* across asset classes. Two recent papers make this case precisely.
+The high cross-sector connectedness during crises suggests volatility dynamics may be not merely correlated but *similar* across asset classes. Two recent papers make this case precisely.
 
 Sirignano and Cont (2019) train a single deep network (LSTM layers followed by a fully-connected layer) to predict the direction of the next price move by pooling high-frequency data across hundreds of US equities. The pooled ("universal") model outperforms individual asset-specific models, implying that the features driving price formation are largely shared.
 
@@ -343,19 +302,15 @@ Rosenbaum and Zhang (2022) push universality further by training a universal LST
 >
 > If volatility dynamics really are "universal" (same roughness, same feature importance across assets), then the strong cross-asset connectedness you see during crises may not require a contagion story. Instead, a single common factor (e.g., dealer risk capacity, funding liquidity) could drive all assets simultaneously. This does not diminish the usefulness of spillover indices as diagnostic tools, but it changes how you interpret them: high spillover may reflect common-factor exposure rather than sequential transmission from one asset to the next.
 
-> **Project Connection: Why This Matters**
->
-> Universality has a direct architectural implication for your project. If vol dynamics are truly shared across assets, you can train a single model on pooled data (all assets stacked) rather than fitting $N$ separate models. This dramatically increases your effective sample size and reduces overfitting. Even for a univariate HAR-based forecast, pooling across assets with shared features (same lags, same jump indicators) can improve out-of-sample QLIKE.
-
 ### Pooled Panel Forecasting Across Instruments
 
-Pooling raises a concrete question the box above left open: how do you feed RV histories for all $34$ instruments in your project into a single HAR regression or a single LightGBM, without (a) drowning the few liquid index futures under the $30$ mega-cap equities, (b) letting the model confuse a structurally high-vol name with a structurally low-vol one, or (c) leaking information across instruments on a crisis day? This subsection answers those questions for the two model classes you actually use as baselines, pooled linear/HAR and pooled trees. It stays on forecasting; it does not wander into causal questions like "did asset A's vol *cause* asset B's", that is a separate topic.
+Universality has a direct architectural implication: if vol dynamics are truly shared across assets, you can train a single model on pooled data rather than fitting $N$ separate models, which raises a concrete question: how do you feed RV histories for all $34$ instruments in your project into a single HAR regression or a single LightGBM, without (a) drowning the few liquid index futures under the $30$ mega-cap equities, (b) letting the model confuse a structurally high-vol name with a structurally low-vol one, or (c) leaking information across instruments on a crisis day? This subsection answers those questions for the two model classes you actually use as baselines, pooled linear/HAR and pooled trees.
 
 > **Prereq: Panel Data**
 >
 > Until now this guide has treated each instrument as its own time series: one column of $\operatorname{RV}_t$, fit a HAR, repeat $34$ times. A **panel** (or **longitudinal**) data set instead tracks multiple **entities** $i = 1, \ldots, N$ over multiple time periods $t = 1, \ldots, T$, with each observation indexed by the pair $(i,t)$. Here the entities are the $N = 34$ instruments (the $30$ mega-cap equities plus $4$ sector/index ETFs and the E-mini S&P 500 future from [Chapter 10](ch10-feature-engineering.md)), the time index $t$ runs over trading days, and the target $y_{it}$ is next-day (or $h$-day) realized volatility for instrument $i$. When every instrument is observed on every date the panel is **balanced**; when some $(i,t)$ cells are missing it is **unbalanced** (treated at the end of this subsection).
 
-Fitting $34$ separate HARs throws away an obvious resource: the instruments share dynamics. [Chapter 7](ch07-rough-volatility.md) and the universality results above (Sirignano and Cont, 2019; Rosenbaum and Zhang, 2022) argue that the *shape* of volatility dynamics (HAR decay structure, jump sensitivity, the leverage tilt) is broadly common across liquid assets. If that is even approximately true, then stacking the $34$ instruments into one $(i,t)$ panel lets a single set of coefficients borrow strength from every series at once.
+Fitting $34$ separate HARs throws away an obvious resource: the instruments share dynamics. [Chapter 7](ch07-rough-volatility.md) and the universality results above (Sirignano and Cont, 2019; Rosenbaum and Zhang, 2022) argue that the *shape* of volatility dynamics, HAR decay structure, jump sensitivity, the leverage tilt, is broadly common across liquid assets. If that is even approximately true, then stacking the $34$ instruments into one $(i,t)$ panel lets a single set of coefficients borrow strength from every series at once.
 
 > **Intuition: Why stacking grows the sample**
 >
@@ -363,13 +318,13 @@ Fitting $34$ separate HARs throws away an obvious resource: the instruments shar
 
 #### A pooled HAR baseline, and why naive pooling fails
 
-The naive move is to stack every instrument's HAR **design matrix** (just the table of feature values, one row per $(\text{instrument},\text{day})$ and one column per feature) and run one OLS (**ordinary least squares**, the standard best-fit-line procedure). Stacking means literally laying each instrument's feature table on top of the next into one tall table. The problem is **instrument-specific heterogeneity**: a high-beta growth name lives at a structurally higher average $\operatorname{RV}$ than a defensive utility, and a single common **intercept** (the baseline level the line starts from) cannot represent both. Forcing one intercept makes the pooled fit chase the cross-instrument *level* differences instead of the volatility *dynamics* you actually want to learn. The fix is an **entity fixed effect**: one intercept per instrument. Because each instrument carries many features rather than one, the single slope $m$ of a straight line $y=mx+b$ becomes a **slope vector** $\bm{\beta}$ with one slope per feature.
+The naive move is to stack every instrument's HAR **design matrix**, just the table of feature values, one row per $(\text{instrument},\text{day})$ and one column per feature, and run one OLS (**ordinary least squares**, the standard best-fit-line procedure). Stacking means literally laying each instrument's feature table on top of the next into one tall table. The problem is **instrument-specific heterogeneity**: a high-beta growth name lives at a structurally higher average $\operatorname{RV}$ than a defensive utility, and a single common **intercept** (the baseline level the line starts from) cannot represent both. Forcing one intercept makes the pooled fit chase the cross-instrument *level* differences instead of the volatility *dynamics* you actually want to learn. The fix is an **entity fixed effect**: one intercept per instrument. Because each instrument carries many features rather than one, the single slope $m$ of a straight line $y=mx+b$ becomes a **slope vector** $\bm{\beta}$ with one slope per feature.
 
 The entity fixed-effects model gives each instrument its own baseline volatility level while sharing one common slope vector across all of them:
 
 $$
-y_{it} = \underbrace{\alpha_i}_{\text{instrument level}}
-         + \mathbf{x}_{it}'\bm{\beta} + \varepsilon_{it},
+  y_{it} = \underbrace{\alpha_i}_{\text{instrument level}}
+           + \mathbf{x}_{it}'\bm{\beta} + \varepsilon_{it},
 $$
 
 The notation $\mathbf{x}_{it}'\bm{\beta}$ (read "$x$-transpose-$\bm{\beta}$"; the raised tick mark $'$ is the *transpose*, which here just turns the column of features into a row so the next step is a sum) is shorthand for multiplying each of the $K$ features by its matching coefficient in $\bm{\beta}$ and adding them into a single predicted number, the same $\beta_1\,\text{feature}_1 + \beta_2\,\text{feature}_2 + \cdots$ you saw in the HAR regression of [Chapter 10](ch10-feature-engineering.md).
@@ -382,7 +337,7 @@ The notation $\mathbf{x}_{it}'\bm{\beta}$ (read "$x$-transpose-$\bm{\beta}$"; th
 
 > **Intuition: In Plain English**
 >
-> The entity fixed-effects equation says: "Let every instrument sit at its own resting volatility level $\alpha_i$, but make them all obey the *same* rule for how yesterday's, last week's, and last month's vol map into tomorrow's." The fixed effect quarantines the boring, permanent level differences into $\alpha_i$ so that the interesting, shared dynamics live entirely in $\bm{\beta}$. You estimate one HAR for the whole desk instead of $34$ noisy ones.
+> The entity fixed-effects equation above says: "Let every instrument sit at its own resting volatility level $\alpha_i$, but make them all obey the *same* rule for how yesterday's, last week's, and last month's vol map into tomorrow's."
 
 > **Project Connection: Why This Matters**
 >
@@ -393,10 +348,10 @@ You do not have to literally add $34$ dummy columns. The algebraically identical
 Demeaning each instrument's series removes its fixed effect, leaving a clean regression for $\bm{\beta}$:
 
 $$
-\underbrace{(y_{it} - \bar{y}_i)}_{\text{demeaned target}}
-= (\mathbf{x}_{it} - \bar{\mathbf{x}}_i)'\bm{\beta} + (\varepsilon_{it} - \bar{\varepsilon}_i),
-\qquad
-\bar{y}_i = \frac{1}{T_i}\sum_{t} y_{it},
+  \underbrace{(y_{it} - \bar{y}_i)}_{\text{demeaned target}}
+  = (\mathbf{x}_{it} - \bar{\mathbf{x}}_i)'\bm{\beta} + (\varepsilon_{it} - \bar{\varepsilon}_i),
+  \qquad
+  \bar{y}_i = \frac{1}{T_i}\sum_{t} y_{it},
 $$
 
 where:
@@ -415,32 +370,32 @@ where:
 
 > **Warning: Within estimation discards cross-instrument level information**
 >
-> The within estimator uses only *within-instrument* variation over time; it throws away the *between-instrument* variation in average levels entirely. That is deliberate (the level differences are the heterogeneity you wanted to control for) but it has a consequence: you cannot identify the effect of any *instrument-constant* feature (sector label, "is-an-index" flag) inside a fixed-effects regression, because such a feature has zero within variation and is indistinguishable from $\alpha_i$, the instrument's intercept already captures anything that never changes for that instrument, so a sector label adds no new information the regression can separate out. If you need those level effects, carry them as separate dummy features in the tree model below rather than the FE regression.
+> The within estimator uses only *within-instrument* variation over time; it throws away the *between-instrument* variation in average levels entirely. That is deliberate, the level differences are the heterogeneity you wanted to control for, but it has a consequence: you cannot identify the effect of any *instrument-constant* feature (sector label, "is-an-index" flag) inside a fixed-effects regression, because such a feature has zero within variation and is indistinguishable from $\alpha_i$, the instrument's intercept already captures anything that never changes for that instrument, so a sector label adds no new information the regression can separate out. If you need those level effects, carry them as separate dummy features in the tree model below rather than the FE regression.
 
 #### Time fixed effects: absorbing market-wide crisis days
 
-The time-varying spillovers section above showed that on crisis days (Lehman, the euro crisis, the March 2020 COVID selloff) *every* instrument's vol spikes at once. In a pooled panel those common-shock days act like $34$ correlated duplicate observations of the same event, and they can dominate the fit. A **time fixed effect** $\delta_t$ absorbs whatever is common to all instruments on a given day.
+The time-varying spillovers section above showed that on crisis days, Lehman, the euro crisis, the March 2020 COVID selloff, *every* instrument's vol spikes at once. In a pooled panel those common-shock days act like $34$ correlated duplicate observations of the same event, and they can dominate the fit. A **time fixed effect** $\delta_t$ absorbs whatever is common to all instruments on a given day.
 
 Adding a per-day intercept on top of the per-instrument intercept strips out market-wide volatility shocks:
 
 $$
-y_{it} = \alpha_i
-         + \underbrace{\delta_t}_{\text{market-wide day shock}}
-         + \mathbf{x}_{it}'\bm{\beta} + \varepsilon_{it},
+  y_{it} = \alpha_i
+           + \underbrace{\delta_t}_{\text{market-wide day shock}}
+           + \mathbf{x}_{it}'\bm{\beta} + \varepsilon_{it},
 $$
 
 where:
 
-- $\delta_t$: the *time-specific intercept*, common to all $N$ instruments on day $t$, absorbing aggregate vol spikes, macro releases, and the contagion days quantified by the total-spillover index $S^{(H)}_t$ from the Diebold-Yilmaz spillover section above (a single number near $30$--$40\%$ in calm markets and $70$--$85\%$ in crises that tracks how much of the market is moving together),
-- all other symbols are as in the entity fixed-effects equation; with both $\alpha_i$ and $\delta_t$ present this is a **two-way fixed-effects** model.
+- $\delta_t$: the *time-specific intercept*, common to all $N$ instruments on day $t$, absorbing aggregate vol spikes, macro releases, and the contagion days quantified by the total-spillover index $S^{(H)}_t$ from the Diebold-Yilmaz section above (a single number near $30$--$40\%$ in calm markets and $70$--$85\%$ in crises that tracks how much of the market is moving together),
+- all other symbols are as in the entity fixed-effects equation above; with both $\alpha_i$ and $\delta_t$ present this is a **two-way fixed-effects** model.
 
 > **Intuition: In Plain English**
 >
-> The entity effect $\alpha_i$ asks "which instrument is this?" and removes it. The time effect $\delta_t$ asks "what was the whole market doing today?" and removes that too. What survives is the *relative* signal: on a day when market vol is elevated, which names are even *more* elevated than the average, and is that excess predictable from their own lagged-vol features? $\delta_t$ is, in effect, the regression-coefficient cousin of the total-spillover regime indicator $S^{(H)}_t$, both soak up the shared crisis component so the model can focus on cross-sectional differences.
+> The entity effect $\alpha_i$ asks "which instrument is this?" and removes it. The time effect $\delta_t$ asks "what was the whole market doing today?" and removes that too. What survives is the *relative* signal: on a day when market vol is elevated, which names are even *more* elevated than the average, and is that excess predictable from their own lagged-vol features?
 
 > **Project Connection: Why This Matters**
 >
-> There is a real trade-off here for an RV forecaster. If your deliverable is the *absolute* level of each instrument's vol (the input to a vol-targeting strategy, one that scales position size up when forecast vol is low and down when it is high, so it needs the absolute level), do *not* include time effects: $\delta_t$ absorbs the common vol signal that is precisely what such a strategy needs to size positions. Include time effects only when you care about the *cross-sectional* question, which names will be relatively more volatile, e.g. for a dispersion or relative-value trade, which only bets on which names are *more* volatile than others and so needs the cross-sectional ranking rather than the absolute level. A practical compromise that keeps the absolute signal is to drop $\delta_t$ but add the spillover features from the predictive-features section below as columns, letting the model condition on the regime rather than differencing it away.
+> There is a real trade-off here for an RV forecaster. If your deliverable is the *absolute* level of each instrument's vol (the input to a vol-targeting strategy, one that scales position size up when forecast vol is low and down when it is high, so it needs the absolute level), do *not* include time effects: $\delta_t$ absorbs the common vol signal that is precisely what such a strategy needs to size positions. Include time effects only when you care about the *cross-sectional* question, which names will be relatively more volatile, e.g. for a dispersion or relative-value trade, which only bets on which names are *more* volatile than others and so needs the cross-sectional ranking rather than the absolute level. A practical compromise that keeps the absolute signal is to drop $\delta_t$ but add the spillover features (see the spillover-features section below) as columns, letting the model condition on the regime rather than differencing it away.
 
 #### Encoding instrument identity for a pooled LightGBM
 
@@ -448,7 +403,7 @@ A tree model does not demean. To pool $34$ instruments in LightGBM you instead g
 
 > **Key Idea: Instrument dummies recover instrument-specific dynamics for free**
 >
-> When the tree splits on `is_AAPL = 1` and then splits on the weekly-$\operatorname{RV}$ feature beneath that branch, it has effectively estimated a *different* HAR slope for that instrument, a feature$\times$instrument *interaction* (a rule that lets the slope on a feature differ by instrument), and via a first split on identity alone it also reproduces the per-instrument level $\alpha_i$, which the single shared $\bm{\beta}$ of the entity fixed-effects model can only get through explicit interaction terms. Pooling in a tree therefore gives you the sample-size benefit of the panel *and* per-instrument flexibility, without fitting $34$ separate models.
+> When the tree splits on `is_AAPL = 1` and then splits on the weekly-$\operatorname{RV}$ feature beneath that branch, it has effectively estimated a *different* HAR slope for that instrument, a feature$\times$instrument *interaction* (a rule that lets the slope on a feature differ by instrument), and via a first split on identity alone it also reproduces the per-instrument level $\alpha_i$, which the single shared $\bm{\beta}$ of the entity fixed-effects equation can only get through explicit interaction terms. Pooling in a tree therefore gives you the sample-size benefit of the panel *and* per-instrument flexibility, without fitting $34$ separate models.
 
 > **Warning: Never target-encode the instrument ID, it leaks the future**
 >
@@ -456,11 +411,11 @@ A tree model does not demean. To pool $34$ instruments in LightGBM you instead g
 
 > **Project Connection: Why This Matters**
 >
-> This leakage is the cross-sectional cousin of the standard look-ahead bias from [Chapter 16](ch16-forecast-evaluation.md). The same panel structure that grows your sample also multiplies the ways the future can leak into the past, and the most dangerous one is at the *fold* level: a random $K$-fold split scatters rows from the same date across train and test, so the model sees other instruments' day-$t$ behaviour while predicting instrument $i$ on day $t$. Use the time-blocked purged CV of [Chapter 16](ch16-forecast-evaluation.md), and follow the cross-sectional leakage rule in [Chapter 16](ch16-forecast-evaluation.md): entire *dates* go to train or test as a block, never split across folds.
+> This leakage is the cross-sectional cousin of the standard look-ahead bias from [Chapter 16](ch16-forecast-evaluation.md). The same panel structure that grows your sample also multiplies the ways the future can leak into the past, and the most dangerous one is at the *fold* level: a random $K$-fold split scatters rows from the same date across train and test, so the model sees other instruments' day-$t$ behaviour while predicting instrument $i$ on day $t$. Use the time-blocked purged CV (the purged-CV section of [Chapter 16](ch16-forecast-evaluation.md)), and follow the cross-sectional leakage rule (the cross-sectional-leakage section of [Chapter 16](ch16-forecast-evaluation.md)): entire *dates* go to train or test as a block, never split across folds.
 
 #### Unbalanced panels and short-history instruments
 
-Your panel will almost certainly be **unbalanced**: a name added to the index two years ago has half the history of the index future, and a recent IPO has a few hundred days at most. Both the within estimator and a tree handle this without special pleading (demeaning in the within-estimator equation uses whatever $T_i$ days exist for instrument $i$, and a tree simply sees fewer rows for that name) but two cautions apply specifically to RV forecasting.
+Your panel will almost certainly be **unbalanced**: a name added to the index two years ago has half the history of the index future, and a recent IPO has a few hundred days at most. Both the within estimator and a tree handle this without special pleading, demeaning in the within equation above uses whatever $T_i$ days exist for instrument $i$, and a tree simply sees fewer rows for that name, but two cautions apply specifically to RV forecasting.
 
 > **Warning: Short histories distort a pooled fit two ways**
 >
@@ -469,14 +424,14 @@ Your panel will almost certainly be **unbalanced**: a name added to the index tw
 The practical recipe for the pooled RV panel:
 
 1. Stack the $34$ instruments into an $(i,t)$ panel; $z$-score every feature *within instrument* using a trailing window ([Chapter 10](ch10-feature-engineering.md)).
-2. For the linear baseline, use entity fixed effects (the entity fixed-effects model above); add time effects only if the target is cross-sectional rather than absolute.
+2. For the linear baseline, use entity fixed effects (the entity fixed-effects equation above); add time effects only if the target is cross-sectional rather than absolute.
 3. For the tree, add $N-1$ one-hot instrument dummies; *never* target-encode the ID.
-4. Validate with date-blocked purged CV ([Chapter 16](ch16-forecast-evaluation.md)), so whole dates, not random rows, define the folds.
+4. Validate with date-blocked purged CV (the purged-CV and cross-sectional-leakage sections of [Chapter 16](ch16-forecast-evaluation.md)), so whole dates, not random rows, define the folds.
 5. Sanity-check robustness by re-fitting on the balanced full-history sub-panel; report $\operatorname{QLIKE}$ for both.
 
-## 15.5 Spillover Indices as Predictive Features
+## Spillover Indices as Predictive Features
 
-The previous sections treated spillover indices as descriptive diagnostics. This section flips the lens: can you use them as *inputs* to the forecasting models from [Chapter 11](ch11-tree-methods-vol.md) through [Chapter 13](ch13-hybrid-ensemble.md)? The answer is a qualified yes, with important caveats.
+The previous sections treated spillover indices as descriptive diagnostics. This section flips the lens: can you use them as *inputs* to the forecasting models from [Chapter 11](ch11-tree-methods-vol.md) through [Chapter 13](ch13-hybrid-ensemble.md)?
 
 ### Three Feature Families
 
@@ -491,8 +446,6 @@ The previous sections treated spillover indices as descriptive diagnostics. This
 > **Warning: Spillover features are slow-moving**
 >
 > Spillover indices computed from a 200-day rolling window update slowly. For short-horizon forecasts (1--5 days), they may add little predictive power beyond the VIX or a simple HAR model. Their value is highest for medium-to-long horizons (1 week to 3 months) and for regime-conditional models.
->
-> Additionally, the TVP-VAR variant from Antonakakis, Chatziantoniou, and Gabauer (2020) responds faster than rolling-window estimates, making it more suitable as an ML input if you need timelier signals.
 
 A practical recipe for incorporating spillover features:
 
@@ -502,7 +455,7 @@ A practical recipe for incorporating spillover features:
 4. Include as additional columns in the feature matrix from [Chapter 10](ch10-feature-engineering.md), alongside HAR lags, VRP, and other predictors.
 5. Check $\operatorname{SHAP}$ importance: if spillover features rank below the top 10 in a LightGBM model, they likely add noise rather than signal for your target horizon.
 
-## 15.6 Summary
+## Summary
 
 - The Diebold-Yilmaz framework measures volatility spillovers using a VAR on realized volatilities and generalized forecast error variance decomposition (GFEVD).
 - The **total spillover index** $S^{(H)}$ captures the fraction of forecast-error variance explained by cross-asset shocks; typical values are 30--40% in calm markets, 70--85% during crises.
