@@ -3,12 +3,8 @@
 
 \begin{application}[Why This Chapter?]
 GARCH models forecast volatility using only daily returns, without intraday data.
-They are the historical workhorse of volatility modeling and remain widely used in
-risk management systems. Understanding GARCH is necessary background for
-appreciating why the HAR model (Chapter~\ref{ch:har}), which uses realized
-volatility from intraday data, represents a significant improvement. Realized GARCH
-and the HEAVY model bridge these two worlds. Project~1 (HARQ-X) uses GARCH as a
-comparison baseline.
+Project~1 (HARQ-X) uses GARCH as a comparison baseline, and Realized GARCH and the
+HEAVY model bridge the daily-return and realized-volatility worlds.
 \end{application}
 
 Chapters~\ref{ch:rv}--\ref{ch:jumps} built volatility estimators from intraday
@@ -95,13 +91,6 @@ conditional variance.
 \end{tikzpicture}
 \end{center}
 
-\begin{intuition}[Why Squared Returns?]
-If a stock fell 3\% yesterday, you expect higher volatility today. If it barely
-moved (0.1\%), you expect calm. Squaring the return strips away the sign and gives a
-rough measure of how ``big'' the move was. ARCH formalizes this: the conditional
-variance is a weighted sum of past squared returns.
-\end{intuition}
-
 \citet{Engle1982} proposed the ARCH($q$) model. In its simplest form, ARCH(1):
 %
 \begin{equation}
@@ -118,20 +107,6 @@ variance is a weighted sum of past squared returns.
         realized variance
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-Tomorrow's variance equals a floor level plus a correction based on how big today's
-move was. If the market barely moved, the forecast stays near the floor. If it moved
-a lot, the forecast jumps. This is the simplest possible ``volatility responds to
-recent news'' model.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-ARCH is the conceptual ancestor of every conditional variance model you will compare
-against. Its core idea (past squared returns predict future variance) reappears in
-the HAR model, which replaces squared returns with realized variance at multiple
-horizons.
-\end{projectconnection}
-
 The general ARCH($q$) model adds more lags:
 %
 \begin{equation}
@@ -143,12 +118,6 @@ The general ARCH($q$) model adds more lags:
   \item $q$: number of lags included
   \item $\alpha_i \geq 0$: weight on the squared return from $i$ days ago
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-ARCH($q$) generalizes the same idea: instead of looking only at yesterday, you look
-at the last $q$ days of squared returns and take a weighted average. More lags let
-the model capture longer memory in volatility, but each lag adds a free parameter.
-\end{intuition}
 
 \begin{warning}[ARCH's Parameter Problem]
 Volatility is persistent: a shock today still affects volatility weeks later.
@@ -174,9 +143,8 @@ squared return (news) with yesterday's forecast (memory). A single memory term
 replaces an infinite history of squared returns.
 \end{intuition}
 
-The following diagram shows how information flows in GARCH(1,1). Today's variance
-forecast feeds into tomorrow's, creating a self-reinforcing loop that captures
-persistence.
+Today's variance forecast feeds into tomorrow's, creating a self-reinforcing loop
+that captures persistence (see diagram).
 
 \begin{center}
 \begin{tikzpicture}[
@@ -236,15 +204,6 @@ persistence.
   \item $\sigma^2_{t-1}$: yesterday's conditional variance forecast (the ``memory'')
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-Tomorrow's variance is a weighted average of three things: the long-run average
-variance ($\omega$), how big today's surprise was ($\alpha \, r^2_{t-1}$), and what
-you already thought variance was ($\beta \, \sigma^2_{t-1}$). The memory term
-$\beta \, \sigma^2_{t-1}$ is the key innovation over ARCH: it lets one parameter do
-the work of many lagged squared returns, because yesterday's forecast already
-encodes the entire history.
-\end{intuition}
-
 \begin{projectconnection}[Why This Matters]
 GARCH(1,1) is your simplest conditional-variance baseline. In a model horse race,
 any ML model or HAR variant that cannot beat GARCH(1,1) out of sample is not worth
@@ -276,10 +235,8 @@ never decay, and the unconditional variance is undefined
 
 \begin{intuition}[In Plain English]
 The unconditional variance is the ``gravity'' level that the conditional variance
-always pulls toward. When $\alpha + \beta$ is close to 1, the pull is very weak:
-after a volatility spike, it takes weeks or months for the forecast to drift back to
-normal. This is mean reversion in volatility, and the speed of that reversion is
-$1 - \alpha - \beta$.
+always pulls toward. This is mean reversion in volatility, and the speed of that
+reversion is $1 - \alpha - \beta$.
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
@@ -297,37 +254,16 @@ $\beta = 0.90$. Yesterday's return was $r_{t-1} = -0.03$ (a 3\% loss), and
 yesterday's conditional variance was $\sigma^2_{t-1} = 0.0004$
 (implying $\sigma_{t-1} = 0.02$, or 2\% daily vol).
 
-\textbf{Step 1: Compute each component.}
-%
-\begin{align*}
-\text{Baseline:}& \quad \omega = 0.00001 \\
-\text{News:}& \quad \alpha \cdot r^2_{t-1}
-  = 0.08 \times (-0.03)^2
-  = 0.08 \times 0.0009
-  = 0.000072 \\
-\text{Memory:}& \quad \beta \cdot \sigma^2_{t-1}
-  = 0.90 \times 0.0004
-  = 0.00036
-\end{align*}
+\textbf{Step 1: Compute the forecast.}
+Summing the baseline, news, and memory components gives
+$\sigma^2_t = 0.00001 + 0.000072 + 0.00036 = 0.000442$, so
+$\sigma_t = \sqrt{0.000442} \approx 2.10\%$.
 
-\textbf{Step 2: Sum the components.}
-%
-\[
-\sigma^2_t = 0.00001 + 0.000072 + 0.00036 = 0.000442
-\]
-
-\textbf{Step 3: Convert to daily volatility.}
-%
-\[
-\sigma_t = \sqrt{0.000442} \approx 0.0210 = 2.10\%
-\]
-
-The 3\% loss (larger than the 2\% daily vol) pushes the variance forecast up from
-0.0004 to 0.000442, a 10.5\% increase. Most of the forecast (81\%) comes from the
+Most of the forecast (81\%) comes from the
 memory term $\beta \sigma^2_{t-1}$, reflecting the high persistence typical of
 financial volatility.
 
-\textbf{Step 4: Check long-run variance.}
+\textbf{Step 2: Check long-run variance.}
 %
 \[
 \bar{\sigma}^2 = \frac{0.00001}{1 - 0.08 - 0.90}
@@ -370,8 +306,8 @@ volatility rises. A positive return has the opposite effect but to a smaller deg
 This ``leverage effect'' is one of the most robust stylized facts in equity markets.
 \end{intuition}
 
-The following diagram illustrates the asymmetry. For the same magnitude of return,
-negative returns produce a larger volatility response than positive returns.
+For the same magnitude of return, negative returns produce a larger volatility
+response than positive returns (diagram).
 
 \begin{center}
 \begin{tikzpicture}
@@ -451,58 +387,12 @@ The effect is straightforward:
         $\alpha + \gamma$, giving a stronger volatility response.
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-GJR-GARCH is just GARCH(1,1) with a bonus penalty for bad news. After a positive
-return, the equation is identical to standard GARCH. After a negative return, the
-indicator switches on and adds extra sensitivity ($\gamma$) to the squared return.
-The model has two ``gears'': a calm gear for up days and a reactive gear for down
-days.
-\end{intuition}
-
 \begin{projectconnection}[Why This Matters]
 The leverage effect is one of the strongest predictable patterns in equity volatility.
 Adding an asymmetry term (whether in GJR-GARCH or as a signed-return feature in your
 ML model) typically improves QLIKE by 5--15\%. If your HAR baseline does not include
 a negative-return indicator, GJR-GARCH shows exactly why it should.
 \end{projectconnection}
-
-\begin{workedexample}{GJR-GARCH: Positive vs.\ Negative Shocks}
-Using $\omega = 0.00001$, $\alpha = 0.04$, $\gamma = 0.08$, $\beta = 0.90$,
-and $\sigma^2_{t-1} = 0.0004$:
-
-\textbf{Case A: $r_{t-1} = +0.03$ (3\% gain).}
-%
-\begin{align*}
-\sigma^2_t &= 0.00001 + 0.04 \times 0.0009 + 0 + 0.90 \times 0.0004 \\
-           &= 0.00001 + 0.000036 + 0.00036 = 0.000406
-\end{align*}
-\[
-\sigma_t = \sqrt{0.000406} \approx 2.01\%
-\]
-
-\textbf{Case B: $r_{t-1} = -0.03$ (3\% loss).}
-%
-\begin{align*}
-\sigma^2_t &= 0.00001 + 0.04 \times 0.0009
-              + 0.08 \times 0.0009 + 0.90 \times 0.0004 \\
-           &= 0.00001 + 0.000036 + 0.000072 + 0.00036 = 0.000478
-\end{align*}
-\[
-\sigma_t = \sqrt{0.000478} \approx 2.19\%
-\]
-
-The negative return produces a forecast of 2.19\% versus 2.01\% for the same-size
-positive return. The 3\% loss roughly triples the ``news'' contribution to variance
-(from 0.000036 to 0.000108), reflecting the leverage effect.
-\end{workedexample}
-
-\begin{keyidea}[When GJR Matters]
-GJR-GARCH is most useful for equities, where the leverage effect is strong. For
-exchange rates, the effect is weaker and often statistically insignificant;
-symmetric GARCH(1,1) is typically adequate
-\citep{hansen2005forecast}.
-\end{keyidea}
-
 
 %% ═══════════════════════════════════════════════════════════════
 \section{EGARCH: Log-Variance and Guaranteed Positivity}
@@ -553,10 +443,8 @@ sign.
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-EGARCH's log-variance formulation has a practical benefit for your project: working
-in logs stabilizes estimation and makes the variance automatically positive. Many ML
-models for realized volatility also work in log space ($\log \RV_t$) for the same
-reason. If you include EGARCH as a baseline, its sign-effect coefficient $\gamma$
+Many ML models for realized volatility also work in log space ($\log \RV_t$), just as
+EGARCH does. If you include EGARCH as a baseline, its sign-effect coefficient $\gamma$
 gives you a direct comparison point for how well your ML model captures asymmetry.
 \end{projectconnection}
 
@@ -621,15 +509,6 @@ The full FIGARCH(1,$d$,1) specification is written using the lag operator $L$:
 The key point is not the algebra but the implication: FIGARCH matches the slow decay
 of volatility autocorrelations far better than GARCH.
 
-\begin{intuition}[In Plain English]
-Standard GARCH forgets shocks exponentially: a volatility spike from two months ago
-has almost no influence on today's forecast. FIGARCH forgets shocks more slowly,
-following a power law. The parameter $d$ controls how slowly: $d = 0$ is normal GARCH
-(fast forgetting), and $d$ closer to 1 means shocks linger almost indefinitely. This
-matches what we see empirically, where volatility autocorrelations are still
-detectable at lags of 100 days or more.
-\end{intuition}
-
 \begin{projectconnection}[Why This Matters]
 Long memory in volatility is precisely why HAR works: its weekly and monthly
 components act as a discrete approximation to the slow-decaying memory that FIGARCH
@@ -665,9 +544,8 @@ intraday returns and is orders of magnitude more precise. Realized GARCH exploit
 this better signal.
 \end{intuition}
 
-The following diagram shows how information flows in Realized GARCH versus standard
-GARCH. The key addition is the measurement equation linking $\RV_t$ to the latent
-conditional variance $h_t$.
+The key addition in Realized GARCH is the measurement equation linking $\RV_t$ to the
+latent conditional variance $h_t$ (see diagram).
 
 \begin{center}
 \begin{tikzpicture}[
@@ -834,9 +712,7 @@ HEAVY runs two GARCH-like equations side by side. The first forecasts the varian
 daily returns, and the second forecasts realized variance itself. Both use
 yesterday's $\RV$ as input instead of $r^2$. Think of it as two parallel trackers:
 one for ``what will the daily return variance be?'' and one for ``what will intraday
-volatility look like?'' Because $\RV$ reacts to intraday information immediately, the
-HEAVY model adjusts to regime changes (like a volatility spike) much faster than
-standard GARCH, which must wait for large daily returns to accumulate.
+volatility look like?''
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
@@ -861,9 +737,9 @@ variation, while GARCH must wait for the slow accumulation of squared daily retu
 \label{sec:comparison}
 %% ═══════════════════════════════════════════════════════════════
 
-The table below summarizes the three approaches. The key distinction is the data
-input: standard GARCH uses only daily returns, while Realized GARCH and HEAVY
-incorporate intraday information through $\RV_t$.
+The key distinction across the three approaches is the data input: standard GARCH
+uses only daily returns, while Realized GARCH and HEAVY incorporate intraday
+information through $\RV_t$ (see table).
 
 \begin{center}
 \renewcommand{\arraystretch}{1.3}

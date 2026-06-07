@@ -36,14 +36,6 @@ Concrete examples of jump triggers:
   \item \textbf{Geopolitical shocks:} The Swiss National Bank abandoned its EUR/CHF floor on January 15, 2015. EUR/CHF dropped roughly 30\% in seconds.
 \end{itemize}
 
-\begin{intuition}[Diffusion vs.\ Jump]
-Normal price movements are many small moves (diffusion).
-A jump is a sudden, large move that cannot be explained by the smooth diffusion process.
-An earnings surprise that moves a stock 8\% in one tick is a jump.
-A stock drifting 0.05\% per 5-minute bar over the course of an afternoon is diffusion.
-The mathematical distinction is sharp: diffusion is a continuous path, while a jump is a discontinuity in the path.
-\end{intuition}
-
 \begin{prereq}[The Jump-Diffusion Price Process]
 Chapter~\ref{ch:rv} introduced the pure-diffusion log-price process: $dp_t = \mu_t\,dt + \sigma_t\,dW_t$.
 Adding jumps extends this to:
@@ -169,9 +161,6 @@ This is the core mechanism: jumps are isolated events, so a product of consecuti
 \end{intuition}
 
 \begin{definition}[Bipower Variation]
-We need an estimator that converges to integrated variance even when jumps are present.
-The idea: instead of squaring each return (which amplifies jumps), multiply consecutive absolute returns so that an isolated jump is dampened by its normal-sized neighbor.
-
 \begin{equation}
   \BPV_t = \frac{\pi}{2}\sum_{i=2}^{n}|r_{t,i}|\,|r_{t,i-1}|
   \label{eq:bpv}
@@ -185,14 +174,7 @@ The idea: instead of squaring each return (which amplifies jumps), multiply cons
 \end{itemize}
 \end{definition}
 
-\begin{projectconnection}[Why This Matters]
-$\BPV_t$ is the workhorse estimator you will use to construct the continuous variation component $C_t$ for HAR-J and HAR-CJ models (Chapter~\ref{ch:har}).
-Without it, your forecasting model receives $\RV_t$ contaminated by unpredictable jumps, which dilutes the persistent signal that drives forecast accuracy.
-\end{projectconnection}
-
 \subsection{Why the $\pi/2$ Scaling Factor}
-
-The scaling factor deserves its own explanation, because it looks arbitrary until you see where it comes from.
 
 \begin{prereq}[Mean Absolute Value of a Standard Normal]
 If $Z \sim \N(0,1)$, then $\E[|Z|] = \sqrt{2/\pi} \approx 0.7979$.
@@ -394,22 +376,12 @@ With 78 returns instead of 6, the effect would be even more diluted.
 
 $\BPV_t$ gives you an estimate of continuous variation, and $\RV_t - \BPV_t$ gives you an estimate of jump variation.
 But both are estimates, subject to sampling noise.
-On any given day, $\RV_t - \BPV_t$ will be slightly positive even if no jump occurred, simply due to estimation error.
+On any given day, $\RV_t - \BPV_t$ is slightly positive even with no jump, due to estimation error.
 You need a formal statistical test to determine whether the difference is large enough to declare a jump day.
-
-\begin{intuition}[The Logic of the Jump Test]
-If no jumps occurred, $\RV_t$ and $\BPV_t$ are both consistent estimators of the same quantity ($\IVol_t$), so their difference should be close to zero.
-If the difference is ``too large'' relative to sampling noise, you reject the null and declare that a jump occurred.
-The test statistic measures how many standard deviations the difference is from zero.
-\end{intuition}
 
 \citet{BNS2006} proposed the following test.
 
 \begin{definition}[BNS Jump Test Statistic]
-We know $\RV_t - \BPV_t$ estimates the jump component, but on any given day this difference is noisy.
-We need a way to ask: ``Is this difference large enough to be statistically significant, or is it just estimation noise?''
-The BNS test standardizes the difference by its sampling variability.
-
 \begin{equation}
   Z_{\text{BNS},t} = \frac{\RV_t - \BPV_t}{\sqrt{\vartheta\,\max\!\left(\frac{1}{n}\,\operatorname{RQ}_t,\; 10^{-10}\right)}}
   \label{eq:bns-test}
@@ -455,40 +427,6 @@ You never need to compute it by hand.
 The realized quarticity estimator $\operatorname{RQ}_t = \frac{n}{3}\sum r_{t,i}^4$ does it for you using fourth powers of returns.  A jump-robust alternative (tripower quarticity) uses products of three consecutive absolute returns raised to the $4/3$ power, analogous to how $\BPV$ uses products of two absolute returns.
 \end{prereq}
 
-\begin{workedexample}{Applying the BNS Jump Test}
-Suppose you compute the following quantities for a single day using 78 five-minute returns ($n = 78$):
-\begin{itemize}[nosep]
-  \item $\RV_t = 2.50 \times 10^{-4}$
-  \item $\BPV_t = 1.80 \times 10^{-4}$
-  \item $\operatorname{RQ}_t = 5.00 \times 10^{-8}$
-\end{itemize}
-
-\textbf{Step 1: Compute the numerator.}
-\[
-  \RV_t - \BPV_t = 2.50 \times 10^{-4} - 1.80 \times 10^{-4} = 0.70 \times 10^{-4}
-\]
-
-\textbf{Step 2: Compute the denominator.}
-\[
-  \sqrt{\vartheta \cdot \frac{1}{n}\operatorname{RQ}_t} = \sqrt{0.6090 \times \frac{5.00 \times 10^{-8}}{78}} = \sqrt{0.6090 \times 6.41 \times 10^{-10}}
-\]
-\[
-  = \sqrt{3.90 \times 10^{-10}} = 1.975 \times 10^{-5}
-\]
-
-\textbf{Step 3: Compute the test statistic.}
-\[
-  Z_{\text{BNS},t} = \frac{0.70 \times 10^{-4}}{1.975 \times 10^{-5}} = \frac{7.00 \times 10^{-5}}{1.975 \times 10^{-5}} = 3.54
-\]
-
-\textbf{Step 4: Compare to critical value.}
-$Z_{\text{BNS},t} = 3.54 > 2.326$ (1\% critical value).
-Reject the null of no jumps at the 1\% level.
-This day has a statistically significant jump component.
-
-The continuous variation estimate is $\BPV_t = 1.80 \times 10^{-4}$, and the estimated jump variation is $0.70 \times 10^{-4}$, roughly 28\% of the total quadratic variation.
-\end{workedexample}
-
 \begin{warning}[BNS Test Size Distortion in Finite Samples]
 The BNS test has known size distortions in finite samples: with 78 returns per day, it can over-reject the null (detect jumps that are not there) or under-reject (miss small jumps).
 \citet{HuangTauchen2005} documented these problems and proposed a ratio form of the test statistic that has better finite-sample properties.
@@ -517,9 +455,6 @@ Then standardize the return by this local volatility.
 If the standardized return exceeds a threshold derived from extreme-value theory, flag it as a jump.
 
 \begin{definition}[Lee-Mykland Test Statistic]
-To pinpoint exactly which returns within the day are jumps, we standardize each return by a local estimate of diffusion volatility.
-If a return is far too large to have come from the local diffusion process, it must be a jump.
-
 \begin{equation}
   \mathcal{L}_{t,i} = \frac{|r_{t,i}|}{\hat{\sigma}_{t,i}}
   \label{eq:lm-stat}
@@ -550,12 +485,6 @@ Lee-Mykland gives you jump \emph{times and sizes}, not just a daily indicator.
 This is the basis for signed jump features: you can separately measure ``bad jumps'' (large negative returns) and ``good jumps'' (large positive returns) within the day.
 Signed jump variation feeds directly into the SHAR model and the asymmetric jump features in Chapter~\ref{ch:features}, where negative jumps predict higher future volatility than positive jumps of the same magnitude.
 \end{projectconnection}
-
-\begin{keyresult}[\citet{LeeMykland2008}: Intraday Jump Detection]
-The Lee-Mykland test provides both jump detection and jump timing at intraday frequency.
-It identifies the specific returns within the day that are jumps, along with their sizes.
-At standard significance levels, the test correctly identifies large jumps (those exceeding roughly 3--5 local standard deviations) with high power, while maintaining reasonable size control.
-\end{keyresult}
 
 \subsection{Diagram: Intraday Jump Detection}
 
@@ -678,11 +607,6 @@ At $p = 2$ (standard $\RV$), you get an honest count of both.
 \end{intuition}
 \end{definition}
 
-\begin{projectconnection}[Why This Matters]
-The A\"it-Sahalia-Jacod test uses power variation to detect jumps at higher sampling frequencies where microstructure noise corrupts BPV-based methods.
-If your data source provides tick-level or 1-minute data and you want to push to higher frequency for better estimation, this framework gives you a noise-robust alternative to the BNS test for deciding which days contain jumps.
-\end{projectconnection}
-
 The \citet{AitSahaliaJacod2009} test statistic compares $V_t^{(p)}$ computed at two sampling frequencies, $\Delta$ and $k\Delta$ (e.g., 5-minute and 15-minute).
 Under the null of no jumps, the ratio converges to a constant $k^{p/2-1}$.
 Under the alternative (jumps present), the ratio is different.
@@ -710,12 +634,6 @@ For a first pass, the BNS test at 5-minute frequency is usually sufficient.
 The BNS approach estimates continuous variation indirectly: compute $\BPV_t$, and the jump component is the residual $\RV_t - \BPV_t$.
 Threshold methods take the opposite approach: directly classify each return as either a jump or a diffusion return, then compute realized variance using only the diffusion returns.
 
-\begin{keyidea}[Truncation: The Simplest Decomposition]
-Any return larger than a threshold $\vartheta_i$ is classified as a jump.
-Continuous variation is computed by summing squared returns only for returns below the threshold.
-This is conceptually simpler than bipower variation and naturally extends to the HAR-CJ decomposition used in Chapter~\ref{ch:har}.
-\end{keyidea}
-
 \begin{definition}[Threshold Realized Variance]
 Instead of dampening jumps implicitly (as BPV does), we can remove them explicitly: classify each return as ``jump'' or ``not jump'' based on a size cutoff, then sum squared returns only for the non-jump returns.
 
@@ -729,14 +647,6 @@ Instead of dampening jumps implicitly (as BPV does), we can remove them explicit
   \item $\mathbf{1}\{\cdot\}$: indicator function (equals 1 if the condition is true, 0 otherwise)
   \item $\vartheta_i$: threshold for return $i$, typically set as $\vartheta_i = c\,\hat{\sigma}_i\,\Delta^{\varpi}$, where $c$ is a constant (e.g., $c = 3$), $\hat{\sigma}_i$ is a local volatility estimate, and $\varpi \in (0, 1/2)$ controls how the threshold scales with sampling frequency
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-Threshold realized variance is a filter.
-It looks at each 5-minute return and asks: ``Is this return small enough to be normal diffusion, or is it suspiciously large?''
-Returns below the cutoff are kept and squared as usual (they estimate continuous variation).
-Returns above the cutoff are discarded (they are presumed jumps).
-The result is a ``cleaned'' version of $\RV_t$ with jump contamination removed.
-\end{intuition}
 \end{definition}
 
 \begin{projectconnection}[Why This Matters]
@@ -820,11 +730,6 @@ The jump component is nearly unpredictable but still included to prevent it from
 In the HAR-J and HAR-CJ models, each component receives its own coefficient, letting the model exploit the different persistence.}
 \label{fig:decomposition-pipeline}
 \end{figure}
-
-\begin{keyidea}[Forecasting with Separated Components]
-In the HAR-J and HAR-CJ models (Chapter~\ref{ch:har}), the continuous component enters with high persistence coefficients (it is highly predictable), while the jump component enters with a small, often statistically insignificant coefficient (it is nearly unpredictable).
-The forecasting improvement comes from the continuous side: by removing jump contamination, you get a cleaner, more persistent signal that the model can exploit more effectively \citep{ABD2007}.
-\end{keyidea}
 
 There is an additional asymmetry.
 \citet{BKT2015} and \citet{PSS2015} found that ``bad jumps'' (large negative returns) are more informative for future volatility than ``good jumps'' (large positive returns).

@@ -3,8 +3,6 @@
 
 \begin{application}[Why This Chapter]
 HAR is THE benchmark for volatility forecasting.
-Every ML model in Chapters~\ref{ch:trees}--\ref{ch:hybrid} must beat HAR to justify its complexity.
-This chapter must be crystal clear because every subsequent forecasting chapter references it.
 Projects 1, 4, and 5 all use HAR variants as their primary baseline.
 \end{application}
 
@@ -100,8 +98,6 @@ Dashed arrows indicate feedback: today's volatility feeds back into each partici
 \begin{keyidea}[Why This Matters for Forecasting]
 If the market were homogeneous (all participants on the same clock), a simple AR(1) model would suffice.
 The heterogeneity means that volatility dynamics involve multiple time scales simultaneously.
-You need a model that captures daily, weekly, and monthly persistence in a single equation.
-That model is HAR.
 \end{keyidea}
 
 
@@ -140,19 +136,7 @@ The monthly average realized variance on day $t$ is:
 \end{itemize}
 \end{definition}
 
-\begin{intuition}[In Plain English]
-These are just moving averages of past volatility over two different windows.
-$\RV^{(w)}$ smooths out the last five days to give a ``medium-term'' volatility reading, and $\RV^{(m)}$ smooths over the last 22 days to give a ``long-term'' reading.
-The daily value captures what happened yesterday; the averages capture what has been happening recently and over the past month.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-When you build your feature matrix for any ML model, you will always include these three inputs: daily, weekly average, and monthly average RV.
-They are the core HAR features, and every extension in this chapter simply adds to them.
-\end{projectconnection}
-
-Now the model.
-The idea is as simple as it sounds: regress tomorrow's realized variance on yesterday's daily, weekly, and monthly values.
+The model regresses tomorrow's realized variance on yesterday's daily, weekly, and monthly values.
 
 \begin{definition}[The HAR-RV Model \citep{Corsi2009}]
 \label{def:har}
@@ -183,13 +167,6 @@ Three coefficients, but through the averages, information from 22 past days ente
 The result is autocorrelation decay that closely approximates a long-memory process, with none of the estimation complexity of FIGARCH \citep{Corsi2009}.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-HAR is YOUR primary baseline.
-Every ML model you build must beat HAR to be worth anything.
-It predicts tomorrow's vol from a weighted combination of yesterday's vol, last week's average vol, and last month's average vol.
-When you report results, your first table column is always HAR.
-\end{projectconnection}
-
 \begin{warning}[Log or Level?]
 Many papers estimate HAR on $\ln(\RV)$ rather than $\RV$ in levels.
 As noted in Chapter~\ref{ch:rv} (Section~\ref{sec:rv-vs-rvol}), $\ln(\RV_t)$ is approximately Gaussian, which makes OLS residuals better behaved and guarantees positive forecasts (since $e^x > 0$).
@@ -206,62 +183,6 @@ The monthly term's coefficient is similar to the daily term's, confirming that l
 
 The in-sample $R^2$ is typically 0.40--0.60 for daily-horizon forecasts on equity index $\RV$.
 This is high for a financial time series, and it comes from just three predictors.
-
-\begin{workedexample}[Computing a HAR Forecast]
-You have 22 days of daily realized variance for the S\&P~500 (in units of $10^{-4}$, so 1.0 means 1\% annualized vol corresponds to roughly $0.40 \times 10^{-4}$ daily):
-
-\medskip
-\begin{center}
-\begin{tabular}{@{} c r c r c r @{}}
-\toprule
-\textbf{Day} & \textbf{$\RV_t$} & \textbf{Day} & \textbf{$\RV_t$} & \textbf{Day} & \textbf{$\RV_t$} \\
-\midrule
-1  & 0.80 & 9  & 1.50 & 17 & 1.80 \\
-2  & 0.90 & 10 & 1.30 & 18 & 2.20 \\
-3  & 1.10 & 11 & 1.20 & 19 & 2.50 \\
-4  & 1.00 & 12 & 1.40 & 20 & 2.00 \\
-5  & 1.20 & 13 & 1.60 & 21 & 1.70 \\
-6  & 1.50 & 14 & 1.50 & 22 & 1.90 \\
-7  & 1.40 & 15 & 1.70 & & \\
-8  & 1.60 & 16 & 1.90 & & \\
-\bottomrule
-\end{tabular}
-\end{center}
-\medskip
-
-All values are in units of $10^{-4}$.
-
-\textbf{Step 1: Compute the daily component.}
-$\RV_{22} = 1.90$
-
-\textbf{Step 2: Compute the weekly average.}
-\[
-  \RV^{(w)}_{22} = \frac{1}{5}(\RV_{22} + \RV_{21} + \RV_{20} + \RV_{19} + \RV_{18})
-  = \frac{1.90 + 1.70 + 2.00 + 2.50 + 2.20}{5} = \frac{10.30}{5} = 2.06
-\]
-
-\textbf{Step 3: Compute the monthly average.}
-\[
-  \RV^{(m)}_{22} = \frac{1}{22}\sum_{i=1}^{22} \RV_i
-  = \frac{0.80 + 0.90 + \cdots + 1.90}{22} = \frac{33.70}{22} = 1.532
-\]
-
-\textbf{Step 4: Apply pre-fitted coefficients.}
-Using $\beta_0 = 0.05$, $\beta_d = 0.36$, $\beta_w = 0.28$, $\beta_m = 0.28$ (all in $10^{-4}$ units):
-\begin{align*}
-  \widehat{\RV}_{23} &= 0.05 + 0.36 \times 1.90 + 0.28 \times 2.06 + 0.28 \times 1.532 \\
-                      &= 0.05 + 0.684 + 0.577 + 0.429 \\
-                      &= 1.740
-\end{align*}
-
-The forecast for day 23 is $1.740 \times 10^{-4}$, or equivalently a daily volatility of $\sqrt{1.740 \times 10^{-4}} = 1.32\%$.
-
-Notice how the forecast blends three time scales.
-The daily term ($\RV_{22} = 1.90$) pulls the forecast toward recent conditions.
-The weekly average ($2.06$) is higher than the monthly average ($1.532$) because the last five days were volatile, so the weekly term pulls the forecast up.
-The monthly average anchors the forecast closer to the longer-run level.
-\end{workedexample}
-
 
 Figure~\ref{fig:har-cascade} summarizes the HAR cascade: how the three components at different time scales feed into a single forecast.
 
@@ -348,16 +269,6 @@ The difference $\RV_t - \BPV_t$ therefore isolates the jump component.
 BPV was introduced by \citet{BNS2004} and is covered in detail in Chapter~\ref{ch:jumps}.
 \end{prereq}
 
-\begin{intuition}[In Plain English]
-BPV estimates the ``smooth'' part of volatility by multiplying consecutive absolute returns together.
-The idea is that a genuine jump is a one-off spike that is unlikely to hit two adjacent intervals, so the product of neighbors filters jumps out while keeping the continuous volatility signal.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-BPV is the tool you use to separate continuous volatility from jumps when constructing features for HAR-J and HAR-CJ.
-If your data source provides intraday returns, computing BPV alongside RV gives you a richer feature set at zero additional model complexity.
-\end{projectconnection}
-
 \subsection{HAR-J}
 
 \citet{ABD2007} proposed the HAR-J model, which adds a jump component as an additional predictor:
@@ -371,17 +282,6 @@ If your data source provides intraday returns, computing BPV alongside RV gives 
   \item $\beta_J$: coefficient on jumps; typically estimated as negative and small, meaning jumps have a weak or transient effect on future volatility
   \item All other terms are the same as in Equation~\eqref{eq:har}
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-HAR-J takes the standard HAR and adds one extra input: how much of yesterday's volatility came from jumps (sudden price spikes) rather than normal trading.
-If yesterday had a big jump, the model can treat that spike differently from steady high volatility, because jumps tend not to repeat.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-HAR-J adds the jump component as a separate feature.
-The continuous component is more persistent and predictable than jumps, so letting the model see them separately improves forecasts.
-In your ML pipeline, $J_t = \max(\RV_t - \BPV_t, 0)$ is a feature you should always compute when you have intraday data.
-\end{projectconnection}
 
 \begin{keyresult}[\citet{ABD2007}: Jumps Matter Less Than You Expect]
 \citet{ABD2007} find that the jump component $J_t$ is statistically significant but economically small in forecasting next-day $\RV$.
@@ -411,19 +311,7 @@ The empirical finding is consistent with HAR-J: continuous coefficients ($\beta^
 \begin{intuition}[In Plain English]
 HAR-CJ goes further than HAR-J by building separate daily, weekly, and monthly averages for the continuous part and the jump part.
 Instead of asking ``how volatile was the market?'' at each horizon, it asks two questions: ``how volatile was the smooth trading activity?'' and ``how big were the jumps?''
-The consistent finding is that only the continuous answers matter for forecasting; the jump answers contribute almost nothing beyond the daily horizon.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-HAR-CJ gives you six features instead of three: $C_t, C^{(w)}_t, C^{(m)}_t, J_t, J^{(w)}_t, J^{(m)}_t$.
-When you feed these to an ML model, the model can learn that continuous components carry the forecasting signal and jumps are noise, rather than you having to hard-code that decision.
-\end{projectconnection}
-
-\begin{keyidea}[Jumps Are Noise for Forecasting]
-A large jump (e.g., from a surprise rate cut) spikes today's $\RV$ but typically does not persist into tomorrow.
-The continuous component, which reflects the background level of trading activity and uncertainty, is far more persistent and forecastable.
-This is why separating $C$ from $J$ can help: it prevents a one-day spike from inflating the forecast.
-\end{keyidea}
 
 Figure~\ref{fig:har-cj-decomp} shows how HAR-CJ decomposes realized variance before forecasting, compared to the standard HAR approach.
 
@@ -520,12 +408,6 @@ Can you bring this asymmetry into the HAR framework?
 \end{itemize}
 \end{prereq}
 
-\begin{intuition}[In Plain English]
-Realized semivariance splits total volatility into ``upside choppiness'' and ``downside choppiness.''
-$RS^+$ measures how much the price bounced around on the way up during the day, while $RS^-$ measures how much it bounced around on the way down.
-Together they add up to total RV, but they carry different information about what comes next.
-\end{intuition}
-
 \begin{keyresult}[\citet{PSS2015}: Bad Volatility Is More Persistent]
 Decomposing realized variance into positive semivariance $RS^+$ and negative semivariance $RS^-$ substantially improves forecasts.
 Bad volatility ($RS^-$, from downward price moves) is significantly more persistent than good volatility ($RS^+$, from upward moves).
@@ -557,12 +439,6 @@ Rallies of the same magnitude do not create the same cascading effects.
 This asymmetry is the leverage effect operating at the intraday level.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-SHAR treats positive and negative semivariance differently, capturing the leverage effect within the HAR framework.
-For your project, $RS^+_t$ and $RS^-_t$ are two features that replace the single $\RV_t$ feature, and an ML model can learn the asymmetry automatically.
-SHAR is a strong baseline when forecasting equity index volatility, where the leverage effect is most pronounced.
-\end{projectconnection}
-
 \citet{PSS2015} show that SHAR improves forecast accuracy relative to HAR across multiple asset classes, with the largest gains on equity indices where the leverage effect is strongest.
 
 
@@ -590,18 +466,6 @@ Realized quarticity ($RQ_t$) is a consistent estimator of this quantity:
 \end{itemize}
 \end{prereq}
 
-\begin{intuition}[In Plain English]
-Realized quarticity measures how much volatility itself jumped around during the day.
-If intraday volatility was steady, fourth powers of returns are small and $RQ$ is low, meaning your RV estimate is trustworthy.
-If intraday volatility spiked wildly (e.g., a flash crash followed by a recovery), $RQ$ is high, meaning your RV number is noisy and should be taken with a grain of salt.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-$RQ_t$ is the key ingredient that separates HARQ from plain HAR.
-When you compute your daily features, always compute $\sqrt{RQ_t}$ alongside $\RV_t$.
-It tells your model how much to trust yesterday's volatility reading, which is the core insight behind the HARQ paper your project builds on \citep{BPQ2016}.
-\end{projectconnection}
-
 The idea behind HARQ is simple: when yesterday's $\RV$ is noisy (high $RQ$), the model should rely less on it.
 When it is precise (low $RQ$), the model should rely more on it.
 
@@ -625,13 +489,6 @@ This simple modification produces statistically significant forecast improvement
   \item When $RQ_t$ is large (noisy day), $\beta_{dQ}\sqrt{RQ_t}$ is a large negative number, shrinking the effective coefficient toward zero
   \item When $RQ_t$ is small (precise day), the adjustment is negligible and the coefficient stays near $\beta_d$
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-HARQ adds estimation uncertainty as a feature.
-On days when yesterday's RV estimate is noisy (high $RQ$), the model automatically relies less on it and shifts weight to the more stable weekly and monthly averages.
-On days when yesterday's RV is precise (low $RQ$), the model trusts it fully.
-It is a ``confidence-weighted'' version of HAR.
-\end{intuition}
 
 \begin{projectconnection}[Why This Matters]
 HARQ is THE paper your project builds on.
@@ -718,12 +575,6 @@ The HAR-X framework adds these as extra regressors.
 \end{itemize}
 \end{definition}
 
-\begin{intuition}[In Plain English]
-HAR-X is just HAR with extra columns in the regression.
-The three core RV inputs stay, and you bolt on whatever other predictors you think contain information about future volatility: the VIX, yesterday's stock return, trading volume, macro surprises, and so on.
-Each additional predictor gets its own coefficient, so OLS tells you whether it helps after controlling for the core HAR terms.
-\end{intuition}
-
 \begin{projectconnection}[Why This Matters]
 HAR-X is the linear version of what your ML model will do.
 Any feature you feed to a random forest or neural network, you should first test in a HAR-X regression to see whether it helps linearly.
@@ -745,18 +596,6 @@ When $p$ is large, you face a classic overfitting problem: many predictors, limi
   \item The penalty applies to the exogenous coefficients $\gamma_j$, not the core HAR terms
   \item The Lasso selects which exogenous variables matter while keeping the core HAR structure intact
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-When you have many candidate predictors, Lasso-HAR asks: ``which of these extra variables actually help, and which are just adding noise?''
-It does this by penalizing the model for using too many variables.
-The penalty forces weak predictors' coefficients to exactly zero, automatically dropping them from the forecast, while keeping the core daily/weekly/monthly HAR terms intact.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Lasso-HAR is the simplest regularized model in your toolbox and a natural stepping stone between plain HAR and full ML.
-If Lasso-HAR with 20 features beats HAR, you know the extra features carry signal.
-The next question, which your project addresses, is whether nonlinear models (trees, neural nets) can extract even more from those same features.
-\end{projectconnection}
 
 \begin{prereq}[Lasso Regularization]
 The Lasso (Least Absolute Shrinkage and Selection Operator) adds an L1 penalty ($\lambda \sum |\gamma_j|$) to the OLS objective.
@@ -783,17 +622,6 @@ Two predictors are \textbf{collinear} when one is nearly a linear function of th
 The HAR design matrix is a textbook case: the weekly average $\RV^{(w)}_t$ contains $\RV_t$ as one of its five terms, and the monthly average $\RV^{(m)}_t$ contains both as part of its 22 terms (Definition~\ref{def:rv-averages}).
 When columns of the design matrix $\bX$ are nearly linearly dependent, the Gram matrix $\bX^\top\bX$ (a summary grid of how the predictors overlap) has a near-zero \textbf{eigenvalue} (a single number that here signals a direction in the data carrying almost no information), OLS coefficients swing wildly from sample to sample, and adding even one exogenous predictor can flip a sign.
 \end{prereq}
-
-\begin{intuition}[A Note on the Matrix Notation Ahead]
-This section leans on a few pieces of linear-algebra shorthand; here they are in plain words, once, so the equations read smoothly.
-\textbf{Bold letters} ($\by$, $\bX$, $\bbeta$) are whole lists or grids of numbers, not single values.
-A \textbf{matrix} is just a grid of numbers; the notation $\by \in \R^n$ means ``$\by$ is a list of $n$ numbers,'' and $\bX \in \R^{n\times p}$ means ``$\bX$ is a table with $n$ rows (one per training day) and $p$ columns (one per feature).''
-The double bars $\lVert\mathbf{v}\rVert_2^2$ are a \textbf{norm}: square every number in the list $\mathbf{v}$ and add them up.
-The superscript $\top$ means \textbf{transpose}: flip a grid on its side so rows become columns, the bookkeeping that lets two grids multiply.
-The superscript $-1$ means \textbf{matrix inverse}, the grid-version of dividing (it undoes a multiplication).
-And $\arg\min_{\bbeta}$ reads ``the coefficient list $\bbeta$ that makes everything to its right as small as possible.''
-You will meet each of these again in context below.
-\end{intuition}
 
 The Lasso of Section~\ref{sec:har-x} answers ``which extra predictors matter?'' by zeroing out the weak ones.
 But zeroing is exactly the wrong move for the \emph{core} HAR terms.
@@ -833,11 +661,6 @@ So when the daily and weekly terms are nearly interchangeable, ridge prefers to 
 The result is a HAR whose three components stay sensible even when the data cannot cleanly tell them apart.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-Ridge-HAR is the regularized baseline your project reports next to HARQ.
-When you eventually feed the same daily/weekly/monthly features to a tree ensemble or neural network, ridge-HAR is the linear bar to clear: if LightGBM cannot beat ridge-HAR on out-of-sample $\QLIKE$ using identical features, the nonlinearity bought you nothing and you have likely overfit (the litmus test of Section~\ref{sec:har-hard-to-beat}).
-\end{projectconnection}
-
 \subsection{Closed-Form Solution}
 
 Unlike the Lasso, ridge has a closed form.
@@ -872,11 +695,6 @@ OLS-HAR has to invert $\bX^\top\bX$, and when the daily/weekly/monthly columns n
 Ridge slides $\lambda$ down the diagonal first, which is like propping up the near-flat direction so the inversion no longer blows up.
 The bigger $\lambda$ is, the more the wobbly directions get held in place, and the more stable the three HAR coefficients become from one sample to the next.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-The closed form is why ridge-HAR is essentially free to run: there is no iterative optimizer, no convergence to babysit, just one matrix inversion per candidate $\lambda$.
-You can sweep an entire grid of $\lambda$ values and refit ridge-HAR in milliseconds, which makes it a cheap, robust default to anchor every forecasting table in the project.
-\end{projectconnection}
 
 \subsection{Why Ridge Damps the Noisy Collinear Directions}
 
@@ -969,17 +787,6 @@ The intuition: OLS variance is proportional to $\sigma^2\sum_j d_j^{-2}$ (recall
 A small dose of bias buys a large variance reduction.
 The MSE-optimal $\lambda$ depends on the unknown $\bbeta$ and $\sigma^2$, so in practice it is chosen by cross-validation.
 \end{keyresult}
-
-\begin{intuition}[In Plain English]
-The theorem says there is \emph{always} some amount of shrinkage that makes HAR forecasts better, not just sometimes.
-For collinear HAR features the ``always'' is especially generous: the noisier the distinction between daily, weekly, and monthly $\RV$, the more there is to gain.
-The only catch is that the best $\lambda$ depends on quantities you do not know, which is why you tune it on held-out data rather than guess.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Hoerl--Kennard is the formal license for using ridge-HAR as a default: on the collinear daily/weekly/monthly design, some positive $\lambda$ is guaranteed to forecast $\RV$ better in MSE than OLS-HAR.
-The practical question is never ``should I regularize?'' but ``how much?'', and that is a tuning problem you solve with purged cross-validation (below), reported in out-of-sample $\QLIKE$ in Chapter~\ref{ch:evaluation}.
-\end{projectconnection}
 
 \begin{workedexample}[Ridge Splits Weight Across $\RV_d$ and $\RV_w$]
 Take the two most collinear HAR predictors: yesterday's daily realized variance $\RV_t$ (call it $\RV_d$) and the weekly average $\RV^{(w)}_t$ (call it $\RV_w$), which literally contains $\RV_d$ as one of its five terms.
@@ -1141,27 +948,16 @@ The \textbf{elastic net} \citep{ZouHastie2005} combines both penalties so you ca
   \item $\tfrac{1-\alpha}{2}\,\lVert\bbeta\rVert_2^2$: the $L_2$ component that shrinks correlated coefficients toward each other; the factor $\tfrac{1}{2}$ is a conventional scaling that keeps the algebra tidy and does not change the behaviour
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-Elastic net is a dial between the two behaviours.
-The $L_1$ part still hunts down and switches off predictors that do not earn their keep, but the $L_2$ part insists that if two features are nearly the same, they should be kept or dropped \emph{as a pair} with similar coefficients, instead of one randomly winning.
-For HAR, that means you can let the model prune a long list of exogenous candidates while it refuses to break up the tightly correlated daily/weekly/monthly core.
-\end{intuition}
-
 \begin{keyidea}[The Grouping Effect]
 \citet{ZouHastie2005} prove the \textbf{grouping effect}: if two features are highly correlated, elastic net assigns them nearly equal coefficients, rather than the Lasso's all-or-nothing pick.
 The strength of the grouping is controlled by the $L_2$ weight $(1-\alpha)$: more $L_2$ means tighter grouping.
 For HAR this is exactly right: the daily, weekly, and monthly $\RV$ terms form a natural correlated group that elastic net keeps intact while pruning useless exogenous regressors---the principled middle ground between ridge-HAR (no selection) and Lasso-HAR (group-blind selection).
 \end{keyidea}
 
-\begin{projectconnection}[Why This Matters]
-Elastic-net-HAR is the natural model when your HAR-X feature set mixes a small correlated core (the $\RV$ components, plus perhaps $RS^+,RS^-,C,J$ from Sections~\ref{sec:har-j}--\ref{sec:shar}) with a long tail of speculative exogenous predictors (VIX innovations, macro surprises, cross-asset vol).
-It prunes the tail while protecting the correlated core, giving you a sparse, interpretable linear forecaster that is still a fair baseline for the nonlinear models of Chapter~\ref{ch:trees}.
-\end{projectconnection}
-
 \subsection{Tuning and Diagnostics}
 
 Ridge, Lasso, and elastic net all leave you with a tuning parameter $\lambda$ (and, for elastic net, the mix $\alpha$).
-The single most consequential decision in this whole section is \emph{how} you choose them, because the wrong validation scheme silently leaks future volatility into the past.
+How you choose them matters most: the wrong validation scheme silently leaks future volatility into the past.
 
 \begin{warning}[Tune $\lambda$ with Purged CV, Not i.i.d.\ K-Fold]
 Standard $K$-fold CV assumes independent observations; realized variance violates this badly---it is highly persistent (Section~\ref{sec:hmh}), and the HAR features $\RV^{(w)}_t,\RV^{(m)}_t$ are overlapping moving averages, so adjacent days share information by construction.
@@ -1180,12 +976,6 @@ Four habits make regularized HAR robust:
 \end{enumerate}
 \end{keyidea}
 
-\begin{intuition}[In Plain English]
-Think of $\mathrm{df}(\lambda)$ as ``how many real knobs the model is still turning.''
-With no penalty, ridge-HAR uses all $p$ knobs; crank $\lambda$ up and the noisy collinear directions stop responding, so the \emph{effective} number of knobs falls below $p$ even though the coefficient vector still has $p$ entries.
-This is how you say ``my regularized HAR is really only as complex as $2.3$ free parameters'' and compare it fairly to a sparser model.
-\end{intuition}
-
 \begin{keyidea}[Implementation Checklist for Ridge/Elastic-Net HAR]
 \begin{enumerate}[nosep]
   \item \textbf{Standardize before penalizing.} The $L_2$ and $L_1$ penalties are scale-dependent: a feature in raw $\RV$ units and one in percentage points are penalized unequally. Standardize every column to zero mean and unit variance \emph{inside each training fold} (never on the full sample) before fitting.
@@ -1194,13 +984,6 @@ This is how you say ``my regularized HAR is really only as complex as $2.3$ free
   \item \textbf{Fit in logs.} As in Section~\ref{sec:har-model}, estimating on $\ln\RV$ keeps residuals near-Gaussian and forecasts positive; the penalty and standardization arguments are unchanged.
 \end{enumerate}
 \end{keyidea}
-
-\begin{projectconnection}[Why This Matters]
-Ridge-HAR and elastic-net-HAR are the ``Ridge/Lasso-HAR'' baselines your project specification calls for, sitting between plain OLS-HAR and the tree/neural models of Chapters~\ref{ch:trees}--\ref{ch:hybrid}.
-Build them once, tune them with purged CV, and report them on every forecasting chart alongside HAR and HARQ.
-If a nonlinear model cannot beat a properly tuned ridge-HAR on identical features and the same horizon, you have not found nonlinear structure; you have found a more expensive way to overfit.
-\end{projectconnection}
-
 
 \section{Why HAR Is Hard to Beat}
 \label{sec:har-hard-to-beat}

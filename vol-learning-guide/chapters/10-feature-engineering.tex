@@ -20,7 +20,6 @@ This chapter catalogs the features that the literature and Kaggle competitions h
 \section{Feature Taxonomy}\label{sec:feat-taxonomy}
 % ──────────────────────────────────────────────────────────────
 
-Before diving into individual features, it helps to see the full landscape.
 Figure~\ref{fig:feature-taxonomy} groups every feature family into five branches.
 You do not need all of them for every project; the tree is a menu, not a checklist.
 
@@ -96,7 +95,7 @@ Every feature must pass through the temporal alignment gate: it can only use dat
 \section{Triple Expansion: Level, Change, Z-Score}\label{sec:feat-triple}
 % ──────────────────────────────────────────────────────────────
 
-Before cataloging individual features, we introduce a systematic expansion technique that applies to every continuous feature in the catalog.
+A systematic expansion technique applies to every continuous feature in the catalog.
 For any base quantity $x_t$, construct three variants:
 
 \begin{definition}[Triple Expansion]
@@ -131,22 +130,8 @@ For tree-based models (random forests, gradient boosting), multicollinearity is 
 Neural networks are also largely robust to correlated inputs, especially with regularization.
 The triple expansion is therefore a ``free'' way to enrich the feature set for non-linear models.
 
-\begin{workedexample}[Triple expansion of bid-ask spread]
-Suppose the time-weighted average bid-ask spread over the observation window is:
-\[
-s_t = 0.08\%, \qquad s_{t-1} = 0.06\%, \qquad \bar{s}_{t,22} = 0.05\%, \qquad \hat{\sigma}_{s,t,22} = 0.015\%.
-\]
-The three expanded features are:
-\begin{itemize}[nosep]
-  \item \textbf{Level:} $s_t^{\text{level}} = 0.08\%$ (spread is 8 bps, moderately wide).
-  \item \textbf{Change:} $s_t^{\text{change}} = 0.08\% - 0.06\% = +0.02\%$ (spread widened by 2 bps overnight -- liquidity is deteriorating).
-  \item \textbf{Z-score:} $s_t^{\text{z-score}} = (0.08 - 0.05)/0.015 = 2.0$ (spread is 2 standard deviations above its 22-day mean -- unusually wide for this stock).
-\end{itemize}
-The level alone says ``moderately wide.'' The change says ``getting worse.'' The z-score says ``abnormally wide for this stock.'' A tree model can split on any of the three depending on which is most informative for the current regime.
-\end{workedexample}
-
 \begin{projectconnection}[Why This Matters]
-Apply the triple expansion systematically to every continuous feature in your pipeline. This multiplies your feature count by roughly $3\times$ but gives tree models three distinct ``views'' of each quantity. In the vol-project-ref feature composition (Chapter~8), the triple expansion is identified as a core engineering principle: it captures state, direction, and unusualness in a single pass, and it is the primary reason feature counts grow from ${\sim}20$ base features to ${\sim}80$ model inputs.
+In the vol-project-ref feature composition (Chapter~8), the triple expansion is identified as a core engineering principle: it is the primary reason feature counts grow from ${\sim}20$ base features to ${\sim}80$ model inputs.
 \end{projectconnection}
 
 % ──────────────────────────────────────────────────────────────
@@ -166,10 +151,6 @@ The HAR model (Chapter~\ref{ch:har}) already exploits this by using three horizo
   \item $\RV_t^{(w)}$: weekly RV, the average of the past 5 trading days.
   \item $\RV_t^{(m)}$: monthly RV, the average of the past 22 trading days.
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-These three features capture volatility at different ``speeds.'' Daily RV tells you what happened today. Weekly RV smooths out day-to-day noise to reveal the recent trend. Monthly RV captures the slow-moving baseline level. By including all three, you give the model a short-term, medium-term, and long-term view of volatility, which is why HAR works so well despite being a simple linear model.
-\end{intuition}
 
 \begin{projectconnection}[Why This Matters]
 These three features are the columns your HAR baseline consumes. Every ML model you build should include $\log \RV_t^{(d)}$, $\log \RV_t^{(w)}$, and $\log \RV_t^{(m)}$ as core inputs. The goal of fancier feature engineering is to add value on top of these, not to replace them. If an ML model cannot beat HAR using only these three features, the extra complexity is not justified.
@@ -251,10 +232,6 @@ Under standard diffusion assumptions, $\operatorname{RQ}_t \xrightarrow{p} \int_
 Realized quarticity measures how ``wild'' the intraday price path was. By raising each return to the fourth power, extreme moves dominate the sum. A day with one large intraday swing followed by calm will have high RQ even if overall RV is moderate. In short, RQ tells you how much you should trust today's RV number: high RQ means the RV estimate is noisy and unreliable.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-Include $\sqrt{\operatorname{RQ}_t}$ as a standalone feature column. It serves double duty: (1) tree models can learn to split on it, effectively down-weighting noisy RV days the way HARQ does analytically, and (2) it provides a data-quality signal that no other feature captures. On days where RQ is elevated, your forecast should lean more on the stable weekly and monthly averages.
-\end{projectconnection}
-
 \textbf{Why RQ matters for feature engineering.}
 The asymptotic variance of $\RV_t$ is proportional to $\operatorname{RQ}_t$.
 When RQ is high, today's RV number is unreliable.
@@ -271,20 +248,8 @@ For ML models, include both $\RV_t^{(d)}$ and $\sqrt{\operatorname{RQ}_t}$ as se
 \end{keyidea}
 
 \begin{projectconnection}[Why This Matters]
-The HARQ interaction feature is the single most important extension beyond baseline HAR for your project. \citet{BollerslevPattonQuaedvlieg2016HARQ} show it improves QLIKE by 5--15\% across equity indices. For your ML pipeline, you do not need to hard-code the interaction: include $\RV_t^{(d)}$, $\RV_t^{(w)}$, $\RV_t^{(m)}$, and $\sqrt{\operatorname{RQ}_t}$ as four separate columns and let gradient-boosted trees or neural networks discover the interaction automatically.
+The HARQ interaction feature is the single most important extension beyond baseline HAR for your project. \citet{BollerslevPattonQuaedvlieg2016HARQ} show it improves QLIKE by 5--15\% across equity indices.
 \end{projectconnection}
-
-\begin{workedexample}[Computing RQ]
-With $n = 78$ five-minute returns and $\sum r_{t,i}^4 = 5.2 \times 10^{-12}$:
-\[
-\operatorname{RQ}_t = \frac{78}{3} \times 5.2 \times 10^{-12} = 26 \times 5.2 \times 10^{-12} = 1.35 \times 10^{-10}.
-\]
-Compare this to a calm day where $\sum r_{t,i}^4 = 8.0 \times 10^{-13}$:
-\[
-\operatorname{RQ}_t^{\text{calm}} = 26 \times 8.0 \times 10^{-13} = 2.08 \times 10^{-11}.
-\]
-The noisy day has RQ roughly 6.5 times larger, telling you its RV reading is much less precise.
-\end{workedexample}
 
 % ──────────────────────────────────────────────────────────────
 \section{Signed and Asymmetric Features}\label{sec:feat-signed}
@@ -311,7 +276,7 @@ Total RV treats a 2\% up-move and a 2\% down-move identically. Semivariances bre
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-Include $\RV_t^-$ and $\RV_t^+$ (and their weekly/monthly averages) as separate feature columns. The SHAR baseline already uses them, so your ML model needs them to at least match SHAR performance. Empirically, $\RV_t^-$ carries roughly twice the predictive weight of $\RV_t^+$, so if you must prune features, keep $\RV_t^-$ and drop $\RV_t^+$ before dropping other features.
+Include $\RV_t^-$ and $\RV_t^+$ (and their weekly/monthly averages) as separate feature columns. If you must prune features, keep $\RV_t^-$ and drop $\RV_t^+$ before dropping other features.
 \end{projectconnection}
 
 By construction, $\RV_t = \RV_t^+ + \RV_t^-$ (ignoring zero returns).
@@ -341,7 +306,7 @@ Signed jumps isolate the extreme tail events and ask: did the big intraday moves
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-Add $J_t^-$ as a feature column. Negative jumps are substantially more predictive of future volatility than positive jumps. In HAR-CJ extensions, including $J_t^-$ separately improves QLIKE by 1--3\%. For your ML model, this asymmetric jump signal complements the semivariance features and is especially valuable during turbulent periods when jump activity clusters.
+In HAR-CJ extensions, including $J_t^-$ separately improves QLIKE by 1--3\%.
 \end{projectconnection}
 
 \textbf{Realized semicovariances.}
@@ -353,10 +318,6 @@ When prices fall, leveraged investors face margin calls, hedging demand spikes, 
 The mechanism is mechanical, not behavioral: a short gamma position that loses money forces the holder to sell more, amplifying volatility.
 Features that isolate this downside channel capture a structural driver, not a statistical accident.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-The asymmetry between positive and negative moves is one of the strongest and most robust findings in the volatility literature. For your project, always compute signed versions of your features: $\RV_t^-$ vs.\ $\RV_t^+$, $J_t^-$ vs.\ $J_t^+$, and (if using multivariate features) downside semicovariances. This costs you nothing in terms of data requirements but gives tree models a clean split variable to identify leverage-effect regimes.
-\end{projectconnection}
 
 % ──────────────────────────────────────────────────────────────
 \section{Higher Moments}\label{sec:feat-moments}
@@ -373,14 +334,6 @@ Realized skewness and kurtosis measure the shape of the intraday return distribu
   \item $\operatorname{RKurt}_t$: realized kurtosis, measuring tail heaviness (higher = more extreme moves relative to typical).
   \item Both are normalized by powers of RV so they are scale-free.
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-Realized skewness tells you whether today's intraday price action was lopsided: a very negative value means the big moves were predominantly downward. Realized kurtosis tells you whether the price path had fat tails: a high value means there were extreme intraday swings relative to the typical move size. Together they describe the ``shape'' of intraday price behavior beyond just its level (RV) and sign (semivariances).
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Include realized skewness and kurtosis in your initial feature set, but expect them to rank low in importance. Their main value is as regime-conditioning variables: when realized skewness is very negative, the model may learn that volatility persistence changes. Tree models can use them as split variables to identify stress regimes even if their linear predictive power is weak.
-\end{projectconnection}
 
 \begin{warning}[Modest Predictive Power]
 Realized skewness and kurtosis are noisy estimators and have shown only modest incremental forecasting power for next-day RV in most studies.
@@ -411,11 +364,11 @@ The balance of resting orders on each side of the book reveals directional press
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-OBI measures who is more eager to trade. When there is much more volume resting on the bid side than the ask, buyers are providing liquidity and the price is likely to tick up (or at least not fall). When ask-side volume dominates, sellers are in control. Extreme imbalance in either direction signals one-sided pressure that tends to resolve through a price move, and price moves create volatility.
+OBI measures who is more eager to trade. Extreme imbalance in either direction signals one-sided pressure that tends to resolve through a price move, and price moves create volatility.
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-If you are working with tick-level data (e.g., Optiver-style competitions or LOB snapshots), OBI is one of the strongest short-horizon features. Compute time-weighted OBI over your observation window and include it as a feature column. The absolute value $|\text{OBI}_t|$ is often more useful than signed OBI for volatility forecasting, since extreme imbalance in either direction predicts elevated vol.
+The absolute value $|\text{OBI}_t|$ is often more useful than signed OBI for volatility forecasting, since extreme imbalance in either direction predicts elevated vol.
 \end{projectconnection}
 
 \textbf{Weighted average price (WAP) log returns.}
@@ -499,7 +452,7 @@ If the price was falling and then starts falling faster, that is negative accele
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-For tick-level or LOB-based projects, include the standard deviation or sum of squared accelerations over the observation window as a feature column. This was one of the highest-importance features in top Optiver competition solutions. It captures information orthogonal to RV (which uses only first differences), providing the model with a signal about momentum instability that raw RV misses.
+This was one of the highest-importance features in top Optiver competition solutions. It captures information orthogonal to RV (which uses only first differences), providing the model with a signal about momentum instability that raw RV misses.
 \end{projectconnection}
 
 \textbf{Volume profiles.}
@@ -539,8 +492,6 @@ The key innovation is measuring in \emph{volume time} rather than clock time: a 
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-Include VPIN as a feature column if you have trade-level data with directional classification.
-Use $n = 50$ volume buckets per day as a starting point.
 VPIN is most valuable at the intraday and 1-day horizons, where it captures the arrival of informed order flow before it fully resolves into price moves.
 At longer horizons, VPIN's signal decays because the information has already been incorporated into prices.
 \end{projectconnection}
@@ -576,7 +527,6 @@ Rising $\lambda$ predicts higher near-term volatility because it signals that or
 Estimate $\hat{\lambda}_t$ on a rolling 60-interval window using 5-minute data and include it as a feature column.
 $\hat{\lambda}_t$ captures a different dimension of market quality than the bid-ask spread: the spread measures the cost of a small trade, while $\lambda$ measures the cost of a \emph{large} trade.
 During stress periods, $\lambda$ spikes before the spread widens, making it a leading indicator.
-For your project, the triple expansion of Kyle's lambda (level, change, z-score) provides three informative feature columns for tree models.
 \end{projectconnection}
 
 \begin{warning}[Microstructure features are asset-specific]
@@ -607,8 +557,6 @@ where:
 
 \begin{intuition}[In Plain English]
 The Amihud ratio answers a simple question: ``How much does the price move per dollar of trading activity?''
-A liquid stock can absorb millions of dollars in trading with barely a price ripple (low ILLIQ).
-An illiquid stock moves substantially even on modest dollar volume (high ILLIQ).
 This is exactly \citeauthor{Kyle1985}'s concept of market depth, but measured with data available for any publicly traded asset -- no tick data, no LOB snapshots, just daily returns and volume.
 When ILLIQ spikes, the market is having trouble absorbing order flow, which reliably precedes periods of elevated realized volatility.
 \end{intuition}
@@ -634,10 +582,6 @@ The \textbf{microprice} \citep{CarteaJaimungalPenalva2015} corrects for order-bo
   \item When bid volume dominates, the microprice shifts toward the ask (fair value is higher).
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-The microprice is essentially the same idea as WAP. Both weight the bid price by ask volume and vice versa. The key insight is that the side of the book with more resting volume is ``cheaper'' to trade against, so the true fair value sits closer to the other side. The microprice is a better estimate of where the next trade will actually occur than the simple midprice.
-\end{intuition}
-
 \begin{projectconnection}[Why This Matters]
 For microstructure-level projects, the deviation $|S^* - S_{\text{mid}}|$ between microprice and midprice is itself a useful feature: it measures how asymmetric the book is. Large deviations indicate one-sided pressure that often precedes short-term volatility. Use microprice returns rather than midprice returns as the basis for computing short-horizon RV targets.
 \end{projectconnection}
@@ -657,10 +601,6 @@ Abnormal volume today predicts elevated RV tomorrow, even after controlling for 
 The intuition: volume spikes reflect new information arriving (earnings whispers, large block trades, portfolio rebalancing) that has not yet fully resolved into price moves.
 Include at least one volume feature in any feature set.
 \end{keyidea}
-
-\begin{projectconnection}[Why This Matters]
-Add $\log(\text{volume}/\text{MA}_{20}\text{volume})$ as a feature column. It is easy to compute, available for any traded asset, and provides incremental predictive power beyond lagged RV. For microstructure-level projects, also include volume acceleration and the microprice-midprice deviation. These volume-based features are most valuable in the 1--2 day forecasting horizon where information arrival is actively resolving into price moves.
-\end{projectconnection}
 
 \subsection{Order Flow Imbalance and Depth Features}\label{sec:feat-ofi}
 
@@ -736,8 +676,6 @@ When both align, the next price move is likely to be large and fast.
 
 \begin{projectconnection}[Why This Matters]
 Include all three features -- OFI variability, depth ratio, and market urgency -- in your microstructure feature set.
-OFI captures dynamic flow, the depth ratio captures static structural imbalance, and market urgency captures the interaction of spread and imbalance.
-Together they provide three orthogonal views of market quality.
 For the E-mini L2 data, use $L = 5$ for the depth ratio.
 For the 30 equities (L1 only), you can compute OBI and market urgency but not the multi-level depth ratio.
 \end{projectconnection}
@@ -768,10 +706,6 @@ The risk reversal measures the difference in implied volatility between out-of-t
 The risk reversal tells you which side of the distribution the options market is more worried about. For equities, puts are almost always more expensive than calls (negative RR), reflecting the market's willingness to pay a premium for downside protection. When the skew becomes more negative than usual, the market is pricing in elevated crash risk. This forward-looking fear signal often precedes actual volatility increases.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-Include $\text{RR}_{25}$ as a feature column whenever options data is available. It captures tail-risk expectations that are invisible in price-based features. For your project, the level of skew and its recent change (5-day difference) are both informative: a sudden steepening of the skew predicts near-term vol spikes even when ATM IV has not yet moved.
-\end{projectconnection}
-
 \textbf{Term structure slope.}
 The slope of the IV term structure reveals whether the market expects volatility to increase or decrease over time:
 \begin{equation}\label{eq:ts-slope}
@@ -787,7 +721,7 @@ Normally, longer-dated options cost more in vol terms because there is more time
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-The term structure slope is a powerful regime indicator. Include it as a feature column and also consider its interaction with lagged RV. When TS is negative (backwardation), the market has already priced in a vol spike, so your model should dampen its vol-up forecasts. When TS is positive and rising, the market expects calm to continue. This feature is most useful at the 1-week to 1-month forecasting horizon where options have their largest informational advantage over realized measures.
+Consider the term structure slope's interaction with lagged RV. When TS is negative (backwardation), the market has already priced in a vol spike, so your model should dampen its vol-up forecasts. When TS is positive and rising, the market expects calm to continue.
 \end{projectconnection}
 
 \textbf{VRP proxy.}
@@ -805,7 +739,7 @@ VRP is the ``insurance premium'' the market charges for bearing volatility risk.
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-VRP is one of the strongest features for medium-horizon (1-week to 1-month) vol forecasting. Include it as a feature column using the simple proxy $\text{VIX}_t^2/10{,}000 - \RV_t^{(m)}$. Be careful about temporal alignment: the ``expected'' component must use only backward-looking data. Using a forward-looking RV estimate in the VRP proxy introduces lookahead bias. For Project 5 (VRP ML trader), this feature becomes the primary signal rather than just an input.
+Include VRP as a feature column using the simple proxy $\text{VIX}_t^2/10{,}000 - \RV_t^{(m)}$. Be careful about temporal alignment: the ``expected'' component must use only backward-looking data. Using a forward-looking RV estimate in the VRP proxy introduces lookahead bias. For Project 5 (VRP ML trader), this feature becomes the primary signal rather than just an input.
 \end{projectconnection}
 
 \textbf{VIX and VVIX.}
@@ -853,7 +787,6 @@ This is a more refined feature than the raw term structure slope because it dire
 Include VTS (the VIX futures ratio) as a regime indicator feature.
 Values below 0.9 strongly predict elevated near-term RV, while values above 1.1 signal calm.
 Also compute forward volatility at matched horizons (e.g., 1-to-3 month forward vol for predicting 1-month-ahead RV) and include it alongside the raw term structure slope.
-Forward vol provides a cleaner signal than the slope because it removes the contaminating effect of near-term event pricing.
 \end{projectconnection}
 
 \begin{keyidea}[Options features are forward-looking]
@@ -864,7 +797,7 @@ The gains are largest at horizons beyond one week, where the informational advan
 \end{keyidea}
 
 \begin{projectconnection}[Why This Matters]
-For your project, the options-implied feature family (ATM IV, RR$_{25}$, TS slope, VRP, VVIX) provides the largest marginal improvement over HAR-family baselines. If you have access to options data, these features should be your first extension beyond the core lagged-RV set. At the 1-day horizon, the gain is modest (1--3\% QLIKE). At the 1-week and 1-month horizons, the gain can reach 5--10\% because options encode forward-looking information that lagged RV cannot.
+For the options-implied feature family (ATM IV, RR$_{25}$, TS slope, VRP, VVIX), the gain over HAR-family baselines varies sharply by horizon. At the 1-day horizon, the gain is modest (1--3\% QLIKE). At the 1-week and 1-month horizons, the gain can reach 5--10\% because options encode forward-looking information that lagged RV cannot.
 \end{projectconnection}
 
 % ──────────────────────────────────────────────────────────────
@@ -936,7 +869,7 @@ Fractional differencing is a weighted average of the current value and all past 
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-Apply fractional differencing to $\log \RV_t$ with $d \approx 0.35$--$0.45$ and include the result as a feature column. This is especially important for linear models and neural networks that assume stationary inputs. Tree models are less sensitive to non-stationarity, but fractionally differenced log-RV can still help by making the signal cleaner. Use the grid-search approach described below to find the optimal $d$ for your specific dataset.
+Apply fractional differencing to $\log \RV_t$ with $d \approx 0.35$--$0.45$ and include the result as a feature column. This is especially important for linear models and neural networks that assume stationary inputs. Tree models are less sensitive to non-stationarity, but fractionally differenced log-RV can still help by making the signal cleaner.
 \end{projectconnection}
 
 The binomial coefficients $\binom{d}{k}$ for non-integer $d$ are:
@@ -1035,9 +968,7 @@ When vol-of-vol is low, volatility is clustered tightly around its current level
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-Include $\text{VoV}_t$ as a feature column.
-It complements fractional differencing by capturing the \emph{dispersion} of the vol process rather than its \emph{persistence}.
-Tree models can use VoV as a split variable to identify regimes where the standard HAR-style forecast (based on mean persistence) is less reliable.
+Tree models can use $\text{VoV}_t$ as a split variable to identify regimes where the standard HAR-style forecast (based on mean persistence) is less reliable.
 If the VVIX index is available (it is for SPX), it provides a forward-looking analog of VoV; when both are available, include both and let the model choose.
 \end{projectconnection}
 
@@ -1061,13 +992,6 @@ When $D_t$ is small (say, 3 days since the last spike), mean reversion is still 
 When $D_t$ is large (say, 45 days since the last spike), the market has been calm for a while, and the probability of a new spike is rising (vol clustering means calm periods do not last forever).
 Trees can learn this non-monotonic relationship: short durations predict high vol (mean-reversion tail), and very long durations predict moderately elevated vol (the calm-before-the-storm effect).
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Include $D_t$ and $\log(1 + D_t)$ as feature columns.
-The log transform compresses large duration values, which makes the feature more useful for tree splits at the short end (where the action is).
-Regime duration captures time-varying dynamics that neither fractional differencing nor the rolling Hurst exponent can express: the \emph{position within a volatility cycle} rather than the cycle's statistical properties.
-It is especially valuable at the 1-week horizon, where mean-reversion dynamics are most pronounced.
-\end{projectconnection}
 
 % ──────────────────────────────────────────────────────────────
 \section{Calendar and Event Features}\label{sec:feat-calendar}
@@ -1117,12 +1041,8 @@ Extract it as:
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-This formula ``subtracts out'' the normal day-to-day volatility to isolate the extra uncertainty the market assigns to the event itself. The idea is that total implied variance over a period equals the sum of variances from individual days (roughly, under independence). By comparing two options that differ only in whether they include the event day, you can back out how much additional variance the event contributes.
+This formula ``subtracts out'' the normal day-to-day volatility to isolate the extra uncertainty the market assigns to the event itself. By comparing two options that differ only in whether they include the event day, you can back out how much additional variance the event contributes.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Event-implied vol is a much richer feature than a binary event dummy. It tells your model not just that an FOMC meeting is happening, but how uncertain the market is about the outcome. Include $\sigma_{\text{event}}$ as a feature column on event days (and zero on non-event days). This feature requires options data but adds significant value for event-day forecasting, where binary dummies alone are too crude.
-\end{projectconnection}
 
 \textbf{Historical event-day RV ratios.}
 Compute the ratio $\text{RV}(\text{event day}) / \text{RV}(\text{surrounding days})$ historically for each event type.
@@ -1155,7 +1075,6 @@ where $t_e^{\text{next}}$ is the date of the next occurrence of event $e$, and $
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-A binary dummy says ``FOMC is today'' or ``FOMC is not today.''
 A proximity measure says ``FOMC is 3 days away'' -- and the model can learn that volatility starts compressing 2--3 days before FOMC (the ``pre-FOMC drift'') and then expands sharply on announcement day.
 This anticipation ramp is invisible to binary dummies: 5 days before FOMC looks identical to 50 days before FOMC in a binary encoding, but the market's behavior is measurably different.
 The continuous encoding lets tree models learn the full shape of the event response, not just the on/off state.
@@ -1263,7 +1182,6 @@ Treat sentiment features as a ``nice to have'' rather than a core requirement.
 % ──────────────────────────────────────────────────────────────
 
 With dozens of candidate features, you need a principled way to assess which ones actually help.
-This section previews the tools you will use extensively in Chapters~\ref{ch:trees}--\ref{ch:hybrid}.
 
 \textbf{Mean Decrease in Accuracy (MDA).}
 Permute one feature column at a time and measure how much out-of-sample loss increases.
@@ -1371,7 +1289,7 @@ where:
 \end{definition}
 
 \begin{intuition}[In Plain English]
-ALE plots answer the question: ``As this feature increases, does the model's prediction go up, down, or stay flat?'' Unlike partial dependence plots, which can be misleading when features are correlated (they evaluate the model at feature combinations that never occur in practice), ALE plots only compute effects within the observed data range. The result is a curve showing the marginal effect of one feature on the prediction, holding everything else at its actual (not hypothetical) value.
+Unlike partial dependence plots, which can be misleading when features are correlated (they evaluate the model at feature combinations that never occur in practice), ALE plots only compute effects within the observed data range. The result is a curve showing the marginal effect of one feature on the prediction, holding everything else at its actual (not hypothetical) value.
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
@@ -1441,11 +1359,6 @@ You run 5-fold purged CV and rank features within each fold by both MDA and mean
 For the signed-jump feature $J_t^-$, the picture splits: $\rho_{\text{stab}}^{\text{MDA}} = 0.41$ (red flag) but $\rho_{\text{stab}}^{\text{SHAP}} = 0.74$ (caution). The disagreement is the signal. MDA works by shuffling a feature's column to destroy its information and seeing how much worse the forecast gets; if the column is zero on most days, shuffling those zeros changes almost nothing, so MDA rates the feature low on quiet folds. $J_t^-$ is mostly zero and occasionally huge, so a fold that happens to contain a crash day attributes large SHAP credit to it, while permutation MDA --- which measures average accuracy loss --- sees little change on the many quiet days and ranks it inconsistently. The honest reading is not ``MDA says drop it, SHAP says keep it.'' It is ``$J_t^-$'s importance is concentrated in a few turbulent dates; verify on those dates before deciding.'' This is precisely the kind of feature for which the signed-magnitude transform (Equation~\ref{eq:signed-magnitude}) tames the tail and often stabilizes the ranking.
 \end{workedexample}
 
-
-\begin{projectconnection}[Why This Matters]
-Follow this exact protocol for your internship project. Run MDA across your 5 purged CV folds and report the stability of the top-10 feature rankings. If $\log \RV_t^{(d)}$ and $\sqrt{\operatorname{RQ}_t}$ consistently rank in the top 5, you have confirmation that your ML model has learned the HARQ insight from data. Present the stability table and ALE plots in your final report; they are more convincing evidence of model quality than a single QLIKE number.
-\end{projectconnection}
-
 % ──────────────────────────────────────────────────────────────
 % ──────────────────────────────────────────────────────────────
 \section{Proving a Feature Adds Value: The Incremental-Information Test}\label{sec:feat-incremental}
@@ -1459,7 +1372,7 @@ You have just learned how to rank features by importance (Section~\ref{sec:feat-
 
 \subsection{Two Nested Models}\label{sec:feat-incremental-nested}
 
-The test compares two models, one \emph{nested} inside the other (the bigger model contains every feature of the smaller one, plus exactly one more). We deliberately make Model~A a strong baseline, not a weak one, so that passing the test means something.
+The test compares two models, one \emph{nested} inside the other (the bigger model contains every feature of the smaller one, plus exactly one more).
 
 \begin{itemize}[nosep]
   \item \textbf{Model~A (the baseline):} the HAR core plus VIX. Features are $\log \RV_t^{(d)}$, $\log \RV_t^{(w)}$, $\log \RV_t^{(m)}$ (Equations~\ref{eq:rv-d}--\ref{eq:rv-m}) and $\log \text{VIX}_t$.
@@ -1486,12 +1399,8 @@ We judge the candidate on three complementary axes. Each answers a slightly diff
   \item $\Delta \QLIKE > 0$ means the candidate \emph{lowered} loss (improvement); $\Delta \QLIKE \le 0$ means it added nothing or hurt.
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-This equation simply asks: ``How many units of forecast loss did I save by adding this one column?'' Because $\QLIKE$ is the loss the desk actually cares about (Chapter~\ref{ch:evaluation}), $\Delta\QLIKE$ measures value in the units that matter, on data the model has never seen. A positive number is necessary but not sufficient: a tiny positive $\Delta\QLIKE$ could be noise, which is why we test it for significance in the next subsection.
-\end{intuition}
-
 \begin{projectconnection}[Why This Matters]
-This is the single most important feature-vetting computation in your project. Run it for every candidate before you commit it to the model: a feature that does not lower out-of-sample $\QLIKE$ relative to HAR core $+$ VIX does not belong in the matrix, regardless of how good its in-sample story is. Your QLIKE improvement target of 30--80 bps (Chapter~\ref{ch:evaluation}) is the \emph{cumulative} budget; the incremental test tells you how much of that budget each feature is actually spending.
+This is the single most important feature-vetting computation in your project. Your QLIKE improvement target of 30--80 bps (Chapter~\ref{ch:evaluation}) is the \emph{cumulative} budget; the incremental test tells you how much of that budget each feature is actually spending.
 \end{projectconnection}
 
 \textbf{(2) SHAP attribution in Model~B.} Refit $\SHAP$ (Equation~\ref{eq:shap}, Figure~\ref{fig:feature-importance}) on Model~B and read off the mean absolute SHAP value of the candidate, $\overline{|\phi_x|}$, the average over the test-fold observations of $|\phi_x^{(i)}|$, the candidate's per-prediction SHAP contribution from Equation~\ref{eq:shap}. A feature with a real $\Delta\QLIKE$ but near-zero SHAP is a contradiction worth investigating; a feature with large SHAP but zero $\Delta\QLIKE$ is importance shared with a correlated baseline column, because SHAP can hand a feature credit that really belongs to a near-identical baseline column it travels with --- removing the candidate then changes nothing (zero $\Delta\QLIKE$) since the baseline column still carries the signal (the SHAP-instability warning of Section~\ref{sec:feat-importance}). Agreement between the two is the reassuring case.
@@ -1565,7 +1474,7 @@ A feature earns its column only if, relative to HAR core $+$ VIX, it delivers a 
 % ──────────────────────────────────────────────────────────────
 
 You have now seen seven layers of features: lagged RV transforms, noise-awareness features (RQ), signed and asymmetric measures, options-implied quantities, microstructure signals, cross-asset spillovers, calendar/event features, and long-memory/regime features.
-The natural question is: \emph{How much does each layer actually contribute?}
+\emph{How much does each layer actually contribute?}
 
 The answer follows a characteristic \textbf{diminishing returns curve}: the first few feature families provide the vast majority of forecasting accuracy, and each subsequent layer adds progressively less.
 
@@ -1687,15 +1596,6 @@ Specifically:
 \end{enumerate}
 Chasing Layer~5--7 features when your Layer~0 baseline is poorly calibrated (wrong training window, wrong re-estimation frequency, wrong target transform) is optimizing the wrong thing.
 \end{keyidea}
-
-\begin{projectconnection}[Why This Matters]
-The diminishing returns curve is the punchline of this entire chapter.
-For your internship project, it means:
-(1) your first model should use only Layers~0--2 (${\sim}15$--20 features) and should beat a well-tuned HAR before you declare victory;
-(2) if you have options data, adding VRP and skew should be your first extension, not microstructure features;
-(3) the QLIKE improvement target of 30--80 bps is achievable primarily through Layers~0--2 plus proper model tuning, not through feature quantity.
-Present the diminishing returns curve in your final report to explain why you prioritized feature quality over feature quantity.
-\end{projectconnection}
 
 % ══════════════════════════════════════════════════════════════
 \section{Summary}\label{sec:feat-summary}

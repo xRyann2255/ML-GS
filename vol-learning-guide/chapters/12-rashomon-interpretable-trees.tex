@@ -106,14 +106,6 @@ within 2\% of optimal accuracy, VIX and ATM IV are interchangeable
 substitutes, but lagged RV is always important.''  That statement requires
 looking at all good models, not just one.
 
-\begin{keyidea}[The Core Insight]
-What if we looked at \emph{all} good models instead of just one?  If a
-feature is important in every near-optimal model, that importance is robust.
-If it is important in some but not others, it is a substitute that can be
-swapped out.  The distinction between ``robustly important'' and
-``substitutable'' is invisible to any single-model explanation method.
-\end{keyidea}
-
 
 % ──────────────────────────────────────────────────────────────
 \section{The Rashomon Set}\label{sec:rashomon:set}
@@ -153,14 +145,6 @@ model $f$ evaluated on the training data.
     within $\mathcal{F}$ (e.g., found by GOSDT for optimal sparse trees).
   \item $L(f^*)$ --- the best achievable loss in the class.
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-The Rashomon set is the ``cloud'' of models that are all approximately tied
-for best.  Imagine ranking every possible decision tree by its error on your
-data, then drawing a horizontal line at $1.02 \times \text{(best error)}$.
-Every tree below that line is in the Rashomon set.  The set may contain tens,
-thousands, or even $10^{12}$ trees --- all of them are defensible choices.
-\end{intuition}
 
 For decision trees specifically, \citet{XinEtAl2022} define the objective
 function as the misclassification loss plus a sparsity penalty:
@@ -245,7 +229,7 @@ models using either one.
 % ──────────────────────────────────────────────────────────────
 
 Before we can enumerate \emph{all} near-optimal trees, we must be able to
-find \emph{one} provably optimal tree.  This is the foundation.
+find \emph{one} provably optimal tree.
 
 \subsection{Why Not Just Use CART?}
 
@@ -282,13 +266,6 @@ upper and lower bounds on the objective at each split.  When the lower bound
 of a subtree exceeds the current best upper bound, that entire subtree is
 pruned.
 
-\begin{intuition}[In Plain English]
-Think of it as a chess engine: instead of playing the locally best-looking
-move (greedy), you search several moves ahead and pick the sequence that
-leads to the best position.  Branch-and-bound makes this tractable by ruling
-out hopeless positions early.
-\end{intuition}
-
 \subsection{SPLIT: Greedy Where It Doesn't Matter, Optimal Where It Does}
 
 A crucial empirical observation by \citet{BabbarEtAl2025} is that greedy
@@ -318,11 +295,7 @@ worst case of fully optimal methods.
 \begin{projectconnection}[Interpretable Trees for Vol Forecasting]
 For our volatility project, a depth-5 tree with 10--15 features is a
 realistic interpretable baseline.  An optimal tree of this size can be found
-in under a second with LicketySPLIT.  Every prediction traces to a
-root-to-leaf path, making it trivial to explain: ``the model forecasts high
-volatility because yesterday's RV was above the 90th percentile AND the VIX
-term structure is in backwardation.''  This transparency is valuable for
-presentations and for building trust with portfolio managers.
+in under a second with LicketySPLIT.
 \end{projectconnection}
 
 \subsection{STreeD: Piecewise-Linear Regression Trees}
@@ -515,14 +488,6 @@ Bike         & 14{,}330 & 194 & $74\times$  & 0.999 \\
 10 bootstrapped datasets, $\lambda = 0.02$, $\epsilon = 0.01$, depth 5,
 lookahead depth 2.}
 
-\begin{intuition}[In Plain English]
-RESPLIT is like asking: ``what if we only optimize the important splits (near
-the root) and let the unimportant splits (near the leaves) be good enough?''
-The answer: you get almost the same set of near-optimal trees, 10--20 times
-faster, with almost identical downstream conclusions about which features
-matter.
-\end{intuition}
-
 \subsection{LicketyRESPLIT: Polynomial-Time Approximation}
 \label{sec:rashomon:licketyresplit}
 
@@ -632,7 +597,6 @@ dramatic improvements in scalability.}
 \section{What the Rashomon Set Reveals}\label{sec:rashomon:analysis}
 % ──────────────────────────────────────────────────────────────
 
-Having the Rashomon set is only useful if we can extract insights from it.
 Two complementary tools turn the raw set of models into actionable
 conclusions about feature importance.
 
@@ -660,12 +624,6 @@ the original loss:
   \item A reliance of 1.0 means the feature contributes nothing; larger
     values indicate greater importance
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-Model reliance is permutation importance: scramble a feature and see how much
-worse the model gets.  MCR asks: across all near-optimal models, what is the
-minimum and maximum permutation importance of each feature?
-\end{intuition}
 
 MCR defines two key quantities for each feature $j$:
 \begin{align}
@@ -969,14 +927,6 @@ A Rashomon-based approach to regime-stable feature selection:
     VIX $> 20$).
 \end{enumerate}
 
-\begin{intuition}[In Plain English]
-Instead of asking ``is this feature important right now in my current model,''
-ask ``is this feature important in every near-optimal model, in every regime
-I've seen?''  Features that pass this test are the ones you can defend in a
-presentation.  The ones that fail are the ones that will embarrass you when
-someone asks ``why did the ranking change?''
-\end{intuition}
-
 \subsection{Prediction Multiplicity: Quantifying Model-Choice Uncertainty}
 
 The Rashomon set also reveals \textbf{prediction multiplicity}: the range of
@@ -1012,17 +962,6 @@ Rashomon analysis gives you defensible answers:
     $[0.00012, 0.00018]$.  The spread tells you how much of the forecast
     uncertainty comes from model choice rather than data noise.''
 \end{itemize}
-
-\begin{keyidea}[The Novelty of This Application]
-As of 2025, no published paper applies Rashomon set analysis to financial
-time-series data.  The tools (TreeFARMS, RESPLIT, LicketyRESPLIT) have been
-demonstrated on tabular classification datasets (COMPAS, FICO, UCI
-benchmarks).  Applying them to volatility forecasting would require
-adapting the framework to regression trees and squared-error or QLIKE loss,
-but the conceptual apparatus --- enumerate near-optimal models, compute MCR,
-examine VIC --- carries over directly.  This is a genuine opportunity for
-novel contribution.
-\end{keyidea}
 
 
 % ──────────────────────────────────────────────────────────────

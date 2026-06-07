@@ -6,11 +6,8 @@
 \section{Why This Chapter Matters}
 
 \begin{application}[From Components to Combinations]
-Chapters~\ref{ch:trees} and~\ref{ch:deeplearning} showed that ML models
-improve on HAR primarily through richer features and nonlinear interactions,
-not by replacing the linear structure that HAR captures well.  This chapter
-asks: why not let HAR handle the linear part and train ML only on the
-residual?  Hybrid models do this, and they are the safest bet in the
+Hybrid models let HAR handle the linear part and train ML only on the
+residual, and they are the safest bet in the
 volatility forecasting literature~\citep{RahimikiaPoon2020}.  Project~1
 (HARQ-X with ML Residual Augmentation) is a hybrid by design.
 \end{application}
@@ -22,7 +19,7 @@ HAR is parsimonious but linear; gradient-boosted trees are flexible but
 hungry for signal.  This chapter shows you how to combine them so that
 each component operates where it is strongest.
 
-The core philosophy is simple: \emph{decompose}, then \emph{specialize}.
+The core idea: \emph{decompose}, then \emph{specialize}.
 Let a well-understood econometric model absorb the predictable structure,
 then aim the full power of ML at whatever remains.  The resulting hybrid
 almost always outperforms either component alone, and it does so with
@@ -215,25 +212,6 @@ you want when most of the signal has already been removed.
           e_t = \RV_{t+1} - \widehat{\HAR}_t.
         \end{equation}
 
-        \begin{intuition}[In Plain English]
-        Steps~1--2 are the ``let HAR go first'' principle in action.
-        You fit a standard HAR model, record its predictions, and then
-        subtract those predictions from the actual realized volatility.
-        The residual $e_t$ is everything HAR could not explain: jump
-        effects, leverage asymmetry, regime shifts, and noise.  The ML
-        model in the next step will see only this leftover signal.
-        \end{intuition}
-
-        \begin{projectconnection}[Why This Matters]
-        This two-step decomposition underpins your project's model comparison.
-        HAR and HARQ serve as econometric baselines; LightGBM then learns
-        nonlinear patterns from the full feature set (Layers~0--7).  Because
-        HARQ already adapts its coefficients to measurement-error regimes,
-        comparing LightGBM's QLIKE against HARQ tells you exactly how much
-        the ML model's nonlinearity adds beyond what the noise-adaptive
-        linear baseline already captures.
-        \end{projectconnection}
-
   \item Construct a feature matrix $\bX_t$ from the feature engineering
         toolkit of Chapter~\ref{ch:features} (jump indicators, leverage,
         signed volatility, VIX basis, microstructure noise proxies).
@@ -254,37 +232,10 @@ you want when most of the signal has already been removed.
                 in the kernel-induced feature space.
         \end{itemize}
 
-        \begin{intuition}[In Plain English]
-        The SVR loss function says: ``If my prediction is within
-        $\varepsilon$ of the true residual, call it good enough and move
-        on.  Only penalize me for the amount I miss by beyond that
-        tolerance.''  The regularization term $\frac{1}{2}\|w\|^2$ keeps
-        the model simple, and $C$ controls how aggressively you chase
-        the outlier residuals versus keeping the model smooth.
-        \end{intuition}
-
-        \begin{projectconnection}[Why This Matters]
-        In a HARQ-X + ML residual pipeline, most residuals will be small
-        because HARQ already captures the dominant linear dynamics.  The
-        $\varepsilon$-tube ensures the SVR does not waste capacity fitting
-        noise on those easy days.  Instead, it concentrates support
-        vectors on post-jump and regime-shift days where HARQ
-        underperforms, which is exactly where forecasting gains translate
-        into economic value.
-        \end{projectconnection}
-
   \item Produce the combined forecast:
         \begin{equation}\label{eq:har-svr-combined}
           \hat{y}_{t+1} = \widehat{\HAR}_t + \widehat{\text{SVR}}(\bX_t).
         \end{equation}
-
-        \begin{intuition}[In Plain English]
-        The final forecast is simply the HAR prediction plus the SVR
-        correction.  On days where HAR is already accurate, SVR's
-        correction is near zero (inside the $\varepsilon$-tube).  On days
-        where HAR struggles, SVR adds a nonlinear adjustment.  You never
-        discard the HAR forecast; you only add to it.
-        \end{intuition}
 
         \begin{projectconnection}[Why This Matters]
         This additive structure means you can always decompose your final
@@ -334,14 +285,6 @@ The standard GARCH(1,1) update is
   \sigma^2_{t+1} = \omega + \alpha\,\epsilon_t^2 + \beta\,\sigma^2_t.
 \end{equation}
 
-\begin{intuition}[In Plain English]
-Tomorrow's variance equals a long-run average ($\omega$) plus a fraction
-of today's squared shock ($\alpha\,\epsilon_t^2$) plus a fraction of
-today's variance ($\beta\,\sigma^2_t$).  The parameters $\alpha$ and
-$\beta$ are fixed for all time, which means the model treats calm
-markets and crisis markets with the same update rule.
-\end{intuition}
-
 GINN replaces the fixed parameters $(\omega, \alpha, \beta)$ with
 time-varying outputs of a neural network $g_{\btheta}$:
 \begin{equation}\label{eq:ginn}
@@ -365,12 +308,9 @@ where each term is:
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-GINN keeps the GARCH update rule but lets a neural network adjust the
-knobs ($\omega$, $\alpha$, $\beta$) at each time step based on auxiliary
-features.  During calm markets the network can set $\beta$ high (strong
+During calm markets the network can set $\beta$ high (strong
 persistence); after a jump it can raise $\alpha$ (more reactive to
-shocks).  The GARCH skeleton is never discarded, so the model
-automatically inherits volatility clustering and mean reversion.
+shocks).
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
@@ -492,22 +432,11 @@ The procedure has three stages:
         simplification that captures the same core idea: text provides
         an exogenous signal beyond lagged~$\RV$.
 
-        \begin{intuition}[In Plain English]
-        The key insight is that news text can carry information about
-        tomorrow's volatility that lagged RV alone does not capture.
-        Whether you inject that signal as a single sentiment score in
-        a linear regression or let a CNN learn a richer representation,
-        the principle is the same: combine text with the HAR baseline.
-        \end{intuition}
-
         \begin{projectconnection}[Why This Matters]
         At Goldman Sachs you may have access to proprietary news feeds
         or internal research sentiment.  Public NLP signals show modest
         and conditional improvements---primarily on volatility jump
-        days---but a curated internal signal could do better.  More
-        importantly, this equation shows the general template for
-        augmenting HAR with any exogenous feature: just add it as an
-        extra regressor and test whether $\gamma \neq 0$.
+        days---but a curated internal signal could do better.
         \end{projectconnection}
 
   \item \textbf{Evaluation.}  Compare $\QLIKE$ loss of HAR vs.\
@@ -549,8 +478,7 @@ first'' principle of this chapter.
 
 If you must choose one approach from this chapter for a production
 volatility forecast, choose a weighted average of HAR and LightGBM.
-It is simple, robust, and remarkably hard to beat.  Two combination
-strategies dominate practice.
+Two combination strategies dominate practice.
 
 \subsubsection{Strategy A: Fixed Weighted Average}
 
@@ -567,24 +495,6 @@ where:
   \item $\widehat{\text{GBM}}_t$ --- the LightGBM forecast trained on the
         full feature set of Chapter~\ref{ch:features}.
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-The combined forecast is a simple weighted average of two models.  With
-$w = 0.7$, you are saying ``I trust HAR for 70\% of the forecast and
-let LightGBM contribute the remaining 30\%.''  This is the forecast
-analogue of portfolio diversification: even if LightGBM is noisier than
-HAR, blending the two reduces overall forecast variance as long as their
-errors are not perfectly correlated.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-A fixed 70/30 blend is the simplest credible baseline for the internship
-project.  Before investing time in stacking or neural residual models,
-demonstrate that this blend already beats standalone HAR on QLIKE.
-The weight $w$ can be optimized by minimizing QLIKE on a validation set,
-which directly aligns the combination with the project's primary
-evaluation metric.
-\end{projectconnection}
 
 \begin{keyidea}[The 70/30 Rule]
 A 70/30 HAR/LightGBM blend is remarkably hard to beat.  It inherits HAR's
@@ -619,60 +529,12 @@ on out-of-sample predictions:
                 models.
         \end{itemize}
 
-        \begin{intuition}[In Plain English]
-        Instead of fixing the blend weights by hand, you let the data
-        decide.  You generate out-of-sample predictions from each base
-        model (so the meta-learner never sees in-sample fits), then run
-        a simple ridge regression that learns how much to trust each
-        model.  The intercept $\alpha_0$ corrects any systematic bias,
-        and the ridge penalty prevents the meta-learner from overfitting
-        to noise in the small differences between HAR and LightGBM.
-        \end{intuition}
-
         \begin{projectconnection}[Why This Matters]
-        Stacking is the natural upgrade path from a fixed 70/30 blend.
-        If your project has multiple candidate models (HARQ, HARQ-X,
-        LightGBM, SVR), stacking lets you combine all of them in a
-        principled way.  Critically, the meta-learner can be trained by
+        The meta-learner can be trained by
         minimizing QLIKE rather than MSE, ensuring the combination
         weights are aligned with the project's primary loss function.
         \end{projectconnection}
 \end{enumerate}
-
-\begin{workedexample}[Stacking on Five Test Days]
-
-Suppose you have OOS predictions from HAR and LightGBM on 5 test days,
-along with realized values:
-
-\medskip
-\begin{center}
-\begin{tabular}{cccc}
-\toprule
-Day & $\widehat{\HAR}$ & $\widehat{\text{GBM}}$ & $\RV_{t+1}$ (actual) \\
-\midrule
-1 & 12.1 & 13.5 & 13.0 \\
-2 & 18.7 & 19.2 & 20.1 \\
-3 & 10.3 & 11.0 & 10.8 \\
-4 & 25.4 & 22.8 & 23.5 \\
-5 &  9.8 & 10.4 & 10.0 \\
-\bottomrule
-\end{tabular}
-\end{center}
-\medskip
-
-A ridge meta-learner fit on these data might yield weights
-$\hat{\alpha}_1 = 0.45$, $\hat{\alpha}_2 = 0.58$ (they need not sum
-to 1 when an intercept is included).  For day~4, the stacked forecast is
-\[
-  \hat{y}_5 = \hat{\alpha}_0 + 0.45 \times 25.4 + 0.58 \times 22.8
-  = \hat{\alpha}_0 + 24.65.
-\]
-Compare the component MSEs: HAR alone achieves MSE $= 1.33$, LightGBM
-alone achieves MSE $= 0.35$, and the stacked combination achieves
-MSE $= 0.27$.  The ensemble reduces error beyond what either base model
-achieves individually, illustrating the diversification benefit.
-
-\end{workedexample}
 
 \subsection{Architecture Diagram}
 
@@ -735,8 +597,7 @@ LightGBM: a fixed weighted average
 predictions (Equation~\eqref{eq:stacking}).  Both are instances of a
 broader design choice: how do you wire multiple models together?  Three
 architectures dominate the ensemble literature, and each answers that
-question differently.  Understanding their tradeoffs is essential before
-committing to one for a production volatility pipeline.
+question differently.
 
 
 \subsection{Architecture A: Feature Stacking}\label{sec:hybrid:feat-stack}
@@ -766,13 +627,10 @@ where each term is:
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-Think of the LSTM as a feature extractor: it reads a day's worth of
-5-minute bars and compresses them into a short summary vector.
-LightGBM then treats that summary as additional columns alongside the
-usual tabular features.  The hope is that the LSTM captures intraday
-dynamics (order flow imbalances, microstructure noise patterns) that
-tabular statistics miss, and the tree can exploit those dynamics
-alongside everything else.
+The LSTM compresses a day of 5-minute bars into a summary vector that
+LightGBM treats as extra columns, hoping to capture intraday dynamics
+(order flow imbalances, microstructure noise patterns) that tabular
+statistics miss.
 \end{intuition}
 
 \subsubsection{The Gradient Isolation Problem}
@@ -862,19 +720,6 @@ where each term is:
         sequences (set to zero if Stage~3 is dropped).
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-Residual stacking is like a relay race.  HAR runs the first leg and
-explains everything it can with three coefficients.  LightGBM picks up
-what HAR dropped --- the nonlinear, interaction-driven patterns in the
-leftover signal.  If there is still structure remaining (temporal
-dependencies in the second-stage residuals), an LSTM runs the final
-leg.  Each runner is specialized by construction: you never ask a model
-to redo work that a prior stage already handled.  This is the
-three-stage extension of the HAR-SVR pipeline from
-Section~\ref{sec:hybrid:har-svr}, replacing SVR with LightGBM and
-adding an optional LSTM stage.
-\end{intuition}
-
 \begin{projectconnection}[Residual Stacking Is Your Default Architecture]
 This three-stage pipeline maps directly onto the HARQ-X + ML residual
 direction.  HARQ-X replaces plain HAR in Stage~1, giving even cleaner
@@ -920,15 +765,6 @@ where each term is:
         Equation~\eqref{eq:stacking} relaxes this constraint).
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-Prediction blending is forecast-level diversification.  Each model
-makes its best guess independently, and you take a weighted average.
-No model sees what the others are doing during training.  This is the
-ensemble equivalent of portfolio diversification: even if individual
-forecasters are noisy, their weighted average has lower variance as
-long as errors are imperfectly correlated.
-\end{intuition}
-
 \subsubsection{Weight Schemes}
 
 Two approaches to setting blend weights:
@@ -947,14 +783,6 @@ where each term is:
   \item $\QLIKE_k^{-1}$ --- the inverse loss; models with lower
         (better) $\QLIKE$ receive higher weight.
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-Inverse-$\QLIKE$ weighting says: ``Trust each model in proportion to
-how well it performed on validation data.''  A model with half the
-$\QLIKE$ loss of another gets twice the weight.  This is a one-line
-formula that requires no optimization and aligns directly with the
-project's primary evaluation metric.
-\end{intuition}
 
 \paragraph{Regime-dependent weights.}
 Use different blend weights in different volatility regimes.  For
@@ -1033,17 +861,6 @@ Literature support
 \end{tabular}
 \end{table}
 
-\begin{intuition}[Reading the Comparison Table]
-The table reveals a clear pattern: moving from left to right (feature
-stacking $\to$ residual stacking $\to$ prediction blending), complexity
-decreases, debuggability increases, and literature support strengthens.
-Feature stacking sounds appealing in theory --- richer input to the
-tree --- but gradient isolation undermines the premise.  Residual
-stacking gives each model a distinct role by construction.  Prediction
-blending is the simplest and most robust, requiring no architectural
-coupling between models at all.
-\end{intuition}
-
 
 %% ============================================================
 %% NEW SECTION — Identifying Regimes (GMM / EM / BIC / Markov-switching)
@@ -1057,8 +874,8 @@ regime-switching combination of Chapter~\ref{ch:trees}
 we have so far left undefined: a \emph{regime indicator}.  Until now we
 have used ad-hoc thresholds --- $\RV_t^{(w)}$ above its 75th percentile,
 or $\IVol_t > 30$ for the VIX --- to declare a market ``stressed.''  Those
-rules are easy to state and easy to defend, but they raise an obvious
-question: \emph{why $75$th and not $80$th?}  This section replaces the
+rules are easy to state but arbitrary: \emph{why $75$th and not $80$th?}
+This section replaces the
 hand-picked threshold with a probabilistic model that lets the data decide
 both how many regimes exist and which one each day belongs to --- the
 ``GMM-based regime probability'' that Chapter~\ref{ch:trees} promised when
@@ -1384,25 +1201,10 @@ where each term is:
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-BIC scores a model as ``how badly it fits'' plus ``how much it costs in
-parameters.''  Each extra regime buys a lower misfit term but pays the
-$p\log T$ tax.  You pick the $K$ that \emph{minimizes} BIC: the point where
-one more regime no longer explains enough new structure to justify its
-parameters.  In volatility data, $K=2$ or $K=3$ usually wins --- markets
+In volatility data, $K=2$ or $K=3$ usually wins --- markets
 have a calm state, a crisis state, and sometimes an in-between ``elevated
 but orderly'' state.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Fit a GMM for each $K \in \{2,3,4\}$, record BIC, and pick the minimum.
-Then \emph{inspect} the regimes: do the cluster means in
-\eqref{eq:hybrid:regime-inputs} correspond to recognizable market
-conditions (low-$\RV$/low-VIX calm, high-$\RV$/high-jump crisis)?  If $K=2$
-and $K=3$ have near-tied BIC, prefer the smaller, more interpretable model
---- a two-regime calm/crisis split is the cleanest fit for the
-regime-dependent blend, and it maps directly onto the two states of the
-Markov-switching model in Section~\ref{sec:hybrid:markov}.
-\end{projectconnection}
 
 \subsection{The sklearn Workflow}
 \label{sec:hybrid:sklearn-gmm}
@@ -1701,16 +1503,6 @@ where each term is:
         data.
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-If LightGBM consistently outperforms HAR during high-volatility weeks
-but underperforms during calm weeks, it makes sense to shift weight
-toward LightGBM when volatility is elevated and toward HAR when
-markets are quiet.  Regime-dependent weights let you exploit this
-pattern.  But the key word is ``consistently'' --- if the performance
-difference across regimes is noisy or unstable, regime conditioning
-adds complexity without improving accuracy.
-\end{intuition}
-
 \begin{warning}[Regime Weights Require Stable Performance Differences]
 Regime-dependent weights help only when model accuracy varies
 \emph{systematically} across regimes, not just randomly.  If the
@@ -1775,8 +1567,6 @@ Pure deep learning
 \end{table}
 
 \begin{keyidea}[Default to Hybrid]
-Your default architecture should be hybrid, not pure ML.  Start with HAR
-as a backbone and add ML complexity only where the residuals justify it.
 You earn the right to go pure ML only when you have a large sample, rich
 features, and evidence that the linear baseline leaves substantial
 structure in the residuals~\citep{RahimikiaPoon2020}.

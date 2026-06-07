@@ -74,14 +74,6 @@ The payoff to the holder (the \textbf{long} side) of a variance swap at expiry i
 \end{itemize}
 The \textbf{short} side, which is GSVIVS01, receives the negative of \Cref{eq:gsvivs:varswap-payoff}, and therefore profits exactly when realized variance comes in below the strike, $\sigma^2_{\text{realized}} < \Kvar^2$.
 
-\begin{intuition}[In Plain English]
-A variance swap is a bet settled on a single number: how bumpy the ride actually was. The strike is the bumpiness the market charged for in advance. If you are short and the market turns out smoother than the strike, you keep the difference; if it turns out rougher, you pay it. There is no direction in the bet at all, only magnitude: a big rally and a big crash of the same size pay the same.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-\Cref{eq:gsvivs:varswap-payoff} is the entire economic engine of GSVIVS01 in one line. The strategy is permanently the short side, so its daily fortune is decided by the sign of $\sigma^2_{\text{realized}} - \Kvar^2$. A drawdown is nothing more exotic than a day on which realized variance beat the strike. Because $\Kvar$ is known in the morning and $\sigma^2_{\text{realized}}$ is what our model forecasts, the drawdown-prediction problem of Act~2 is already visible here.
-\end{projectconnection}
-
 \begin{workedexample}[A Single Short Variance Swap]
 Suppose GSVIVS01 sells a one-day variance swap struck at $\Kvar = 20\%$ annualized, with a variance notional of \$1{,}000 per annualized variance point (where one ``point'' is one unit of $\sigma^2$ expressed in percent-squared, so $\Kvar^2 = 400$). If the day turns out quiet and annualized realized volatility is $16\%$ (realized variance $256$), the short collects $N_{\text{var}}(\Kvar^2 - \sigma^2_{\text{realized}}) = 1000\,(400 - 256) = \$144{,}000$. If instead a shock hits and realized volatility is $35\%$ (variance $1225$), the short pays $1000\,(400 - 1225) = -\$825{,}000$. The asymmetry of the two outcomes, a steady modest gain against an occasional large loss, is the signature of every short-variance position and the reason Act~2 exists. (Unit convention, used throughout: $\Kvar$ is quoted in percentage volatility points, e.g.\ $20$, so $\Kvar^2 = 400$; the signal in \Cref{eq:gsvivs:vrpgap} divides by $100$ first to work in decimal variance, e.g.\ $0.04$.)
 \end{workedexample}
@@ -137,7 +129,7 @@ In words: one log contract can be reproduced by a forward plus a basket holding 
 where $P(K)$ and $C(K)$ are the current prices of the put and call struck at $K$ and $r$ is the risk-free rate. The first three terms ($rT$, the bracket, and the $\log$) are interest-rate and reference-price corrections; with $S_* = F$ (the forward) they vanish, and this reduces to the symmetric form quoted in the strategy spec, $\Kvar^2 = \frac{2e^{rT}}{T}\big[\int_0^F P(K)/K^2\,dK + \int_F^\infty C(K)/K^2\,dK\big]$, which is the \textbf{model-free implied variance} of \Cref{eq:model-free-var}.
 
 \begin{intuition}[In Plain English]
-The fair strike is not a model output; it is a shopping bill. Buy every out-of-the-money option, weight each by one over its strike squared, and the total cost is the fair price of future variance. ``Model-free'' means no Black--Scholes, no Heston, no assumption about the shape of volatility: the option prices themselves, whatever produced them, already encode the market's price of variance.
+The fair strike is not a model output; it is a shopping bill. Buy every out-of-the-money option, weight each by one over its strike squared, and the total cost is the fair price of future variance. ``Model-free'' means the option prices themselves, whatever produced them, already encode the price of variance, with no assumption about the shape of volatility (no Black--Scholes, no Heston).
 \end{intuition}
 
 \subsection*{Step 3: why $1/K^2$, and why the strike beats at-the-money implied vol}
@@ -200,10 +192,6 @@ Replacing the integrals in \Cref{eq:gsvivs:kvar} by a sum over traded strikes gi
   \item the final term: a small correction for the nearest listed strike $K_0$ not sitting exactly at the forward; negligible at the 0DTE horizon where $T$ is tiny.
   \item the factor $100$ in $\Kvar = 100\sqrt{\sigma^2}$: it expresses the strike in percentage volatility points (e.g.\ $20$, not $0.20$).
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-\Cref{eq:gsvivs:cboe} is the practical recipe behind the previous section's shopping bill. Walk along the available strikes, take each out-of-the-money option's mid price, weight it by the strike spacing over the strike squared, and add it all up. That sum, the same arithmetic the VIX is built from, is the fair variance the strip will sell.
-\end{intuition}
 
 \begin{projectconnection}[Why This Matters]
 This is not just background: \Cref{eq:gsvivs:cboe} is the data feed for Act~2. The strategy's data source (\texttt{EDRVS\_EXPIRY}) publishes the fair variance by listed expiry, and when it is missing we reconstruct $\Kvar$ from the option grid using exactly this formula. The $\Kvar$ that enters the signal in \Cref{sec:gsvivs:signal} is the output of \Cref{eq:gsvivs:cboe}.
@@ -277,10 +265,6 @@ On 26 May 2022 the S\&P~500 forward was $4057.84$ and GSVIVS01 sold $25$ options
 \label{fig:gsvivs:flatgamma}
 \end{figure}
 
-\begin{keyidea}[GSVIVS01 Is the Clean Variance Instrument]
-The variance swap was named in \Cref{ch:ivrv-straddle} as the clean instrument the straddle could not be; GSVIVS01 delivers it by trading the strip on 0DTE options, among the most liquid contracts in the world. So everything that chapter said about a clean realized-minus-implied variance payoff applies to GSVIVS01 with far less leakage from vanna and volga.
-\end{keyidea}
-
 The strip is executed on a fixed daily schedule, summarized in \Cref{tab:gsvivs:schedule}. The fixed signal-generation time is not a detail: it is what hands Act~2 a clean, lookahead-safe boundary for the forecast (\Cref{sec:gsvivs:signal}).
 
 \begin{table}[ht]
@@ -316,10 +300,6 @@ The day's profit and loss is then the premium collected on the short strip, less
   \item $\Delta_j$: the size of the $j$-th futures hedge trade, executed at price $S_{\text{exec},j}$.
   \item $S_{\text{close}}$: the underlying's settlement price, against which the hedge is marked.
 \end{itemize}
-
-\begin{intuition}[In Plain English]
-Each day the strategy banks the premium from the options it wrote, then subtracts whatever it cost to keep itself directionally flat while the market wandered. On a calm day the premium dwarfs the hedging cost and the day is green; on a violent day the hedge cannot keep up and the options it wrote pay out, and the day is deeply red. \Cref{eq:gsvivs:dailypnl} is the daily increment that the index compounds.
-\end{intuition}
 
 The \textbf{GSVIVS01 index} compounds these daily increments from a base of $100$. \Cref{tab:gsvivs:index} shows the strategy's real first week. Four quiet days drip in single-digit to twenty-something basis points; then 1 June erases nearly all of it in one move. That shape, many small gains punctuated by a sharp loss, is the short-variance signature we formalize next and learn to predict in Act~2.
 
@@ -360,10 +340,6 @@ The balance $\theta + \tfrac12\sigma^2 S^2\Gamma = 0$ says these are two sides o
 \begin{intuition}[In Plain English]
 Short gamma is the mathematics of ``picking up pennies in front of a steamroller.'' Every quiet day, theta hands the strategy a few pennies. The steamroller is gamma: on the rare day the market lurches, the short delta is on the wrong side and the loss is large and convex in the size of the move. The strategy is not broken when it has a bad day; a bad day is the price it pays for all the good ones. The job of Act~2 is to see the steamroller coming.
 \end{intuition}
-
-\begin{keyidea}[Every Drawdown Is an $\RV > \Kvar$ Day]
-Tie the Greeks back to \Cref{eq:gsvivs:varswap-payoff}. The short-gamma losses are not random misfortune; they occur exactly on the days when realized variance exceeds the strike the strip sold that morning. The drawdowns in the index are therefore not a separate phenomenon to be modelled on their own: they are the visible face of $\sigma^2_{\text{realized}} > \Kvar^2$. This is what makes them, in principle, predictable, and it is the bridge into Act~2.
-\end{keyidea}
 
 \begin{figure}[ht]
 \centering
@@ -432,10 +408,6 @@ A note on sign conventions, since \Cref{eq:gsvivs:cubic} is easy to misread agai
 A crash and a melt-up of the same percentage do not cost the variance seller the same. The squared-return part of variance treats them identically, but a third-order correction tilts the scales: a downward gap inflicts a bigger loss than an upward move of equal size. Since equity crashes are gaps down, the short variance position's worst days are concentrated on the downside. \citet{CarrLee2009} make the same point in peer-reviewed form: the leading replication error is third order in the daily return and signed by the average of cubed returns, so a market that gaps down underprices the variance the seller must pay.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-\Cref{eq:gsvivs:cubic} tells the forecast where to look. The drawdowns are driven by \emph{downward jumps}, not by slow grinds, so the most informative inputs are the jump and downside features of \Cref{ch:jumps}: the jump component of realized variance, the downside semivariance, and any signal of fragile, gap-prone conditions. A model that forecasts only the smooth, diffusive part of variance will systematically miss the days that matter. This is the precise reason the feature set in \Cref{sec:gsvivs:classification} leans on jumps and leverage rather than treating all variance equally.
-\end{projectconnection}
-
 \begin{figure}[ht]
 \centering
 \begin{tikzpicture}
@@ -480,10 +452,6 @@ We now build the number that decides each day's position. We have two ingredient
   \item the factor $252$: annualizes the daily forecast so the two terms share units.
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-The gap asks one question: how much fatter is the premium the strip is selling than the claims I expect to pay? A large positive gap means the strike sits comfortably above what I think will be realized, so the insurance is richly priced and worth writing. A gap near zero means the edge has evaporated. A negative gap means I expect to pay out more than I am being paid, the textbook setup for a drawdown.
-\end{intuition}
-
 The position follows from the sign and size of the gap, with thresholds that can be asymmetric (it should take more conviction to fade the premium than to collect it):
 \begin{equation}
 \label{eq:gsvivs:signalrule}
@@ -495,14 +463,6 @@ The position follows from the sign and size of the gap, with thresholds that can
 \end{cases}
 \end{equation}
 The strategy reads the gap through three channels: \textbf{compression} (the gap drifting toward zero as the edge thins), \textbf{inversion} (the gap turning negative, the strong drawdown warning), and a \textbf{contrarian spike} (a sudden jump in the gap after a vol event, often signalling the market has overshot and it is safe to re-enter).
-
-\begin{warning}[Benchmark Against the Strike, Not At-the-Money IV]
-This is where Act~1's skew-premium result earns its place. \Cref{eq:gsvivs:vrpgap} uses $\Kvar$, not $\sigma_0$, for the reason established in \Cref{sec:gsvivs:fair-strike} (\Cref{eq:gsvivs:skew}): the strike exceeds at-the-money IV by the skew premium, so a gap built on $\sigma_0$ is systematically too small. The earlier version of this signal benchmarked against at-the-money IV and mistimed the exit; benchmarking against $\Kvar$ is the fix.
-\end{warning}
-
-\begin{keyidea}[The Schedule Gives a Free Lookahead Boundary]
-GSVIVS01 generates its signal at 13:10~ET (\Cref{tab:gsvivs:schedule}), so any forecast that drives the position must use only information available by 13:10 on day $t$. The product's own clock supplies the lookahead-safe cutoff, just as \Cref{ch:ivrv-straddle}'s 3:55~pm protocol did (\Cref{sec:ivrv:signal}); we adopt that discipline wholesale rather than re-deriving the lookahead taxonomy.
-\end{keyidea}
 
 \begin{application}[Why Conditional Timing Is the Whole Game]
 The recent literature settles a question that justifies this project's existence. Running GSVIVS01 \emph{unconditionally} is not a free lunch: \citet{Vilkov2024} finds the same-day 0DTE variance risk premium is small and hard to monetize after realistic frictions, with profit and loss ``dominated by tail risk rather than stable mean carry,'' and that disciplined \emph{conditional} timing is what delivers net performance. The premium is genuinely there, richer per unit of time than the familiar one-month premium \citep{AlmeidaFreireHizmeri2024}, but harvesting it safely requires sizing the short on a signal. The closest published analogue to our overlay, \citet{Yang2024}, conditions a short-variance position on a volatility forecast and improves risk-adjusted returns (the measured figures are in \Cref{sec:gsvivs:evaluation}). In other words, the state of the art says: do not run the short flat-out; time it. That is precisely what \Cref{eq:gsvivs:signalrule} does.
@@ -586,10 +546,6 @@ The classifier's verdict becomes a position on the index. The overlay scales a b
 \end{equation}
 so that a $+1$ signal holds the full GSVIVS01 exposure (collect the premium), a $0$ signal goes flat (side-step the predicted drawdown), and a $-1$ signal \emph{shorts} the index (a counter-trade that profits if the drawdown materializes, used only on the highest-conviction days). Buy-and-hold GSVIVS01 is the special case Signal $\equiv +1$; the project's overlay is the modulation of that baseline by the forecast.
 
-\begin{intuition}[In Plain English]
-The overlay is a hand on the throttle of an existing engine. Most days it leaves GSVIVS01 running at full power, collecting premium. On the days the model smells a drawdown it eases off to neutral, or, when it is very sure, throws the engine into reverse to profit from the fall. We are not building a new strategy; we are timing a known one.
-\end{intuition}
-
 \begin{warning}[Graded Sizing Beats a Binary Switch]
 A hard on/off rule is rarely optimal. \citet{LiWu2026} find that a moderate, confidence-scaled position size delivers a higher Sharpe ratio than either a binary switch or maximally aggressive scaling. As flagged in \Cref{ch:ivrv-straddle}, that result is a directional single-asset study, so borrow only its qualitative lesson: scale the overlay with conviction in the signal, and never press so hard that one adverse day dominates. The $-1$ short in particular should be reserved for strong, corroborated drawdown signals, because shorting a short-variance index means buying convexity at a cost.
 \end{warning}
@@ -599,7 +555,7 @@ A hard on/off rule is rarely optimal. \citet{LiWu2026} find that a moderate, con
 \label{sec:gsvivs:evaluation}
 % ═══════════════════════════════════════════════════
 
-Everything converges here. The deliverable is not a lower QLIKE; it is a \emph{better-behaved GSVIVS01 index}, and the evaluation must measure that honestly, tie it back to forecast accuracy, and survive the multiple-testing and small-sample traps that make backtests lie.
+The deliverable is not a lower QLIKE; it is a \emph{better-behaved GSVIVS01 index}, and the evaluation must measure that honestly, tie it back to forecast accuracy, and survive the multiple-testing and small-sample traps that make backtests lie.
 
 The headline metric is the overlaid index path against buy-and-hold. We judge it on three axes:
 \begin{itemize}
@@ -607,10 +563,6 @@ The headline metric is the overlaid index path against buy-and-hold. We judge it
   \item \textbf{Drawdown control}: the reduction in maximum drawdown, and the Calmar ratio (return over maximum drawdown), since avoiding the worst days is the whole point.
   \item \textbf{Coverage}: the performance target of staying invested on the $85$--$88\%$ of safe days while side-stepping the $5$ to $10$ worst drawdowns per year, each worth $50$ to $200$ bps.
 \end{itemize}
-
-\begin{keyidea}[Classification Quality Is Economic Value]
-The classification metrics of \Cref{sec:gsvivs:classification} and the economic metrics here are two views of one quantity. Through the cost matrix of \Cref{fig:gsvivs:costmatrix}, a given precision and recall on the tail days map directly to basis points saved (true positives) and basis points forgone (false positives), as the worked example showed. Reporting both is not redundant: the classification view tells you \emph{why} the overlay works (it catches the down-jump days), and the economic view tells you \emph{whether} it is worth the costs.
-\end{keyidea}
 
 \begin{application}[The Benchmark to Match, and Its Caveat]
 The closest measured precedent is \citet{Yang2024}: a volatility-forecast-conditioned short-variance overlay that raised the Sharpe ratio from $1.54$ to $1.76$ on variance swaps while cutting maximum drawdown, skewness, and kurtosis, cutting exposure only in high-volatility regimes. Treat this as the directional target our overlay should reach or beat. But its setting is one-month variance swaps with monthly rebalancing, not 0DTE, so the \emph{magnitude} does not transfer: it is a hypothesis to test on our data (\Cref{sec:gsvivs:experiments}), not a number to claim.

@@ -23,14 +23,6 @@ feeds the Layer~4 spillover features that enter LightGBM as scalar inputs.
 (Chapter~\ref{ch:rv}). The natural multivariate extension replaces squared returns
 with outer products.
 
-\begin{intuition}[From Variance to Covariance]
-Realized variance sums squared intraday returns: $\RV_t = \sum_i r_{t,i}^2$.
-If you have a $p$-vector of returns (one entry per asset), the analogous
-quantity is the outer product $\mathbf{r}_{t,i}\,\mathbf{r}_{t,i}^\top$,
-a $p \times p$ matrix. Summing these outer products over intraday intervals
-gives you a realized covariance matrix.
-\end{intuition}
-
 \begin{definition}[Realized Covariance Matrix]
 Let $\mathbf{r}_{t,i} \in \R^p$ be the $i$-th intraday return vector on day $t$,
 for $i = 1, \ldots, M$. The \textbf{realized covariance} (RC) matrix is
@@ -52,17 +44,6 @@ Under no noise and synchronous trading, $\mathbf{RC}_t$ converges to the
 integrated covariance matrix as $M \to \infty$
 \citep{BarndorffNielsenHansenLundeShephard2011}.
 \end{definition}
-
-\begin{projectconnection}[Why This Matters]
-You are not just forecasting one stock's volatility. Portfolio construction,
-hedging, and risk management all require the full covariance matrix. Realized
-covariance extends your RV pipeline (Chapter~\ref{ch:rv}) from a single number
-per day to a $p \times p$ matrix per day, with $p(p+1)/2$ unique entries. For
-$p = 50$ assets, that is 1{,}275 quantities to estimate and forecast daily.
-Your project forecasts univariate RV for 34 instruments, but the cross-asset
-covariance structure feeds directly into the Layer~4 spillover features that
-enter LightGBM as scalar inputs.
-\end{projectconnection}
 
 % ── TikZ: Covariance matrix heatmap schematic ──
 \begin{figure}[ht]
@@ -149,8 +130,8 @@ entries are the realized variances from Chapter~\ref{ch:rv}.}
 
 \subsection{The Synchronicity Problem}
 
-In theory, you form each $\mathbf{r}_{t,i}$ by observing all $p$ assets at the
-same timestamps. In practice, different assets trade at different times. A
+Forming each $\mathbf{r}_{t,i}$ requires observing all $p$ assets at the same
+timestamps, but different assets trade at different times. A
 thinly traded stock might have no trade in a given 5-minute window. If you
 simply ignore missing observations, you bias realized covariance toward zero
 (the ``Epps effect'').
@@ -225,22 +206,10 @@ Hayashi--Yoshida realized covariance is
 \end{definition}
 
 \begin{intuition}[In Plain English]
-The Hayashi--Yoshida estimator says: if two assets' return intervals overlap in
-time at all, their returns carry information about comovement. Instead of
-forcing both assets onto a common clock (which throws away data), HY simply
-multiplies every pair of returns whose time intervals share any overlap and sums
-the products. It is like computing a dot product, but one that uses every
+Instead of forcing both assets onto a common clock (which throws away data),
+Hayashi--Yoshida is like computing a dot product, but one that uses every
 available trade rather than only the synchronized ones.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Real equity data is messy: liquid large-caps trade every second while
-small-caps may go minutes between prints. If your project universe mixes
-liquid and illiquid names, naive RC biases covariances toward zero (the Epps
-effect), understating diversification benefits. The Hayashi--Yoshida estimator
-is the go-to fix for building an unbiased daily covariance matrix from raw
-trade data before feeding it into HAR-DRD or a GNN forecaster.
-\end{projectconnection}
 
 \begin{workedexample}{Hayashi--Yoshida with 2 Assets}
 Suppose on one day, asset A trades at times $\{0, 2, 5, 8\}$ with prices
@@ -249,12 +218,12 @@ prices $\{50, 50.5, 49.8, 50.2\}$.
 
 \textbf{Step 1: compute returns.}
 \begin{align*}
-  r_1^A &= \ln(101/100) \approx 0.00995, &\quad &\text{interval } [0,2), \\
-  r_2^A &= \ln(99/101) \approx -0.02000, &\quad &\text{interval } [2,5), \\
-  r_3^A &= \ln(100.5/99) \approx 0.01504, &\quad &\text{interval } [5,8). \\[4pt]
-  r_1^B &= \ln(50.5/50) \approx 0.00995, &\quad &\text{interval } [0,3), \\
-  r_2^B &= \ln(49.8/50.5) \approx -0.01396, &\quad &\text{interval } [3,6), \\
-  r_3^B &= \ln(50.2/49.8) \approx 0.00800, &\quad &\text{interval } [6,8).
+  r_1^A &= \ln(101/100) \approx 0.00995, &\quad
+  r_2^A &= \ln(99/101) \approx -0.02000, &\quad
+  r_3^A &= \ln(100.5/99) \approx 0.01504, \\
+  r_1^B &= \ln(50.5/50) \approx 0.00995, &\quad
+  r_2^B &= \ln(49.8/50.5) \approx -0.01396, &\quad
+  r_3^B &= \ln(50.2/49.8) \approx 0.00800.
 \end{align*}
 
 \textbf{Step 2: identify overlapping pairs.}
@@ -274,15 +243,9 @@ $[5,8)$ & $[6,8)$ & Yes \\
 \end{center}
 
 \textbf{Step 3: sum products of overlapping pairs.}
-\begin{align*}
-  \widehat{\sigma}_{AB}^{\mathrm{HY}}
-  &= (0.00995)(0.00995) + (-0.02000)(0.00995) \\
-  &\quad + (-0.02000)(-0.01396) + (0.01504)(-0.01396) \\
-  &\quad + (0.01504)(0.00800) \\
-  &= 9.90 \times 10^{-5} - 1.99 \times 10^{-4} + 2.79 \times 10^{-4}
-     - 2.10 \times 10^{-4} + 1.20 \times 10^{-4} \\
-  &\approx 9.0 \times 10^{-5}.
-\end{align*}
+\[
+  \widehat{\sigma}_{AB}^{\mathrm{HY}} \approx 9.0 \times 10^{-5}.
+\]
 The positive value indicates slight positive comovement. Note: no observations
 were discarded.
 \end{workedexample}
@@ -339,23 +302,14 @@ The rate of convergence is $M^{-1/5}$ (slower than the noise-free $M^{-1/2}$),
 the same price paid in the univariate case.
 \end{keyresult}
 
-\begin{projectconnection}[Why This Matters]
-If your project uses high-frequency data to build daily covariance matrices,
-the multivariate realized kernel is the ``gold standard'' estimator: it handles
-both microstructure noise and non-synchronous trading while guaranteeing that
-the output is a valid (PSD) covariance matrix. This means you can feed $\mathbf{K}_t$
-directly into a portfolio optimizer or a downstream forecasting model (HAR-DRD,
-GNN) without worrying about negative eigenvalues.
-\end{projectconnection}
-
 
 % ──────────────────────────────────────────────────────────────
 \section{DCC-GARCH}\label{sec:multivariate:dcc}
 % ──────────────────────────────────────────────────────────────
 
 \textbf{Where we are.}  You can now \emph{estimate} a daily covariance matrix
-using high-frequency data. Next, you need to \emph{forecast} tomorrow's
-covariance matrix. DCC-GARCH is the multivariate analog of GARCH
+from high-frequency data; the next task is to \emph{forecast} tomorrow's.
+DCC-GARCH is the multivariate analog of GARCH
 (Chapter~\ref{ch:garch}): a parametric, easy-to-estimate baseline.
 
 % ── TikZ: DCC decomposition ──
@@ -497,15 +451,6 @@ $\mathbf{RC}_t$ is), and the Wishart distribution is the natural error
 distribution for random matrices that must be positive semi-definite.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-WAR is conceptually the cleanest multivariate extension of HAR: model the
-whole matrix as one object. In practice, the curse of dimensionality kills it.
-With $p = 50$ assets, the coefficient matrix $A$ alone has 2{,}500 parameters,
-far exceeding typical sample sizes. This motivates the decomposition strategies
-(DRD, Cholesky) and graph-based approaches you would actually use in a GS
-project, where $p$ could easily be 50--500.
-\end{projectconnection}
-
 \begin{warning}[Parameter Explosion]
 Each coefficient matrix $A$ has $p^2$ free parameters. For $p = 50$ assets,
 $A$ alone has 2{,}500 parameters. With daily, weekly, and monthly lags, that
@@ -547,16 +492,6 @@ Then model $D_t$ and $R_t$ separately:
 \end{itemize}
 Reassemble: $\widehat{\mathbf{RC}}_{t+1} = \hat{D}_{t+1}\,\hat{R}_{t+1}\,\hat{D}_{t+1}$.
 \end{keyidea}
-
-\begin{intuition}[In Plain English]
-DRD says: instead of trying to forecast all $p(p+1)/2$ entries of a covariance
-matrix at once, split the problem into two simpler pieces. First, forecast how
-volatile each asset will be tomorrow (the diagonal, which you already know how
-to do with HAR/HARQ). Second, forecast how correlated each pair will be (the
-off-diagonal, after normalizing). Then multiply them back together. This
-``divide and conquer'' approach lets you reuse your best univariate tools on
-each piece.
-\end{intuition}
 
 % ── TikZ: DRD decomposition schematic ──
 \begin{figure}[ht]
@@ -607,17 +542,6 @@ then reassembled.}
 \label{fig:drd-decomp}
 \end{figure}
 
-\begin{projectconnection}[Why This Matters]
-HAR-DRD is arguably the strongest conventional baseline for multivariate vol
-forecasting. It directly extends the HARQ framework your project builds on:
-you can apply the $\sqrt{\mathrm{RQ}}$ measurement-error correction from
-Chapter~\ref{ch:har} to each variance element, improving forecasts on noisy
-days. Your project uses univariate forecasting per instrument, but the
-cross-sectional structure that HAR-DRD captures is exactly what your Layer~4
-cross-asset features (sector-mean RV, Diebold-Yilmaz spillover index) distill
-into scalar inputs for LightGBM.
-\end{projectconnection}
-
 \begin{keyresult}[Separate Modeling Beats Joint]
 \citet{BollerslevPattonQuaedvlieg2018} show that the HARQ-DRD model, where
 variances and correlations are modeled with separate HAR regressions and
@@ -640,16 +564,10 @@ Then $D_t = \diag(0.0200, 0.0158)$ and
   = \begin{pmatrix} 1.000 & 0.379 \\ 0.379 & 1.000 \end{pmatrix}.
 \]
 
-\textbf{Step 2: model variances.}  Fit HAR to $\{\RV_t^A\}$ and $\{\RV_t^B\}$
-separately (as in Chapter~\ref{ch:har}).
-
-\textbf{Step 3: model correlation.}  Apply Fisher $z$-transform:
+\textbf{Step 2: model correlation.}  Apply Fisher $z$-transform:
 $z_t = \frac{1}{2}\ln\!\bigl(\frac{1 + 0.379}{1 - 0.379}\bigr) \approx 0.399$.
 Fit HAR to the $\{z_t\}$ series. Invert the transform on the forecast to get
 $\hat{\rho}_{t+1}$.
-
-\textbf{Step 4: reassemble.}
-$\hat{\mathbf{RC}}_{t+1} = \hat{D}_{t+1}\,\hat{R}_{t+1}\,\hat{D}_{t+1}$.
 \end{workedexample}
 
 \begin{warning}[PSD Not Guaranteed]
@@ -707,13 +625,11 @@ $l_{22} = \sqrt{0.00025 - 0.006^2} = \sqrt{0.000214} \approx 0.01463$.
 Log-transform diagonal: $(\ln 0.02, \ln 0.01463) \approx (-3.912, -4.225)$.
 Off-diagonal left as-is: $0.006$.
 
-\textbf{Step 3: fit HAR to each of the 3 elements} (daily, weekly, monthly
-lags, as in Chapter~\ref{ch:har}).
+\textbf{Step 3: fit HAR to each of the 3 elements.}
 
 \textbf{Step 4: forecast and reassemble.}
-Suppose HAR forecasts yield $(\hat{\ell}_{11}^*, \hat{\ell}_{21}, \hat{\ell}_{22}^*)
-= (-3.900, 0.0058, -4.210)$. Exponentiate diagonals:
-$\hat{l}_{11} = e^{-3.900} \approx 0.02020$, $\hat{l}_{22} = e^{-4.210} \approx 0.01483$.
+Suppose the HAR forecasts, after exponentiating the diagonals, yield
+$\hat{l}_{11} \approx 0.02020$, $\hat{l}_{21} = 0.00580$, $\hat{l}_{22} \approx 0.01483$.
 Then
 \[
   \widehat{\mathbf{RC}}_{t+1}
@@ -789,25 +705,6 @@ where
         partial correlation.
 \end{itemize}
 \end{keyidea}
-
-\begin{intuition}[In Plain English]
-Graph-HAR says: an asset's future volatility depends not only on its own past
-(the standard HAR terms) but also on what is happening to its neighbors. The
-``neighborhood'' is defined by the graph: assets that are highly correlated form
-a cluster, and when one member's volatility spikes, the others tend to follow.
-The extra term $\gamma \sum_k W_{jk}\,\RV_{k,t}$ is simply a weighted average
-of yesterday's volatility across connected assets, capturing spillover effects
-that a univariate model would miss entirely.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Graph-HAR demonstrates that cross-asset spillover information improves univariate
-vol forecasts.  Your project captures this same mechanism through Layer~4
-cross-asset features: sector-mean RV, the Diebold-Yilmaz spillover index, and
-cross-asset RV rank.  These scalar features distill the neighbor-weighted-average
-idea into inputs that LightGBM can exploit without requiring a full graph
-learning framework.
-\end{projectconnection}
 
 \begin{keyidea}[GNN for Covariance --- \citet{ZhangCucuringuDong2023}]
 Going further, Graph Neural Networks (GNNs) replace the linear spillover term

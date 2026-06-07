@@ -2,9 +2,6 @@
 \label{ch:noise}
 
 \begin{application}[Why This Chapter]
-Microstructure noise is the reason you cannot simply sample tick-by-tick and compute realized variance.
-This chapter teaches when noise matters, how it biases RV, and the family of robust estimators that correct for it.
-Chapter~\ref{ch:features} uses these estimators as features.
 Project~2 (LOB-based intraday) works directly in the high-frequency regime where noise is most severe.
 \end{application}
 
@@ -29,9 +26,7 @@ Transaction prices alternate between bid and ask depending on who initiates the 
 \end{prereq}
 
 \begin{prereq}[Sampling Frequency Terminology]
-``Sampling at 1-second frequency'' means computing one return per second.
 A 6.5-hour U.S.\ equity trading day has $6.5 \times 3{,}600 = 23{,}400$ one-second intervals.
-``Tick-by-tick'' means using every single trade as a price observation; for liquid stocks, this can mean thousands of observations per minute.
 \end{prereq}
 
 There are three main sources of microstructure noise.
@@ -147,7 +142,7 @@ The standard noise model assumes the observed log price is the true (efficient) 
   p^*_{t,i} = p_{t,i} + \varepsilon_{t,i}, \qquad \varepsilon_{t,i} \overset{\text{iid}}{\sim} (0, \omega^2)
 \]
 
-The fundamental question is: if you compute RV from noisy prices, how far off is the answer?
+How far off is RV computed from noisy prices?
 \citet{HansenLunde2006} and \citet{AitSahaliaMyklandZhang2005} showed that, under this model, the expected value of noisy RV decomposes into signal plus a noise term that scales with the number of observations:
 
 \begin{equation}
@@ -163,8 +158,7 @@ The fundamental question is: if you compute RV from noisy prices, how far off is
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-On average, noisy RV equals the true volatility plus a junk term that grows in proportion to how many returns you use.
-Every return you add contributes a little bit of noise variance ($2\omega^2$), so using more returns makes the contamination worse, not better.
+Using more returns makes the contamination worse, not better.
 This is the opposite of what you would expect from classical statistics, where more data means more precision.
 \end{intuition}
 
@@ -192,7 +186,7 @@ Always inspect the volatility signature plot for your specific asset.
 % ═══════════════════════════════════════════════════
 
 Chapter~\ref{ch:rv} introduced the volatility signature plot (Figure~\ref{fig:vol-sig-plot}).
-This section explains it as a \emph{diagnostic tool}: the first thing you should plot before choosing an estimator or sampling frequency.
+The signature plot is a \emph{diagnostic tool}: plot it before choosing an estimator or sampling frequency.
 
 \begin{definition}[Volatility Signature Plot (Formal)]
 The volatility signature plot displays $\bar{\RV}(\Delta)$, the average realized variance computed across $T$ days, as a function of the sampling interval $\Delta$:
@@ -344,12 +338,6 @@ The all-tick RV has bias $\approx 2n\omega^2$.
 Subtracting $(\bar{n}_{K_\text{slow}} / n) \times \RV^{(\text{all})}_t$ removes exactly $2\bar{n}_{K_\text{slow}}\omega^2$ from the slow-scale estimate, canceling the noise.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-TSRV is the conceptual foundation for all noise-robust estimators.
-Even if you use 5-minute RV for your HAR model, understanding TSRV tells you exactly what you are giving up: the ability to use all available tick data.
-If you extend the project to intraday forecasting or LOB-based features, TSRV is the simplest estimator to implement as a first noise-robust baseline.
-\end{projectconnection}
-
 Figure~\ref{fig:tsrv-scales} illustrates the two scales on the same price path.
 
 \begin{figure}[htbp]
@@ -441,25 +429,9 @@ This is the price you pay for not knowing the noise level $\omega^2$ a priori.
 Subsequent estimators (MSRV, realized kernel) improve this rate.
 
 \begin{workedexample}{TSRV on a 6.5-Hour Trading Day}
-Suppose you have tick-by-tick data for a liquid stock with $n = 23{,}400$ ticks (one per second over 6.5 hours).
-You choose a slow scale of $K_{\text{slow}} = 390$ (equivalent to spacing returns 390 seconds, or 6.5 minutes, apart).
-
-\textbf{Step 1: Fast-scale RV.}
-Compute $\RV^{(\text{all})}_t$ from all 23,400 one-second returns.
-Say you get $\RV^{(\text{all})}_t = 3.2 \times 10^{-4}$.
-This is inflated by noise.
-
-\textbf{Step 2: Slow-scale subsampled RV.}
-Compute 390 separate RVs, each from a non-overlapping grid of $23{,}400 / 390 = 60$ returns spaced 390 seconds apart, offset by one tick each time.
-Average them: $\RV^{(\text{avg}, 390)}_t = 1.3 \times 10^{-4}$.
-
-\textbf{Step 3: Noise correction.}
-The average number of returns per subsample is $\bar{n}_{390} = (23{,}400 - 390 + 1)/390 \approx 59$.
-The correction factor is $\bar{n}_{390}/n = 59/23{,}400 \approx 0.00252$.
-
-\textbf{Step 4: Combine.}
+For a liquid stock with $n = 23{,}400$ one-second ticks and a slow scale $K_{\text{slow}} = 390$, the fast-scale $\RV^{(\text{all})}_t = 3.2 \times 10^{-4}$ (noise-inflated), the slow-scale $\RV^{(\text{avg}, 390)}_t = 1.3 \times 10^{-4}$, and the correction factor $\bar{n}_{390}/n \approx 0.00252$, giving
 \[
-  \widehat{\IVol}_t^{\text{TSRV}} = 1.3 \times 10^{-4} - 0.00252 \times 3.2 \times 10^{-4} = 1.3 \times 10^{-4} - 0.008 \times 10^{-4} \approx 1.29 \times 10^{-4}
+  \widehat{\IVol}_t^{\text{TSRV}} = 1.3 \times 10^{-4} - 0.00252 \times 3.2 \times 10^{-4} \approx 1.29 \times 10^{-4}.
 \]
 
 The correction is small here because the slow scale already removes most noise.
@@ -477,12 +449,6 @@ TSRV uses two scales.
 A natural extension is to use \emph{many} scales simultaneously.
 \citet{Zhang2006} developed the Multi-Scale Realized Volatility (MSRV) estimator, which combines information from multiple time scales to achieve a faster convergence rate.
 
-\begin{intuition}[From Two Scales to Many]
-Think of TSRV as using a single pair of binoculars: one lens zoomed in (fast scale) and one zoomed out (slow scale).
-MSRV uses an entire array of zoom levels, weighting each one optimally.
-More zoom levels means more information about how the noise distorts each scale, which means a more precise correction.
-\end{intuition}
-
 \begin{definition}[Multi-Scale Realized Volatility (MSRV)]
 MSRV takes a weighted combination of subsampled RVs at $J$ different scales $K_1 < K_2 < \cdots < K_J$:
 \begin{equation}
@@ -496,17 +462,6 @@ MSRV takes a weighted combination of subsampled RVs at $J$ different scales $K_1
   \item The weights satisfy $\sum_j a_j = 1$ (so the estimator targets $\IVol_t$) and a second constraint that cancels the $\omega^2$ bias
 \end{itemize}
 \end{definition}
-
-\begin{intuition}[In Plain English]
-MSRV says: instead of looking at the data through just two zoom levels (fast and slow), look through many zoom levels and combine them with carefully chosen weights.
-The weights are picked so that all the noise cancels out, while squeezing as much precision as possible from each scale.
-It is a weighted average of the same subsampled RVs that TSRV uses, but with more of them and smarter weights.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-MSRV proves that the $n^{-1/4}$ rate is achievable and establishes the theoretical efficiency frontier for noise-robust estimation.
-In practice, the realized kernel (next section) is easier to tune and achieves the same rate, so MSRV is more important as a theoretical benchmark than as a tool you would implement for your vol forecasting pipeline.
-\end{projectconnection}
 
 \begin{keyresult}[\citet{Zhang2006}: MSRV Achieves the Optimal Rate]
 The MSRV estimator achieves the convergence rate $n^{-1/4}$:
@@ -542,13 +497,10 @@ The autocovariance at lag $h$ of a sequence $\{x_1, \ldots, x_n\}$ measures the 
 \[
   \hat{\gamma}_h = \frac{1}{n} \sum_{i=1}^{n-h} (x_i - \bar{x})(x_{i+h} - \bar{x})
 \]
-For returns, lag 0 autocovariance is the variance.
-Lag 1 autocovariance measures whether today's return predicts tomorrow's (or this tick's return predicts the next).
 \end{prereq}
 
 \begin{prereq}[Kernel Functions]
 A kernel function $k(x)$ is a smooth weighting function satisfying $k(0) = 1$ and $k(x) \to 0$ as $|x| \to \infty$.
-It assigns full weight to the center (lag~0) and smoothly downweights observations further away.
 Common examples: the Bartlett kernel $k(x) = 1 - |x|$ for $|x| \leq 1$ (a triangle), and the Parzen kernel (a piecewise cubic that is smoother at the boundary).
 \end{prereq}
 
@@ -570,17 +522,8 @@ The realized kernel takes the autocovariances of observed returns and weights th
 \end{itemize}
 \end{definition}
 
-\begin{intuition}[In Plain English]
-The realized kernel starts with the naive RV (the lag-0 autocovariance) and then adds in weighted autocovariances at nearby lags.
-The negative autocovariances at lag $\pm 1$, caused by bid-ask bounce, partially cancel the noise that inflated the lag-0 term.
-The kernel function smoothly tapers the weights so that distant lags (which are mostly estimation noise) contribute very little.
-The result is an estimate that keeps the true volatility signal while subtracting out the spurious noise component.
-\end{intuition}
-
 \begin{projectconnection}[Why This Matters]
-The realized kernel is the default noise-robust estimator in empirical finance and the one you are most likely to encounter in published vol forecasting papers.
 If you extend your project beyond 5-minute RV (for example, to compute more accurate daily IV estimates or to work with tick-level LOB data), the realized kernel from the \texttt{highfrequency} R package is the standard tool.
-Using it as a feature alongside 5-minute RV in your HAR model could capture information about intraday noise intensity.
 \end{projectconnection}
 
 The ``flat-top'' property is important: \citet{BNHLS2008} require $k'(0) = 0$ (the kernel is flat at the origin), which ensures that the noise bias is removed at the correct rate.
@@ -645,12 +588,6 @@ The logic is:
   \item \textbf{Higher lags}: Beyond a few lags, the noise-induced autocorrelation dies out, and genuine autocorrelation (if any) is captured.
 \end{enumerate}
 
-\begin{keyidea}[The Realized Kernel in Practice]
-The realized kernel is the most widely used noise-robust estimator in empirical finance.
-It achieves the optimal convergence rate ($n^{-1/4}$), handles moderately dependent noise (not just i.i.d.), has well-understood asymptotic theory, and is implemented in standard packages (\texttt{highfrequency} in R, \texttt{realized} in MATLAB).
-If you need a noise-robust daily RV estimate, the realized kernel is the default choice.
-\end{keyidea}
-
 \subsection{Bandwidth Selection}
 
 The bandwidth $H$ controls how many autocovariance lags are included.
@@ -703,15 +640,9 @@ The pre-averaged realized variance is:
 \end{definition}
 
 \begin{intuition}[In Plain English]
-Pre-averaging works in two steps.
-First, it replaces each noisy price with a local moving average of nearby prices (Equation~\ref{eq:pre-avg-price}), which smooths out the bid-ask bounce in the same way that averaging poll results smooths out sampling error.
-Second, it computes a sum of squared ``pre-averaged returns'' (Equation~\ref{eq:pre-avg-rv}), with a small bias correction subtracted (the second term), playing the same debiasing role as the fast-scale correction in TSRV.
+Step 1 replaces each noisy price with a local moving average of nearby prices (Equation~\ref{eq:pre-avg-price}).
+Step 2 computes a sum of squared ``pre-averaged returns'' (Equation~\ref{eq:pre-avg-rv}), minus a small bias correction (the second term) that plays the same debiasing role as the fast-scale correction in TSRV.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Pre-averaging is particularly relevant if your project uses tick-level order book data, because it provides a natural way to construct ``clean'' returns from noisy transaction prices before feeding them into ML features.
-The block length $L$ is the single tuning parameter, and its optimal value $L \propto n^{1/2}$ means you can set it automatically from the number of ticks in a day.
-\end{projectconnection}
 
 Figure~\ref{fig:pre-averaging} compares raw and pre-averaged returns.
 
@@ -821,9 +752,7 @@ They differ in implementation details, robustness to dependent noise, and ease o
 \label{sec:which-estimator}
 % ═══════════════════════════════════════════════════
 
-You now have a menu of noise-robust estimators.
-The practical question is: which one should you use?
-The answer depends on your goal.
+Which estimator you use depends on your goal.
 
 Figure~\ref{fig:estimator-sig-comparison} shows how the different estimators behave on the volatility signature plot.
 The key visual takeaway: noise-robust estimators produce a flat line across frequencies, while naive RV diverges.
@@ -977,10 +906,7 @@ For estimation accuracy, intraday analysis, or when working with tick data in Pr
 \end{keyidea}
 
 \begin{projectconnection}[Why This Matters]
-For your HAR-based vol forecasting project, the practical takeaway from this chapter is threefold.
-First, 5-minute RV is your primary target variable, and it works well precisely because it sidesteps the noise problem.
-Second, the \emph{difference} between noise-robust RV (e.g., realized kernel) and 5-minute RV on the same day is itself a signal: it measures how much microstructure noise is present, which proxies for liquidity and can be used as an ML feature.
-Third, if you extend the project to higher-frequency forecasting or LOB data, you now know exactly which estimators to reach for and why.
+For your HAR-based vol forecasting project, the \emph{difference} between noise-robust RV (e.g., realized kernel) and 5-minute RV on the same day is itself a signal: it measures how much microstructure noise is present, which proxies for liquidity and can be used as an ML feature.
 \end{projectconnection}
 
 

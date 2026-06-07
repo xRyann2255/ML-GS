@@ -1,16 +1,9 @@
 \chapter{Practical Applications and Project Directions}
 \label{ch:applications}
 
-\begin{application}[Why This Chapter]
-The preceding chapters built a toolkit: estimators, forecasters, features, and evaluation methods.
-This chapter answers the question every trading desk asks: ``so what?''
-It translates statistical forecast accuracy into economic value: the language that gets a model deployed.
-\end{application}
-
 A model that beats HAR by 8\% on QLIKE is scientifically interesting.
 But a desk head wants to know: how much Sharpe does that buy me?
 How much P\&L does it add to my book?
-This chapter provides the frameworks for answering those questions.
 
 % ═══════════════════════════════════════════════════
 \section{Volatility Targeting: The Simplest Economic Value Test}
@@ -40,14 +33,8 @@ Its popularity stems from simplicity, low latency, and the fact that it requires
 
 \begin{intuition}[In Plain English]
 Tomorrow's variance estimate is a weighted blend of today's squared return (the ``news'') and today's variance estimate (the ``memory'').
-A high $\delta$ means slow adaptation: the estimate barely moves day-to-day.
-A low $\delta$ means the estimate jumps quickly with every new return, reacting fast but also picking up noise.
+A high $\delta$ means slow adaptation (the estimate barely moves day-to-day); a low $\delta$ means it jumps quickly with every new return, reacting fast but also picking up noise.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-EWMA is the baseline your vol-targeting backtest must beat.
-If your HAR or ML forecast cannot outperform this one-parameter smoother in a position-sizing test, the model adds no economic value regardless of its QLIKE score.
-\end{projectconnection}
 
 % ──────────────────────────────────────────────────
 \subsection{The Volatility-Targeting Formula}
@@ -69,15 +56,6 @@ The result is a return stream with approximately constant realized volatility eq
 The mechanism: by reducing exposure before drawdowns, vol-targeting truncates the left tail.
 A better vol forecast means you cut exposure earlier and more precisely.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-This formula is the direct economic-value test for your internship project.
-Your LightGBM model, trained with custom QLIKE loss on Layers~0--7, produces a
-forecast $\hat\sigma_t$ that feeds directly into this position-sizing equation.
-Every QLIKE improvement translates into more precise position sizing and higher
-Sharpe.  The vol-targeting backtest is your primary deliverable for demonstrating
-that statistical accuracy creates real P\&L.
-\end{projectconnection}
 
 % ──────────────────────────────────────────────────
 \subsection{Worked Example: Vol-Targeting the S\&P 500}
@@ -175,10 +153,10 @@ This section builds directly on the vol-targeting strategy of Section~\ref{sec:v
 \end{prereq}
 
 \begin{intuition}[What a Sharpe Ratio Means]
-The \textbf{Sharpe ratio} is return per unit of risk: the average yearly return divided by how bumpy that return is, annualized as $\SR = (\mu_{\text{ret}}/\sigma_{\text{ret}})\times\sqrt{252}$ (the full definition is collected in Table~\ref{tab:perf-metrics}; $\mu_{\text{ret}}$ is the mean daily return, $\sigma_{\text{ret}}$ its standard deviation, and $\sqrt{252}$ scales a daily figure up to a year). As a rough scale: $\approx 0.5$ is mediocre, $\approx 1.0$ is good, $\approx 2.0$ is excellent. So the $0.76$ vs.\ $0.88$ gap below is a meaningful but not enormous edge, and a Sharpe of zero means the strategy makes no money per unit of risk --- the level at which it stops being worth running.
+The $0.76$ vs.\ $0.88$ gap below is a meaningful but not enormous edge (the full Sharpe definition is collected in Table~\ref{tab:perf-metrics}).
 \end{intuition}
 
-The Sharpe ratios in the worked-example table of Section~\ref{subsec:vol-target-example} ($0.76$ for EWMA, $0.88$ for ML) were all computed \emph{gross}: they ignored the cost of trading. Chapter~\ref{ch:evaluation} repeatedly promised that a real QLIKE improvement must ``survive transaction costs'' and that turnover must be reported alongside any economic-value claim. This section makes good on that promise. It answers the question a desk head asks the instant you show a Sharpe improvement: \emph{how much of that survives once I have to pay the spread every time the forecast moves the position?}
+The Sharpe ratios in the worked-example table of Section~\ref{subsec:vol-target-example} ($0.76$ for EWMA, $0.88$ for ML) were all computed \emph{gross}: they ignored the cost of trading. Chapter~\ref{ch:evaluation} required that a real QLIKE improvement ``survive transaction costs'' and that turnover be reported alongside any economic-value claim. It answers the question a desk head asks the instant you show a Sharpe improvement: \emph{how much of that survives once I have to pay the spread every time the forecast moves the position?}
 
 The tension: the extra reactivity that wins on QLIKE is exactly what raises trading, so a jumpier forecast can win gross and lose net.
 
@@ -199,14 +177,6 @@ where:
   \item $c$ --- the \textbf{half-spread cost} per unit of traded notional, expressed in the same units as $r_t$. A full round-trip (out and back) costs $2c$.
 \end{itemize}
 If the forecast is unchanged, $w_t = w_{t-1}$ and you pay nothing. If a vol spike pushes the weight down over several days --- as the ML model did in Section~\ref{subsec:vol-target-example}, from $0.82$ on day~13 to $0.36$ on day~16 --- the cost is charged on each day's move, not on the cumulative drop. The largest single-day cut in that table is on day~14 ($|0.54 - 0.82| = 0.28$ of notional, costing $0.28\,c$); the day-16 move itself is only $|0.36 - 0.45| = 0.09$.
-
-\begin{intuition}[In Plain English]
-Every time your vol forecast changes, the vol-targeting rule tells you to resize the position, and resizing costs the spread. Equation~\eqref{eq:net-pnl-vt} simply takes the gross return you would have earned and deducts a toll proportional to how far you moved the position. A forecast that holds steady pays almost no toll; a forecast that twitches up and down every day pays the toll every day, even when the underlying never moved enough to matter.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-This is the equation that decides whether your LightGBM forecast is worth deploying. Chapter~\ref{ch:evaluation} showed your model beats HAR on QLIKE; Section~\ref{sec:vol-targeting} showed that translates into gross Sharpe. Equation~\eqref{eq:net-pnl-vt} is the gate between ``statistically better'' and ``economically better.'' If the extra reactivity that wins on QLIKE also doubles the rebalancing toll, the net Sharpe can land \emph{below} the EWMA baseline. You must report Equation~\eqref{eq:net-pnl-vt}, not Equation~\eqref{eq:vol-target-weight} alone.
-\end{projectconnection}
 
 \begin{workedexample}[Gross vs.\ Net Over Eight Days of Vol-Targeting]
 We recast the day-by-day P\&L onto the vol-targeting weights from the transition table in Section~\ref{subsec:vol-target-example}. Take the ML model's weights $w_t^{\text{ML}}$ from that table, assume $w_{12} = 0.82$ entering the window, and an SPX-futures half-spread $c = 1$~bp. \textbf{All P\&L columns below are in percent}, so to keep the arithmetic in one unit we write that $1$~bp cost as $0.01\%$ per unit of weight traded. The underlying daily returns $r_t$ are the SPX moves over the sell-off.
@@ -232,10 +202,7 @@ $t$ & $w_t^{\text{ML}}$ & $r_t$ (\%) & $|\Delta w_t|$ & Gross (\%) & Net (\%) \\
 \end{center}
 
 \medskip
-\noindent\textbf{One net cell, fully worked.} Take day~14. Gross return is weight times underlying: $0.54 \times (-0.10\%) = -0.054\%$. Cost is the traded notional times the per-unit cost: $|\Delta w| \times c = 0.28 \times 0.01\% = 0.0028\%$. Net is gross minus cost: $-0.054\% - 0.003\% = -0.057\%$, which is the day-14 Net entry. Every other Net cell is built the same way.
-
-\medskip
-\noindent\textbf{Reading the table.} The protection came not from one day but from a step-by-step cut: starting at $0.82$, the forecast shrank the weight to $0.54$, then $0.45$, then $0.36$, so that by day~16 --- the day of the $-2.1\%$ drop --- only $0.36$ of the book was exposed. The gross loss that day was therefore $0.36 \times 2.1\% = 0.76\%$ instead of a near-full $2.1\%$. Over the eight days, total traded notional is $\sum|\Delta w_t| = 0.57$, so total cost at $c = 1$~bp is $0.57 \times 0.01\% = 0.006\%$. Costs consumed only $0.006/0.394 \approx 1.5\%$ of the (negative) gross P\&L. \textbf{The surprise is how cheap this looks}: even an aggressive regime-detecting forecast, run on a $1$~bp instrument, barely registers costs over a short window. The cost problem is invisible day-by-day; it accumulates over a full year of small daily re-weights --- which the next subsection makes precise.
+\noindent\textbf{Reading the table.} The protection came not from one day but from a step-by-step cut: starting at $0.82$, the forecast shrank the weight to $0.54$, then $0.45$, then $0.36$, so that by day~16 --- the day of the $-2.1\%$ drop --- only $0.36$ of the book was exposed. The gross loss that day was therefore $0.36 \times 2.1\% = 0.76\%$ instead of a near-full $2.1\%$. Over the eight days, total traded notional is $\sum|\Delta w_t| = 0.57$, so total cost at $c = 1$~bp is $0.57 \times 0.01\% = 0.006\%$. Costs consumed only $0.006/0.394 \approx 1.5\%$ of the (negative) gross P\&L. Even an aggressive regime-detecting forecast, run on a $1$~bp instrument, barely registers costs over a short window. The cost problem is invisible day-by-day; it accumulates over a full year of small daily re-weights --- which the next subsection makes precise.
 \end{workedexample}
 
 % ──────────────────────────────────────────────────
@@ -258,14 +225,6 @@ where:
 \end{itemize}
 A strategy with $\bar\tau = 0.05$ resizes $5\%$ of its position on an average day; over $252$ trading days that adds up to $252 \times 0.05 = 12.6$ times the size of the whole book traded in a year.
 
-\begin{intuition}[In Plain English]
-Turnover is a tax on changing your mind. The vol-targeting rule changes its mind exactly when the forecast $\hat\sigma_t$ changes, so $\bar\tau$ is a direct, monetized measure of how \emph{wiggly} your volatility forecast is. A smooth forecast (EWMA, slow HAR) barely moves the weight and pays little tax; a forecast that reacts to every microstructure blip moves the weight constantly and pays the tax every day.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-Report $\bar\tau$ alongside QLIKE for every forecast you submit. Turnover is what turns a QLIKE win into a net-Sharpe win or loss, so a deliverable that quotes accuracy without turnover is incomplete.
-\end{projectconnection}
-
 Turnover matters because it converts, almost mechanically, into a deduction from the Sharpe ratio. Annualizing the cost term of Equation~\eqref{eq:net-pnl-vt} and dividing by the volatility of the strategy's returns gives the \textbf{Sharpe drag}:
 \begin{equation}
 \label{eq:sharpe-drag}
@@ -280,12 +239,8 @@ where:
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-Where does the exact shape come from? Sharpe is average return $\div$ volatility. Costs lower the average return by (annual turnover $\times$ cost per trade) $= 252\,\bar\tau\,c$ each year, but barely touch the volatility. So the Sharpe falls by exactly that cost amount divided by the same $\sigma_{\text{ret}}$ you were already dividing by --- which is the second term. The $\sqrt{252}$ in the Sharpe definition is absorbed because both the numerator (now a per-year cost) and $\sigma_{\text{ret}}$ are on an annual footing. Read plainly: the penalty is the product of three measurable things --- how often you trade ($252\,\bar\tau$), how much each trade costs ($c$), and how that compares to the size of the moves you are trying to capture ($\sigma_{\text{ret}}$). The relationship is linear and merciless: double the turnover and you double the drag. This is precisely \emph{why} a jumpier ML vol forecast costs more to run than a smooth HAR forecast --- the jumpier forecast has a larger $\bar\tau$, so the same per-trade cost $c$ subtracts twice as much Sharpe. Because the book is vol-targeted, $\sigma_{\text{ret}} \approx \sigma_{\text{target}}$ stays roughly constant, which is what keeps this form clean and linear --- accurate enough that we treat the ``$\approx$'' as ``$=$'' for the rest of the section.
+Where does the exact shape come from? Sharpe is average return $\div$ volatility. Costs lower the average return by (annual turnover $\times$ cost per trade) $= 252\,\bar\tau\,c$ each year, but barely touch the volatility. So the Sharpe falls by exactly that cost amount divided by the same $\sigma_{\text{ret}}$ you were already dividing by --- which is the second term. The $\sqrt{252}$ in the Sharpe definition is absorbed because both the numerator (now a per-year cost) and $\sigma_{\text{ret}}$ are on an annual footing.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-This is the formula that operationalizes Chapter~\ref{ch:evaluation}'s demand to report turnover. When you present that your ML forecast beats HAR, Equation~\eqref{eq:sharpe-drag} forces an honest accounting: if the ML forecast's $\bar\tau$ is, say, $0.09$ versus HAR's $0.04$, the ML model's cost drag is larger by $252 \times (0.09 - 0.04) \times 0.0002 / 0.10 \approx 0.025$ Sharpe (at $c = 2$~bp and $\sigma_{\text{ret}} = 0.10$) and it must earn that back through better tail protection before its net Sharpe edge is real. A worthwhile contribution to your internship is a Sharpe-drag decomposition that isolates how much of the ML gross advantage survives its higher turnover.
-\end{projectconnection}
 
 \begin{workedexample}[How Turnover Eats the ML Sharpe Edge]
 From Section~\ref{subsec:vol-target-example}, the gross figures are $\SR^{\text{gross}}_{\text{HAR}} = 0.82$ and $\SR^{\text{gross}}_{\text{ML}} = 0.88$, both at $\sigma_{\text{ret}} \approx 10\%$ (the target). Suppose the smoother HAR weights have turnover $\bar\tau_{\text{HAR}} = 0.04$ while the reactive ML weights have $\bar\tau_{\text{ML}} = 0.09$. Take an SPX-futures half-spread $c = 2$~bp $= 0.0002$. \emph{Note:} this example works entirely in decimals (returns and costs as fractions, so $\sigma_{\text{ret}} = 0.10$ and $c = 0.0002$), in contrast to the percent-based table above --- keep the two conventions separate.
@@ -466,11 +421,6 @@ The estimate is approximate but directionally informative:
 Adding $\text{sign}(\text{GEX})$ or GEX-quintile as a feature to HAR-X is a novel extension not yet thoroughly explored in the academic literature \citep{Bennett2014}.
 \end{keyidea}
 
-\begin{projectconnection}[Why This Matters]
-GEX provides a feature that captures a fundamentally different mechanism from any return-based or RV-based predictor.
-Including it in your LightGBM feature set demonstrates market microstructure awareness and gives your model an edge that purely statistical approaches miss.
-\end{projectconnection}
-
 \subsection{Structured Products and the Short-Gamma Overhang}
 
 The primary source of dealer short-gamma exposure is structured products (autocallables, barrier options, worst-of notes).
@@ -484,9 +434,7 @@ Near options expiry, large open interest at specific strikes creates \textbf{pin
 This suppresses realized vol on expiry days, a calendar effect (Section~\ref{sec:feat-calendar}) with a mechanical explanation.
 
 \begin{application}[Novel HAR-X Features from Dealer Positioning]
-Dealer positioning features (GEX, distance to nearest barrier level, net open interest by strike) represent a genuinely novel addition to standard HAR-X feature sets.
-They are publicly computable from options market data and capture a mechanism (mechanical hedging feedback) that is distinct from any feature based on past returns or past RV.
-For your internship, including a GEX feature and documenting its incremental predictive power would demonstrate awareness of market microstructure that goes beyond the academic literature.
+Beyond GEX, distance to nearest barrier level and net open interest by strike are publicly computable dealer-positioning features worth testing for incremental predictive power in a HAR-X model.
 \end{application}
 
 
@@ -516,7 +464,7 @@ The question that decides your reception is: \emph{did you start from an economi
 The first framing invites engagement: there is a well-grounded mechanism --- the leverage effect, or the variance risk premium (Chapter~\ref{ch:vrp}) --- and modern tools were used to test it. The audience evaluates the hypothesis, then checks whether the test is clean. The second framing invites the question ``how many features did you try?'' and a reach for the Deflated Sharpe Ratio (Section~\ref{sec:eval-dsr}; a Sharpe adjusted downward for how many things you tried, so that staying positive means the edge survives that penalty).
 
 \begin{keyidea}[The ML Is the Test, Not the Story]
-Lead with the volatility mechanism, not the model. The economic theory --- leverage effect, variance risk premium, jump persistence (Chapter~\ref{ch:har}, Chapter~\ref{ch:vrp}) --- provides the \emph{why}; the ML (Chapter~\ref{ch:trees}) provides the \emph{how much better than HAR}. The forecast is evaluated by whether it answers a volatility question better than the HAR baseline, not by its raw $R^2$.
+Lead with the volatility mechanism, not the model: the economic theory provides the \emph{why}, the ML (Chapter~\ref{ch:trees}) provides the \emph{how much better than HAR}, and the forecast is judged against the HAR baseline, not by its raw $R^2$.
 \end{keyidea}
 
 \begin{warning}[Never Open with Model Architecture]
@@ -626,8 +574,4 @@ The following questions come up in almost every desk presentation of a volatilit
 \begin{warning}[Never Say ``I Don't Know'' Without a Follow-Up]
 If you genuinely have not tested something, say: ``I haven't run that specific test. My best estimate from [related analysis] is [X], and I can run it and follow up by [date].'' This is honest, shows you know which test would answer the question, and commits to a deliverable. Never just say ``I don't know'' and move on.
 \end{warning}
-
-\begin{projectconnection}[Why This Matters]
-Every answer above points back to an analysis you have already done in this guide --- the DM test, the VIX-tercile decomposition, the ridge-HAR comparison, the look-ahead controls, the DSR. The communication skill is not new analysis; it is having the right cross-reference ready so that a hard question lands on a backup slide rather than on silence. Build the backups while you build the analysis, not the night before Week~20.
-\end{projectconnection}
 

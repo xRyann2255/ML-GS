@@ -1,12 +1,6 @@
 \chapter{From Forecast to P\&L: A Realistic, Evaluable IV--RV Straddle}
 \label{ch:ivrv-straddle}
 
-\begin{application}[Why This Chapter]
-Every preceding chapter built one half of a bridge: estimators and models that turn raw prices into a realized-volatility forecast, and an evaluation toolkit that scores those forecasts with QLIKE, Diebold--Mariano tests, and the deflated Sharpe ratio.
-This chapter builds the other half. It takes a single forecast number, $\widehat{\RV}_t$, and turns it into a traded strategy whose profit and loss (P\&L) can be measured, costed honestly, and judged with the same statistical rigour we demand of the forecast itself.
-It is the capstone: the place where ``my model beats HAR by 40 basis points of QLIKE'' becomes ``my model makes money, and here is the deflated Sharpe ratio that proves it is not luck.''
-\end{application}
-
 Suppose your machine-learning model forecasts tomorrow's realized variance more accurately than the HAR benchmark. A desk head will not be impressed by a lower QLIKE; they will ask a blunt question: \emph{does the better forecast make money, and how do you know it is not a fluke of the backtest?} Answering honestly is harder than it looks. The natural way to monetise a volatility view is to trade an option and hedge away its directional exposure, but the moment you do this you inherit a thicket of frictions: the option's bid--ask spread, the cost of rebalancing the hedge, the random error the discrete hedge injects, and the statistical trap of having tried many strategy variants before reporting the best one. This chapter assembles the \textbf{most realistic version} of that trade, component by component, and shows exactly where each standard shortcut is sound, where it is flawed, and what it quietly leaves out.
 
 \begin{prereq}[Background]
@@ -88,12 +82,8 @@ f \in \Big\{\, \underbrace{x - y}_{\text{difference}},\ \ \underbrace{x/y}_{\tex
   \item $f$: the gap functional. The difference is the most direct; the ratio and log-ratio are scale-free and behave better when volatility levels swing widely.
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-The signal asks a single question: how rich is the insurance the market is selling, compared with what I expect to pay out? A large positive gap (implied far above forecast realized) means the premium looks fat relative to the claims I anticipate, so I want to be the seller. A negative gap means insurance is cheap, so I want to be the buyer. The functional form barely matters; what matters is the sign and rough magnitude of the gap.
-\end{intuition}
-
 \begin{projectconnection}[Why This Matters]
-This equation is the only place the forecast enters the strategy. Every later section is execution and accounting that is identical no matter whose forecast you plug in. A more accurate $\widehat{\RV}_t$ sharpens both the \emph{sign} (are we on the right side of the trade?) and the \emph{magnitude} (how hard should we press?) of the signal. This is the precise mechanism by which a lower QLIKE is supposed to become higher P\&L, and \Cref{sec:ivrv:evaluation} tests whether it actually does.
+This equation is the only place the forecast enters the strategy. Every later section is execution and accounting that is identical no matter whose forecast you plug in. This is the precise mechanism by which a lower QLIKE is supposed to become higher P\&L, and \Cref{sec:ivrv:evaluation} tests whether it actually does.
 \end{projectconnection}
 
 Before differencing, the two numbers must live in the same units. Implied volatility is quoted annualized; realized volatility forecasts are usually expressed per day. Because volatility scales with the square root of time, we convert the implied quote to daily units by dividing by the square root of the number of trading days in a year,
@@ -125,16 +115,12 @@ Finally, how big should the bet be? The crude choice is binary: a fixed-size sho
 \citet{LiWu2026} study a \emph{directional} machine-learning hedging rule on a single ETF, not an IV--RV straddle. It supports the qualitative claim ``moderate scaling beats a binary switch'' and nothing more; do not borrow any of its magnitudes for this strategy.
 \end{warning}
 
-\begin{warning}[Do Not Re-derive the Premium Here]
-The gap in \Cref{eq:ivrv:signal} is the variance risk premium wearing a trading hat. Its economics (why implied sits above realized roughly $85\%$ of the time, the ex-ante versus ex-post distinction) were settled in \Cref{sec:vrp-definition}, equation~\eqref{eq:vrp-operational}. The four-source taxonomy of lookahead biases, including the subtle cross-sectional kind that appears when pooling many symbols, is in \Cref{sec:eval-lookahead-taxonomy} and \Cref{tab:lookahead-taxonomy}.
-\end{warning}
-
 % ═══════════════════════════════════════════════════
 \section{The P\&L Engine: The Gamma Identity}
 \label{sec:ivrv:pnl-engine}
 % ═══════════════════════════════════════════════════
 
-Why should a delta-hedged option pay off on realized-minus-implied variance at all? The answer is one of the most elegant identities in derivatives, and it is the engine under the whole strategy. Suppose we hold an option and continuously rebalance the stock hedge using the delta computed at the option's \emph{implied} volatility. Where an \emph{unhedged} option's daily P\&L would be dominated by a large random term in the direction the stock moved, \citet{AhmadWilmott2005} show that hedging at implied volatility cancels that randomness, leaving a one-day mark-to-market profit (the change in the position's value at current prices) that is completely deterministic:
+Why should a delta-hedged option pay off on realized-minus-implied variance at all? The answer is a single identity, and it is the engine under the whole strategy. Suppose we hold an option and continuously rebalance the stock hedge using the delta computed at the option's \emph{implied} volatility. Where an \emph{unhedged} option's daily P\&L would be dominated by a large random term in the direction the stock moved, \citet{AhmadWilmott2005} show that hedging at implied volatility cancels that randomness, leaving a one-day mark-to-market profit (the change in the position's value at current prices) that is completely deterministic:
 
 \begin{equation}
 \label{eq:ivrv:aw-daily}
@@ -152,10 +138,6 @@ d\Pi_t = \tfrac{1}{2}\big(\sigma^2 - \tilde{\sigma}^2\big)\,S^2\,\Gamma^{i}\,dt 
 \begin{intuition}[In Plain English]
 Hedging at the implied volatility makes each day's profit a clean, sign-definite bet: you earn the gap between the variance that actually happened ($\sigma^2$) and the variance the market charged for ($\tilde{\sigma}^2$), scaled by how much curvature (dollar gamma) the position carries that day. Remarkably there is no random $dX$ term: once you fix the hedge at implied vol, the daily P\&L stops depending on the direction the stock moved and depends only on how \emph{much} it moved. The position has been turned into a pure variance meter.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-\Cref{eq:ivrv:aw-daily} is the bridge from a volatility forecast to dollars. If our forecast says $\sigma$ will be below the implied $\tilde{\sigma}$, the daily increment is positive for a short position; the better the forecast pins $\sigma$, the more reliably we sit on the profitable side of the gap. This is the exact quantity our backtest accumulates day by day.
-\end{projectconnection}
 
 Summing the discounted daily increments over the life of the trade gives the total profit from hedging at implied volatility,
 \begin{equation}
@@ -179,14 +161,6 @@ In a daily backtest we do not integrate; we sum one increment per day. The unobs
 \begin{warning}[Notation: Variance Form vs.\ Volatility Form]
 \Cref{sec:gamma-pnl} wrote this identity as equation~\eqref{eq:gamma-pnl-simple}, $\tfrac12\Gamma S^2(\RV^2 - \IVol^2)T$, where there $\RV$ denotes realized \emph{volatility}, so $\RV^2$ is a variance. Here $\RV_t$ denotes realized \emph{variance} directly, so the bracket is $(\RV_t - \IVol^2/252)$ with no square. The two are the same object; only the symbol's meaning differs, and we use the variance form throughout this chapter.
 \end{warning}
-
-\begin{intuition}[In Plain English]
-Each day you collect (or pay) one number: half the dollar gamma times how much the realized variance overshot or undershot the slice of implied variance you were charged for that day. String these daily numbers together and you have the strategy's gross P\&L, before any costs.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-\Cref{eq:ivrv:daily-discrete} is literally the line of code at the heart of the backtest loop in \Cref{sec:ivrv:algorithm}. Every refinement still to come, transaction costs, hedging-error variance, kurtosis, modifies what surrounds this line; the line itself is the payoff of the forecast.
-\end{projectconnection}
 
 The dollar-gamma weight $S_t^2\Gamma_t$ is not constant: it is largest when the stock sits near the strike and falls away as the stock drifts into either wing (\Cref{fig:ivrv:dollar-gamma}). This is the source of the path dependence: the same average variance gap earns very different money depending on whether the stock spent the period parked at the strike (high weight) or trending away from it (low weight). A single straddle cannot escape this path dependence, which is why \Cref{sec:ivrv:breaks} examines where its clean variance interpretation frays.
 
@@ -212,22 +186,12 @@ The dollar-gamma weight $S_t^2\Gamma_t$ is not constant: it is largest when the 
 \label{fig:ivrv:dollar-gamma}
 \end{figure}
 
-\begin{workedexample}[Three Days of Gamma P\&L]
-Hold a short straddle on a \$100 stock with dollar gamma $\Gamma_t S_t^2 = \$200{,}000$ (treated as roughly constant), against an implied volatility of $20\%$. The daily implied variance charged is $\IVol^2/252 = 0.04/252 = 1.587\times10^{-4}$. Suppose the realized daily variances on three days are $1.0$, $2.5$, and $0.6$ (all $\times10^{-4}$). Because a short position earns the negative of the long P\&L, each day's P\&L for the \emph{short} is $-\tfrac12\Gamma_t S_t^2(\RV_t - \IVol^2/252)$ (we profit when realized variance comes in below implied):
-\begin{itemize}
-  \item Day 1: $-\tfrac12(200{,}000)(1.0-1.587)\times10^{-4} = +\$5.9$.
-  \item Day 2: $-\tfrac12(200{,}000)(2.5-1.587)\times10^{-4} = -\$9.1$.
-  \item Day 3: $-\tfrac12(200{,}000)(0.6-1.587)\times10^{-4} = +\$9.9$.
-\end{itemize}
-The quiet days pay the short; the one stormy day claws most of it back. Net over three days: $+\$6.7$, gross of every cost still to come. This is the whole game in miniature: a short straddle is a steady drip of premium punctuated by sharp losses when realized variance spikes.
-\end{workedexample}
-
 % ═══════════════════════════════════════════════════
 \section{Where the Clean Identity Breaks}
 \label{sec:ivrv:breaks}
 % ═══════════════════════════════════════════════════
 
-The gamma identity of \Cref{eq:ivrv:daily-discrete} is beautiful, but it rests on four quiet assumptions: that we hold a single, near-the-money option; that the underlying follows a continuous, jump-free diffusion; that volatility itself does not move while we trade; and that we rebalance the hedge continuously. Real life violates all four. This section names each crack and the Greek or theorem that measures it, so that \Cref{sec:ivrv:hedging-error} can put a number on the most important one.
+The gamma identity of \Cref{eq:ivrv:daily-discrete} rests on four assumptions: that we hold a single, near-the-money option; that the underlying follows a continuous, jump-free diffusion; that volatility itself does not move while we trade; and that we rebalance the hedge continuously. Real life violates all four. This section names each crack and the Greek or theorem that measures it, so that \Cref{sec:ivrv:hedging-error} can put a number on the most important one.
 
 The first two cracks are \textbf{higher-order Greeks}: sensitivities of the position to things the simple identity treats as frozen. \textbf{Vanna} measures how the option's delta drifts as volatility moves:
 \begin{equation}
@@ -244,10 +208,6 @@ The first two cracks are \textbf{higher-order Greeks}: sensitivities of the posi
 Vanna is the cross-talk between price and volatility. It says: when volatility ticks up, my delta is no longer where I left it, so my ``delta-neutral'' hedge has quietly become directional. A position with large vanna leaks P\&L whenever spot and volatility move together, which is exactly what happens in an equity sell-off (price down, vol up).
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-The gamma identity assumes the only thing that matters is how much the stock moved. Vanna is the first correction: if implied volatility shifts while we hold the straddle (and in equities it systematically shifts opposite to price, the leverage effect of \Cref{ch:vrp}), our realized P\&L departs from the clean $\tfrac12\Gamma S^2(\RV - \IVol^2/252)$ prediction. A backtest that ignores vanna will misattribute this leakage to forecast error.
-\end{projectconnection}
-
 \textbf{Volga} (also called vomma) measures the position's convexity in volatility itself:
 \begin{equation}
 \label{eq:ivrv:volga}
@@ -261,10 +221,6 @@ The gamma identity assumes the only thing that matters is how much the stock mov
 \begin{intuition}[In Plain English]
 Gamma is convexity in the stock price; volga is convexity in volatility. A position with positive volga gains more from a large volatility swing than it loses from a small one, so it is implicitly long vol-of-vol. For a straddle the legs carry volga away from the money, which is why a straddle held through a volatility regime change behaves differently from a textbook variance bet.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-When realized volatility is itself volatile (vol-of-vol, the VVIX story of \Cref{sec:vvix}), volga turns the clean linear-in-variance payoff into something curved. Our forecast targets the level of realized variance, not its volatility; volga is the channel through which a correct level forecast can still produce a surprising P\&L.
-\end{projectconnection}
 
 The third crack is \textbf{jumps}. The gamma identity is a statement about quadratic variation accumulated smoothly; a gap (an earnings move, a macro shock) is not captured by $\tfrac12\Gamma S^2 \,\RV$ because gamma is not constant across a large jump. \citet{CarrLee2009} show that for the variance-swap replication the leading error from discreteness and jumps is \emph{third order} in the daily return, so it is small for ordinary days and bites only on the rare large move, precisely when it hurts most.
 
@@ -300,12 +256,8 @@ c_{\text{opt}} = \Vega \cdot \tfrac{1}{2}\big(\sigma_{\text{ask}} - \sigma_{\tex
   \item $\sigma_{\text{ask}} - \sigma_{\text{bid}}$: the bid--ask spread quoted \emph{in implied-volatility points}; the half-spread is what we cross.
 \end{itemize}
 
-\begin{intuition}[In Plain English]
-Option market makers quote a spread in volatility, and crossing it once costs you half of it. Vega is the exchange rate that turns ``volatility points'' into ``dollars,'' so the cost of trading the option is simply vega times the half-spread. Charging it only on the days you actually trade (rather than smearing a daily fee across the whole holding period) matches how the cost is really incurred: you pay the spread when you cross it, not while you sit.
-\end{intuition}
-
 \begin{projectconnection}[Why This Matters]
-This is the cost most likely to decide whether the strategy is real. A forecast edge of a few volatility points is easily swallowed by a spread of a few volatility points if you trade too often. Modelling $c_{\text{opt}}$ event-by-event, rather than as a flat daily haircut, is what lets the backtest reward a forecast that trades patiently and punish one that churns.
+Modelling $c_{\text{opt}}$ event-by-event, rather than as a flat daily haircut, is what lets the backtest reward a forecast that trades patiently and punish one that churns.
 \end{projectconnection}
 
 How large is the spread in practice, and does event-driven costing match reality? Two findings anchor the answer. First, \citet{MuravyevPearson2020} show that the cost actually paid depends enormously on execution: for the most liquid US equity options the average quoted spread is roughly $8.1$ cents, the conventional ``effective'' spread about $6.2$ cents, but a timing-aware execution that waits for favourable quotes pays only about $1.3$ cents, roughly a fifth of the effective and a sixth of the quoted figure. The strategy-level consequence is stark: they document that a long--short straddle portfolio sorted on implied-minus-realized volatility earns about $22.7\%$ per month gross but collapses to about $3.9\%$ per month once the full quoted spread is charged. \emph{The sign of the conclusion flips with the cost assumption.}
@@ -378,10 +330,6 @@ Maturity bucket & Effective spread (\% of premium) \\
 Each rebalance trades an amount of stock proportional to how much delta moved, and the expected size of that move is governed by the half-normal mean $\sqrt{2/\pi}$. Leland's insight is that you can bake the resulting expected cost into a single fudge to volatility: hedge as if the world were slightly more volatile, and the fatter option premium pays your transaction bill. The $1/\sqrt{\delta t}$ factor warns that hedging twice as often does not halve costs, it raises the volatility adjustment.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-Leland's formula gives the backtest a cheap, deterministic way to load delta-hedging costs into the P\&L without simulating every fill: inflate the variance used in the gamma identity by the bracketed factor. It tells us how the hedging-frequency knob trades replication accuracy against accumulated cost, which is exactly the dial \Cref{sec:ivrv:algorithm} must set.
-\end{projectconnection}
-
 The catch is that \Cref{eq:ivrv:leland-vol} is a heuristic, not an optimal policy, and modern work has mapped its limits precisely. \citet{KabanovSafarian1997} prove that if transaction costs are held \emph{constant} as the rebalancing frequency grows, the Leland-hedged portfolio does \emph{not} converge to the option payoff: a nonzero, negative limiting error remains, meaning the strategy systematically under-hedges. The error only vanishes if costs shrink with frequency: \citet{LepinetteKabanov2010} show that with costs scaling as $k_n = k_0\,n^{-1/2}$, the mean-square hedging error converges to zero at rate $n^{-1}$ (root-mean-square at $n^{-1/2}$) for \emph{convex} payoffs, and a straddle is convex. Beyond these results, the current frontier treats hedging as a control problem rather than a volatility fudge: \citet{ArzelLehdili2026} use a no-transaction band of width $h_{WW} = \big(3\lambda\delta S\,\Gamma^2/(2\gamma)\big)^{1/3}$ (the Whalley--Wilmott band) inside which one simply does not trade, and \citet{BrugiereTurinici2025} show a neural-network hedger beating Leland at realistic cost levels.
 
 \begin{warning}[Leland Is a Cost-Line Inflator, Not the Optimal Trade]
@@ -415,10 +363,6 @@ This is the discrete-hedging error of \citet{BoyleEmanuel1980}, here in the conv
 \begin{intuition}[In Plain English]
 Between hedge adjustments the stock moves, and your frozen delta is wrong by a little. The gamma term tells you how badly: each interval you book half the dollar gamma times the gap between the variance you expected ($\sigma^2\delta t$) and the variance that actually happened ($\sigma^2\delta t\,u_i^2$). On average this gap is zero, so you neither make nor lose money from it systematically, but it jitters your P\&L, and that jitter is pure noise added on top of the variance bet you actually wanted.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-This noise is the floor on how cleanly any forecast can be monetised through a discretely hedged straddle. It does not care how good $\widehat{\RV}_t$ is; it is the cost of hedging in discrete time. In \Cref{sec:ivrv:evaluation} its standard deviation is added to the Sharpe denominator, so getting it right is the difference between an honest Sharpe and an inflated one.
-\end{projectconnection}
 
 Because the steps are independent and $\Var(u_i^2) = 2$ for a Gaussian return, the aggregate error variance is a sum of $N$ equal pieces. With $\delta t = T/N$,
 \begin{equation}
@@ -495,7 +439,7 @@ Realized kurtosis asks how much of the day's variance came from a few big five-m
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
-The kurtosis feeds straight into the hedging-error variance and therefore into the Sharpe denominator. A reassuring fact from \citet{AmayaEtAl2015} is that realized kurtosis is far more robust to microstructure noise than realized \emph{variance}: the noise-sensitive moment is RV, not the fourth-moment ratio, so we can trust $RK_t$ even where we would worry about $\RV_t$ (\Cref{ch:micro}).
+The kurtosis feeds straight into the hedging-error variance and therefore into the Sharpe denominator. A reassuring fact from \citet{AmayaEtAl2015} is that realized kurtosis is far more robust to microstructure noise than realized \emph{variance}: the noise-sensitive moment is RV, not the fourth-moment ratio, so we can trust $RK_t$ even where we would worry about $\RV_t$ (\Cref{ch:noise}).
 \end{projectconnection}
 
 Two cautions keep this honest. First, realized higher moments are \textbf{interval-variant}: \citet{AhadzieJeyasreedharan2020} show they do not converge to the sample skewness and kurtosis of daily returns and depend on both the sampling interval and the holding interval. Aggregating 5-minute estimates up to a 15-minute horizon via a central-limit argument is therefore a \emph{stated convention}, not a free lunch; the number you report is tied to the frequency you chose. Second, $\kappa$ is not one constant across names: realized kurtosis is systematically higher for small-cap, high book-to-market, and low-beta stocks \citep{AmayaEtAl2015}, so imposing a single conservative value such as $\kappa = 4.0$ across a single-name universe is a simplification, defensible as a baseline but worth stress-testing.
@@ -503,10 +447,6 @@ Two cautions keep this honest. First, realized higher moments are \textbf{interv
 \begin{warning}[$\kappa = 4.0$ Is a Convention, Not a Measurement]
 A flat $\kappa = 4.0$ is a reasonable, mildly conservative default (it sits above the Gaussian $3$), but it is a placeholder for a per-symbol estimate. Estimate $RK_t$ for each name from its own 5-minute returns where you can, and always report how the deflated Sharpe of \Cref{sec:ivrv:evaluation} moves as $\kappa$ ranges over, say, $\{3, 4, 6\}$. If the conclusion flips within that range, the strategy's edge is inside the hedging noise, not above it.
 \end{warning}
-
-\begin{workedexample}[A Realized-Kurtosis Number]
-Take a toy day of four 5-minute returns (in standardized units): $r = (0.5,\ -0.3,\ 1.8,\ -0.4)$. Then $\sum r_i^2 = 0.25 + 0.09 + 3.24 + 0.16 = 3.74$ and $\sum r_i^4 = 0.0625 + 0.0081 + 10.4976 + 0.0256 = 10.59$. With $n=4$, $RK = (4 \times 10.59)/(3.74^2) = 42.38/13.99 \approx 3.03$. One slightly larger move (the $1.8$) already pulls the realized kurtosis to the Gaussian neighbourhood; a single genuine jump would send it far higher. This is why a fat-tailed day inflates the hedging-error variance through $\kappa$ in \Cref{eq:ivrv:kappa-inflation}.
-\end{workedexample}
 
 % ═══════════════════════════════════════════════════
 \section{Assembling the Backtest}

@@ -16,8 +16,6 @@ You will finish with the model-free VIX, which connects options prices directly 
 \label{sec:what-is-option}
 % ═══════════════════════════════════════════════════════
 
-This section defines what an option contract is and what it pays at expiry.
-
 \begin{prereq}[Background for This Chapter]
 You need comfort with:
 \begin{itemize}[nosep]
@@ -73,13 +71,6 @@ If $S_T = 80$, you do nothing: buying at 100 when the market price is 80 would b
 Your payoff is never negative.
 This asymmetry is the entire reason options have value, and why someone must be paid a premium to write them.
 \end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-The asymmetric payoff structure is what makes options sensitive to volatility in the first place.
-A stock's P\&L is symmetric around its expected return, so only direction matters.
-An option's P\&L is asymmetric, so both the direction \emph{and magnitude} of moves matter, which is why option prices encode information about the distribution of future returns, not just the mean.
-This is the foundation for extracting implied volatility and the variance risk premium (Chapter~\ref{ch:vrp}) from option prices.
-\end{projectconnection}
 
 Figure~\ref{fig:payoff-diagrams} shows the payoff profiles.
 The kink at $K$ is the signature of an option; linear instruments (stocks, futures) have straight-line payoffs.
@@ -177,7 +168,7 @@ The formula assumes:
   \item The risk-free interest rate $r$ is constant and known.
   \item No dividends.
 \end{enumerate}
-Every single one of these assumptions is wrong in practice. This matters, and we will exploit it.
+Every one of these assumptions is wrong in practice, and the volatility surface is what that wrongness looks like.
 \end{keyidea}
 
 \begin{definition}[The Black-Scholes Formula for a European Call\protect\footnote{A \textbf{European} option can only be exercised at expiry, not before. An \textbf{American} option can be exercised at any time up to expiry. For the purpose of defining implied volatility, the European version is standard.}]
@@ -249,9 +240,7 @@ You are paying for the \emph{possibility} that the index rises above 105 within 
 \end{workedexample}
 
 \begin{projectconnection}[Why This Matters]
-Black-Scholes tells you the fair price of an option given a \emph{fixed} volatility assumption, but volatility is not fixed.
-That disconnect is the entire point of the volatility surface and of your forecasting project.
-The formula's single most important role for you is as the \emph{inverse function} that maps observed option prices to implied volatilities (Section~\ref{sec:implied-vol}), which then become features and benchmarks for your ML model.
+Its key role for you is as the \emph{inverse function} that maps observed option prices to implied volatilities (Section~\ref{sec:implied-vol}), which then become features and benchmarks for your ML model.
 \end{projectconnection}
 
 \begin{warning}[Black-Scholes Is Wrong, but Universal]
@@ -281,7 +270,6 @@ For a European call option priced by Black-Scholes:
 \end{definition}
 
 \begin{intuition}[In Plain English]
-The Greeks answer five practical questions: how much does my option gain or lose if (1) the stock moves, (2) the stock moves \emph{fast}, (3) a day passes, (4) volatility changes, or (5) interest rates change?
 Vega is the most important Greek for volatility trading because it tells you how many dollars you make or lose per percentage-point change in implied vol.
 A high-vega position is a direct bet on volatility; a zero-vega portfolio is insulated from vol changes.
 \end{intuition}
@@ -336,19 +324,12 @@ Short-dated ATM options have concentrated vega, making them efficient instrument
 \label{fig:vega-profile}
 \end{figure}
 
-\begin{projectconnection}[Why This Matters]
-Vega tells you how sensitive option prices are to volatility changes, which is critical when trading vol forecasts.
-If your ML model predicts that realized vol will be higher than implied vol, you want to buy options with high vega to maximize your dollar exposure to that view.
-Understanding the vega profile also explains why ATM options are the most liquid instruments for vol trading and why the variance swap (Section~\ref{sec:var-swap}) is designed to provide constant dollar exposure to variance regardless of the stock price.
-\end{projectconnection}
-
-
 % ═══════════════════════════════════════════════════════
 \section{Implied Volatility}
 \label{sec:implied-vol}
 % ═══════════════════════════════════════════════════════
 
-With Black-Scholes in hand, we now reverse-engineer it to extract the market's view of volatility.
+Reversing the Black-Scholes formula extracts the market's view of volatility.
 
 Every input to the Black-Scholes formula ($S$, $K$, $r$, $T$) is directly observable from market data, except one: $\sigma$.
 If you also observe the market price of the option $C_{\text{mkt}}$, you can back out the volatility the market is implicitly using.
@@ -387,16 +368,6 @@ Comparing it to your RV forecast gives you the \textbf{variance risk premium}: $
 If your ML model produces a more accurate RV forecast than the market's implied estimate, the VRP becomes a tradeable signal (Chapter~\ref{ch:vrp}).
 IV is also one of the strongest single features for predicting future realized vol \citep{Gu2020}, so it will appear directly in your feature set (Chapter~\ref{ch:features}).
 \end{projectconnection}
-
-\begin{workedexample}{Backing Out Implied Volatility}
-Continuing the example from Section~\ref{sec:black-scholes}: $S = 100$, $K = 105$, $r = 5\%$, $T = 0.25$.
-Suppose the market price of the call is $C_{\text{mkt}} = \$3.10$ (higher than the \$2.48 we computed with $\sigma = 20\%$).
-
-Since the market price exceeds our 20\%-vol price, the market is pricing in higher volatility.
-Using numerical root-finding on $C_{\text{BS}}(S, K, r, T, \sigma) = 3.10$, you would find $\sigma_{\text{imp}} \approx 23.3\%$.
-
-The market is telling you: the uncertainty priced into this option corresponds to roughly 23.3\% annualized volatility, not the 20\% we assumed.
-\end{workedexample}
 
 \subsubsection*{Computing IV: The Newton-Raphson Method}
 
@@ -480,11 +451,6 @@ If Black-Scholes were correct (constant volatility, log-normal returns, no jumps
 The surface would be perfectly flat.
 The fact that the surface is \emph{not} flat is direct evidence that Black-Scholes is wrong, and the shape of the surface tells you \emph{how} it is wrong.
 \end{keyidea}
-
-\begin{projectconnection}[Why This Matters]
-The volatility surface encodes information about jump risk, tail risk, and market fear that goes beyond what backward-looking realized volatility captures.
-Changes in the surface's shape (steepening skew, inverting term structure) are forward-looking signals that could serve as features for your ML model, potentially improving on a pure HAR baseline that only uses past RV.
-\end{projectconnection}
 
 \subsection{The Volatility Smile and Skew}
 \label{sec:smile-skew}
@@ -667,15 +633,6 @@ Together, the two reconstruct the full wing structure:
 The risk reversal captures \textbf{directional asymmetry} (skewness demand); the butterfly captures \textbf{symmetric tail thickness} (kurtosis demand).
 One measures the tilt of the smile; the other measures its curvature.
 
-\begin{keyidea}[Skew vs.\ Butterfly: What Each Captures]
-\begin{itemize}[nosep]
-  \item \textbf{Risk reversal (skew)}: dominated by demand for downside protection relative to upside. In equities, the risk reversal is persistently negative (OTM puts are more expensive than OTM calls). It tracks \emph{skewness} in the risk-neutral distribution.
-  \item \textbf{Butterfly}: dominated by demand for \emph{both} tails simultaneously. It tracks \emph{excess kurtosis} in the risk-neutral distribution -- the market's pricing of large moves in either direction beyond what ATM vol implies.
-\end{itemize}
-You can have a steep skew with a low butterfly (the left tail is fat, but the right tail is not), or a mild skew with a high butterfly (both tails are fat, roughly equally).
-The two dimensions are largely independent.
-\end{keyidea}
-
 \subsubsection*{Crisis Behavior}
 
 During crises, the butterfly typically spikes alongside VIX, but with a distinctive pattern.
@@ -685,7 +642,6 @@ When \emph{both} wings are elevated, the butterfly rises sharply.
 A rising butterfly with a steepening skew is the signature of a broad-based panic: the market is pricing extreme moves in both directions, not just a directional crash.
 In contrast, a rising skew with a \emph{stable} butterfly signals targeted downside hedging without generalized tail fear.
 
-This distinction matters because realized volatility behaves differently in the two regimes.
 Symmetric tail pricing (high butterfly) tends to precede periods of elevated but two-sided choppiness, while pure skew spikes often precede sharp, directional sell-offs that resolve more quickly.
 
 \begin{projectconnection}[Why This Matters]
@@ -693,7 +649,6 @@ The butterfly spread is one of nine options-implied features in the project's fe
 It provides information that the risk reversal (skew) cannot: whether the market prices \emph{symmetric} tail risk, not just directional fear.
 Empirically, the butterfly is most useful as a crisis-detection signal.
 Spikes in the butterfly predict periods of elevated realized volatility at weekly and monthly horizons, especially when combined nonlinearly with VIX and the term structure slope in tree-based models.
-Because the butterfly captures kurtosis demand rather than directional skewness, it adds orthogonal information to the risk reversal and helps the model distinguish between one-sided drawdowns and regime shifts into sustained high-volatility environments.
 \end{projectconnection}
 
 \subsection{The Full Surface}
@@ -748,17 +703,6 @@ Short maturities (front of the surface): the skew is steeper and IV levels are m
 Long maturities (back): the surface flattens as mean-reversion dampens both the level and the skew.}
 \label{fig:iv-surface-3d}
 \end{figure}
-
-\begin{keyidea}[What the Surface Shape Tells You]
-The shape of the IV surface encodes the market's collective view on:
-\begin{itemize}[nosep]
-  \item \textbf{Skew} (IV higher for low strikes): the market prices crash risk above what log-normal returns imply.
-  \item \textbf{Smile} (IV elevated at both extremes): the market prices fat tails in both directions.
-  \item \textbf{Steep term structure}: short-term uncertainty is elevated relative to long-term expectations (often a fear signal).
-  \item \textbf{Inverted term structure}: near-term panic; the market expects volatility to decline eventually.
-\end{itemize}
-Each of these shapes changes over time, and tracking those changes is a source of features for volatility forecasting.
-\end{keyidea}
 
 \subsection{Fitting the Surface: The SVI Parametrization}\label{sec:svi}
 
@@ -896,8 +840,7 @@ PC3 (curvature) loads positively at both extremes and negatively at ATM, capturi
 \end{figure}
 
 \begin{keyidea}[Practical Use: Surface Compression]
-Instead of feeding hundreds of IV grid points into a forecasting model, you can represent each day's surface (or surface change) with just three numbers: the PC1, PC2, and PC3 scores.
-This is a powerful dimensionality reduction for feature engineering (Chapter~\ref{ch:features}): three features capture 95\% of the surface's information content.
+Represent each day's surface (or surface change) by just its PC1, PC2, and PC3 scores -- a three-feature compression for feature engineering (Chapter~\ref{ch:features}).
 \end{keyidea}
 
 
@@ -922,13 +865,6 @@ Given a continuum of European call prices $C(K,T)$ observed across strikes $K$ a
 The numerator combines two effects: $\partial C / \partial T$ captures the time decay of the option (how much value accrues as the horizon extends), while $rK\,\partial C / \partial K$ is a cost-of-carry correction arising from discounting.
 The denominator, $\frac{1}{2}K^2\,\partial^2 C / \partial K^2$, is proportional to the \textbf{risk-neutral density} of the underlying at strike $K$ and maturity $T$ -- it measures how much probability the market assigns to the stock landing near $K$.
 For the formula to be well-defined, the denominator must be strictly positive (a condition equivalent to the absence of butterfly arbitrage).
-
-\begin{intuition}[In Plain English]
-The Dupire formula asks: given how option prices change as you shift the strike and the maturity, what instantaneous volatility must the market be assigning to each specific price level at each specific future time?
-The numerator measures how much extra option value you get by extending the horizon (adjusted for interest rates).
-The denominator measures how tightly the market's probability is concentrated near that strike.
-Dividing the two gives you the local ``speed of randomness'' the market prices at that point.
-\end{intuition}
 
 \begin{intuition}[Local Vol as Market-Implied Instantaneous Vol]
 Local vol is the unique diffusion coefficient $\sigma(S,t)$ such that a one-factor model
@@ -990,22 +926,6 @@ Using a central difference with $\Delta K = 10$:
 \end{align*}
 
 Therefore $\sigma_{\text{loc}}(100, 0.25) = \sqrt{0.0481} \approx 21.9\%$.
-
-\begin{center}
-\begin{tabular}{@{}lc@{}}
-\toprule
-Quantity & Value \\
-\midrule
-$\partial C / \partial T$       & 9.40 \\
-$\partial C / \partial K$       & $-0.5525$ \\
-$\partial^2 C / \partial K^2$   & 0.0345 \\
-Numerator                        & 8.295 \\
-Denominator                      & 172.5 \\
-$\sigma_{\text{loc}}^2$         & 0.0481 \\
-$\sigma_{\text{loc}}$           & 21.9\% \\
-\bottomrule
-\end{tabular}
-\end{center}
 \end{workedexample}
 
 \begin{warning}[Local Vol Is Not a Forecast]
@@ -1016,8 +936,6 @@ For forecasting, use the realized measures and ML models from later chapters.
 \end{warning}
 
 \begin{projectconnection}[Why This Matters]
-Local vol extractions at specific moneyness levels (e.g., 90\% and 110\% of spot) encode the market's current pricing of tail risk at different horizons.
-These can serve as ML features (Chapter~\ref{ch:features}) that complement backward-looking realized measures with forward-looking options information.
 The ratio of local vol at 90\% moneyness to ATM local vol is a cleaner skew measure than raw IV skew, potentially giving your model a more informative tail-risk signal.
 \end{projectconnection}
 
@@ -1069,12 +987,6 @@ Each option at strike $K$ provides local information about the probability of th
 By weighting them by $1/K^2$ and integrating, you reconstruct the full distribution and extract its second moment (variance) without ever assuming what that distribution looks like.
 \end{intuition}
 
-\begin{projectconnection}[Why This Matters]
-This integral is the theoretical foundation for VIX, which is one of the single strongest predictors of future realized vol.
-Because the model-free variance extracts \emph{risk-neutral} expected variance (not real-world expected variance), it systematically overestimates realized vol.
-That persistent gap is the variance risk premium (Chapter~\ref{ch:vrp}), and your ML model's ability to forecast the realized side more accurately than the market's implied estimate is what creates a tradeable signal.
-\end{projectconnection}
-
 \subsection{The VIX Index}
 \label{sec:vix-index}
 
@@ -1105,18 +1017,6 @@ In practice, the CBOE interpolates between the two nearest-to-30-day maturities 
 
 Equation~\eqref{eq:vix} is the discrete approximation of the continuous integral in Equation~\eqref{eq:model-free-var}: the sum over OTM options across all available strikes replaces the integral, and the $\Delta K_i / K_i^2$ weighting mirrors the $1/K^2$ in the continuous formula.
 
-\begin{intuition}[In Plain English]
-The VIX formula adds up the prices of out-of-the-money options across all available strikes, weighting each by $1/K^2$ so that lower-strike options (which capture crash risk) count proportionally more.
-The result is the options market's collective estimate of how much the S\&P~500 will bounce around over the next 30 days, expressed as an annualized percentage.
-The small correction term at the end accounts for the fact that the forward price may not land exactly on an available strike.
-\end{intuition}
-
-\begin{projectconnection}[Why This Matters]
-VIX is the single most widely used implied-vol feature in volatility forecasting models and often the strongest univariate predictor of future realized vol \citep{Gu2020}.
-For your project, VIX (or VIX$^2$) enters the model both as a direct feature and as one side of the variance risk premium: $\text{VRP}_t = \text{VIX}_t^2 - \widehat{\text{RV}}_{t,t+30}$.
-Any improvement your ML model achieves in forecasting the RV side translates directly into a more accurate VRP signal and better trading decisions.
-\end{projectconnection}
-
 \begin{keyidea}[Interpreting VIX Levels]
 VIX is quoted in annualized percentage points.
 Typical values for the S\&P~500:
@@ -1137,25 +1037,6 @@ The average gap between VIX-squared and subsequent 30-day realized variance is t
 Historically, VIX exceeds subsequent realized vol roughly 85\% of the time \citep{Carr2009}.
 Using VIX as a direct volatility forecast is a common and costly mistake: it confuses the risk-neutral measure $\mathbb{Q}$ with the real-world measure $\mathbb{P}$.
 \end{warning}
-
-\begin{workedexample}{From VIX to Expected Daily Moves}
-VIX is currently at 22.
-What daily price move does this imply?
-
-\textbf{Step 1:} Convert to a decimal: $22/100 = 0.22$ (22\% annualized).
-
-\textbf{Step 2:} Convert to daily.
-With approximately 252 trading days per year:
-\[
-  \sigma_{\text{daily}} \approx \frac{0.22}{\sqrt{252}} \approx 0.0139 = 1.39\%
-\]
-
-\textbf{Step 3:} Interpret.
-With the S\&P~500 at 5{,}000, a one-standard-deviation daily move is roughly $5{,}000 \times 0.0139 \approx 69$ points.
-
-This is only approximate (it assumes returns are normal and ignores the risk-premium bias), but it gives you the right order of magnitude for how much daily movement the options market is pricing.
-\end{workedexample}
-
 
 % ═══════════════════════════════════════════════════════
 \section{Variance Swaps: Trading Realized Volatility}\label{sec:var-swap}
@@ -1190,14 +1071,6 @@ where:
 \end{itemize}
 The buyer of the swap profits when realized variance exceeds the strike; the seller profits when it falls below.
 \end{definition}
-
-\begin{intuition}[In Plain English]
-A variance swap is a bet on how volatile the market will actually be.
-At the start, the two parties agree on a ``fair'' variance level ($K_{\text{var}}$).
-At expiry, they compare that to what actually happened (realized variance).
-The buyer gets paid the difference if markets were choppier than expected; the seller gets paid if markets were calmer.
-It is the purest financial instrument for expressing a view on volatility itself, stripped of any directional bet on the market.
-\end{intuition}
 
 Traders often think in terms of \textbf{vega notional} rather than variance notional, because it is more intuitive.
 The vega notional approximates the dollar P\&L per volatility point (not variance point):
@@ -1290,10 +1163,7 @@ A position can be deeply underwater mid-life even if it ultimately settles in yo
 \end{warning}
 
 \begin{projectconnection}[Why This Matters]
-The variance swap makes the VRP a tradeable quantity.
-$\text{VIX}^2/10{,}000$ minus your forecast of 30-day RV $=$ variance risk premium (Chapter~\ref{ch:vrp}).
-If your ML model forecasts RV more accurately than the market-implied $K_{\text{var}}$, you can systematically harvest the mispricing.
-This is the core mechanism behind Project~5 (VRP ML Trader) and the economic-value test for any of the other project directions.
+If your ML model forecasts RV more accurately than the market-implied $K_{\text{var}}$, you can systematically harvest the mispricing -- the core mechanism behind Project~5 (VRP ML Trader) and the economic-value test for any of the other project directions.
 \end{projectconnection}
 
 
@@ -1301,8 +1171,6 @@ This is the core mechanism behind Project~5 (VRP ML Trader) and the economic-val
 \section{Connecting the Vol Surface to Volatility Forecasting}
 \label{sec:surface-to-forecasting}
 % ═══════════════════════════════════════════════════════
-
-This section previews how the concepts introduced here feed into the rest of the guide.
 
 \begin{keyidea}[IV Surface Features for ML Models]
 The volatility surface provides a rich set of features for realized volatility forecasting models (Chapters~\ref{ch:features}--\ref{ch:hybrid}):
