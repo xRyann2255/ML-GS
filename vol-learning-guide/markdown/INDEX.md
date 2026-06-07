@@ -56,14 +56,15 @@ These markdown files are a faithful word-for-word conversion of `vol-learning-gu
 | [16](ch16-forecast-evaluation.md) | Forecast Evaluation | QLIKE, MSE, MAE loss functions. Diebold-Mariano test, Model Confidence Set. Purged CV, walk-forward. |
 | [17](ch17-applications-projects.md) | Applications and Projects | Vol-targeting, risk parity, momentum scaling. Practical applications of vol forecasts. |
 | [18](ch18-ivrv-straddle.md) | From Forecast to P&L: A Realistic, Evaluable IV--RV Straddle | Delta-hedged straddle on the IV-RV gap, gamma P&L identity, option/hedge transaction costs, Leland, discrete-hedging-error variance, realized kurtosis, deflated Sharpe. |
+| [19](ch19-gsvivs01.md) | Predicting Drawdowns of a Daily Variance-Swap Seller: The GSVIVS01 Index | Variance-swap re-derivation (DDKZ log-contract, 1/K^2 strip, CBOE formula, skew premium), the real GSVIVS01 0DTE replication strategy, strike-based VRP-gap signal, down-jump cubic drawdown mechanism, cost-sensitive classification, flat/short overlay, deflated-Sharpe economic value. |
 
 ---
 
 ## Quick Reference
 
-**Chapters:** 19 files (across 6 parts; numbered 1-18 with a 12b)
+**Chapters:** 20 files (across 6 parts; numbered 1-19 with a 12b)
 
-**Key progression:** Measurement (Ch 1-4) -> Classical forecasting (Ch 5-7) -> Options-implied info (Ch 8-9) -> ML methods (Ch 10-13) -> Multivariate/network (Ch 14-15) -> Evaluation and practice (Ch 16-18)
+**Key progression:** Measurement (Ch 1-4) -> Classical forecasting (Ch 5-7) -> Options-implied info (Ch 8-9) -> ML methods (Ch 10-13) -> Multivariate/network (Ch 14-15) -> Evaluation and practice (Ch 16-19)
 
 **Baseline model:** HAR-RV (Ch 6) -- every ML model must beat this
 
