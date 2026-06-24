@@ -59,7 +59,8 @@ ML/
 │   ├── vol-learning-guide/      # realized-vol estimation, forecasting & ML (20 chapters)
 │   ├── quant-trading/           # quant trading (38 chapters)
 │   └── vol-project-ref/         # realized-vol project reference
-└── archive/                     # archived work (risk-as-alpha, incl. old ml-finance guide)
+├── archive/                     # archived work (risk-as-alpha, incl. old ml-finance guide)
+└── qr-decode/                   # QR-video → repo decoder (one-command pipeline; see below)
 ```
 
 ## Current Phase: Exploration & Feature Understanding
@@ -130,6 +131,24 @@ The `docs-only` branch contains only compiled PDFs, deliverables, and markdown n
 - `guides/vol-project-ref/markdown/` (markdown conversion of project reference, with Mermaid diagrams, for LLM consumption)
 - `deliverables/` (all .md and .html)
 - `notes/` (all .md)
+
+---
+
+## QR-Code Video Decoder (`qr-decode/`)
+
+Utility to recover a repository that was encoded as base64, split across 810 QR codes, and screen-recorded to video. The whole pipeline runs as **one command**:
+
+```bash
+pip install opencv-python zxing-cpp numpy
+python qr-decode/decode.py [VIDEO] [--out DIR]   # VIDEO defaults to qr_codes.mp4
+```
+
+`decode.py` does everything end to end: scans every video frame with `zxing`, decodes each standard byte-mode QR payload (format `{seq}/{total}:{base64_chunk}`), reassembles the chunks in sequence order into one base64 string, verifies its **SHA-256** (expected `bab1a635…cd90cf`), base64-decodes it to `repo-snapshot.tar.xz`, and extracts it into `restored/`. It aborts on any missing chunk or SHA mismatch (`--keep-going` overrides).
+
+- `regenerate_qrs.py` — source-side companion that (re)generates spec-compliant, self-verified QR PNGs from the base64 (run on the machine holding the source file).
+- `repo-snapshot.tar.xz`, `repo-snapshot.tar.xz.b64`, `restored/` — the recovered, SHA-verified output.
+
+The QRs must be **standard** byte-mode symbols. An earlier non-standard encoder (invalid format-info, each codeword repeated 8× → unreadable and data-truncated) made the video undecodable past chunk 1; regenerating with `regenerate_qrs.py` (or any compliant library, e.g. `segno`) is the fix.
 
 ---
 
