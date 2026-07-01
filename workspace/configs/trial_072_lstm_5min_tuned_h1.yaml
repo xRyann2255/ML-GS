@@ -1,0 +1,82 @@
+# Trial-072: LSTM 5-min enriched — improved hyperparameters
+#
+# Fixes from trial-071 diagnosis:
+#   - hidden_dim: 128 (was 64) — more capacity for 12-feature input
+#   - learning_rate: 5e-4 (was 1e-3) — more conservative for stability
+#   - max_epochs: 80 (was 50) — let it converge fully
+#   - early_stopping_rounds: 8 (was 5) — more patience
+#   - bidirectional: true — capture both forward/backward intraday patterns
+#   - dropout: 0.2 (was 0.1) — prevent overfitting with larger model
+#   - batch_size: 128 (was 64) — smoother gradients with 2 symbols
+#
+# Trial-071 result: LSTM QLIKE=0.3307 (HAR=0.1989)
+# In-sample diagnosis: normalised LSTM achieves QLIKE=0.2276
+# The gap is due to OOS degradation; stronger regularisation should help.
+
+name: trial_072_lstm_5min_tuned_h1
+universe: [SPY, AAPL]
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [har_core]
+
+model:
+  name: lstm
+  params:
+    hidden_dim: 128
+    n_layers: 2
+    dropout: 0.2
+    bidirectional: true
+    learning_rate: 5.0e-4
+    weight_decay: 1.0e-4
+    max_epochs: 80
+    batch_size: 128
+    val_fraction: 0.15
+    early_stopping_rounds: 8
+    loss: qlike
+    device: auto
+    precision: auto
+    compile: false
+    seed: 42
+    pool_mode: attention
+    head_mode: mlp
+
+sequences:
+  features:
+    - log_ret
+    - abs_ret
+    - vol_share
+    - buy_ratio
+    - order_flow_imbalance
+    - rolling_vpin
+    - cum_rv
+    - session_frac
+    - price_accel
+    - log_n_trades
+    - intrabar_rv
+    - volume_surprise
+  max_bars: 78
+  bar_interval: 300
+  norm_mode: per_symbol
+  source: parquet
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 1260
+  test_size: 252
+
+training_mode: pooled
+seed: 42
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+  baseline: lstm_5min
+  models:
+    - har
+    - har_iv
+    - lstm
+
+output_dir: data/models/trial_072_lstm_5min_tuned

@@ -1,0 +1,187 @@
+# Trial-067: XGBoost multi-seed validation (h=1 only)
+#
+# Hypothesis: Trial-063's single-seed XGBoost h=1 QLIKE (0.12895) is
+# reproducible across seeds. If the 5-seed mean remains ~0.129, XGBoost
+# is the new h=1 champion (+80 bps over LightGBM 5-seed mean 0.13679).
+#
+# Design: 5 identical XGBoost models (seeds 42/123/456/789/2026) with
+# har_iv_0dte init. Same methodology as trial-047 (LightGBM reseed).
+# h=1 only to minimize compute.
+#
+# Baseline: trial_063_xgboost_champion (single-seed h1=0.12895)
+
+name: trial_067_xgb_reseed_h1
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+  
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    max_leaves: 32
+    max_depth: 8
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv_0dte
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0
+  gsvivs_iv_sources:
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+    - spx_atm_iv_1w
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 5
+  baseline: xgb_seed_42
+  mcs_bootstrap: 10000
+  models:
+    - har
+    - har_iv
+    - har_iv_0dte
+    - xgb_seed_42
+    - xgb_seed_123
+    - xgb_seed_456
+    - xgb_seed_789
+    - xgb_seed_2026
+  model_configs:
+    xgb_seed_42:
+      name: xgboost
+      params:
+        seed: 42
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 32
+        max_depth: 8
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+    xgb_seed_123:
+      name: xgboost
+      params:
+        seed: 123
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 32
+        max_depth: 8
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+    xgb_seed_456:
+      name: xgboost
+      params:
+        seed: 456
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 32
+        max_depth: 8
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+    xgb_seed_789:
+      name: xgboost
+      params:
+        seed: 789
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 32
+        max_depth: 8
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+    xgb_seed_2026:
+      name: xgboost
+      params:
+        seed: 2026
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 32
+        max_depth: 8
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+
+training_mode: pooled
+output_dir: data/models/trial_067_xgb_reseed_h1

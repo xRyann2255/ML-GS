@@ -1,0 +1,70 @@
+# Trial-061: HAR-IV with both 0DTE + 1DTE as separate features
+#
+# Hypothesis: Including BOTH 0DTE and 1DTE IV as separate regressors
+# outperforms using either alone because:
+#   - 0DTE at close ≈ backward-looking (correlates 0.82 with same-day RV)
+#   - 1DTE at close ≈ forward-looking (pcorr 0.46 with next-day RV | RV_T)
+#   - Together they decompose IV signal into persistence + expectation
+#
+# If β_1dte > 0 while β_0dte ≈ 0, that confirms 0DTE is redundant with
+# log_rv_d (both measure today's vol). If both are positive, they carry
+# complementary information.
+#
+# Design: Same tournament as trial-060, adding har_iv_0dte_1dte.
+# Requires: iv_1dte column in SPX.parquet (already ingested from trial-060).
+
+name: trial_061_har_iv_both_0dte_1dte
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-06-15"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options]
+
+model:
+  name: har_iv_0dte_1dte
+  params: {}
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  dh_enabled: false
+  vt_enabled: false
+  models:
+    - har
+    - har_iv
+    - har_iv_1w
+    - har_iv_0dte
+    - har_iv_1dte
+    - har_iv_0dte_1dte
+  baseline: har_iv_0dte
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_061_har_iv_both_0dte_1dte

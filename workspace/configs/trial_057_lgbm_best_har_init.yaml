@@ -1,0 +1,127 @@
+# Trial-057: LightGBM with best HAR init from trial-056 tournament
+#
+# Hypothesis: Using the trial-056 tournament winners as LightGBM init_score
+# produces better residuals than the trial-036 champion's inits.
+#
+# Trial-056 winners (linear QLIKE, best per horizon):
+#   h=1:  har_cj_iv_0dte            (0.13590) — beat har_iv_0dte by +2.8 bps
+#   h=5:  har_iv_1w                 (0.10529) — already the best (no change)
+#   h=22: ridge_har_cj_iv_freq_vrp  (0.16966) — beat har_iv by +21 bps
+#
+# Changes vs trial-036 champion:
+#   h=1:  har_iv_0dte → har_cj_iv_0dte (continuous/jump + 0DTE IV, 5 params)
+#   h=5:  har_iv_1w   → har_iv_1w      (unchanged)
+#   h=22: har_iv      → ridge_har_cj_iv_freq_vrp (CJ + freq IV + VRP, Ridge, 8 params)
+#
+# Control: trial-047 reseeded means (h1=0.13679, h5=0.10804, h22=0.16826)
+# h=22 is the critical test — LightGBM currently LOSES to har_iv by 7 bps.
+
+name: trial_057_lgbm_best_har_init
+
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+# Default model: LightGBM with har_iv_1w init (h=5 default)
+model:
+  name: lightgbm
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    num_leaves: 16
+    max_depth: 4
+    min_child_samples: 150
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 3
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    base_model: har_iv_1w
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# Per-horizon init: trial-056 tournament winners
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_cj_iv_0dte
+  22:
+    model:
+      params:
+        base_model: ridge_har_cj_iv_freq_vrp
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  dh_enabled: false
+  vt_enabled: false
+  mcs_bootstrap: 0
+  parallel_models: 4
+  models:
+    # --- LightGBM with trial-057 best HAR inits ---
+    - lgbm_057_best_init
+
+    # --- Linear baselines (best per horizon from trial-056) ---
+    - har_cj_iv_0dte
+    - har_iv_1w
+    - ridge_har_cj_iv_freq_vrp
+
+    # --- Previous linear baselines (trial-036 inits) ---
+    - har_iv_0dte
+    - har_iv
+
+  baseline: har_iv
+  model_configs:
+    lgbm_057_best_init:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_1w
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_057_lgbm_best_har_init

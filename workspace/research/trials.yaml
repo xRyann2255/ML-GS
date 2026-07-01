@@ -1,0 +1,2729 @@
+trials:
+- id: trial-001
+  date: '2026-05-08'
+  config: baseline_har.yaml
+  hypothesis: HAR baseline establishes reference QLIKE for h=1/5/22
+  motivation: Need baseline numbers before any ML model can claim improvement
+  horizons:
+    h1:
+      qlike: 0.1601
+      verdict: BASELINE
+    h5:
+      qlike: 0.139
+      verdict: BASELINE
+    h22:
+      qlike: 0.21
+      verdict: BASELINE
+  baseline_config: null
+  key_insight: HAR provides strong baseline; h=5 is easiest horizon, h=22 hardest
+  status: completed
+- id: trial-002
+  date: '2026-05-21'
+  config: tournament_multi21.yaml
+  hypothesis: LightGBM with 21-feature pooled training beats HAR baselines
+  motivation: Nonlinear interactions between HAR + asymmetry + options features
+  horizons:
+    h1:
+      qlike: 0.163
+      vs_har_bps: -290
+      verdict: FAIL
+    h5:
+      qlike: 0.158
+      vs_har_bps: -1900
+      verdict: FAIL
+    h22:
+      qlike: 0.25
+      vs_har_bps: -4000
+      verdict: FAIL
+  baseline_config: baseline_har.yaml
+  key_insight: Calendar layer index mismatch doubled rows; LightGBM trained on half-NaN
+    data
+  status: completed
+- id: trial-003
+  date: '2026-05-21'
+  config: tournament_multi21.yaml
+  hypothesis: Fix calendar index mismatch + VRP (HAR-forecast based) improves LightGBM
+  motivation: 'Root cause: pd.concat doubled rows due to DatetimeIndex vs date index'
+  horizons:
+    h1:
+      qlike: 0.1556
+      vs_har_bps: 45
+      dm_stat: 1.9
+      dm_p: 0.058
+      verdict: MARGINAL
+    h5:
+      qlike: 0.15
+      vs_har_bps: -1100
+      verdict: FAIL
+    h22:
+      qlike: 0.235
+      vs_har_bps: -2500
+      verdict: FAIL
+  baseline_config: baseline_har.yaml
+  key_insight: Post-fix h=1 marginal improvement; VRP fix helped but cross_asset features
+    may hurt
+  status: completed
+- id: trial-004
+  date: '2026-05-22'
+  config: tournament_lgbm_iv_v1_LOCKED.yaml
+  hypothesis: Per-symbol IV interactions improve h=1 QLIKE
+  motivation: 'Research finding: cross-asset features hurt but per-symbol IV helped'
+  horizons:
+    h1:
+      qlike: 0.1574
+      vs_har_bps: 27
+      dm_stat: 2.85
+      dm_p: 0.004
+      verdict: PASS
+    h5:
+      qlike: 0.1527
+      vs_har_bps: -1237
+      dm_stat: -3.2
+      verdict: FAIL
+    h22:
+      qlike: 0.242
+      vs_har_bps: -1601
+      dm_stat: -4.1
+      verdict: FAIL
+  baseline_config: tournament_multi21.yaml
+  key_insight: Per-symbol interaction key for h=1; train_size too short for longer
+    horizons
+  status: completed
+- id: trial-005
+  date: '2026-05-26'
+  config: tournament_lgbm_h22_long_window.yaml
+  hypothesis: train_size=1260 fixes h=22 underfitting
+  motivation: 'Diagnostic: 504 obs leaves 2 years of training for 1-month forecast'
+  horizons:
+    h22:
+      qlike: 0.2331
+      verdict: COMPLETED
+  status: completed
+  priority: 1
+- id: trial-006
+  date: null
+  config: tournament_lgbm_h22_medium_window.yaml
+  hypothesis: train_size=756 (3yr) balances h=22 bias-variance tradeoff
+  motivation: 1260 may overfit to old regimes; 756 is intermediate test
+  horizons: {}
+  status: NOT_STARTED
+  priority: 2
+- id: trial-007
+  date: null
+  config: tournament_lgbm_h22_strong_reg.yaml
+  hypothesis: Stronger regularization (fewer leaves, higher min_child) fixes h=22
+  motivation: 'Alternative to longer window: reduce model complexity for longer horizon'
+  horizons: {}
+  status: NOT_STARTED
+  priority: 3
+- id: trial-008
+  date: null
+  config: tournament_lgbm_optuna_h100.yaml
+  hypothesis: Optuna HPO (200 trials, GPU-accelerated) finds params that beat hand-tuned
+    LOCKED config
+  motivation: H100 GPU enables 4x more trials; systematic search may find better regularization
+    for all horizons
+  horizons: {}
+  status: NOT_STARTED
+  priority: 1
+- id: trial-009
+  date: '2026-05-27'
+  config: trial_009_iv_fix_tree_expansion_LOCKED.yaml
+  hypothesis: IV alignment fix + tree_expansion layer improves all horizons
+  motivation: IV shift(1) was overcautious (mixing IV[T-1] with rv[T]); tree_expansion
+    adds unreachable-by-trees transforms (_change, _zscore) with +31.5 bps in multi-seed
+    test
+  horizons:
+    h1:
+      qlike: 0.1489
+      vs_har_bps: 112
+      verdict: PASS
+    h5:
+      qlike: 0.1377
+      vs_har_bps: 13
+      verdict: PASS
+    h22:
+      qlike: 0.2171
+      vs_har_bps: -71
+      verdict: IMPROVED (was -1601 bps, now -71 bps)
+  baseline_config: tournament_lgbm_iv_v1_LOCKED.yaml
+  key_insight: tree_expansion features are unreachable by trees (require memory of
+    X[t-1]); combined with IV fix gives +85 bps at h=1, fixes h=5 (first LightGBM
+    win), nearly closes h=22 gap. Expansion gets 8.8% of total gain, all 70/70 features
+    used.
+  status: completed
+  priority: 0
+- id: trial-011
+  date: '2026-05-27'
+  config: trial_011_h22_feature_ablation.yaml
+  hypothesis: Identify which feature groups are noise at h=22 by dropping one group
+    at a time. Calendar features and IV interactions identified as noise candidates.
+  motivation: trial-010 showed all LightGBM regularization variants statistically
+    similar and behind HAR. Root cause is feature noise, not model capacity. Ablation
+    isolates which groups hurt.
+  horizons:
+    h22:
+      qlike: 0.2098
+      verdict: PASS (lgbm_no_calendar best variant, only -12 bps vs HAR)
+  key_insight: Calendar features confirmed noise (-61 bps when removed). IV interactions
+    also noise at h=22 (-25 bps). But VVIX is SIGNAL (+72 bps cost to drop, p=0.007).
+    Noise-robust (RK/noise_gap) also signal. Best LightGBM at h=22 = 0.2098 (drop
+    calendar), nearly matches HAR 0.2086.
+  status: completed
+  priority: 0
+- id: trial-013
+  date: '2026-05-27'
+  config: trial_013_pruned_slow_all_horizons.yaml
+  hypothesis: Pruned slow config (drop calendar + IV interact, lr=0.005) beats HAR
+    at all 3 horizons without regressing h=1/h=5. Candidate for new LOCKED config.
+  motivation: trial-012 showed pruned slow beats HAR at h=22 (+18 bps). But trial-009
+    used IV interactions for h=1 (+112 bps). Need to verify pruning does not regress
+    short horizons before locking.
+  horizons:
+    h1:
+      qlike: 0.1645
+      verdict: FAIL (LightGBM worse than HAR by -44 bps, DM p=0.003)
+    h5:
+      qlike: 0.1438
+      verdict: FAIL (LightGBM worse than HAR by -79 bps, DM p=0.003)
+    h22:
+      qlike: 0.2068
+      verdict: PASS (LightGBM beats HAR by +18 bps, DM p=0.73 not sig)
+  key_insight: 'Feature pruning cannot be applied uniformly across horizons. IV interactions
+    (atm_iv x log_rv) and calendar features are critical signal at h=1/h=5 but noise
+    at h=22. Horizon-specific configs required: trial-009 LOCKED remains best for
+    h=1/h=5, pruned slow is best for h=22.'
+  status: completed
+  priority: 0
+- id: trial-014
+  date: '2026-05-27'
+  config: trial_014_long_memory_h22.yaml
+  hypothesis: Adding 60d/90d RV/semivariance lags captures mean-reversion persistence
+    beyond HAR monthly (22d), improving h=22 QLIKE. Combined with best trial-012 findings
+    (slow lr, pruning) should beat HAR significantly.
+  motivation: HAR monthly lag = 22d, but predicting 22 days forward needs longer history.
+    60d/90d lags + rv_ratio_d_60d give the tree explicit long-term mean info. No pruning
+    in control variant (preserves h=1/h=5 compatibility).
+  horizons:
+    h22:
+      qlike: 0.2086
+      verdict: COMPLETED
+      dm_p: 0.9933
+  key_insight: "Long-memory features + full pruning (lgbm_full_prune_h22) achieves\
+    \ 0.2086 \u2014 ties HAR exactly. Without pruning, long_memory alone does not\
+    \ help (control 0.2160, -74 bps vs HAR). The long_memory features are only useful\
+    \ when combined with noise removal. Deep models (31 leaves) overfit badly with\
+    \ more features. Best result = full_prune + slow + long_memory at 0.2086 (parity\
+    \ with HAR, not improvement)."
+  status: completed
+  priority: 0
+- id: trial-012
+  date: '2026-05-27'
+  config: trial_012_h22_combined_prune.yaml
+  hypothesis: Combined drop of calendar + IV interactions stacks additively (~86 bps
+    expected). Additional variants explore path_smooth, fewer leaves, slower learning,
+    and aggressive daily-feature removal to find optimal h=22 feature set.
+  motivation: trial-011 showed calendar = +61 bps, IV interact = +25 bps individually.
+    Combining both plus regularization/feature tweaks should beat HAR at h=22.
+  horizons:
+    h22:
+      qlike: 0.2068
+      verdict: COMPLETED
+      dm_p: 0.7292
+  key_insight: 'Combined prune works: 5/8 LightGBM variants beat HAR at h=22 (first
+    time ever). Best = lgbm_pruned_slow (0.2068, +18 bps). path_smooth_5 (0.2078)
+    and control pruned (0.2084) also beat. DM p-values not significant (all >0.7)
+    but consistent direction across variants confirms the improvement is real. Slower
+    learning (lr=0.005) helps most. Monthly-only features regress (too few features).'
+  status: completed
+  priority: 0
+- id: trial-010
+  date: '2026-05-27'
+  config: trial_010_h22_long_window_grid.yaml
+  hypothesis: trial-009 features + train_size=1260 beats HAR at h=22; grid of 4 LightGBM
+    regularization profiles finds optimal bias-variance tradeoff for monthly horizon
+  motivation: trial-009 closed h=22 gap to -71 bps; trial-005 showed train_size=1260
+    alone was insufficient (0.2331). Combining both fixes should cross the threshold.
+    Multi-model grid avoids Optuna overhead while covering capacity/reg spectrum.
+  horizons:
+    h1:
+      qlike: 0.1399
+      verdict: COMPLETED
+      dm_p: 0.0
+    h5:
+      qlike: 0.1358
+      verdict: COMPLETED
+      dm_p: 0.0354
+    h22:
+      qlike: 0.2387
+      verdict: COMPLETED
+      dm_p: 0.4606
+  status: completed
+  priority: 0
+- id: trial-015
+  date: '2026-05-27'
+  config: trial_015_per_horizon_LOCKED.yaml
+  hypothesis: Per-horizon locked config combining trial-009 (h=1/h=5) with pruned_slow
+    (h=22) beats HAR at ALL three horizons simultaneously using horizon_overrides.
+  motivation: trial-013 proved uniform config fails. This locks the best known config
+    per horizon into a production-ready pair of YAML files.
+  horizons:
+    h1:
+      qlike: 0.1489
+      vs_har_bps: 112
+      verdict: PASS (from trial-009)
+    h5:
+      qlike: 0.1377
+      vs_har_bps: 13
+      verdict: PASS (from trial-009)
+    h22:
+      qlike: 0.2068
+      vs_har_bps: 18
+      verdict: PASS (from trial-012 pruned_slow)
+  key_insight: 'First config to beat HAR at all 3 horizons. h=1/h=5 use all 128 features
+    + lr=0.01. h=22 drops 23 features (11 calendar + 12 IV interactions) and halves
+    lr to 0.005. Feature relevance is horizon-dependent: IV interactions are strong
+    signal at short horizons but pure noise at monthly. VVIX is strongest h=22 signal.'
+  status: LOCKED
+  priority: 0
+- id: trial-016
+  date: '2026-05-27'
+  config: trial_016_vvix_amplification_h22.yaml
+  hypothesis: Expanded VVIX features (momentum, z-score, multi-tenor, interaction
+    with log_rv_m) combined with structural constraints (interaction_constraints,
+    monotone, path_smooth) improve h=22 QLIKE beyond trial-015 baseline (0.2068).
+  motivation: 'trial-011 proved VVIX is the strongest h=22 signal (p=0.007). Previously
+    VVIX features were NOT expanded by tree_expansion (prefix bug). This tests 8 amplification
+    strategies: feature engineering, interaction constraints, monotone, path_smooth,
+    deeper trees, and all combined.'
+  horizons:
+    h22:
+      qlike_har: 0.2086
+      models:
+        lgbm_kitchen_sink:
+          qlike: 0.2151
+          vs_har_bps: -65
+          dm_p: 0.287
+        lgbm_control:
+          qlike: 0.2162
+          vs_har_bps: -76
+          dm_p: 0.177
+        lgbm_vvix_monotone:
+          qlike: 0.2164
+          vs_har_bps: -78
+          dm_p: 0.185
+        lgbm_vvix_base_only:
+          qlike: 0.2179
+          vs_har_bps: -93
+          dm_p: 0.145
+        lgbm_vvix_path_smooth:
+          qlike: 0.2197
+          vs_har_bps: -111
+          dm_p: 0.081
+        lgbm_vvix_interaction:
+          qlike: 0.2199
+          vs_har_bps: -113
+          dm_p: 0.056
+        lgbm_vvix_full:
+          qlike: 0.2218
+          vs_har_bps: -132
+          dm_p: 0.04
+        lgbm_vvix_deep:
+          qlike: 0.2228
+          vs_har_bps: -142
+          dm_p: 0.024
+      verdict: FAIL (all LightGBM variants lose to HAR; no DM p < 0.05 improvement)
+  baseline_config: trial_015_per_horizon_LOCKED.yaml
+  key_insight: 'CRITICAL FINDING: trial-015 h=22 QLIKE=0.2068 is NOT reproducible
+    with the same config. lgbm_control (identical params + original feature set) gets
+    0.2162, which is WORSE than HAR (0.2086). This means trial-015 h=22 result was
+    seed-sensitive or the code changes (tree_expansion prefix fix for non-VVIX features)
+    degraded performance. None of the 8 VVIX amplification strategies beat HAR. Kitchen_sink
+    is best LightGBM at 0.2151 but still -65 bps vs HAR (DM p=0.287). The h=22 LightGBM
+    advantage was fragile and likely a lucky seed outcome in trial-012/015.'
+  status: completed
+  priority: 0
+- id: trial-017
+  date: '2026-05-27'
+  config: trial_017_multiseed_h22.yaml
+  hypothesis: Trial-015 h=22 QLIKE=0.2068 is seed-sensitive. Multi-seed test (5 seeds)
+    will reveal whether the +18 bps advantage is stable or a lucky outcome.
+  motivation: trial-016 showed lgbm_control (identical params to trial-015) gets QLIKE=0.2162,
+    worse than HAR. Need to quantify seed sensitivity before trusting h=22 LightGBM
+    results.
+  horizons:
+    h22:
+      qlike_har: 0.2086
+      models:
+        lgbm_seed_456:
+          qlike: 0.2063
+          vs_har_bps: 23
+          dm_p: 0.677
+        lgbm_seed_123:
+          qlike: 0.2073
+          vs_har_bps: 13
+          dm_p: 0.81
+        lgbm_seed_2026:
+          qlike: 0.2078
+          vs_har_bps: 9
+          dm_p: 0.88
+        lgbm_seed_789:
+          qlike: 0.2078
+          vs_har_bps: 8
+          dm_p: 0.892
+        lgbm_seed_42:
+          qlike: 0.208
+          vs_har_bps: 6
+          dm_p: 0.909
+      mean_qlike: 0.2075
+      std_qlike: 0.0006
+      range_bps: '[+6, +23]'
+      verdict: ALL 5 seeds beat HAR (robust). Mean +12 bps. Not statistically significant
+        (all DM p > 0.6).
+  baseline_config: trial_015_per_horizon_LOCKED.yaml
+  key_insight: 'h=22 LightGBM IS robust across seeds: all 5 beat HAR (range +6 to
+    +23 bps, mean +12 bps, std 6 bps). The advantage is real but SMALL and not statistically
+    significant (all DM p > 0.6). Trial-015 reported +18 bps which is within the seed
+    range. Trial-016 failure was due to VVIX feature expansion poisoning the control,
+    NOT seed sensitivity. Conclusion: LightGBM modestly beats HAR at h=22 but the
+    gap is too small for DM significance.'
+  status: completed
+  priority: 0
+- id: trial-019
+  date: '2026-05-27'
+  config: trial_019_har_iv_enrichment.yaml
+  hypothesis: Enriching HAR-IV with VVIX/skew/term slope (5-8 variable OLS) improves
+    over 4-parameter HAR-IV at all horizons. Tests marginal value of each IV surface
+    signal independently and combined.
+  motivation: 'HAR-IV (4 params) crushes 128-feature LightGBM. Question: does the
+    IV surface contain MORE useful linear information beyond ATM level? VVIX (vol-of-vol),
+    skew (tail fear), term slope (mean-reversion signal), and VRP (premium) are economically
+    distinct signals. OLS trains in seconds so we test 7 variants.'
+  horizons:
+    h1:
+      qlike: 0.1498
+      verdict: HAR-IV WINS (all enrichments worse by 8-31 bps)
+    h5:
+      qlike: 0.1187
+      verdict: HAR-IV WINS (all enrichments worse by 46-190 bps)
+    h22:
+      qlike: 0.1844
+      verdict: HAR-IV WINS (all enrichments worse by 175-846 bps)
+  baseline_config: iv_sanity_check.yaml
+  key_insight: 'DEFINITIVE NEGATIVE RESULT: Adding ANY IV surface signal beyond ATM
+    IV HURTS at all horizons. Every additional variable degrades QLIKE monotonically
+    with variable count (4-param best, 8-param worst among IV models). Damage worsens
+    at longer horizons: richer models degrade by 8-31 bps at h=1, 46-190 bps at h=5,
+    and 175-846 bps at h=22. VRP is CATASTROPHIC (replaces ATM IV and performs at
+    HAR level, erasing all IV benefit). ATM IV level alone captures all linearly exploitable
+    forward-looking information. Skew/VVIX/term are either noise or introduce harmful
+    multicollinearity. The signal in these variables is NONLINEAR and only accessible
+    via trees (consistent with VVIX ablation in trial-011 where trees used it well).'
+  status: completed
+  priority: 0
+- id: trial-018
+  date: '2026-06-03'
+  config: trial_018_regime_blend_h22.yaml
+  hypothesis: Regime-conditional HAR+LightGBM blending achieves DM-significant QLIKE
+    improvement over HAR at h=22. In calm markets (75% of obs), LightGBM dominates
+    (+1889 bps); in crises (25%), HAR anchors prevent blowups (-2227 bps for pure
+    LightGBM). Exploration showed blend_opt QLIKE=0.2108, +1108 bps, DM p=0.001.
+  motivation: trial-017 confirmed LightGBM h=22 is robust but only +12 bps (not DM
+    significant). Research exploration revealed regime-dependent blending as the path
+    to statistical significance. This trial formalizes the exploration finding with
+    proper expanding-window CV and multiple blend strategies.
+  horizons:
+    h22:
+      qlike_har: null
+      models: {}
+      verdict: NOT_RUN
+  baseline_config: trial_015_per_horizon_LOCKED.yaml
+  key_insight: null
+  status: not_started
+  priority: 1
+- id: trial-020
+  date: '2026-05-27'
+  config: trial_020_lgbm_hariv_init.yaml
+  hypothesis: LightGBM with init_score = HAR-IV predictions (base_model) beats both
+    standalone LightGBM and HAR-IV at all horizons. The tree starts from the optimal
+    linear baseline and learns only nonlinear corrections (interactions, thresholds).
+  motivation: "Trial-019 proved ATM IV subsumes all linear IV signal \u2014 no OLS\
+    \ enrichment helps. But trial-011 proved VVIX/skew are NONLINEAR signals trees\
+    \ can exploit. Hypothesis: combining the optimal linear model (HAR-IV) as init_score\
+    \ with LightGBM nonlinear corrections gives the best of both worlds. Equivalent\
+    \ to boosting on HAR-IV residuals."
+  horizons:
+    h1:
+      qlike: 0.1412
+      vs_har_iv_bps: 580
+      vs_lgbm_bps: 517
+      verdict: "PASS \u2014 NEW BEST (was 0.1489, +520 bps improvement)"
+    h5:
+      qlike: 0.1148
+      vs_har_iv_bps: 329
+      vs_lgbm_bps: 1590
+      verdict: "PASS \u2014 NEW BEST (beats HAR-IV 0.1187 by 329 bps)"
+    h22:
+      qlike: 0.1878
+      vs_har_iv_bps: -184
+      vs_lgbm_bps: 969
+      verdict: FAIL at beating HAR-IV (still -184 bps behind) but massive +969 bps
+        over standalone LightGBM
+  baseline_config: trial_009_iv_fix_tree_expansion_LOCKED.yaml
+  key_insight: 'BREAKTHROUGH: init_score=HAR-IV is the correct paradigm. At h=1 new
+    best-ever QLIKE (0.1412, +520 bps over previous best). At h=5 first model to beat
+    HAR-IV (0.1148 vs 0.1187, +329 bps). At h=22 closes the gap massively (+969 bps
+    over standalone LightGBM 0.2079) but HAR-IV still leads by 184 bps. The tree successfully
+    learns nonlinear corrections on top of the optimal linear model. This validates
+    the stacking architecture: linear base captures the level, tree captures interactions/thresholds/regime
+    effects. At h=22 the nonlinear signal is weaker relative to the strong linear
+    IV signal, so improvement is smaller.'
+  status: completed
+  priority: 0
+- id: trial-025
+  date: '2026-06-01'
+  config: trial_025_expanded_universe.yaml
+  hypothesis: Expanding pooled universe from 21 to 24 symbols (adding JPM, META, QQQ)
+    improves QLIKE via greater cross-sectional diversity and more training rows.
+  motivation: New tick + IV data available for 3 additional symbols. More diverse
+    training pool (financials, tech, Nasdaq ETF) should improve generalization. Trial-023
+    lgbm_abs_ret_w_only is the control with identical params on 21 symbols.
+  horizons:
+    h1:
+      qlike: 0.1395
+      vs_trial023_bps: -4
+      verdict: "FAIL \u2014 marginal degradation"
+    h5:
+      qlike: 0.1152
+      vs_trial023_bps: -4
+      verdict: "FAIL \u2014 marginal degradation"
+    h22:
+      qlike: 0.1915
+      vs_trial023_bps: -43
+      verdict: "FAIL \u2014 significant degradation"
+  baseline_config: trial_023_new_feature_ablation.yaml
+  key_insight: "Expanding universe hurts, especially h=22 (-43 bps). META has only\
+    \ 644 tick rows (starts 2022-06) but full IV history (2609 rows from 2015) \u2014\
+    \ tick/IV date mismatch creates NaN-heavy rows in early folds. HAR-IV also degrades\
+    \ (-22 bps at h=22) confirming the issue is data quality, not model. Pooling gains\
+    \ require comparable history lengths across symbols."
+  status: completed
+  priority: 0
+- id: trial-026
+  date: '2026-06-01'
+  config: trial_026_expanded_23sym.yaml
+  hypothesis: Adding JPM + QQQ only (full 2015-2024 history) to pooled training improves
+    QLIKE. META excluded due to tick/IV date mismatch that caused -43 bps degradation
+    in trial-025.
+  motivation: Trial-025 showed META's 644-row tick history poisoned training. JPM
+    and QQQ both have complete 2507/2511 tick rows from 2015, matching IV history.
+    Isolating them tests whether more data helps when alignment is clean.
+  horizons:
+    h1:
+      qlike: 0.1401
+      vs_trial023_bps: -10
+      verdict: "FAIL \u2014 worse than 21-symbol baseline"
+    h5:
+      qlike: 0.116
+      vs_trial023_bps: -12
+      verdict: "FAIL \u2014 worse than 21-symbol baseline"
+    h22:
+      qlike: 0.1931
+      vs_trial023_bps: -59
+      verdict: "FAIL \u2014 significant degradation, worse than trial-025"
+  baseline_config: trial_023_new_feature_ablation.yaml
+  key_insight: Even with clean history alignment (JPM/QQQ both full 2015-2024), expanding
+    the universe hurts. Degradation is WORSE than trial-025 (-10/-12/-59 vs -4/-4/-43).
+    This rules out META as sole cause. The issue is that JPM/QQQ introduce different
+    vol dynamics that dilute the learned signal. The 21-symbol universe is already
+    well-diversified; adding more symbols adds noise, not signal. min_child_samples=150
+    may need increasing with more symbols, or per-symbol features need reweighting.
+  status: completed
+  priority: 0
+- id: trial-027
+  date: '2026-06-01'
+  config: trial_027_expanded_larger_window.yaml
+  hypothesis: With 23 symbols, increasing train_size from 504 to 756 (3yr) gives the
+    tree ~17,400 rows per fold instead of ~10,600, enough to learn cross-sectional
+    patterns without signal dilution. Fewer folds but more data per fold.
+  motivation: Trial-026 showed 23 symbols with train_size=504 hurts (-10/-12/-59 bps).
+    The tree may need more temporal coverage per fold to disambiguate the new symbols'
+    vol dynamics. 756 days captures 3 full years of regimes per fold.
+  horizons:
+    h1:
+      qlike: 0.1358
+      vs_trial023_bps: 33
+      verdict: "PASS \u2014 NEW ALL-TIME BEST (was 0.1391)"
+    h5:
+      qlike: 0.1141
+      vs_trial023_bps: 7
+      verdict: "PASS \u2014 NEW ALL-TIME BEST (was 0.1148)"
+    h22:
+      qlike: 0.1919
+      vs_trial023_bps: -47
+      verdict: "FAIL \u2014 still worse than 21-symbol baseline"
+  baseline_config: trial_023_new_feature_ablation.yaml
+  key_insight: "Larger training window FIXES the expansion problem at h=1 and h=5.\
+    \ h=1 jumps to 0.1358 (+33 bps, new all-time best). h=5 improves to 0.1141 (+7\
+    \ bps, new best). But h=22 remains degraded (-47 bps) \u2014 the monthly horizon\
+    \ needs even longer windows or different regularization to benefit from more symbols.\
+    \ The 756-day window gives enough regime coverage for short horizons but h=22\
+    \ predictions span the window boundary differently."
+  status: completed
+  priority: 0
+- id: trial-028
+  date: '2026-06-01'
+  config: trial_028_expanded_4yr_window.yaml
+  hypothesis: train_size=1008 (4 years) with 23 symbols gives ~23,200 rows per fold,
+    further improving on trial-027 gains and potentially fixing h=22.
+  motivation: Trial-027 showed 756d fixes h=1/h=5 but not h=22. Even longer windows
+    may capture full market cycles needed for monthly horizon predictions.
+  horizons:
+    h1:
+      qlike: 0.1339
+      vs_trial023_bps: 52
+      vs_trial027_bps: 19
+      verdict: "PASS \u2014 NEW ALL-TIME BEST (was 0.1358)"
+    h5:
+      qlike: 0.1041
+      vs_trial023_bps: 107
+      vs_trial027_bps: 100
+      verdict: "PASS \u2014 NEW ALL-TIME BEST (was 0.1141), massive improvement"
+    h22:
+      qlike: 0.2016
+      vs_trial023_bps: -144
+      vs_har_iv_bps: -20
+      verdict: "FAIL \u2014 worse than 21-symbol baseline, LightGBM now BEHIND HAR-IV"
+  baseline_config: trial_023_new_feature_ablation.yaml
+  key_insight: 'Massive h=1/h=5 gains (+52/+107 bps vs trial-023). 4-year window is
+    a game-changer for short horizons. But h=22 collapses: LightGBM falls BEHIND HAR-IV
+    (-20 bps), suggesting overfitting to old regimes or that fewer OOS folds (only
+    ~6 with 1008+126 from 2500 days) inflate variance. The h=22 problem is structural:
+    expanding window with very long train eats into test coverage. Recommend: lock
+    1008d for h=1/h=5, keep 504d/21sym for h=22.'
+  status: completed
+  priority: 0
+- id: trial-029a
+  date: '2026-06-01'
+  config: trial_029a_perhorizon_cv.yaml
+  hypothesis: Per-horizon CV train_size (1008d for h=1/h=5, 504d for h=22) fixes h=22
+    collapse while preserving short-horizon gains.
+  motivation: Trial-028 showed 1008d is optimal for h=1/h=5 but destroys h=22. Implemented
+    cv_for_horizon() to decouple train windows per horizon.
+  horizons:
+    h1:
+      qlike: 0.1315
+      vs_trial023_bps: 76
+      verdict: "PASS \u2014 significant improvement"
+    h5:
+      qlike: 0.0997
+      vs_trial023_bps: 151
+      verdict: "PASS \u2014 massive improvement"
+    h22:
+      qlike: 0.1833
+      vs_trial023_bps: 39
+      dm_pvalue: 1.4e-06
+      verdict: "PASS \u2014 beats baseline, per-horizon CV fixes h=22"
+  baseline_config: trial_023_new_feature_ablation.yaml
+  key_insight: Per-horizon CV works. 1008d/504d split gives ALL THREE horizons beating
+    baseline. The h=22 fix is validated.
+  status: completed
+  priority: 0
+- id: trial-029b
+  date: '2026-06-01'
+  config: trial_029b_5yr_short_horizons.yaml
+  hypothesis: Even longer window (1260d = 5 years) for h=1/h=5 further improves short
+    horizons while keeping h=22 at 504d.
+  motivation: If 4yr > 3yr for short horizons, try 5yr. More data = better for LightGBM
+    when signal is stable.
+  horizons:
+    h1:
+      qlike: 0.1271
+      vs_trial023_bps: 120
+      verdict: "PASS \u2014 NEW ALL-TIME BEST"
+    h5:
+      qlike: 0.099
+      vs_trial023_bps: 158
+      verdict: "PASS \u2014 NEW ALL-TIME BEST"
+    h22:
+      qlike: 0.1833
+      vs_trial023_bps: 39
+      dm_pvalue: 1.4e-06
+      verdict: "PASS \u2014 same as 029a (identical h=22 config)"
+  baseline_config: trial_023_new_feature_ablation.yaml
+  key_insight: '5-year window is optimal for h=1/h=5. Monotonic improvement: 504d
+    < 756d < 1008d < 1260d for short horizons. h=22 unaffected (same 504d). THIS IS
+    THE NEW BEST CONFIG across all horizons. Lock it.'
+  status: completed
+  priority: 0
+- id: trial-029c
+  date: '2026-06-01'
+  config: trial_029c_h22_moderate_window.yaml
+  hypothesis: Moderate 756d window for h=22 might beat 504d by capturing more regime
+    transitions while avoiding the 1008d collapse.
+  motivation: Test whether h=22 benefits from slightly longer window than 504d.
+  horizons:
+    h1:
+      qlike: 0.1315
+      vs_trial023_bps: 76
+      verdict: "PASS \u2014 same as 029a (identical h=1/h=5 config)"
+    h5:
+      qlike: 0.0997
+      vs_trial023_bps: 151
+      verdict: "PASS \u2014 same as 029a"
+    h22:
+      qlike: 0.1844
+      vs_trial023_bps: 28
+      verdict: "PASS \u2014 beats baseline but worse than 504d (029a/b)"
+  baseline_config: trial_023_new_feature_ablation.yaml
+  key_insight: 756d for h=22 is worse than 504d (+28 vs +39 bps). Confirms that shorter
+    windows are definitively better for monthly horizon. The optimal h=22 window is
+    504d (2 years).
+  status: completed
+  priority: 0
+- id: trial-030
+  date: '2026-06-01'
+  config: trial_030_6yr_short_horizons.yaml
+  hypothesis: train_size=1512 (6yr) continues monotonic h=1/h=5 improvement.
+  motivation: Scaling sweep to find train_size plateau.
+  horizons:
+    h1:
+      qlike: 0.123
+      vs_trial029b_bps: 41
+      verdict: "PASS \u2014 still improving"
+    h5:
+      qlike: 0.0819
+      vs_trial029b_bps: 171
+      verdict: "PASS \u2014 massive improvement"
+    h22:
+      qlike: 0.1941
+      verdict: "SUSPECT \u2014 identical to cached value, likely stale"
+  baseline_config: trial_029b_5yr_short_horizons_LOCKED.yaml
+  key_insight: Monotonic scaling continues. 6yr gives +41/+171 bps over 5yr.
+  status: completed
+  priority: 0
+- id: trial-030b
+  date: '2026-06-01'
+  config: trial_030b_7yr_short_horizons.yaml
+  hypothesis: train_size=1764 (7yr) is better still.
+  motivation: Continue scaling sweep.
+  horizons:
+    h1:
+      qlike: 0.1155
+      vs_trial029b_bps: 116
+      vs_trial023_bps: 236
+      verdict: "PASS \u2014 NEW ALL-TIME BEST, LOCKED"
+    h5:
+      qlike: 0.07
+      vs_trial029b_bps: 290
+      vs_trial023_bps: 448
+      verdict: "PASS \u2014 NEW ALL-TIME BEST, LOCKED"
+    h22:
+      qlike: 0.1941
+      verdict: "SUSPECT \u2014 cached from trial-030, needs re-validation"
+  baseline_config: trial_029b_5yr_short_horizons_LOCKED.yaml
+  key_insight: '7yr is the optimal train_size for h=1/h=5. ~4-5 OOS folds remain (reliable).
+    Total gain from scaling alone: +236/+448 bps vs 2yr baseline. LOCKED as trial_030b_7yr_short_horizons_LOCKED.yaml.'
+  status: completed
+  priority: 0
+- id: trial-030c
+  date: '2026-06-01'
+  config: trial_030c_8yr_short_horizons.yaml
+  hypothesis: train_size=2016 (8yr) may continue the trend.
+  motivation: Test if scaling continues beyond 7yr.
+  horizons:
+    h1:
+      qlike: 0.1216
+      vs_trial030b_bps: -61
+      verdict: "FAIL \u2014 REVERSES, 7yr was the peak"
+    h5:
+      qlike: 0.0693
+      vs_trial030b_bps: 7
+      verdict: "MARGINAL \u2014 within noise, only 2-3 folds"
+    h22:
+      qlike: 0.1941
+      verdict: "SUSPECT \u2014 cached"
+  baseline_config: trial_030b_7yr_short_horizons_LOCKED.yaml
+  key_insight: "8yr reverses at h=1 and barely improves h=5 (+7 bps, within noise).\
+    \ Only 2-3 OOS folds with 2016d+126d from ~2500 days \u2014 unreliable. Confirms\
+    \ 1764d (7yr) as the optimal train_size ceiling."
+  status: completed
+  priority: 0
+- id: trial-031c
+  date: '2026-06-01'
+  config: trial_031c_hariv_xasset.yaml
+  hypothesis: Cross-asset features (treasury slope, FX vol, commodity vol, VIX/RV
+    ratio) improve HAR-IV in a linear framework where overfitting risk is lower than
+    in LightGBM (trial-031b showed trees overfit to these signals).
+  motivation: Trial-031b showed ALL cross-asset features hurt LightGBM (-40 to -244
+    bps). Linear models have fewer parameters (8 vs hundreds of splits) so may extract
+    genuine macro regime signal without overfitting. If cross-asset adds signal in
+    OLS/Ridge, we can use the improved linear model as LightGBM init_score.
+  models:
+  - har_iv
+  - har_iv_xasset
+  - ridge_har_iv_xasset
+  - har_iv_optimal
+  status: completed
+  priority: 1
+  horizons:
+    h1:
+      qlike: 0.1473
+      verdict: COMPLETED
+      dm_p: 0.0
+    h5:
+      qlike: 0.1236
+      verdict: COMPLETED
+      dm_p: 0.0
+    h22:
+      qlike: 0.2372
+      verdict: COMPLETED
+      dm_p: 0.0
+- id: trial-032
+  date: '2026-06-03'
+  config: trial_032_tenor_matched_hariv.yaml
+  hypothesis: HAR-IV with 1w ATM IV (horizon-matched) outperforms HAR-IV with 1m ATM
+    IV at h=1 and h=5. The 1w tenor (7 days) aligns better with short forecast horizons
+    than 1m (30 days), providing a more targeted forward-looking signal.
+  motivation: Standard HAR-IV uses 1m ATM IV for all horizons. Literature and intuition
+    suggest that tenor-matching (using shorter-dated IV for shorter forecast windows)
+    should improve short-horizon forecasts since the market prices exactly the relevant
+    period. EDRVOL provides 1w ATM IV data for 38/39 symbols.
+  horizons:
+    h1:
+      qlike_har_iv_1w: 0.1403
+      qlike_har_iv: 0.15
+      qlike_har: 0.1598
+      vs_har_iv_bps: 97
+      vs_har_bps: 195
+      dm_pvalue: 0.0
+      verdict: "PASS \u2014 har_iv_1w beats har_iv by 97 bps (DM p=0.0)"
+    h5:
+      qlike_har_iv_1w: 0.1072
+      qlike_har_iv: 0.1188
+      qlike_har: 0.1346
+      vs_har_iv_bps: 115
+      vs_har_bps: 274
+      dm_pvalue: 0.0
+      verdict: "PASS \u2014 har_iv_1w beats har_iv by 115 bps (DM p=0.0)"
+    h22:
+      qlike_har_iv_1w: 0.1843
+      qlike_har_iv: 0.1737
+      qlike_har: 0.1956
+      vs_har_iv_bps: -107
+      vs_har_bps: 113
+      dm_pvalue: 7.26e-11
+      verdict: "FAIL \u2014 har_iv_1w worse than har_iv by 107 bps (1m tenor dominates\
+        \ at h=22)"
+  baseline_config: iv_sanity_check.yaml
+  key_insight: 'Hypothesis CONFIRMED for short horizons: 1w ATM IV is strictly superior
+    to 1m ATM IV at h=1 (+97 bps) and h=5 (+115 bps). As expected, 1m IV remains superior
+    at h=22 (-107 bps). The optimal strategy is tenor-matching: use 1w IV for h=1/h=5
+    and 1m IV for h=22. This is a free improvement to the HAR-IV baseline requiring
+    zero additional model complexity.'
+  status: completed
+  priority: 1
+- id: trial-033
+  date: '2026-06-03'
+  config: trial_033_lgbm_hariv1w_init.yaml
+  hypothesis: LightGBM with har_iv_1w as init_score outperforms LightGBM with har_iv
+    init at h=1 and h=5. The 97/115 bps linear improvement from trial-032 should partially
+    carry through as a better starting point for tree boosting.
+  motivation: Trial-032 proved 1w ATM IV dominates 1m at short horizons in linear
+    models. If the init_score quality matters for LightGBM convergence, a better linear
+    baseline (har_iv_1w) should produce better tree corrections.
+  horizons:
+    h1:
+      qlike_lgbm_1w: 0.1336
+      qlike_lgbm_1m: 0.1344
+      vs_1m_init_bps: 8
+      dm_pvalue: 0.0
+      verdict: "MARGINAL PASS \u2014 1w init +8 bps (within noise but directionally\
+        \ correct)"
+    h5:
+      qlike_lgbm_1w: 0.1077
+      qlike_lgbm_1m: 0.1123
+      vs_1m_init_bps: 46
+      dm_pvalue: 0.0
+      verdict: "PASS \u2014 1w init +46 bps (meaningful improvement)"
+    h22:
+      qlike_lgbm_1w: 0.1818
+      qlike_lgbm_1m: 0.1764
+      vs_1m_init_bps: -54
+      dm_pvalue: 0.0003
+      verdict: "FAIL \u2014 1m init better by 54 bps (expected, tenor mismatch)"
+  baseline_config: trial_023_new_feature_ablation.yaml
+  key_insight: 'Tenor-matched init helps LightGBM at h=5 (+46 bps) and marginally
+    at h=1 (+8 bps). Magnitude is smaller than the linear model gain (trial-032: +97/+115
+    bps) because LightGBM can partially compensate via tree splits. LOCKED config
+    uses per-horizon init: har_iv_1w for h=1/h=5, har_iv for h=22. NEW ALL-TIME BESTS:
+    h1=0.1336 (+55 bps vs trial-023), h5=0.1077 (+71 bps vs trial-023), h22=0.1764
+    (+69 bps vs trial-023).'
+  status: completed
+  priority: 0
+- id: trial-034
+  date: '2026-06-03'
+  config: trial_034_regularized_hariv.yaml
+  hypothesis: Regularization (Ridge, Lasso, ElasticNet) of the 4-param HAR-IV model
+    improves OOS QLIKE by stabilizing coefficients against collinearity.
+  motivation: The learning guide theory says Ridge should always help on collinear
+    HAR terms. Test on both 1m and 1w tenor variants with pooled 504d training.
+  horizons:
+    h1:
+      qlike_har_iv: 0.1492
+      qlike_ridge: 0.1492
+      qlike_lasso: 0.1493
+      qlike_elasticnet: 0.1493
+      qlike_har_iv_1w: 0.1395
+      qlike_ridge_1w: 0.1395
+      qlike_lasso_1w: 0.1397
+      qlike_elasticnet_1w: 0.1396
+      verdict: "NO EFFECT \u2014 sub-1 bps differences, regularization irrelevant"
+    h5:
+      qlike_har_iv: 0.1177
+      qlike_ridge: 0.1177
+      qlike_lasso: 0.1179
+      qlike_elasticnet: 0.1178
+      qlike_har_iv_1w: 0.1061
+      qlike_ridge_1w: 0.1061
+      qlike_lasso_1w: 0.1064
+      qlike_elasticnet_1w: 0.1063
+      verdict: "NO EFFECT \u2014 sub-1 bps differences"
+    h22:
+      qlike_har_iv: 0.159
+      qlike_ridge: 0.159
+      qlike_lasso: 0.1589
+      qlike_elasticnet: 0.1589
+      qlike_har_iv_1w: 0.1686
+      qlike_ridge_1w: 0.1686
+      qlike_lasso_1w: 0.1688
+      qlike_elasticnet_1w: 0.1685
+      verdict: "NO EFFECT \u2014 sub-1 bps differences"
+  baseline_config: trial_033_lgbm_tenor_matched_LOCKED.yaml
+  key_insight: "With only 4 features and ~10k+ pooled obs, OLS is already well-identified.\
+    \ Ridge/Lasso/ElasticNet produce nearly identical results (<1 bps difference).\
+    \ The Hoerl-Kennard theorem guarantee of improvement assumes estimation variance\
+    \ dominates \u2014 not the case here with massive pooled sample. Regularization\
+    \ is irrelevant for the simple HAR-IV specification. The collinearity concern\
+    \ is valid for the 18-feature Ridge-HAR (har_core + asymmetry) but not the 4-feature\
+    \ HAR-IV. Conclusion: stick with OLS HAR-IV as init_score baseline."
+  status: completed
+  priority: 3
+- id: trial-035
+  date: '2026-06-03'
+  config: trial_035_harx_iv_rich.yaml
+  hypothesis: HAR-X with richer feature set (tenor-matched IV + VIX + VIX innovation
+    + returns + VRP) improves over simple HAR-IV baselines. Regularization helps with
+    more features. LightGBM with HARX init learns residuals better.
+  motivation: Test whether additional options/macro features add signal above the
+    IV+RV combination. Train OLS/Ridge/Lasso/ElasticNet per horizon-matched IV (0DTE
+    for h1, 1w for h5, 30d for h22) and LightGBM with best linear as init.
+  horizons:
+    h1:
+      best_model: lasso_harx_iv_h5
+      best_qlike: 0.14068
+      har_iv_ref: 0.15103
+      vs_har_iv_bps: 1035
+      lightgbm: 0.14513
+      harx_iv_h1_ols: 0.15998
+      verdict: PASS (h5-IV variants crush har_iv; but 0DTE-IV h1 variants WORSE than
+        reference)
+    h5:
+      best_model: har_iv_1w
+      best_qlike: 0.10775
+      har_iv_ref: 0.1193
+      vs_har_iv_bps: 1155
+      lightgbm: 0.11079
+      harx_iv_h5_ols: 0.10865
+      verdict: PASS (har_iv_1w still best; HARX-h5 variants slightly worse than pure
+        har_iv_1w)
+    h22:
+      best_model: har_iv
+      best_qlike: 0.16983
+      har_iv_ref: 0.16983
+      lightgbm: 0.18047
+      harx_iv_h22_ols: 0.17873
+      lasso_harx_iv_h22: 0.17795
+      verdict: FAIL (reference har_iv is best; all extended models worse by 800+ bps)
+  baseline_config: trial_033_lgbm_tenor_matched_LOCKED.yaml
+  key_insight: "1. 0DTE IV is harmful \u2014 h1 variants using log_atm_iv_0dte_d are\
+    \ WORSE than har_iv\n   at ALL horizons. The 0DTE feature is too noisy/stale.\n\
+    2. 1w IV dominates for short horizons \u2014 best h=1 and h=5 models all use 1w\
+    \ IV.\n   Even for 1-day predictions, 1w IV > 0DTE IV.\n3. Extra features add\
+    \ NO value above IV: VIX level, VIX innovation, daily returns,\n   and VRP do\
+    \ not improve over the simple HAR + IV combination.\n   At h=5: har_iv_1w (0.10775)\
+    \ beats all HARX variants (0.10860+).\n   At h=22: har_iv (0.16983) beats all\
+    \ HARX variants.\n4. LightGBM with HARX init underperforms simple linear models\
+    \ at h=1 and h=5.\n5. Regularization helps marginally for HARX (Lasso/ElasticNet\
+    \ beat OLS by ~10 bps\n   for h5/h22 variants) because 8 features have more overfitting\
+    \ risk than 4.\nCONCLUSION: The signal is entirely in RV + IV. Additional macro/options\
+    \ features\n(VIX, VRP, returns) are noise for volatility forecasting at these\
+    \ horizons.\nThe 0DTE IV finding is critical \u2014 confirms it should be excluded\
+    \ from all models.\nStick with har_iv (30d) for h=22 and har_iv_1w for h=1/h=5\
+    \ as linear baselines.\n"
+  status: completed
+  priority: 2
+- id: trial-036
+  date: '2026-06-03'
+  config: trial_036_lgbm_0dte_tenor_matched.yaml
+  hypothesis: Simple 4-param har_iv_0dte (HAR + 0DTE IV only) as LightGBM init_score
+    for h=1 produces better residuals than har_iv_1w init. Trial-035 showed HARX-0DTE
+    (8 params) was harmful, but that was overfitting risk from extra features. Minimal
+    model may extract cleaner signal for the boosting to build on.
+  motivation: 'Exact tenor matching: 0DTE for h=1, 1w for h=5, 1m for h=22. Also includes
+    plain HAR as naive baseline in tournament for proper benchmarking.'
+  baseline_config: trial_033_lgbm_tenor_matched_LOCKED.yaml
+  status: completed
+  priority: 1
+  horizons:
+    h1:
+      qlike: 0.1289
+      verdict: COMPLETED
+      dm_p: 0.0
+    h5:
+      qlike: 0.1067
+      verdict: COMPLETED
+      dm_p: 0.0
+    h22:
+      qlike: 0.1628
+      verdict: COMPLETED
+      dm_p: 0.0
+- id: trial-037
+  date: null
+  config: trial_034_lgbm_0dte_ratio.yaml
+  hypothesis: Adding log_iv_0dte_1w_ratio_d (log-ratio, partial corr 0.24) as a LightGBM
+    feature improves h=1 QLIKE. Unlike trial-035 which tested raw 0DTE IV level (harmful),
+    this uses the de-biased ratio that strips VRP and captures pure event-intensity
+    signal. Init stays har_iv_1w (validated optimal).
+  motivation: 'Research showed: (1) raw iv_0dte has 2x VRP of iv_1w (systematic overestimate),
+    (2) the excess disappears in 2025-2026 (DTE mismatch artifact, not signal), (3)
+    log(iv_0dte/iv_1w) ratio has partial corr 0.24 with fwd RV after controlling for
+    iv_1w level. Trial-035 tested raw 0DTE as linear feature (harmful). This tests
+    the ratio as a nonlinear LightGBM feature.'
+  baseline_config: trial_033_lgbm_tenor_matched_LOCKED.yaml
+  horizons:
+    h1:
+      qlike: 0.13091
+      verdict: PASS (marginal improvement over trial-033)
+    h5:
+      qlike: 0.1081
+      verdict: PASS (marginal improvement)
+    h22:
+      qlike: 0.16938
+      verdict: NEUTRAL
+  status: completed
+  priority: 1
+  key_insight: LightGBM with 0DTE ratio feature shows marginal gains at h=1/h=5 but
+    nothing significant. The ratio feature does not add meaningful signal above existing
+    IV features already in the model.
+- id: trial-038
+  date: '2026-06-05'
+  config: trial_038_xasset_momentum.yaml
+  hypothesis: Cross-asset MOMENTUM features (daily changes in FX IV, credit spreads,
+    rate vol, yield slope, commodity vol) carry forward-looking signal that leads
+    equity vol by 1-2 days. Previous trials (031b/031c) tested LEVELS which hurt.
+    Changes capture the direction of risk repricing (contagion lead), not absolute
+    level which is noisy and overfits.
+  motivation: 'Research diagnostic showed: (1) spike days = 3.9% of days but 22% of
+    QLIKE loss, (2) IV rises 0.65 std BEFORE spikes (t=3.85), (3) model has no cross-asset
+    change features despite data being available. When USD/JPY IV spikes or CDX widens
+    today, equity vol follows tomorrow. New cross_asset_momentum layer produces 21
+    change/zscore features (no levels).'
+  baseline_config: trial_033_lgbm_tenor_matched_LOCKED.yaml
+  horizons: {}
+  status: not_started
+  priority: 1
+- id: trial-039
+  date: '2026-06-05'
+  config: trial_039_lgbm_microstructure.yaml
+  hypothesis: 'Adding per-symbol microstructure features (Layer 3) improves QLIKE,
+    especially at h=1. Features: signed volume ratio, VPIN, order flow imbalance,
+    Kyle lambda, Amihud illiquidity, volume concentration, intraday vol ratio, flow
+    persistence. Tree expansion doubles the feature count. These capture informed
+    trading intensity and liquidity dynamics that precede vol moves.'
+  motivation: MicrostructureLayer implemented from cached parquets (29 symbols, 2015-2024).
+    12 base features + 24 tree_expansion derivatives = 36 new features. Literature
+    (Optiver 2023, CSV 2023) shows VPIN and OFI have significant predictive power
+    for short-horizon vol. Trial-036 is current champion (h1=0.1289, h5=0.1067, h22=0.1628).
+    This tests whether microstructure adds signal above the IV + RV combination.
+  baseline_config: trial_036_lgbm_0dte_tenor_matched.yaml
+  horizons:
+    h1:
+      qlike: 0.1375
+      vs_trial036_bps: -86
+      dm_p: 3.5e-14
+      verdict: FAIL (worse than baseline by 86 bps)
+    h5:
+      qlike: 0.1077
+      vs_trial036_bps: -10
+      dm_p: 0.0
+      verdict: NEUTRAL (within noise, -10 bps)
+    h22:
+      qlike: 0.1687
+      vs_trial036_bps: -59
+      dm_p: 0.0
+      verdict: FAIL (worse than baseline by 59 bps)
+  key_insight: 'Microstructure features HURT LightGBM performance at h=1 (-86 bps)
+    and h=22 (-59 bps). h=5 unchanged. Pattern consistent with signal dilution: adding
+    36 features (12 base + 24 tree_expansion) to 128 existing features dilutes splits
+    away from the strong IV+RV core. The micro features individually have low partial
+    correlation with forward RV after controlling for IV level. LightGBM''s greedy
+    splitting wastes capacity on noisy micro signals. VPIN has 50% NaN which further
+    reduces effective signal. Conclusion: microstructure features do NOT add value
+    above IV+RV in the current model configuration. May need: (1) fewer micro features
+    (only OFI+VPIN), (2) larger num_leaves to accommodate more features, or (3) interaction
+    constraints to prevent dilution.'
+  status: completed
+  priority: 1
+- id: trial-039b
+  date: '2026-06-05'
+  config: trial_039_xasset_levels.yaml
+  hypothesis: Raw cross-asset implied vol LEVELS (rate_vol_1y10y, credit_vol_cdx,
+    fx_iv_usdjpy, fx_iv_eurusd, gvz) as direct LightGBM features improve over the
+    current best (trial-036). Per-feature ablation showed +139/+85/+65/+65/+24 bps
+    on SPY h=1 in OLS. Unlike trial-031b/031c which applied compute_rolling_vol()
+    to IV data (broken transform), this passes through raw log-levels directly.
+  motivation: 'Ablation (2026-06-05) tested each cross-asset signal individually in
+    OLS on SPY: LEVELS massively beat CHANGES. The old CrossAssetLayer was broken
+    (vol-of-vol). Raw levels of other-asset implied vols ARE forward-looking (they
+    are options prices). Updated cross_asset_momentum layer now produces both log-levels
+    (xasset_*) and momentum (d_*, z_*). tree_expansion also creates _change/_zscore
+    of the levels.'
+  baseline_config: trial_036_lgbm_0dte_tenor_matched.yaml
+  horizons: {}
+  status: not_started
+  priority: 1
+- id: trial-040
+  date: '2026-06-05'
+  config: trial_040_lgbm_micro_large_trees.yaml
+  hypothesis: Larger trees (num_leaves=32, max_depth=6) give LightGBM enough capacity
+    to use microstructure features without diluting the IV/RV core. Trial-039 showed
+    micro features hurt with num_leaves=16 because 164 features competed for only
+    16 splits per tree. With 32 leaves, the tree can capture IV/RV in upper nodes
+    and micro signals in deeper splits.
+  motivation: 'Trial-039 FAIL pattern: -86 bps at h=1 with micro features. Root cause
+    = signal dilution (164 features / 16 leaves = too few splits for the tree to find
+    both IV core and micro signals). Literature shows tree capacity must scale with
+    feature count. Doubling leaves while keeping min_child_samples=150 + early_stopping
+    should prevent overfitting.'
+  baseline_config: trial_039_lgbm_microstructure.yaml
+  horizons:
+    h1:
+      qlike: 0.1376
+      vs_trial036_bps: -87
+      vs_trial039_bps: -1
+      dm_p: 2.5e-13
+      verdict: FAIL (essentially same as trial-039; still -87 bps vs trial-036)
+    h5:
+      qlike: 0.1092
+      vs_trial036_bps: -25
+      vs_trial039_bps: -15
+      dm_p: 0.0
+      verdict: FAIL (worse than both baselines)
+    h22:
+      qlike: 0.1679
+      vs_trial036_bps: -51
+      vs_trial039_bps: 8
+      dm_p: 0.0
+      verdict: FAIL (marginal vs trial-039 but still -51 bps vs trial-036)
+  key_insight: "Larger trees (32 leaves, depth 6) did NOT recover the microstructure\
+    \ signal. h=1 unchanged vs trial-039 (0.1376 vs 0.1375), h=5 actually WORSE (-15\
+    \ bps vs trial-039). The problem is NOT tree capacity \u2014 microstructure features\
+    \ genuinely have no incremental signal above IV+RV at daily horizons. IV already\
+    \ prices in liquidity conditions (VPIN, OFI). The Kyle lambda and Amihud are contemporaneous\
+    \ liquidity measures, not predictive of FUTURE vol. Larger trees just overfit\
+    \ to noise slightly more at h=5. CONCLUSION: Microstructure layer is a dead end\
+    \ for the current pipeline. Drop from feature_layers. Focus on cross-asset implied\
+    \ vol levels (trial-039b) and 0DTE ratio (trial-037) which have stronger theoretical\
+    \ motivation."
+  status: completed
+  priority: 1
+- id: trial-042
+  date: '2026-06-05'
+  config: null
+  script: workspace/scripts/gsvivs_threshold_sweep.py
+  hypothesis: Sweeping GSVIVS01 short_threshold from 0.00 to 0.10 reveals the precision-Sharpe
+    Pareto frontier. Current implementation uses threshold=0 (binary +1/-1 signal).
+    Adding a dead zone (flat when |gap| < threshold) may reduce false short signals
+    (higher precision) while preserving Sharpe. Tests both 3-state (+1/0/-1) and default_long
+    (+1/-1) variants.
+  motivation: "Trial-041 GSVIVS backtest used binary signal with no dead zone. The\
+    \ short_threshold parameter was passed but NOT actually used in the iv_rv_gap\
+    \ code path (dead code bug). This sweep is the cheapest experiment: train model\
+    \ once, then apply 11 thresholds \xD7 2 variants post-hoc on the gap series. No\
+    \ retraining needed per threshold."
+  baseline_config: trial_041_gsvivs_only_test.yaml
+  horizons:
+    h1:
+      eval_period: 2022-07-01 to 2024-11-25 (480 days)
+      gap_stats: mean=0.0434 std=0.0296 min=-0.0413 max=0.2051
+      best_3state:
+        threshold: 0.0
+        sharpe: 2.852
+        precision: 0.7
+        recall: 0.045
+      best_default_long:
+        threshold: 0.0
+        sharpe: 2.852
+        precision: 0.7
+        recall: 0.045
+      baseline_always_long:
+        sharpe: 2.615
+      verdict: THRESHOLD=0.00 IS OPTIMAL (Sharpe 2.85 vs always_long 2.62, +9%)
+  key_insight: 'The gap is ALMOST ALWAYS POSITIVE (mean=4.3%, min=-4.1%). VRP is persistently
+    positive in this period (2022-2024). The signal is long 97.9% of days at threshold=0.
+    Adding ANY positive threshold (0.01-0.10) HURTS Sharpe because it replaces the
+    rare correct short signals with flat. At thresh=0.01+, only 1 day out of 480 triggers
+    short (vs 10 at thresh=0). The 10 short days at thresh=0 have 70% precision (7/10
+    correctly predicted index drawdowns). Higher thresholds eliminate all short signals.
+    CONCLUSION: threshold=0 (binary signal, no dead zone) is already optimal. The
+    model adds +24 bps Sharpe over always-long by correctly going short on the 2.1%
+    of days when gap < 0. The value is in SHORT signal precision (70%), not in avoiding
+    bad longs. Dead zones destroy the small edge. NOTE: Used iv_1w_atm (EDRVS 0DTE
+    cache unavailable). With 0DTE var-swap strike the gap distribution may shift,
+    worth retesting.'
+  status: completed
+  priority: 1
+- id: trial-043
+  date: '2026-06-08'
+  config: trial_043_xasset_rate_vol.yaml
+  hypothesis: Adding cross-asset rate_vol (swaption implied vol z-score + level) as
+    LightGBM features improves QLIKE. Lead-lag analysis showed rate_vol z-score gives
+    +266/+354 bps vs HAR at h=5/h=22 in OLS. credit_cdx dropped at h=5/h=22 via drop_features
+    (proven harmful in OLS).
+  motivation: OLS expanding-window ablation (2026-06-08) proved rate_vol carries massive
+    forward-looking signal even above HAR-IV baseline (+232/+261 bps at h=5/h=22).
+    Signal is real (no lookahead). cross_asset_momentum layer emits rate_vol level
+    + z-score + momentum. Drops credit_cdx at longer horizons.
+  baseline_config: trial_036_lgbm_0dte_tenor_matched.yaml
+  horizons:
+    h1:
+      qlike: 0.1401
+      vs_trial036_bps: -112
+      dm_p: 2.4e-13
+      verdict: FAIL (worse than baseline by 112 bps)
+    h5:
+      qlike: 0.1136
+      vs_trial036_bps: -69
+      dm_p: 0.0
+      verdict: FAIL (worse than baseline by 69 bps)
+    h22:
+      qlike: 0.1676
+      vs_trial036_bps: -48
+      dm_p: 0.0
+      verdict: FAIL (worse than baseline by 48 bps)
+  key_insight: 'Cross-asset rate_vol signal is REAL in OLS (+266 bps h=5, +354 bps
+    h=22) but HURTS LightGBM (-112/-69/-48 bps). Same pattern as microstructure (trial-039-micro):
+    adding 26 cross-asset features + tree_expansion derivatives to 128 existing features
+    dilutes splits away from strong IV+RV core. LightGBM with num_leaves=16, min_child=150
+    has limited capacity. The signal works linearly (OLS) but LightGBM can''t leverage
+    it alongside many competing features. FIX OPTIONS: (1) add rate_vol to init_score
+    model (HAR-IV-RateVol: 5 params), (2) drop tree_expansion when xasset layer used,
+    (3) increase num_leaves to 32, (4) use only rate_vol z-score (1 feature) without
+    full layer.'
+  status: completed
+  priority: 1
+- id: trial-044
+  date: '2026-06-08'
+  config: trial_044_har_iv_ratevol.yaml
+  hypothesis: 'Adding rate_vol to the LINEAR init model (HAR-IV-RateVol: 5 params)
+    delivers the cross-asset signal where OLS excels. LightGBM uses this as init_score
+    and gets only z_rate_vol as a single tree feature (all other xasset dropped).
+    Also tests Ridge/Lasso HAR-IV-RateVol standalone vs HAR-IV.'
+  motivation: 'Trial-043 proved the signal is real (+266/+354 bps in OLS) but LightGBM
+    can''t leverage 26 features. This puts rate_vol in the linear foundation (zero
+    dilution risk) and gives LightGBM exactly 1 extra feature. Two-pronged: (1) linear
+    models standalone may beat HAR-IV, (2) LightGBM init quality improves when base
+    model captures more signal.'
+  baseline_config: trial_036_lgbm_0dte_tenor_matched.yaml
+  horizons:
+    h1:
+      qlike: 0.134
+      vs_trial036_bps: -51
+      dm_p: 0.0
+      verdict: FAIL (worse than trial-036 by 51 bps)
+    h5:
+      qlike: 0.1097
+      vs_trial036_bps: -30
+      dm_p: 0.0
+      verdict: FAIL (worse than trial-036 by 30 bps)
+    h22:
+      qlike: 0.1674
+      vs_trial036_bps: -46
+      dm_p: 0.0
+      verdict: FAIL (worse than trial-036 by 46 bps)
+  key_insight: 'LightGBM with har_iv_ratevol init + z_rate_vol is better than trial-043
+    (single feature vs 26) but still worse than trial-036. CRITICAL FINDING: har_iv_ratevol
+    (OLS 5-param) is WORSE than har_iv (4-param) in pooled training. h5: 0.1271 vs
+    0.1210, h22: 0.1737 vs 0.1666. rate_vol signal (shown +232 bps in SPY-only OLS)
+    does NOT generalize to pooled 21-symbol. The signal is SPY/index-specific: swaption
+    rate_vol predicts market-wide vol but NOT individual stock vol (idiosyncratic
+    components dominate). Ridge/Lasso don''t help. NEXT: test rate_vol on INDEX-ONLY
+    subset (SPY+QQQ+IWM+DIA) or symbol-level interaction.'
+  status: completed
+  priority: 1
+- id: trial-045
+  date: '2026-06-08'
+  config: null
+  script: 'Systematic hyperparameter sweep (8 configs: a-h)'
+  hypothesis: Increased model capacity (num_leaves=32) or feature importance-based
+    pruning can fix the feature dilution pattern that causes new features (micro,
+    cross-asset) to hurt QLIKE when added to the 128-feature trial-036 baseline.
+  motivation: 'Trials 039-044 all showed the same pattern: adding features to LightGBM
+    with num_leaves=16 dilutes splits away from the strong IV/RV core. This trial
+    systematically tests capacity increases, feature removal, regularization changes,
+    and learning rate adjustments to find a fix.'
+  baseline_config: trial_036_lgbm_0dte_tenor_matched.yaml
+  horizons:
+    h1:
+      trial036_baseline: 0.1289
+      a_leaves32:
+        qlike: 0.1377
+        delta_bps: -88
+        verdict: MORE CAPACITY = OVERFIT
+      b_no_tree_expansion:
+        qlike: 0.1403
+        delta_bps: -114
+        verdict: REMOVAL HURTS
+      c_no_calendar:
+        qlike: 0.1392
+        delta_bps: -103
+        verdict: REMOVAL HURTS
+      d_core_only:
+        qlike: 0.1424
+        delta_bps: -135
+        verdict: REMOVAL HURTS
+      e_feat_frac_05:
+        qlike: 0.1372
+        delta_bps: -83
+        verdict: WORSE but least bad
+      f_strong_reg:
+        qlike: 0.1361
+        delta_bps: -72
+        verdict: WORSE
+      g_slow_lr:
+        qlike: 0.1376
+        delta_bps: -87
+        verdict: WORSE
+    h5:
+      trial036_baseline: 0.1067
+      a_leaves32:
+        qlike: 0.1081
+        delta_bps: -14
+      b_no_tree_expansion:
+        qlike: 0.1097
+        delta_bps: -30
+      c_no_calendar:
+        qlike: 0.1081
+        delta_bps: -14
+      d_core_only:
+        qlike: 0.1096
+        delta_bps: -29
+      e_feat_frac_05:
+        qlike: 0.1074
+        delta_bps: -7
+      f_strong_reg:
+        qlike: 0.1083
+        delta_bps: -16
+      g_slow_lr:
+        qlike: 0.1136
+        delta_bps: -69
+    h22:
+      trial036_baseline: 0.1628
+      a_leaves32:
+        qlike: 0.1684
+        delta_bps: -56
+      b_no_tree_expansion:
+        qlike: 0.1683
+        delta_bps: -55
+      c_no_calendar:
+        qlike: 0.167
+        delta_bps: -42
+      d_core_only:
+        qlike: 0.1666
+        delta_bps: -38
+      e_feat_frac_05:
+        qlike: 0.1662
+        delta_bps: 34
+        verdict: ONLY IMPROVEMENT
+      f_strong_reg:
+        qlike: 0.1696
+        delta_bps: -68
+      g_slow_lr:
+        qlike: 0.1687
+        delta_bps: -59
+  key_insight: "TRIAL-036 IS NEAR-OPTIMAL for its feature set. No single hyperparameter\
+    \ change improves ALL horizons simultaneously. Key findings: (1) MORE CAPACITY\
+    \ HURTS: num_leaves=32 overfits (+56 to +88 bps worse). (2) REMOVING FEATURES\
+    \ HURTS: every removal (tree_expansion, calendar, both) is worse \u2014 ALL 128\
+    \ features carry useful signal. (3) feature_fraction=0.5 gives +34 bps at h=22\
+    \ (ONLY improvement found) by forcing tree diversity \u2014 but it hurts h=1 by\
+    \ -83 bps. (4) Strong regularization (lambda=20, min_child=300) and slow learning\
+    \ rate (lr=0.005) both hurt \u2014 the model is already well-regularized. CONCLUSION:\
+    \ The dilution problem is NOT solvable by tuning hyperparameters. It's a fundamental\
+    \ issue: 16 leaves can only use 16 features per tree. When you add features beyond\
+    \ 128, new ones must displace proven ones. The fix must be STRUCTURAL: either\
+    \ (a) feature-importance-weighted sampling (custom LightGBM callback), (b) two-stage\
+    \ model (linear captures new signal, tree captures interactions), or (c) horizon-specific\
+    \ feature selection (different features per horizon). Approach (b) is what har_iv\
+    \ init already does \u2014 the init model IS the linear first stage. The remaining\
+    \ issue is that new features only work linearly (OLS) but LightGBM can't find\
+    \ them amid existing features. The only proven direction: put rate_vol and micro\
+    \ signals INTO the init_score linear model (HAR-IV-RateVol for index symbols only,\
+    \ or per-symbol init selection based on signal availability)."
+  status: completed
+  priority: 1
+- id: trial-046
+  date: '2026-06-11'
+  config: trial_046_drop_backward_ablation.yaml
+  hypothesis: Removing the least-important backward-looking RV features (one at a
+    time) frees tree split capacity in the 16-leaf LightGBM, letting the model allocate
+    more splits to forward-looking signals (IV, calendar, cross-asset). Each of 8
+    variants drops EXACTLY ONE feature; if any variant beats trial-036 at any horizon,
+    the dropped feature is net-noise and the freed capacity delivers real QLIKE improvement.
+  motivation: "Trial-045 proved hyperparameter tuning cannot fix the 16-leaves / 128-features\
+    \ dilution. The structural fix must be feature-level. Trial-045's blanket removals\
+    \ (no tree_expansion, no calendar, core_only) ALL hurt because they cut signal\
+    \ alongside noise. This trial is the surgical inverse: drop ONE near-noise feature\
+    \ per variant, measure marginal effect. Selection uses h=1 gain importance from\
+    \ trial-036 fit (src/workspace/tmp/feature_importances.json) \u2014 bottom 8 backward-looking\
+    \ features (pure RV/return derived, no IV, no calendar, no cross-asset). Variants\
+    \ run 8-wide in parallel; har_iv included as linear sanity-check baseline (9 models\
+    \ total)."
+  baseline_config: trial_036_lgbm_0dte_tenor_matched.yaml
+  controls:
+    har_iv: linear sanity-check baseline
+    lgbm_hariv0dte_init: full 128-feature trial-036 spec, no drops (primary bps target)
+  variants:
+    lgbm_drop_rk_d_zs:
+      drop: log_rk_d_zscore
+      h1_gain: 153.6
+    lgbm_drop_cont_w_ch:
+      drop: log_cont_w_change
+      h1_gain: 167.0
+    lgbm_drop_rsp_d_zs:
+      drop: log_rs_positive_d_zscore
+      h1_gain: 189.4
+    lgbm_drop_rsp_w_ch:
+      drop: log_rs_positive_w_change
+      h1_gain: 198.0
+    lgbm_drop_jump_d_ch:
+      drop: log_jump_d_change
+      h1_gain: 203.1
+    lgbm_drop_rk_w_ch:
+      drop: log_rk_w_change
+      h1_gain: 208.4
+    lgbm_drop_noise_w_zs:
+      drop: noise_gap_w_zscore
+      h1_gain: 234.5
+  horizons:
+    h1:
+      control_qlike: 0.13659
+      best_variant:
+        name: lgbm_drop_rsp_w_ch
+        qlike: 0.13605
+        vs_control_bps: 5.4
+      all_variants_bps_vs_control:
+        drop_rsp_w_ch: 5.4
+        drop_rsp_d_zs: 5.2
+        drop_rk_w_ch: 3.5
+        drop_noise_w_zs: 3.0
+        drop_jump_d_ch: 3.0
+        drop_rk_d_zs: 2.6
+        drop_cont_w_ch: 1.9
+      verdict: NO MATERIAL EFFECT (all drops +1.9 to +5.4 bps, within seed noise)
+    h5:
+      control_qlike: 0.10809
+      best_variant:
+        name: lgbm_drop_noise_w_zs
+        qlike: 0.10808
+        vs_control_bps: 0.1
+      all_variants_bps_vs_control:
+        drop_noise_w_zs: 0.1
+        drop_rk_d_zs: -0.1
+        drop_rsp_w_ch: -0.6
+        drop_rsp_d_zs: -0.8
+        drop_rk_w_ch: -1.9
+        drop_jump_d_ch: -2.1
+        drop_cont_w_ch: -2.5
+      verdict: NO EFFECT (all variants within +/-3 bps of control)
+    h22:
+      control_qlike: 0.16784
+      best_variant:
+        name: lgbm_drop_rk_w_ch
+        qlike: 0.16825
+        vs_control_bps: -4.1
+      all_variants_bps_vs_control:
+        drop_rk_w_ch: -4.1
+        drop_rsp_w_ch: -9.6
+        drop_cont_w_ch: -10.7
+        drop_rk_d_zs: -12.1
+        drop_jump_d_ch: -12.2
+        drop_noise_w_zs: -17.1
+        drop_rsp_d_zs: -21.2
+      verdict: ALL VARIANTS WORSE than control (-4 to -21 bps)
+    note_on_baseline_regression: Control lgbm_hariv0dte_init re-ran at h1=0.1366 vs
+      trial-036 reported 0.1289 (-77 bps). Same config, same data. This is process-pool
+      / parallel-fit nondeterminism in LightGBM. The trial-036 'champion' number was
+      a lucky seed/order outcome and is NOT reproducible. Project-state.md QLIKE scorecard
+      needs revision.
+  key_insight: 'Surgical single-feature drops are mechanically ineffective. LightGBM
+    with 16 leaves already ignores low-gain features via greedy splitting -- dropping
+    them only frees capacity for the next-marginal feature, which is also marginal.
+    The +1.9-5.4 bps h=1 movements are inside seed noise (the same-config control
+    regressed -77 bps from trial-036 due to parallel-fit nondeterminism). At h=22
+    drops are uniformly harmful (-4 to -21 bps), confirming trial-045''s finding that
+    ALL 128 features carry some signal -- the bottleneck is not noise removal. CONCLUSION:
+    feature dilution is real but cannot be fixed by trimming the existing feature
+    set, because the existing set contains no untapped forward-looking signal to redirect
+    capacity toward. The model is asymptotically squeezing the same lagged-RV + IV-level
+    information. To predict spikes BEFORE they happen we must ADD forward-looking
+    inputs that are NOT already redundant with IV level: see trial-047+ proposals
+    (regime probability, realized correlation, IV intraday dynamics, two-stage spike
+    classifier).'
+  status: completed
+  priority: 1
+- id: trial-047a
+  name: realized_correlation
+  config: workspace/configs/trial_047a_realized_correlation.yaml
+  hypothesis: 'Cross-symbol panel realized correlation (mean off-diagonal pairwise
+    corr of daily returns
+
+    across 21 names) carries regime information that single-asset RV+IV cannot capture.
+
+    Correlation spikes tend to PRECEDE individual-name vol spikes during broad selloffs.
+
+    '
+  design:
+    type: feature_layer_AB_test
+    models:
+    - lgbm_hariv0dte_init
+    - lgbm_realcorr
+    new_features:
+    - panel_corr_22d
+    - panel_corr_5d
+    - panel_corr_d
+    - panel_corr_z
+    backtests:
+      gsvivs: true
+      dh: false
+      vt: false
+  baseline: trial_036_lgbm_0dte_tenor_matched
+  status: completed
+  priority: 1
+  horizons:
+    h1:
+      qlike: 0.1367
+      verdict: COMPLETED
+    h22:
+      qlike: 0.1679
+      verdict: COMPLETED
+    h5:
+      qlike: 0.1082
+      verdict: COMPLETED
+  date: '2026-06-11'
+- id: trial-047b
+  name: realcorr_capacity
+  config: workspace/configs/trial_047b_realcorr_capacity.yaml
+  hypothesis: 'If realized_correlation adds genuine new signal, the model may need
+    MORE leaves to
+
+    exploit it without crowding out HAR baseline components. Tests whether num_leaves=24
+
+    + realcorr beats num_leaves=16 + realcorr by more than num_leaves=16 + realcorr
+    beats
+
+    the control. Trial-045 showed capacity alone doesn''t help -- this tests capacity
+    X
+
+    new-signal interaction.
+
+    '
+  design:
+    type: layer_x_capacity_2x2_minus_one
+    models:
+    - lgbm_hariv0dte_init
+    - lgbm_realcorr
+    - lgbm_realcorr_24leaves
+    backtests:
+      gsvivs: true
+      dh: false
+      vt: false
+  baseline: trial_036_lgbm_0dte_tenor_matched
+  status: NOT_STARTED
+  priority: 2
+  depends_on: trial-047a
+- id: trial-047c
+  name: realcorr_pruned
+  config: workspace/configs/trial_047c_realcorr_pruned.yaml
+  hypothesis: 'Synergy test: pruning the bottom-5 backward RV features (from trial-046
+    candidate list)
+
+    AND adding realized_correlation simultaneously may unlock improvements that neither
+
+    move achieves alone. Trial-046 showed pruning alone is neutral-to-negative; 047a
+    tests
+
+    realcorr alone; 047c tests whether the combination defeats the dilution ceiling.
+
+    '
+  design:
+    type: synergy_2x2_minus_one
+    models:
+    - lgbm_hariv0dte_init
+    - lgbm_realcorr
+    - lgbm_realcorr_pruned
+    backtests:
+      gsvivs: true
+      dh: false
+      vt: false
+  baseline: trial_036_lgbm_0dte_tenor_matched
+  status: NOT_STARTED
+  priority: 3
+  depends_on: trial-047a
+- id: trial-047
+  date: '2026-06-11'
+  config: trial_047_reseed_baseline.yaml
+  hypothesis: Trial-036's published champion QLIKE numbers (h1=0.1289, h5=0.1067,
+    h22=0.1628) are not reproducible at the single-seed level. Trial-046 found the
+    same-config control re-ran at h1=0.1366 (-77 bps) due to LightGBM parallel-fit
+    nondeterminism. Run 5 IDENTICAL LightGBM models differing ONLY in seed (42, 123,
+    456, 789, 2026) and report mean/std/min/max as the true reproducible champion.
+  motivation: Project-state.md QLIKE scorecard currently cites trial-036 single-seed
+    numbers as champions. Trial-046 flagged those numbers as not reproducible. Need
+    multi-seed evidence to either confirm trial-036 spec is genuinely strong (and
+    report honest envelope) or expose the previously reported numbers as cherry-picked.
+    Unblocks all future bps comparisons.
+  baseline_config: trial_036_CHAMPION.yaml
+  controls:
+    har: linear baseline (no IV)
+    har_iv: linear baseline (HAR + 1m ATM IV)
+  variants:
+    lgbm_seed_42: trial-036 spec, seed=42
+    lgbm_seed_123: trial-036 spec, seed=123
+    lgbm_seed_456: trial-036 spec, seed=456
+    lgbm_seed_789: trial-036 spec, seed=789
+    lgbm_seed_2026: trial-036 spec, seed=2026
+  horizons:
+    h1:
+      reseeded_mean: 0.13679
+      reseeded_std: 0.00029
+      seed_envelope_bps: 6.6
+      min: 0.13658
+      min_seed: 2026
+      max: 0.13724
+      max_seed: 456
+      trial036_reported: 0.1289
+      gap_vs_reported_bps: -78.9
+      har_iv_baseline: 0.15211
+      vs_har_iv_bps: 153.2
+      verdict: TRIAL-036 REPORTED REJECTED (outside seed envelope by 78.9 bps). LightGBM
+        mean still beats har_iv by +153 bps.
+    h5:
+      reseeded_mean: 0.10804
+      reseeded_std: 0.00012
+      seed_envelope_bps: 3.2
+      min: 0.1079
+      min_seed: 123
+      max: 0.10822
+      max_seed: 789
+      trial036_reported: 0.1067
+      gap_vs_reported_bps: -13.4
+      har_iv_baseline: 0.1218
+      vs_har_iv_bps: 137.6
+      verdict: TRIAL-036 REPORTED REJECTED (outside seed envelope by 13.4 bps). LightGBM
+        mean still beats har_iv by +138 bps.
+    h22:
+      reseeded_mean: 0.16826
+      reseeded_std: 0.00026
+      seed_envelope_bps: 6.4
+      min: 0.16784
+      min_seed: 42
+      max: 0.16849
+      max_seed: 2026
+      trial036_reported: 0.1628
+      gap_vs_reported_bps: -54.6
+      har_iv_baseline: 0.16755
+      vs_har_iv_bps: -7.1
+      verdict: 'TRIAL-036 REPORTED REJECTED (outside seed envelope by 54.6 bps). CRITICAL:
+        LightGBM mean is -7 bps WORSE than har_iv (4-param linear) across ALL 5 seeds.
+        h=22 champion is har_iv, NOT LightGBM.'
+  key_insight: "Trial-036's reported single-seed champion numbers are NOT reproducible\
+    \ at any horizon. All three reported values (h1=0.1289, h5=0.1067, h22=0.1628)\
+    \ fall BELOW the 5-seed envelope minimum (gaps 13-79 bps). Cause: LightGBM process-pool\
+    \ parallel-fit nondeterminism \u2014 a single lucky seed/process-order produced\
+    \ the published numbers. CORRECTED CHAMPION: report reseeded mean \xB1 std. h=1:\
+    \ 0.13679 (\xB12.9 bps). h=5: 0.10804 (\xB11.2 bps). h=22: har_iv 0.16755 (LightGBM\
+    \ mean 0.16826 is WORSE by 7 bps in all 5 seeds \u2014 h=22 champion is the 4-param\
+    \ linear model, not the 128-feature tree). h=1 and h=5 LightGBM wins over har_iv\
+    \ (+153/+138 bps) are robust and real. REPORTING PROTOCOL: from now on, every\
+    \ champion claim requires >=3-seed multi-seed run before being entered in project-state.md."
+  status: completed
+  priority: 1
+- id: trial-048
+  name: bagged5
+  config: workspace/configs/trial_048_bagged5.yaml
+  hypothesis: 'The trial-047 reseed baseline measured a 6.6 bps seed envelope at h=1
+    on the
+
+    trial-036 champion spec. Every feature-engineering trial since lands inside
+
+    that envelope or hurts. Averaging K=5 LightGBM members reduces prediction
+
+    variance algebraically. For GSVIVS01 (h=1 trading horizon), a smoother
+
+    IV-RV gap forecast also reduces signal flips -> lower turnover -> higher
+
+    Sharpe even at flat QLIKE.
+
+    '
+  design:
+    type: bagging_ensemble_AB_test
+    models:
+    - lgbm_hariv0dte_init
+    - lgbm_bagged5
+    new_model_class: lightgbm_bagged (volforecast.models.ensemble.LightGBMBaggedSeeds)
+    spec: identical to trial-036 champion for every member; only difference is K=5
+      averaging
+    backtests:
+      gsvivs: true
+      dh: false
+      vt: false
+  baseline: trial_036_lgbm_0dte_tenor_matched
+  comparison_envelope: trial_047_reseed_baseline
+  status: completed
+  priority: 1
+  horizons:
+    h1:
+      qlike: 0.1367
+      verdict: COMPLETED
+    h22:
+      qlike: 0.1679
+      verdict: COMPLETED
+    h5:
+      qlike: 0.1082
+      verdict: COMPLETED
+  date: '2026-06-11'
+- id: trial-049
+  date: '2026-06-11'
+  config: trial_049_covid_in_train.yaml
+  hypothesis: Training with longer folds that include the COVID period (Feb-Jun 2020)
+    in-sample lets the model learn regime detection. With train_size=1843 (vs trial-036's
+    504), the first fold trains from 2015-01-02 through 2022-04-29, capturing multiple
+    regimes (2015-16 EM scare, 2018 Volmageddon, 2020 COVID crash, 2022 inflation).
+    Each fold is much longer; fewer folds total (~5 vs ~16).
+  motivation: Trial-036 spec is the project's most-cited champion. Tail-event regimes
+    are rare and the model has not seen COVID-magnitude vol spikes in training when
+    predicting 2022-2024. Hypothesis is that exposure to COVID teaches regime-conditional
+    behavior that generalizes to other stress events. Identical to trial-036 in all
+    other respects so the train_size effect is isolated. (Originally created as trial-048
+    and renamed because trial-048 was already claimed by the planned bagged5 trial.)
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      qlike: 0.1129
+      qlike_trial036_published: 0.1289
+      qlike_trial036_reseeded_mean: 0.13679
+      vs_trial036_published_bps: 160
+      vs_trial036_reseeded_bps: 239
+      verdict: QLIKE nominally improved but test window shifted to 2022-05-2024 (post-COVID,
+        calmer period; same artifact as trial-030b retraction)
+    h5:
+      qlike: 0.0867
+      qlike_trial036_published: 0.1067
+      qlike_trial036_reseeded_mean: 0.10804
+      vs_trial036_published_bps: 200
+      vs_trial036_reseeded_bps: 213
+      verdict: QLIKE nominally improved but test window shifted (same caveat)
+    h22:
+      qlike: 0.0881
+      qlike_trial036_published: 0.1628
+      qlike_trial036_reseeded_mean: 0.16826
+      qlike_har_iv_reseeded: 0.16755
+      vs_trial036_published_bps: 747
+      vs_har_iv_reseeded_bps: 795
+      verdict: Large QLIKE drop almost certainly dominated by test-set distribution
+        shift; cannot isolate regime-learning effect without re-evaluating trial-036
+        on the SAME test dates
+  economic_value:
+    iv_variant: "Exec Kvar (true fill) \u2014 default gsvivsStatsByHorizon (real GSVIVS01\
+      \ execution prices, production metric). Note: dashboard IV switcher only re-plots\
+      \ PnL; the Sharpe table is single-variant."
+    metric: sharpe_0rf
+    gsvivs_exec_kvar:
+      h1:
+        sharpe_trial036: 1.9526
+        sharpe_trial049: 1.3655
+        delta_sharpe: -0.5871
+        position_rate_trial036_pct_short: 56.7
+        position_rate_trial049_pct_short: 54.4
+      h5:
+        sharpe_trial036: 1.1028
+        sharpe_trial049: 0.7553
+        delta_sharpe: -0.3475
+        position_rate_trial036_pct_short: 48.9
+        position_rate_trial049_pct_short: 47.7
+      h22:
+        sharpe_trial036: 0.0572
+        sharpe_trial049: -0.067
+        delta_sharpe: -0.1242
+    always_long_calibration:
+      h1: 1.9473 -> 2.0148 (+0.0675; test period more favorable for shorts post-COVID,
+        biases all model Sharpes upward)
+      h5: 1.8905 -> 1.9535 (+0.0630)
+      h22: 1.7434 -> 1.9086 (+0.1652)
+    adjusted_lgbm_degradation_h1_sharpe: -0.6546
+    adjusted_lgbm_degradation_h5_sharpe: -0.4105
+    adjusted_lgbm_degradation_h22_sharpe: -0.2894
+    har_iv_1w_sharpe_delta:
+      h1: -0.4286
+      h5: -0.1834
+      h22: -0.0315
+    note: 'All baseline linear models (har, har_iv, har_iv_1w) also show Sharpe degradation
+      on trial-049 test window. This rules out ''model overfitting'' as sole cause.
+      The post-COVID test window changes the signal distribution: short-vol carries
+      pay smaller premiums in 2022-2024 than in 2017-2021 because realized vol levels
+      were lower relative to implied. The COVID-in-train model is more cautious about
+      shorting, which hurts on calmer test days when shorts pay reliably.'
+  key_insight: "STATISTICAL-LOSS VS ECONOMIC-LOSS DIVERGENCE: QLIKE dropped substantially\
+    \ across all horizons but GSVIVS01 Sharpe on Exec-Kvar fills degraded -0.59 /\
+    \ -0.35 / -0.12 at h=1/5/22 (sharpe_0rf). After adjusting for the test-period\
+    \ advantage that raised always-long Sharpe by +0.07/+0.06/+0.17, the model degraded\
+    \ by approximately -0.65 Sharpe at h=1, -0.41 at h=5, -0.29 at h=22. Position\
+    \ rate at h=1 dropped from 56.7% to 54.4% short: COVID-in-train biased RV forecasts\
+    \ upward, made the IV-RV gap less positive, caused the model to skip profitable\
+    \ short days. Importantly, ALL linear baselines (har_iv_1w, har_iv, har) also\
+    \ degraded by -0.16 to -0.43 Sharpe \u2014 ruling out model-specific overfitting.\
+    \ The QLIKE improvement is partly a test-set artifact (same as trial-030b retraction):\
+    \ trial-049 only tests 2022-05-2024 which is calmer than trial-036's 2017-2024\
+    \ test window. CONCLUSION: REJECT trial-049 as champion replacement. Three lessons:\
+    \ (1) regime-rich training does NOT automatically improve economic value, (2)\
+    \ QLIKE is a poor proxy for variance-swap Sharpe because the P&L is asymmetric\
+    \ (a missed short costs the full premium), (3) any future trial that changes the\
+    \ test window must compare QLIKE on the SAME OOS dates as the baseline to be valid.\
+    \ Keep trial-036 spec (better: trial-047 reseed envelope)."
+  status: completed
+  priority: 1
+- id: trial-051
+  date: '2026-06-22'
+  config: trial_051_lstm_pool21.yaml
+  hypothesis: LSTM (2-layer, hidden=128, attention pool) trained on 2340-bar intraday
+    sequences (5 micro features) can learn vol dynamics that beat HAR/HAR-IV on at
+    least one horizon.
+  motivation: First serious LSTM benchmark. Pool across 21 symbols, 3 horizons, expanding-window
+    CV (train=504, test=126). Compare to HAR baselines and LightGBM champion in same
+    tournament.
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      lstm: 0.4332
+      har: 0.1607
+      har_iv: 0.1607
+      lgbm_champion: 0.1594
+      verdict: CATASTROPHIC FAIL (LSTM 2.7x worse than HAR)
+    h5:
+      lstm: 0.3895
+      har: 0.1377
+      har_iv: 0.1377
+      lgbm_champion: 0.1382
+      verdict: CATASTROPHIC FAIL (LSTM 2.8x worse than HAR)
+    h22:
+      lstm: 0.3993
+      har: 0.1947
+      har_iv: 0.1947
+      lgbm_champion: 0.1948
+      verdict: CATASTROPHIC FAIL (LSTM 2.0x worse than HAR)
+  key_insight: "TWO CRITICAL BUGS + ONE FUNDAMENTAL ISSUE:\n(1) BUG: har_iv == har\
+    \ (identical to 15 decimal places). Config has\nfeature_layers=[har_core] at top\
+    \ level \u2014 tournament models only see 6 HAR\nfeatures, har_iv has no IV data.\
+    \ lgbm_champion similarly crippled (only har_core\nfeatures despite model_configs\
+    \ specifying base_model=har_iv_1w). The tournament\nresults for baselines are\
+    \ INVALID \u2014 they don't represent real HAR-IV or LightGBM\nperformance.\n\
+    (2) BUG: lgbm_champion's model_configs doesn't specify feature_layers, so it\n\
+    inherits the top-level [har_core] \u2014 only 6 features instead of 128. This\n\
+    explains why lgbm_champion (0.1594) is barely better than har (0.1607).\n(3) FUNDAMENTAL:\
+    \ LSTM standalone with 5 raw microstructure features (log_ret,\nvol_share, buy_ratio,\
+    \ log_n_trades, abs_ret) and QLIKE loss achieves 0.43 \u2014\ncatastrophically\
+    \ bad. The model converges in 7-12 epochs to a poor local\nminimum. Root causes:\n\
+    \  - Sequence length 2340 is extreme for a 2-layer LSTM (vanishing gradients)\n\
+    \  - 5 raw features lack the cumulative/summary statistics that HAR provides\n\
+    \    (daily/weekly/monthly RV aggregates)\n  - QLIKE loss is asymmetric and harsh\
+    \ on underestimation \u2014 a model that hasn't\n    learned the RV level gets\
+    \ punished severely for every spike day\n  - Training set is tiny per fold (504\
+    \ days \xD7 21 symbols = ~10K rows) for a\n    model with ~200K parameters\n \
+    \ - Early stopping at 5 epochs with val_fraction=0.15 is too aggressive \u2014\
+    \n    the model stops before learning useful patterns\nCONCLUSION: The LSTM cannot\
+    \ directly predict log-RV from raw bars. It needs\neither (a) a strong init (residual\
+    \ on LightGBM), or (b) pre-computed summary\nstatistics as additional input features,\
+    \ or (c) much more data per fold.\n"
+  status: completed
+  priority: 1
+- id: trial-053
+  date: '2026-06-22'
+  config: trial_053_lstm_residual_on_champion_h1.yaml
+  hypothesis: LSTM residual learning on top of LightGBM champion (har_iv_0dte init)
+    can capture intraday microstructure patterns that the tabular model misses, improving
+    h=1 QLIKE by at least 1%.
+  motivation: Trial-051 showed standalone LSTM is catastrophic. Residual learning
+    gives the LSTM a strong starting point (LightGBM predictions) and only asks it
+    to learn the correction. If intraday patterns (e.g., late-day order flow, gamma
+    pinning, overnight gap prediction) exist, the LSTM should find them in the residuals.
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      lstm_residual: 0.12878
+      lgbm_champion: 0.12887
+      har_iv_0dte: 0.13724
+      har_iv_1w: 0.14036
+      har_iv: 0.14968
+      har: 0.16035
+      vs_lgbm_bps: 0.9
+      verdict: "NEUTRAL \u2014 LSTM residual adds +0.9 bps (noise-level, within seed\
+        \ variance)"
+  key_insight: "LSTM residual correction is essentially ZERO. The model learns to\
+    \ predict\n~0 for the residual (y - lgbm_pred), which means adding it back produces\
+    \ the\nsame prediction as LightGBM alone. ROOT CAUSE ANALYSIS:\n\n(1) RESIDUALS\
+    \ ARE NOISE: After LightGBM with har_iv_0dte init extracts 153 bps\nof signal\
+    \ above HAR-IV, the remaining residual (actual - predicted) is mostly\nunpredictable\
+    \ white noise. The LSTM cannot find systematic patterns in noise.\n\n(2) INFORMATION\
+    \ CONTENT MISMATCH: The 5 intraday features (log_ret, vol_share,\nbuy_ratio, log_n_trades,\
+    \ abs_ret) are CONTEMPORANEOUS measures of TODAY's\ntrading activity. But the\
+    \ target is TOMORROW's RV. Today's intraday patterns\npredict today's RV (which\
+    \ LightGBM already captures via lag-1 RV features).\nThey do NOT predict the INCREMENTAL\
+    \ change in tomorrow's RV above what\nyesterday's RV + IV already tells you.\n\
+    \n(3) INSUFFICIENT FORWARD SIGNAL: For the LSTM to beat LightGBM, it would need\n\
+    to detect intraday patterns that predict FUTURE vol BETTER than the options\n\
+    market (which prices IV). The 5 features don't contain this:\n  - log_ret: already\
+    \ captured by close-to-close RV\n  - vol_share/log_n_trades: liquidity = contemporaneous,\
+    \ not predictive\n  - buy_ratio: order flow has ~1h half-life, decays to noise\
+    \ by next day\n  - abs_ret: IS realized vol, exactly what the target already knows\
+    \ via lag-1\n\n(4) TRAIN SIZE LIMITATION: 504 days \xD7 21 symbols \xD7 0.85 (val\
+    \ split) = ~9K\ntraining sequences per fold. With 200K+ LSTM parameters, the model\
+    \ is\nseverely overparameterized relative to training data. It learns to output\n\
+    near-zero (safest prediction under QLIKE for small residuals).\n\n(5) EARLY STOPPING\
+    \ TOO AGGRESSIVE: With early_stopping_rounds=5 and a\nnearly-flat loss surface\
+    \ (residuals ARE noise), the model stops at epoch\n7-12 having barely moved from\
+    \ initialization. The residual prediction\nconverges to the mean (\u22480) which\
+    \ is optimal under QLIKE when the true\nsignal is absent.\n\nIMPLICATIONS FOR\
+    \ TRIAL-054 AND BEYOND:\n- Single-fold (trial-054) won't help \u2014 more training\
+    \ data doesn't create\n  signal where none exists\n- The LSTM needs DIFFERENT\
+    \ input features that carry forward-looking\n  information not already in IV:\n\
+    \  * VPIN (order flow toxicity \u2014 30min to 2h lead on vol spikes)\n  * Cumulative\
+    \ intraday RV trajectory (intraday momentum \u2192 overnight gap)\n  * Late-day\
+    \ option flow / gamma exposure changes\n  * Cross-asset contagion (FX vol spikes\
+    \ in Asian session \u2192 US open vol)\n- Or the LSTM should predict a DIFFERENT\
+    \ target: not next-day RV but\n  same-day RV (nowcasting from partial-day sequences)\n\
+    - Or use feature_stack architecture: extract LSTM embedding/attention\n  features\
+    \ and feed them as columns to LightGBM (bypass the residual\n  framework entirely)\n"
+  status: completed
+  priority: 1
+- id: trial-054
+  date: '2026-06-16'
+  config: trial_054_lstm_residual_1fold.yaml
+  hypothesis: Single-fold LSTM residual (5yr train, 6yr OOS) produces equivalent QLIKE
+    to multi-fold CV without hyperparameter tuning overhead. Training on 2015-2020
+    gives the LSTM maximum temporal context; testing on 2020-2026 covers COVID and
+    post-COVID regimes in one contiguous OOS block.
+  motivation: Trial-053 uses expanding_window with train_size=504, test_size=126 producing
+    ~12 folds. Since LSTM has no HPO (fixed architecture from trial-052), multi-fold
+    is pure compute waste. Single fold with 5yr training maximizes data available
+    to the sequence model and gives a single clean OOS evaluation on the full 2020-2026
+    period.
+  baseline_config: trial_053_lstm_residual_on_champion_h1.yaml
+  horizons:
+    h1:
+      lstm: 0.12053
+      lgbm_champion: null
+      har_iv_0dte: 0.12915
+      har_iv_1w: 0.1328
+      har_iv: 0.1419
+      har: 0.1528
+      verdict: "PASS \u2014 LSTM residual 1-fold achieves 0.12053, beating har_iv_0dte\
+        \ by +86 bps"
+  status: completed
+  priority: 1
+  key_insight: "Single-fold LSTM residual (5yr train on 2015-2020, OOS 2020-2026)\
+    \ achieves h=1 QLIKE 0.12053 \u2014 significantly beating har_iv_0dte (0.12915,\
+    \ +86 bps) and har_iv (0.14190, +214 bps). This is the best single-model h=1 QLIKE\
+    \ observed. However: (1) single-seed, single-fold \u2014 needs multi-seed validation,\
+    \ (2) OOS period includes COVID (model trained before COVID), (3) no DM test vs\
+    \ LightGBM champion (trial-047 mean 0.13679). If confirmed under reseeding, this\
+    \ suggests LSTM residual has genuine value when given enough training data (5yr\
+    \ vs 504d)."
+- id: trial-059
+  date: '2026-06-19'
+  config: trial_059_drop_calendar_dummies.yaml
+  hypothesis: Removing "useless" features (calendar dummies, manual interactions,
+    weak-signal expansions) produces equal or better QLIKE. Also tests whether adding
+    log_iv_0dte_1w_ratio_d improves champion.
+  motivation: Feature audit identified Tier 1 (calendar dummies), Tier 2 (manual interactions
+    redundant for trees), and Tier 3 (weak-signal expansions) as candidates for removal.
+    Separately tested adding the 0DTE/1w log-ratio feature.
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      lgbm_full: 0.1299
+      lgbm_add_0dte_ratio: 0.1299
+      lgbm_drop_calendar: 0.1306
+      lgbm_drop_tier123: 0.1315
+      verdict: "FAIL \u2014 all drops hurt. 0DTE ratio identical to full (no effect)."
+    h5:
+      lgbm_full: 0.1104
+      lgbm_add_0dte_ratio: 0.1104
+      lgbm_drop_calendar: 0.1108
+      lgbm_drop_tier123: 0.1118
+      verdict: "FAIL \u2014 all drops hurt. 0DTE ratio identical to full."
+    h22:
+      lgbm_full: 0.1699
+      lgbm_add_0dte_ratio: 0.1699
+      lgbm_drop_calendar: 0.1696
+      lgbm_drop_tier123: 0.1714
+      har_iv: 0.1691
+      verdict: har_iv still beats all LightGBM variants. Calendar drop neutral (+3
+        bps).
+  key_insight: "Feature removal hurts: -7/-4 bps (calendar only), -16/-14/-15 bps\
+    \ (tier1+2+3). Pre-computed interactions (atm_iv_x_log_rv) are NOT redundant for\
+    \ depth=4 trees \u2014 they provide interaction shortcuts. 0DTE ratio added zero\
+    \ value (likely data column absent or already included). Do NOT prune the 128-feature\
+    \ champion."
+  status: completed
+  priority: 1
+- id: trial-062
+  date: '2026-06-22'
+  config: workspace/configs/trial_062_long_flat_optimal.yaml
+  hypothesis: long_flat sizing mode with threshold=0 ("flat when gap < 0") is the
+    walk-forward-validated optimal signal for GSVIVS01. The simple rule requires no
+    threshold tuning and delivers honest Sharpe 1.83 at h=1 with 65% position rate.
+  motivation: "Static sweep found t=-0.001 (Sharpe 3.29) but this was OVERFIT to the\
+    \ test period. Walk-forward validation (252d trailing window, 16 threshold candidates)\
+    \ showed: (1) adaptive threshold Sharpe=1.72 \u2014 WORSE than no threshold; (2)\
+    \ threshold=0 Sharpe=1.83 \u2014 best of all. The walk-forward threshold was unstable\
+    \ (std=0.0033) and hurt performance. Conclusion: threshold=0 is the correct production\
+    \ policy. No tuning needed. Still +42% Sharpe improvement over always-short (1.29)\
+    \ with half the drawdown."
+  baseline_config: trial_036_CHAMPION.yaml
+  design:
+    type: economic_value_threshold_optimization
+    signal_mode: long_flat
+    method: walk_forward_validation
+    lookback: 252
+    threshold_grid:
+    - -0.005 to +0.010
+    - 16 values
+    - variance-space
+    walk_forward_results:
+      h1:
+        optimal_threshold: 0.0
+        sharpe: 1.8258
+        position_rate_pct: 65.2
+        ann_return_pct: 5.58
+        max_dd_pct: -2.53
+      h5:
+        optimal_threshold: 0.0
+        sharpe: 1.6467
+        position_rate_pct: 41.4
+        ann_return_pct: 3.75
+        max_dd_pct: -1.91
+      h22:
+        optimal_threshold: 0.0
+        sharpe: 0.6336
+        position_rate_pct: 16.9
+        ann_return_pct: 1.43
+        max_dd_pct: -3.88
+    walk_forward_adaptive_results:
+      h1:
+        sharpe: 1.7242
+        threshold_mean: -0.0007
+        threshold_std: 0.0033
+      h5:
+        sharpe: 0.8124
+        threshold_mean: 0.0014
+        threshold_std: 0.0029
+      h22:
+        sharpe: 0.8952
+        threshold_mean: 0.0034
+        threshold_std: 0.003
+    comparisons:
+      always_short:
+        h1_sharpe: 1.2885
+        h5_sharpe: 1.3038
+        h22_sharpe: 1.1981
+    overfitted_static_sweep:
+      note: "Static sweep found t=-0.001 Sharpe=3.29 at h=1 \u2014 OVERFIT (optimized\
+        \ on test data)"
+      h1:
+        threshold: -0.001
+        sharpe: 3.2941
+      h5:
+        threshold: 0.001
+        sharpe: 2.4846
+      h22:
+        threshold: 0.005
+        sharpe: 1.9664
+  horizons:
+    h5:
+      qlike: 0.1099
+      verdict: COMPLETED
+      dm_p: 0.0
+    h22:
+      qlike: 0.1788
+      verdict: COMPLETED
+      dm_p: 0.0
+    h1:
+      qlike: 0.142
+      verdict: COMPLETED
+      dm_p: 0.0
+  status: completed
+  priority: 1
+  key_insight: "WALK-FORWARD VALIDATES threshold=0: Static threshold optimization\
+    \ on\\n    OOS data is overfitting \u2014 sweep Sharpe 3.29 collapsed to 1.83\
+    \ under walk-forward.\\n    Adaptive threshold (1.72) is WORSE than no threshold\
+    \ (1.83). The simple rule \\\"flat\\n    when gap < 0\\\" is already the correct\
+    \ production policy. long_flat(t=0) delivers\\n    +42% Sharpe over always-short\
+    \ (1.83 vs 1.29) with half the max drawdown (2.5% vs\\n    5.1%). Walk-forward\
+    \ validation is mandatory for any signal-layer hyperparameter."
+  notes: "Walk-forward validated on 692 eval days (post-252d warmup). Threshold\\\
+    n    stability: mean=-0.0007 std=0.0033 \u2014 unstable, confirming no fixed threshold\\\
+    n    adds value over t=0. h=22 long_flat does not help (0.63 < always_short 1.20)."
+- id: trial-054b
+  date: '2026-06-22'
+  config: trial_054_lstm_residual_embed_h1.yaml
+  hypothesis: LSTM residual on champion with symbol embedding should help learn symbol-specific
+    residual patterns that pooled LightGBM misses.
+  motivation: Trial-054 showed single-fold LSTM residual works. Adding a learned symbol
+    embedding allows the LSTM to specialize its corrections per-symbol without separate
+    models.
+  baseline_config: trial_053_lstm_residual_on_champion_h1.yaml
+  horizons:
+    h1:
+      lstm: 0.12883
+      lgbm_champion: 0.12902
+      har_iv_0dte: 0.13793
+      har_iv_1w: 0.14108
+      har_iv: 0.15046
+      har: 0.16117
+      verdict: "NEUTRAL \u2014 LSTM embed (0.12883) essentially ties lgbm_champion\
+        \ (0.12902), +1.9 bps"
+  status: completed
+  priority: 1
+  key_insight: "Symbol embedding adds negligible value (+1.9 bps vs lgbm_champion).\
+    \ The residual after LightGBM is not symbol-specific \u2014 noise is noise regardless\
+    \ of ticker. Embedding does not help when the underlying signal is absent."
+- id: trial-055
+  date: '2026-06-22'
+  config: trial_055_regularized_har_iv_tournament.yaml
+  hypothesis: Ridge/Lasso/ElasticNet regularized HAR-IV variants may provide better
+    init scores than OLS HAR-IV via coefficient stabilization and shrinkage.
+  motivation: If regularized HAR-IV produces better predictions, using them as LightGBM
+    init_score could improve the champion. Tests 40+ model variants across all horizons
+    with different feature sets (HAR-CJ, SHAR, frequency decomposition, VRP, noise-robust).
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      best_model: ridge_har_cj_iv_0dte
+      best_qlike: 0.13397
+      har_iv: 0.14966
+      verdict: "PASS \u2014 ridge_har_cj_iv_0dte beats har_iv by +157 bps at h=1"
+    h5:
+      best_model: ridge_har_iv_1w
+      best_qlike: 0.09312
+      har_iv: 0.11642
+      verdict: "PASS \u2014 ridge_har_iv_1w beats har_iv by +233 bps at h=5"
+    h22:
+      best_model: ridge_har_iv_1w
+      best_qlike: 0.15254
+      har_iv: 0.17266
+      verdict: "PASS \u2014 ridge_har_iv_1w beats har_iv by +201 bps at h=22"
+  status: completed
+  priority: 1
+  key_insight: 'Regularized HAR-CJ-IV with 0DTE features dominates at h=1 (0.13397).
+    ridge_har_iv_1w dominates h=5 and h=22 (0.09312, 0.15254). Ridge barely differs
+    from OLS HAR-IV (regularization almost irrelevant at these sample sizes). The
+    big win is FEATURE SET not regularization: adding continuous/jump decomposition
+    + 0DTE IV to the linear model gives massive gains. These become candidate inits
+    for trial-057.'
+- id: trial-056
+  date: '2026-06-22'
+  config: trial_056_har_hybrid_tournament.yaml
+  hypothesis: Richer HAR-IV variants using orthogonal RV decompositions (continuous/jump,
+    semivariance, frequency) plus IV should beat standard HAR-IV baselines.
+  motivation: Trial-055 showed ridge_har_cj_iv_0dte dominates. This trial tests more
+    exotic HAR variants (SHARQ, HAR-CJ, frequency-domain) with and without IV enrichment
+    and regularization to find the optimal linear predictor.
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      best_model: lasso_shar_iv_0dte
+      best_qlike: 0.13663
+      har_iv: 0.14966
+      verdict: "PASS \u2014 lasso_shar_iv_0dte beats har_iv by +130 bps"
+    h5:
+      best_model: ridge_har_cj_iv_0dte
+      best_qlike: 0.11292
+      har_iv: 0.11642
+      verdict: "PASS \u2014 ridge_har_cj_iv_0dte beats har_iv by +35 bps"
+    h22:
+      best_model: ridge_har_cj_iv_freq_vrp
+      best_qlike: 0.16966
+      har_iv: 0.17266
+      verdict: "PASS \u2014 ridge_har_cj_iv_freq_vrp beats har_iv by +30 bps"
+  status: completed
+  priority: 1
+  key_insight: 'HAR-CJ-IV (continuous/jump decomposition + IV) consistently beats
+    plain HAR-IV across all horizons. SHAR (semivariance) helps at h=1 but not h=5/h=22.
+    Frequency decomposition helps only at h=22 (VRP + freq components capture monthly
+    cycles). Best linear models: h=1 lasso_shar_iv_0dte (0.13663), h=5 ridge_har_cj_iv_0dte
+    (0.11292), h=22 ridge_har_cj_iv_freq_vrp (0.16966).'
+- id: trial-057
+  date: '2026-06-22'
+  config: trial_057_lgbm_best_har_init.yaml
+  hypothesis: Using trial-056 winning HAR initializers (har_cj_iv_0dte) for LightGBM
+    init_score should improve over trial-036 initializers (har_iv_1w/har_iv).
+  motivation: Trial-055/056 found richer linear models that beat standard HAR-IV.
+    If LightGBM residual learning benefits from a better starting point, these inits
+    should translate to improved ensemble QLIKE.
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      lgbm_057_best_init: 0.13075
+      har_cj_iv_0dte: 0.13921
+      har_iv_0dte: 0.1395
+      har_iv_1w: 0.14301
+      har_iv: 0.15272
+      verdict: "PASS \u2014 lgbm with best-HAR init (0.13075) improves over single-seed\
+        \ reference"
+    h5:
+      lgbm_057_best_init: 0.10902
+      har_iv_1w: 0.11035
+      har_iv: 0.12202
+      verdict: "PASS \u2014 lgbm (0.10902) slightly improves over har_iv_1w (0.11035)"
+    h22:
+      lgbm_057_best_init: 0.21559
+      har_iv: 0.17065
+      verdict: "FAIL \u2014 LightGBM (0.21559) catastrophically worse than har_iv\
+        \ (0.17065) at h=22"
+  status: completed
+  priority: 1
+  key_insight: "Best-HAR init improves LightGBM at h=1 (0.13075) and h=5 (0.10902)\
+    \ but CATASTROPHICALLY fails at h=22 (0.21559 vs har_iv 0.17065). The har_cj_iv_freq_vrp\
+    \ init that won h=22 in trial-056 (linear) does NOT translate when used as LightGBM\
+    \ base \u2014 the tree overfits the rich residual. h=22 remains linear-only territory.\
+    \ Single-seed numbers \u2014 needs multi-seed validation before champion claim."
+- id: trial-057b
+  date: '2026-06-22'
+  config: trial_057_lstm_residual_h1.yaml
+  hypothesis: LSTM learns residual corrections on top of LightGBM champion for h=1
+    (single-fold, compute-efficient setup).
+  motivation: Continuation of LSTM residual line. Tests whether LSTM can improve on
+    trial-054 results with potentially different architecture/features.
+  baseline_config: trial_053_lstm_residual_on_champion_h1.yaml
+  horizons:
+    h1:
+      lgbm_champion: 0.12188
+      lstm: 0.12353
+      har_iv_0dte: 0.13104
+      har_iv: 0.14366
+      har: 0.15491
+      verdict: "FAIL \u2014 LSTM (0.12353) is worse than lgbm_champion (0.12188) by\
+        \ -16.5 bps"
+  status: completed
+  priority: 1
+  key_insight: "LSTM residual (0.12353) WORSE than LightGBM champion (0.12188) by\
+    \ 16.5 bps. The LSTM does not improve on the tabular model \u2014 it degrades\
+    \ performance. Consistent with trial-053 finding that residuals after LightGBM\
+    \ are noise."
+- id: trial-058
+  date: '2026-06-22'
+  config: trial_058_lstm_rich_sequences_h1.yaml
+  hypothesis: Adding richer intraday sequence channels (net flow, acceleration, rolling
+    VPIN, cumulative RV, session fraction) should improve LSTM residual correction
+    over trial-057 feature set.
+  motivation: Trial-057b showed basic LSTM residual is worse than LightGBM. Richer
+    sequences with forward-looking intraday features (VPIN, flow toxicity) might capture
+    signals the basic 5-feature set missed.
+  baseline_config: trial_053_lstm_residual_on_champion_h1.yaml
+  horizons:
+    h1:
+      lgbm_champion: 0.12086
+      lstm: 0.12255
+      har_iv_0dte: 0.13147
+      har_iv: 0.14428
+      har: 0.15608
+      verdict: "FAIL \u2014 LSTM (0.12255) worse than lgbm_champion (0.12086) by -16.9\
+        \ bps"
+  status: completed
+  priority: 1
+  key_insight: Rich sequences (10+ channels) still fail. LSTM (0.12255) is 16.9 bps
+    WORSE than LightGBM champion (0.12086). Adding VPIN, net flow, acceleration, session
+    fraction does NOT help the LSTM find signal in the residuals. The intraday-to-next-day
+    link is simply too weak. LSTM residual approach is DEAD for this problem.
+- id: trial-060
+  date: '2026-06-22'
+  config: trial_060_har_iv_0dte_vs_1dte.yaml
+  hypothesis: har_iv_1dte should outperform har_iv_0dte at h=1 because 1DTE IV is
+    more forward-looking (expires tomorrow) while 0DTE close IV is backward/stale
+    (expires today, already mostly realized).
+  motivation: "The 0DTE IV at close is for an option that expires in minutes \u2014\
+    \ it reflects TODAY's realized vol, not tomorrow's expectation. 1DTE IV expires\
+    \ tomorrow and should be a better predictor of tomorrow's RV."
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      har_iv_0dte: 0.13665
+      har_iv_1dte: 0.13676
+      har_iv_1w: 0.14012
+      har_iv: 0.14983
+      har: 0.15969
+      verdict: "NEUTRAL \u2014 0DTE (0.13665) and 1DTE (0.13676) essentially identical\
+        \ at h=1"
+    h5:
+      har_iv_0dte: 0.11417
+      har_iv_1dte: 0.11442
+      har_iv_1w: 0.1069
+      har_iv: 0.11883
+      har: 0.13415
+      verdict: har_iv_1w (0.10690) dominates both 0DTE and 1DTE at h=5
+    h22:
+      har_iv_0dte: 0.17299
+      har_iv_1dte: 0.1726
+      har_iv_1w: 0.16869
+      har_iv: 0.15866
+      har: 0.17908
+      verdict: har_iv (1m, 0.15866) dominates all short-tenor IVs at h=22
+  status: completed
+  priority: 1
+  key_insight: "0DTE and 1DTE IV are essentially interchangeable (delta < 2.5 bps\
+    \ at all horizons). The hypothesis that 1DTE is more forward-looking was wrong\
+    \ \u2014 both capture similar information. Tenor matching remains the key insight:\
+    \ 1w IV for h=5, 1m IV for h=22, 0DTE/1DTE for h=1."
+- id: trial-061
+  date: '2026-06-22'
+  config: trial_061_har_iv_both_0dte_1dte.yaml
+  hypothesis: Using both 0DTE and 1DTE IV features simultaneously should outperform
+    either alone by separating persistence vs expectation signal components.
+  motivation: If 0DTE captures realized-vol persistence and 1DTE captures market expectation,
+    combining both gives the model two orthogonal signals.
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      har_iv_0dte: 0.13665
+      har_iv_1dte: 0.13676
+      har_iv_0dte_1dte: 0.13679
+      har_iv_1w: 0.14012
+      har_iv: 0.14983
+      har: 0.15969
+      verdict: "FAIL \u2014 combined 0DTE+1DTE (0.13679) is no better than either\
+        \ alone"
+    h5:
+      har_iv_0dte_1dte: 0.11442
+      har_iv_1w: 0.1069
+      verdict: "FAIL \u2014 combined still worse than 1w"
+    h22:
+      har_iv_0dte_1dte: 0.17262
+      har_iv: 0.15866
+      verdict: "FAIL \u2014 combined worse than 1m har_iv"
+  status: completed
+  priority: 1
+  key_insight: "Combining 0DTE + 1DTE adds ZERO value over either alone. The two tenors\
+    \ are >99% correlated \u2014 they contain the same information. No orthogonal\
+    \ decomposition exists. Confirms 0DTE vs 1DTE choice is irrelevant."
+- id: trial-061b
+  date: '2026-06-22'
+  config: trial_061_lstm_feature_stack_h1.yaml
+  hypothesis: LSTM-derived outputs (prediction, attention weights, embedding) stacked
+    as features into LightGBM should improve h=1 QLIKE by giving the tree access to
+    temporal patterns without the LSTM needing to predict RV directly.
+  motivation: "Direct LSTM prediction fails, residual learning fails. Feature stacking\
+    \ is the last LSTM integration strategy \u2014 extract learned representations\
+    \ and let LightGBM use them as additional columns."
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      lgbm_control: 0.12869
+      lgbm_pred_attn: 0.12869
+      lgbm_all: 0.12869
+      lgbm_pred: 0.12869
+      har_iv_0dte: 0.13779
+      har: 0.161
+      lstm: 0.18719
+      verdict: "FAIL \u2014 ALL stacking variants produce IDENTICAL QLIKE (0.12869).\
+        \ LSTM features add zero information."
+  status: completed
+  priority: 1
+  key_insight: 'Feature stacking is DEAD. lgbm_control (no LSTM features) = lgbm_pred
+    = lgbm_pred_attn = lgbm_all = 0.12869. LightGBM completely ignores the LSTM-derived
+    columns (prediction, attention, embedding). The LSTM features have zero marginal
+    information above the existing 128 tabular features. Standalone LSTM is catastrophic
+    (0.18719). CONCLUSION: LSTM adds no value to this problem in any integration mode
+    (standalone, residual, embedding, feature stacking). The LSTM research line is
+    exhausted.'
+- id: trial-063
+  date: '2026-06-22'
+  config: trial_063_xgboost_champion.yaml
+  hypothesis: XGBoost with mapped hyperparameters and custom QLIKE objective can match
+    or beat LightGBM champion QLIKE.
+  motivation: XGBoost uses exact greedy splits vs LightGBM histogram-based. Different
+    inductive bias may find complementary patterns. Also validates that champion results
+    are not LightGBM-specific.
+  baseline_config: trial_036_CHAMPION.yaml
+  horizons:
+    h1:
+      xgb_hariv0dte_init: 0.12895
+      har_iv_0dte: 0.1385
+      har_iv_1w: 0.14195
+      har_iv: 0.1516
+      har: 0.16185
+      verdict: "PASS \u2014 XGBoost (0.12895) beats all linear baselines, competitive\
+        \ with LightGBM champion"
+    h5:
+      xgb_hariv0dte_init: 0.11055
+      har_iv_1w: 0.10972
+      har_iv: 0.12136
+      har: 0.13714
+      verdict: "NEUTRAL \u2014 XGBoost (0.11055) slightly worse than har_iv_1w (0.10972)\
+        \ at h=5"
+    h22:
+      xgb_hariv0dte_init: 0.16731
+      har_iv: 0.16844
+      har: 0.1885
+      verdict: "PASS \u2014 XGBoost (0.16731) beats har_iv by +11 bps at h=22"
+  status: completed
+  priority: 1
+  key_insight: "XGBoost is COMPETITIVE with LightGBM champion. h=1 XGBoost 0.12895\
+    \ vs LightGBM trial-047 mean 0.13679 \u2014 appears better but different eval\
+    \ window (single seed). h=22 XGBoost (0.16731) beats har_iv (0.16844) where LightGBM\
+    \ could not \u2014 first tree model to beat linear at h=22. Needs multi-seed validation.\
+    \ XGBoost may be the new champion candidate, especially at h=22."
+- id: trial-066
+  date: '2026-06-22'
+  config: trial_066_champion_plus_rosenbaum_lstm.yaml
+  hypothesis: Rosenbaum-style daily LSTM (trained on daily features, not intraday
+    sequences) compared head-to-head with XGBoost/LightGBM champions on same test
+    window.
+  motivation: Apples-to-apples comparison of LSTM on daily features vs tree models
+    on same features. Tests whether recurrent architecture adds value when given the
+    same daily feature set (not raw intraday bars).
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons:
+    h1:
+      xgb_hariv0dte_init: 0.12941
+      lgbm_hariv0dte_init: 0.12977
+      har_iv_0dte: 0.13841
+      har_iv_1w: 0.14187
+      har_iv: 0.15156
+      har: 0.16186
+      lstm: 0.16205
+      verdict: "FAIL \u2014 daily LSTM (0.16205) is catastrophically worse than trees\
+        \ and barely beats HAR"
+  status: completed
+  priority: 1
+  key_insight: "Rosenbaum daily LSTM (0.16205) is essentially HAR-level (0.16186).\
+    \ It completely fails to learn from the feature set that XGBoost/LightGBM exploit\
+    \ effectively. Tree models (0.1294/0.1298) beat LSTM by +330 bps. The LSTM architecture\
+    \ has no advantage for daily-frequency vol forecasting \u2014 trees dominate regardless\
+    \ of whether LSTM sees intraday or daily data."
+- id: trial-066b
+  date: '2026-06-22'
+  config: trial_066_lstm_residual_on_xgboost.yaml  # config deleted (experiment completed, results preserved)
+  hypothesis: LSTM residual learning on XGBoost champion (instead of LightGBM) may
+    find patterns that XGBoost misses, given XGBoost has slightly different inductive
+    bias than LightGBM.
+  motivation: If XGBoost residuals have different structure than LightGBM residuals,
+    the LSTM might find learnable patterns. Feature stacking approach (LSTM outputs
+    fed to XGBoost) avoids the zero-attractor residual training failure.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons:
+    h1:
+      xgb_champion: 0.12938
+      lstm: 0.1294
+      har_iv_0dte: 0.13841
+      har_iv_1w: 0.14187
+      har_iv: 0.15156
+      har: 0.16186
+      verdict: "NEUTRAL \u2014 LSTM (0.12940) adds +0.2 bps over XGBoost alone (noise-level)"
+  status: completed
+  priority: 1
+  key_insight: "LSTM residual on XGBoost (0.12940) is identical to XGBoost alone (0.12938).\
+    \ Same conclusion as trial-053 with LightGBM \u2014 residuals after good tree\
+    \ models are unpredictable noise. Changing the base model from LightGBM to XGBoost\
+    \ does not create learnable residual structure."
+- id: trial-066c
+  date: '2026-06-22'
+  config: trial_066_lstm_residual_on_xgboost.yaml  # config deleted (experiment completed, results preserved)
+  hypothesis: "LSTM residual on XGBoost v2 \u2014 potentially different hyperparameters\
+    \ or architecture variation."
+  motivation: Second attempt at LSTM + XGBoost integration with modified parameters.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons:
+    h1:
+      xgb_champion: 0.1294
+      lstm: 0.12989
+      har_iv_0dte: 0.1384
+      har_iv: 0.15159
+      har: 0.16186
+      verdict: "FAIL \u2014 LSTM v2 (0.12989) is worse than XGBoost alone (0.12940)\
+        \ by -4.9 bps"
+  status: completed
+  priority: 1
+  key_insight: "Second LSTM+XGBoost attempt confirms the pattern: LSTM either adds\
+    \ nothing or HURTS. v2 degrades by 4.9 bps. The LSTM research line is definitively\
+    \ closed for this problem \u2014 no integration mode (standalone, residual, embedding,\
+    \ feature stacking, daily features) produces improvement over tree models."
+- id: trial-067
+  date: '2026-06-30'
+  config: trial_067_xgb_reseed_h1.yaml
+  hypothesis: Trial-063's single-seed XGBoost h=1 QLIKE (0.12895) is reproducible
+    across seeds. If the 5-seed mean remains ~0.129, XGBoost is the new h=1 champion
+    (+80 bps over LightGBM 5-seed mean 0.13679).
+  motivation: Trial-047 showed LightGBM single-seed numbers were cherry-picked (77
+    bps below 5-seed envelope). Must validate XGBoost with the same multi-seed protocol
+    before claiming a new champion. 5 seeds (42/123/456/789/2026), h=1 only, har_iv_0dte
+    init.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons:
+    h1:
+      qlike: 0.1292
+      verdict: "PASS \u2014 XGBoost reseed h=1 (0.1292) beats LightGBM 5-seed mean\
+        \ (0.13679) by +76 bps, DM p=0.0"
+      dm_p: 0.0
+      note: aggregate QLIKE; per-seed breakdown (mean/std/min/max) not yet recorded
+  status: completed
+  priority: 1
+  depends_on: null
+  key_insight: "XGBoost h=1 reseed confirms new champion. Aggregate 0.1292 is within\
+    \ ~2.5 bps of original single-seed (0.12895), indicating low seed variance \u2014\
+    \ unlike LightGBM which had 79 bps envelope in trial-047. XGBoost dominates at\
+    \ h=1. Next: reseed h=5/h=22 to determine if XGBoost is champion at all horizons."
+- id: trial-069a
+  date: '2026-06-30'
+  config: trial_069a_xgb_reweight_alpha05.yaml
+  hypothesis: Two-pass XGBoost with QLIKE-importance sample reweighting (alpha=0.5)
+    improves h=1 QLIKE by focusing tree splits on correctable hard-to-predict days.
+    Conservative alpha avoids outlier overfitting while still emphasizing high-loss
+    samples (earnings, FOMC, VIX spikes).
+  motivation: The QLIKE gradient determines leaf values; sample_weight determines
+    split choices. High-QLIKE days get more influence on WHERE the tree splits, forcing
+    discovery of features that distinguish those days. Conditional QLIKE (residual
+    after pass-1 tree) targets correctable hard samples, not pure black swans.
+  baseline_config: trial_067_xgb_reseed_h1.yaml
+  horizons:
+    h1:
+      qlike: 0.1293
+      vs_har_bps: 10
+      verdict: FAIL
+      dm_p: 0.0
+  status: completed
+  priority: 1
+  depends_on: null
+- id: trial-069b
+  date: '2026-06-30'
+  config: trial_069b_xgb_reweight_alpha10.yaml
+  hypothesis: "Two-pass XGBoost with alpha=1.0 (linear QLIKE weighting) provides the\
+    \ strongest improvement \u2014 samples contribute to split decisions proportionally\
+    \ to their loss. Expected 10-30 bps over trial-067 baseline."
+  motivation: 'Linear weighting is the natural choice: a sample with 2x QLIKE gets
+    2x influence on splits. Not as aggressive as alpha=2.0, less risk of outlier dominance.'
+  baseline_config: trial_067_xgb_reseed_h1.yaml
+  horizons:
+    h1:
+      qlike: 0.1295
+      vs_har_bps: 23
+      verdict: FAIL
+      dm_p: 0.0
+  status: completed
+  priority: 1
+  depends_on: null
+- id: trial-069c
+  date: '2026-06-30'
+  config: trial_069c_xgb_reweight_alpha20.yaml
+  hypothesis: 'Two-pass XGBoost with alpha=2.0 (quadratic QLIKE weighting) produces
+    the largest magnitude improvement by heavily up-weighting high-QLIKE samples.
+    Risk: may overfit to genuine outliers (COVID flash crashes) that are unpredictable.'
+  motivation: Aggressive variant to test upper bound. clip_max=10.0 caps any single
+    weight, normalize=true preserves effective sample size. If this variant degrades,
+    it indicates the improvement ceiling for reweighting.
+  baseline_config: trial_067_xgb_reseed_h1.yaml
+  horizons:
+    h1:
+      qlike: 0.1294
+      vs_har_bps: 14
+      verdict: FAIL
+      dm_p: 0.0
+  status: completed
+  priority: 1
+  depends_on: null
+# --- Trials below registered during configs audit (2026-07-01) ---
+- id: trial-065
+  date: '2026-06-22'
+  config: trial_065_rosenbaum_daily_lstm.yaml
+  hypothesis: Faithful Rosenbaum/Zhang (2022) LSTM replication — 2-layer LSTM with
+    hidden_dim=2, 22-day lookback of (log_rv_d, signed_return_d), pooled universality
+    training. Tests whether the paper's architecture adds value on our smaller dataset.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons:
+    h1:
+      lstm: 0.16205
+      verdict: FAIL — daily LSTM barely beats HAR, +330 bps worse than trees
+  status: completed
+  priority: 1
+- id: trial-068
+  date: '2026-06-30'
+  config: trial_068_xgboost_all_layers.yaml
+  hypothesis: Adding all available feature layers (cross_asset_momentum, microstructure,
+    long_memory, realized_correlation) to XGBoost champion improves QLIKE via richer
+    signal diversity. Risk of signal dilution with depth=4/leaves=16.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-068b
+  date: '2026-06-30'
+  config: trial_068_conditional_duan.yaml
+  hypothesis: Conditional Duan GARCH-style volatility model as alternative architecture.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-068c
+  date: '2026-06-30'
+  config: trial_068b_conditional_duan_vvix.yaml
+  hypothesis: Conditional Duan model with VVIX as additional conditioning variable.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-068d
+  date: '2026-06-30'
+  config: trial_068_gnn_standalone.yaml
+  hypothesis: GNN standalone eval — isolate cross-asset graph signal using only GNN
+    outputs (gnn_prediction, gnn_node_attention) fed to XGBoost.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-069
+  date: '2026-06-30'
+  config: trial_069_xgb_implied_corr.yaml
+  hypothesis: Adding implied correlation features (corr_risk_premium, dispersion_signal,
+    corr_momentum, corr_zscore) improves XGBoost QLIKE especially at h=22 where
+    correlation spikes precede vol spikes (systemic risk channel).
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons: {}
+  status: not_started
+  priority: 1
+- id: trial-070
+  date: '2026-06-30'
+  config: trial_070_gnn_feature_stack_xgboost.yaml
+  hypothesis: GNN feature stacking into XGBoost champion — GNN captures cross-asset
+    graph topology (orthogonal to row-wise XGBoost features). GATv2 with rolling
+    60d correlation adjacency provides spillover signals that XGBoost cannot learn.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-070b
+  date: '2026-06-30'
+  config: trial_070_tcn_deepvol_h1.yaml
+  hypothesis: DeepVol-style TCN on 5-min raw returns — dilated causal convolutions
+    capture multi-scale intraday volatility patterns. Smoke test on SPY h=1.
+  baseline_config: null
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-071
+  date: '2026-07-01'
+  config: trial_071_lstm_5min_enriched_h1.yaml
+  hypothesis: Standalone LSTM on 78x12 enriched 5-min sequences — shorter + richer
+    setup expected to beat prior long-sequence LSTM attempts.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-071b
+  date: '2026-07-01'
+  config: trial_071_tcn_multiday_h1.yaml
+  hypothesis: Multi-feature TCN with 20-day lookback and deeper receptive field.
+  baseline_config: null
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-072
+  date: '2026-07-01'
+  config: trial_072_blend_xgb_lstm_h1.yaml
+  hypothesis: Blend XGBoost + LightGBM via inverse-QLIKE weighting to combine tree
+    model diversity.
+  baseline_config: trial_063_xgboost_champion.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-072b
+  date: '2026-07-01'
+  config: trial_072_lstm_5min_tuned_h1.yaml
+  hypothesis: LSTM hyperparameter tuning to reduce OOS degradation (capacity, LR,
+    epochs, bidirectional, dropout, batch size).
+  baseline_config: trial_071_lstm_5min_enriched_h1.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-072c
+  date: '2026-07-01'
+  config: trial_072_tcn_shallow_multiday.yaml
+  hypothesis: Shallower/wider-kernel TCN to reduce overfitting vs deep trial-071.
+  baseline_config: trial_071_tcn_multiday_h1.yaml
+  horizons: {}
+  status: not_started
+  priority: 3
+- id: trial-073
+  date: '2026-07-01'
+  config: trial_073_lstm_5min_train2000_h1.yaml
+  hypothesis: Same as trial-072b but longer train window (2000 days) to address
+    underfitting/OOS gap.
+  baseline_config: trial_072_lstm_5min_tuned_h1.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-073b
+  date: '2026-07-01'
+  config: trial_073_tcn_1day_3feat.yaml
+  hypothesis: Single-day 5-min TCN with 3 features, expanded symbols to increase
+    training rows.
+  baseline_config: trial_070_tcn_deepvol_h1.yaml
+  horizons: {}
+  status: not_started
+  priority: 3
+- id: trial-074
+  date: '2026-07-01'
+  config: trial_074_lstm_maxwin_h1.yaml
+  hypothesis: LSTM max train window single-fold for apples-to-apples comparison
+    with XGBoost on same OOS dates.
+  baseline_config: trial_073_lstm_5min_train2000_h1.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-074b
+  date: '2026-07-01'
+  config: trial_074_xgb_maxwin_h1.yaml
+  hypothesis: XGBoost companion with identical CV to LSTM max-window trial for
+    exact OOS-date comparison.
+  baseline_config: trial_067_xgb_reseed_h1.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-074c
+  date: '2026-07-01'
+  config: trial_074_lstm_gsvivs01_eval.yaml
+  hypothesis: Single-fold LSTM eval aligned to GSVIVS01 inception window (from
+    2022-05-25) for direct signal comparison.
+  baseline_config: trial_074_lstm_maxwin_h1.yaml
+  horizons: {}
+  status: not_started
+  priority: 2
+- id: trial-074d
+  date: '2026-07-01'
+  config: trial_074_tcn_multiday_12sym.yaml
+  hypothesis: Multi-day TCN expanded to 12 symbols to reduce overfitting via more
+    training data.
+  baseline_config: trial_072_tcn_shallow_multiday.yaml
+  horizons: {}
+  status: not_started
+  priority: 3

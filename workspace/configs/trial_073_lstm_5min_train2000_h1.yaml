@@ -1,0 +1,78 @@
+# Trial-073: LSTM 5-min enriched — longer training window (2000 days)
+#
+# Same as trial-072 (best LSTM config so far) except:
+#   - cv.train_size: 2000 (was 1260) — ~8 years of training data
+#
+# Rationale: The LSTM OOS gap (0.2369 vs 0.1989 HAR) suggests underfitting
+# from insufficient training data. 2000 days gives the model ~8 years to
+# learn temporal patterns before the first test fold.
+#
+# Trial-072 result: LSTM QLIKE=0.2369 (HAR=0.1989, gap=38 bps)
+
+name: trial_073_lstm_5min_train2000_h1
+universe: [SPY, AAPL]
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [har_core]
+
+model:
+  name: lstm
+  params:
+    hidden_dim: 128
+    n_layers: 2
+    dropout: 0.2
+    bidirectional: true
+    learning_rate: 5.0e-4
+    weight_decay: 1.0e-4
+    max_epochs: 80
+    batch_size: 128
+    val_fraction: 0.15
+    early_stopping_rounds: 8
+    loss: qlike
+    device: auto
+    precision: auto
+    compile: false
+    seed: 42
+    pool_mode: attention
+    head_mode: mlp
+
+sequences:
+  features:
+    - log_ret
+    - abs_ret
+    - vol_share
+    - buy_ratio
+    - order_flow_imbalance
+    - rolling_vpin
+    - cum_rv
+    - session_frac
+    - price_accel
+    - log_n_trades
+    - intrabar_rv
+    - volume_surprise
+  max_bars: 78
+  bar_interval: 300
+  norm_mode: per_symbol
+  source: parquet
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 2000
+  test_size: 252
+
+training_mode: pooled
+seed: 42
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+  baseline: lstm_5min
+  models:
+    - har
+    - har_iv
+    - lstm
+
+output_dir: data/models/trial_073_lstm_5min_train2000

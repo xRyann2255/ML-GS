@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "paper": "Barndorff-Nielsen, O.E., Kinnebrock, S. & Shephard, N. (2010) 'Measuring Downside Risk - Realised Semivariance', in Bollerslev, T., Russell, J. & Watson, M. (eds) Volatility and Time Series Econometrics: Essays in Honor of Robert Engle, Oxford University Press",
+    "equation": "Eq. (2.1): RS+_t = sum r_{t,i}^2 * I(r_{t,i} >= 0), RS-_t = sum r_{t,i}^2 * I(r_{t,i} < 0)",
+    "key_identity": "RS+_t + RS-_t = RV_t (exhaustive partition)",
+    "computed_by": "hand + NumPy verification",
+    "last_verified": "2026-05-29",
+    "tolerance": "abs=1e-15 for exact cases, rel=1e-12 for identity checks"
+  },
+  "mixed_returns": {
+    "input": [0.0, 0.01, -0.01],
+    "rs_positive": 0.0001,
+    "rs_negative": 0.0001,
+    "computation": "r=0 -> RS+ (0^2=0), r=0.01 -> RS+ (0.0001), r=-0.01 -> RS- (0.0001). RS+ = 0+0.0001 = 0.0001, RS- = 0.0001"
+  },
+  "all_positive": {
+    "input": [0.01, 0.02, 0.03],
+    "rs_positive": 0.0014,
+    "rs_negative": 0.0,
+    "computation": "All positive: RS+ = 0.01^2 + 0.02^2 + 0.03^2 = 0.0001 + 0.0004 + 0.0009 = 0.0014, RS- = 0"
+  },
+  "all_negative": {
+    "input": [-0.01, -0.02, -0.03],
+    "rs_positive": 0.0,
+    "rs_negative": 0.0014,
+    "computation": "All negative: RS+ = 0, RS- = 0.01^2 + 0.02^2 + 0.03^2 = 0.0014"
+  }
+}

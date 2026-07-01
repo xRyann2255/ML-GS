@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vol Learning Dashboard</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --text-dim: #484f58;
+  --red: #f85149;
+  --orange: #e07d3c;
+  --yellow: #f0db4f;
+  --green: #3fb950;
+  --blue: #58a6ff;
+  --purple: #bc8cff;
+  --sidebar-width: 380px;
+  --header-height: 56px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Header */
+.header {
+  height: var(--header-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 24px;
+  z-index: 10;
+  position: relative;
+}
+
+.header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.header-stats {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.stat-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.stat-badge .count {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.stat-badge .count.urgent {
+  background: rgba(248, 81, 73, 0.15);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Layer progress bars in header */
+.layer-bars {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  align-items: center;
+}
+
+.layer-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.layer-bar:hover {
+  background: var(--bg-tertiary);
+}
+
+.layer-bar.active {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+}
+
+.bar-track {
+  width: 48px;
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* Main layout */
+.main {
+  display: flex;
+  height: calc(100vh - var(--header-height));
+}
+
+/* Graph container */
+.graph-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.graph-container svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 100;
+  max-width: 280px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.tooltip.visible { opacity: 1; }
+
+.tooltip .node-name {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.tooltip .node-tier {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: 20px;
+}
+
+.sidebar.open { transform: translateX(0); }
+
+.sidebar-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.sidebar-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text);
+}
+
+.sidebar h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  padding-right: 32px;
+  line-height: 1.4;
+}
+
+.sidebar .tier-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.tier-untested { background: rgba(248, 81, 73, 0.15); color: var(--red); }
+.tier-recognized { background: rgba(224, 125, 60, 0.15); color: var(--orange); }
+.tier-understood { background: rgba(240, 219, 79, 0.15); color: var(--yellow); }
+.tier-mastered { background: rgba(63, 185, 80, 0.15); color: var(--green); }
+
+.sidebar section {
+  margin-bottom: 20px;
+}
+
+.sidebar section h3 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar ul li {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  padding-left: 12px;
+  position: relative;
+}
+
+.sidebar ul li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: var(--text-dim);
+}
+
+.sidebar .why-text {
+  font-size: 13px;
+  color: var(--text);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.sidebar .chapter-ref {
+  font-size: 12px;
+  color: var(--blue);
+}
+
+.sidebar .mastery-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mastery-item {
+  font-size: 12px;
+}
+
+.mastery-item .label {
+  color: var(--text-muted);
+}
+
+.mastery-item .value {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.prereq-list {
+  list-style: none;
+  padding: 0;
+}
+
+.prereq-list li {
+  font-size: 12px;
+  padding: 3px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prereq-list li::before { content: none !important; }
+
+.prereq-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  flex-shrink: 0;
+}
+
+.prereq-icon.met { background: rgba(63, 185, 80, 0.2); color: var(--green); }
+.prereq-icon.unmet { background: rgba(248, 81, 73, 0.2); color: var(--red); }
+
+/* Graph styling */
+.node-circle {
+  cursor: pointer;
+  stroke-width: 1.5;
+  will-change: transform;
+}
+
+.node-circle:hover {
+  filter: brightness(1.3) drop-shadow(0 0 8px currentColor);
+}
+
+.node-label {
+  font-size: 10px;
+  fill: var(--text-muted);
+  pointer-events: none;
+  text-anchor: middle;
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+.node-group:hover .node-label {
+  opacity: 1;
+  fill: var(--text);
+}
+
+.link {
+  stroke-opacity: 0.55;
+}
+
+.link-arrow {
+  fill-opacity: 0.7;
+}
+
+/* Highlight mode */
+.graph-highlight .node-circle { opacity: 0.15; filter: none; }
+.graph-highlight .node-label { opacity: 0; }
+.graph-highlight .link { stroke-opacity: 0.05; }
+.graph-highlight .link-arrow { fill-opacity: 0.05; }
+
+.graph-highlight .node-highlighted .node-circle { opacity: 1; filter: drop-shadow(0 0 6px currentColor); }
+.graph-highlight .node-highlighted .node-label { opacity: 1; }
+.graph-highlight .link-highlighted { stroke-opacity: 0.7; stroke: var(--blue) !important; }
+.graph-highlight .link-highlighted .link-arrow { fill-opacity: 0.7; }
+
+/* Overdue indicator — static glow (no animation for perf) */
+.node-overdue .node-circle {
+  filter: drop-shadow(0 0 6px var(--red)) drop-shadow(0 0 12px rgba(248, 81, 73, 0.25));
+}
+
+/* Cluster hulls */
+.layer-hull {
+  fill-opacity: 0.06;
+  stroke-opacity: 0.18;
+  stroke-width: 1;
+  stroke-dasharray: 4 2;
+}
+
+/* Generated timestamp */
+.generated-stamp {
+  position: absolute;
+  bottom: 12px;
+  left: 16px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Scrollbar */
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Vol Learning Graph</h1>
+  <div class="header-stats">
+    <div class="stat-badge">
+      <span>Mastered</span>
+      <span class="count" id="mastered-count">0/0</span>
+    </div>
+    <div class="stat-badge">
+      <span>Due today</span>
+      <span class="count" id="due-count">0</span>
+    </div>
+  </div>
+  <div class="layer-bars" id="layer-bars"></div>
+</div>
+
+<div class="main">
+  <div class="graph-container" id="graph-container">
+    <div class="tooltip" id="tooltip"></div>
+    <div class="generated-stamp" id="gen-stamp"></div>
+  </div>
+  <div class="sidebar" id="sidebar">
+    <button class="sidebar-close" id="sidebar-close">&times;</button>
+    <div id="sidebar-content"></div>
+  </div>
+</div>
+
+<script>
+// ===== DATA (injected at generation time) =====
+const DATA = {"nodes": [{"id": "logarithm_properties", "name": "Logarithms and exponentials: the language of multiplicative processes", "layer": -1, "requires": [], "tier": "understood", "overdue": true, "downstream_count": 82}, {"id": "summation_notation", "name": "Sigma notation: reading and writing sums compactly", "layer": -1, "requires": [], "tier": "understood", "overdue": true, "downstream_count": 94}, {"id": "indicator_functions", "name": "Indicator functions: filtering with 0s and 1s", "layer": -1, "requires": [], "tier": "understood", "overdue": true, "downstream_count": 10}, {"id": "random_variables", "name": "Random variables: mapping uncertainty to numbers", "layer": -1, "requires": [], "tier": "understood", "overdue": true, "downstream_count": 101}, {"id": "pdf_and_cdf", "name": "PDFs and CDFs: two ways to describe a distribution", "layer": -1, "requires": ["random_variables"], "tier": "understood", "overdue": true, "downstream_count": 100}, {"id": "expected_value", "name": "Expected value E[X]: the probability-weighted average", "layer": -1, "requires": ["summation_notation", "pdf_and_cdf"], "tier": "understood", "overdue": true, "downstream_count": 93}, {"id": "normal_distribution", "name": "The Normal (Gaussian) distribution: the bell curve baseline", "layer": -1, "requires": ["pdf_and_cdf"], "tier": "understood", "overdue": true, "downstream_count": 81}, {"id": "lognormal_distribution", "name": "The Log-Normal distribution: what RV actually looks like", "layer": -1, "requires": ["normal_distribution", "logarithm_properties"], "tier": "understood", "overdue": true, "downstream_count": 54}, {"id": "higher_moments", "name": "Skewness and kurtosis: beyond mean and variance", "layer": -1, "requires": ["expected_value"], "tier": "understood", "overdue": false, "downstream_count": 6}, {"id": "variance_and_std_dev", "name": "Population vs sample variance, and the SD distinction", "layer": -1, "requires": ["expected_value"], "tier": "understood", "overdue": true, "downstream_count": 90}, {"id": "degrees_of_freedom_bessel", "name": "Degrees of freedom and Bessel's correction: why we divide by n-1", "layer": -1, "requires": ["variance_and_std_dev"], "tier": "understood", "overdue": true, "downstream_count": 78}, {"id": "bias_consistency_mse", "name": "Bias, consistency, and the bias-variance tradeoff", "layer": -1, "requires": ["variance_and_std_dev"], "tier": "understood", "overdue": true, "downstream_count": 11}, {"id": "independence_variance_addition", "name": "Independence and why variances add", "layer": -1, "requires": ["variance_and_std_dev"], "tier": "understood", "overdue": true, "downstream_count": 1}, {"id": "covariance_correlation", "name": "Covariance and correlation: measuring linear co-movement", "layer": -1, "requires": ["variance_and_std_dev"], "tier": "understood", "overdue": true, "downstream_count": 35}, {"id": "hypothesis_testing", "name": "Hypothesis testing: making decisions under uncertainty", "layer": -1, "requires": ["normal_distribution"], "tier": "understood", "overdue": false, "downstream_count": 17}, {"id": "central_limit_theorem", "name": "Central Limit Theorem: why averages become normal", "layer": -1, "requires": ["normal_distribution", "variance_and_std_dev"], "tier": "understood", "overdue": true, "downstream_count": 67}, {"id": "jensens_inequality", "name": "Jensen's inequality: why transformations shift the mean", "layer": -1, "requires": ["expected_value", "logarithm_properties"], "tier": "understood", "overdue": true, "downstream_count": 34}, {"id": "autocorrelation", "name": "Autocorrelation: how a series relates to its own past", "layer": -1, "requires": ["covariance_correlation"], "tier": "understood", "overdue": true, "downstream_count": 32}, {"id": "ols_linear_regression", "name": "OLS linear regression: finding the best-fit hyperplane by minimizing squared residuals", "layer": -1, "requires": ["expected_value", "variance_and_std_dev", "covariance_correlation"], "tier": "understood", "overdue": false, "downstream_count": 18}, {"id": "log_returns", "name": "Why we use log returns instead of simple returns", "layer": 0, "requires": ["logarithm_properties"], "tier": "understood", "overdue": true, "downstream_count": 78}, {"id": "variance_as_spread", "name": "Why variance measures spread via squared deviations", "layer": 0, "requires": ["degrees_of_freedom_bessel", "variance_and_std_dev"], "tier": "understood", "overdue": true, "downstream_count": 77}, {"id": "annualizing_vol", "name": "Why we multiply daily vol by sqrt(252)", "layer": 0, "requires": ["independence_variance_addition", "variance_and_std_dev"], "tier": "understood", "overdue": true, "downstream_count": 0}, {"id": "vol_clustering", "name": "Why large moves follow large moves", "layer": 0, "requires": ["variance_as_spread", "autocorrelation"], "tier": "understood", "overdue": true, "downstream_count": 31}, {"id": "fat_tails", "name": "Why extreme returns happen far more often than normal", "layer": 0, "requires": ["variance_as_spread", "normal_distribution", "higher_moments"], "tier": "understood", "overdue": false, "downstream_count": 5}, {"id": "leverage_effect", "name": "Why negative returns amplify vol more than positive", "layer": 0, "requires": ["variance_as_spread"], "tier": "understood", "overdue": false, "downstream_count": 16}, {"id": "integrated_variance", "name": "What we're actually trying to measure (IV as the true target)", "layer": 0, "requires": ["variance_as_spread"], "tier": "understood", "overdue": false, "downstream_count": 67}, {"id": "rv_construction", "name": "Why summing squared intraday returns measures volatility", "layer": 0, "requires": ["log_returns", "variance_as_spread", "integrated_variance", "central_limit_theorem"], "tier": "understood", "overdue": true, "downstream_count": 66}, {"id": "five_min_convention", "name": "Why 5-minute sampling is the standard", "layer": 0, "requires": ["rv_construction"], "tier": "understood", "overdue": true, "downstream_count": 4}, {"id": "rv_is_noisy", "name": "Why RV is an estimate with measurable uncertainty", "layer": 0, "requires": ["rv_construction", "bias_consistency_mse"], "tier": "understood", "overdue": true, "downstream_count": 10}, {"id": "microstructure_noise_concept", "name": "Why transaction prices are contaminated and what that does to RV", "layer": 0, "requires": ["rv_construction", "five_min_convention"], "tier": "understood", "overdue": false, "downstream_count": 3}, {"id": "signature_plot", "name": "How to diagnose the bias-variance tradeoff visually", "layer": 0, "requires": ["microstructure_noise_concept"], "tier": "understood", "overdue": false, "downstream_count": 2}, {"id": "log_rv_transform", "name": "Why we work with ln(RV) instead of RV", "layer": 0, "requires": ["rv_construction", "jensens_inequality", "lognormal_distribution"], "tier": "understood", "overdue": true, "downstream_count": 33}, {"id": "heterogeneous_market_hypothesis", "name": "Why different market participants at different speeds create multi-scale dynamics", "layer": 0, "requires": ["vol_clustering"], "tier": "understood", "overdue": false, "downstream_count": 18}, {"id": "har_model", "name": "How HAR forecasts vol from three time scales using OLS", "layer": 0, "requires": ["rv_construction", "log_rv_transform", "heterogeneous_market_hypothesis", "ols_linear_regression"], "tier": "understood", "overdue": false, "downstream_count": 17}, {"id": "har_approximates_long_memory", "name": "Why 3 coefficients capture the slow decay of vol autocorrelation", "layer": 0, "requires": ["har_model", "vol_clustering"], "tier": "understood", "overdue": false, "downstream_count": 1}, {"id": "har_hard_to_beat", "name": "Why HAR is the benchmark despite being dead simple", "layer": 0, "requires": ["har_model"], "tier": "understood", "overdue": false, "downstream_count": 3}, {"id": "realized_quarticity", "name": "Why RQ measures how much to trust today's RV", "layer": 1, "requires": ["rv_is_noisy", "rv_construction"], "tier": "recognized", "overdue": true, "downstream_count": 9}, {"id": "harq_model", "name": "How HARQ down-weights noisy RV days automatically", "layer": 1, "requires": ["har_model", "realized_quarticity"], "tier": "untested", "overdue": false, "downstream_count": 3}, {"id": "harq_feature", "name": "Why sqrt(RQ) is a standalone feature for ML models", "layer": 1, "requires": ["realized_quarticity", "harq_model"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "noise_robust_estimators", "name": "Why TSRV, kernel, and pre-averaging exist and when to use them", "layer": 1, "requires": ["microstructure_noise_concept", "signature_plot"], "tier": "untested", "overdue": false, "downstream_count": 1}, {"id": "semivariances", "name": "Why splitting RV into upside and downside captures the leverage effect", "layer": 1, "requires": ["rv_construction", "leverage_effect", "indicator_functions"], "tier": "untested", "overdue": false, "downstream_count": 4}, {"id": "shar_model", "name": "How SHAR separates good vol from bad vol in HAR", "layer": 1, "requires": ["har_model", "semivariances"], "tier": "untested", "overdue": false, "downstream_count": 2}, {"id": "jumps_vs_diffusion", "name": "Why prices have two types of movement", "layer": 1, "requires": ["rv_construction", "hypothesis_testing"], "tier": "untested", "overdue": false, "downstream_count": 16}, {"id": "bpv_jump_robustness", "name": "Why multiplying consecutive absolute returns filters out jumps", "layer": 1, "requires": ["jumps_vs_diffusion", "rv_construction"], "tier": "untested", "overdue": false, "downstream_count": 10}, {"id": "pi_over_2_scaling", "name": "Where the pi/2 constant in BPV comes from", "layer": 1, "requires": ["bpv_jump_robustness"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "jump_component_feature", "name": "How J_t = max(RV - BPV, 0) becomes a feature", "layer": 1, "requires": ["bpv_jump_robustness", "indicator_functions"], "tier": "untested", "overdue": false, "downstream_count": 5}, {"id": "har_j_model", "name": "How HAR-J adds jump info to the forecast", "layer": 1, "requires": ["har_model", "jump_component_feature"], "tier": "untested", "overdue": false, "downstream_count": 2}, {"id": "har_cj_model", "name": "How HAR-CJ separates C and J at all time scales", "layer": 1, "requires": ["har_j_model"], "tier": "untested", "overdue": false, "downstream_count": 1}, {"id": "signed_jumps", "name": "Why separating positive from negative jumps adds signal", "layer": 1, "requires": ["jump_component_feature", "leverage_effect"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "triple_expansion", "name": "Why level/change/z-score triples features for free", "layer": 1, "requires": ["rv_construction"], "tier": "untested", "overdue": false, "downstream_count": 1}, {"id": "simple_returns", "name": "What simple returns are and why they're insufficient for aggregation", "layer": 0, "requires": ["logarithm_properties"], "tier": "understood", "overdue": false, "downstream_count": 0}, {"id": "conditional_variance", "name": "Why we forecast time-varying (conditional) variance, not a single constant", "layer": 0, "requires": ["variance_as_spread", "vol_clustering"], "tier": "understood", "overdue": false, "downstream_count": 7}, {"id": "price_process", "name": "The continuous-time price process that generates returns", "layer": 0, "requires": ["log_returns"], "tier": "understood", "overdue": true, "downstream_count": 26}, {"id": "variance_vs_volatility", "name": "Why confusing variance and volatility causes factor-of-100 errors", "layer": 0, "requires": ["variance_as_spread", "rv_construction"], "tier": "understood", "overdue": false, "downstream_count": 0}, {"id": "overnight_return", "name": "Why the overnight return captures information missing from intraday RV", "layer": 0, "requires": ["rv_construction"], "tier": "understood", "overdue": false, "downstream_count": 0}, {"id": "feature_alignment", "name": "Why feature-target alignment prevents lookahead bias in vol forecasting", "layer": 0, "requires": ["rv_construction", "har_model"], "tier": "understood", "overdue": false, "downstream_count": 1}, {"id": "har_core_layer_outputs", "name": "What HARCoreLayer.compute() produces and under what conditions", "layer": 0, "requires": ["har_model", "realized_quarticity"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "bns_jump_test", "name": "How the BNS test statistically detects jumps from the RV-BPV gap", "layer": 1, "requires": ["rv_construction", "bpv_jump_robustness", "realized_quarticity"], "tier": "untested", "overdue": false, "downstream_count": 1}, {"id": "realized_tripower_quarticity", "name": "Why RTQ uses 4/3 powers across three neighbors for jump-robust quarticity", "layer": 1, "requires": ["realized_quarticity", "bpv_jump_robustness"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "lee_mykland_test", "name": "How Lee-Mykland identifies WHICH intraday returns are jumps", "layer": 1, "requires": ["bpv_jump_robustness", "bns_jump_test"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "realized_skewness_kurtosis", "name": "Why intraday higher moments predict future volatility", "layer": 1, "requires": ["rv_construction", "realized_quarticity"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "lasso_har", "name": "How Lasso-HAR bridges HAR to machine learning via automatic feature selection", "layer": 1, "requires": ["har_model", "har_hard_to_beat"], "tier": "untested", "overdue": false, "downstream_count": 1}, {"id": "noise_gap_feature", "name": "Why the gap between noise-robust and standard RV proxies for liquidity", "layer": 1, "requires": ["noise_robust_estimators", "rv_construction"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "asymmetry_layer_outputs", "name": "What AsymmetryLayer.compute() produces", "layer": 1, "requires": ["semivariances", "bpv_jump_robustness", "jump_component_feature"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "qlike_loss", "name": "Why QLIKE is the primary metric for vol forecast evaluation", "layer": 99, "requires": ["rv_construction", "log_rv_transform"], "tier": "recognized", "overdue": true, "downstream_count": 6}, {"id": "diebold_mariano", "name": "How the DM test determines if one forecast is statistically better", "layer": 99, "requires": ["qlike_loss"], "tier": "untested", "overdue": false, "downstream_count": 1}, {"id": "model_confidence_set", "name": "How MCS filters a set of models down to the statistically indistinguishable best", "layer": 99, "requires": ["diebold_mariano"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "mincer_zarnowitz", "name": "How MZ regression tests whether forecasts are efficient (unbiased + calibrated)", "layer": 99, "requires": ["qlike_loss", "retransformation_bias"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "retransformation_bias", "name": "Why naive exp(y_hat) underestimates and how Duan correction fixes it", "layer": 99, "requires": ["log_rv_transform"], "tier": "recognized", "overdue": true, "downstream_count": 10}, {"id": "vol_targeting_sharpe", "name": "How vol-targeting tests whether better QLIKE translates to economic value", "layer": 99, "requires": ["qlike_loss", "retransformation_bias", "vol_targeting_formula", "why_vol_targeting_adds_sharpe"], "tier": "untested", "overdue": false, "downstream_count": 1}, {"id": "deflated_sharpe", "name": "Why testing many strategies inflates the best Sharpe ratio spuriously", "layer": 99, "requires": ["vol_targeting_sharpe"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "purged_kfold_cv", "name": "Why time-series CV requires purging and embargo to prevent data leakage", "layer": 99, "requires": ["har_model", "feature_alignment"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "why_harq_helps_h1_not_h5", "name": "Why HARQ improves forecasts at h=1 but not at longer horizons", "layer": 1, "requires": ["harq_model", "har_approximates_long_memory", "rv_is_noisy"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "why_shar_needs_pooling", "name": "Why SHAR underperforms on single-stock but works with pooled data", "layer": 1, "requires": ["shar_model", "semivariances", "har_hard_to_beat"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "continuous_vs_jump_persistence", "name": "Why the continuous component forecasts but jumps don't persist", "layer": 1, "requires": ["jump_component_feature", "vol_clustering", "har_cj_model"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "feature_count_vs_sample_size", "name": "Why more features can hurt when training data is limited", "layer": 1, "requires": ["triple_expansion", "har_hard_to_beat", "lasso_har"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "noise_quality_vs_asymmetry", "name": "Why HARQ and SHAR are orthogonal improvements to HAR", "layer": 1, "requires": ["harq_model", "shar_model"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "option_contracts_payoffs", "name": "Option contracts and payoff diagrams: the building blocks of vol trading", "layer": 2, "requires": ["price_process", "normal_distribution"], "tier": "recognized", "overdue": false, "downstream_count": 25}, {"id": "black_scholes_formula", "name": "Black-Scholes as a translation device: from vol to price and back", "layer": 2, "requires": ["option_contracts_payoffs", "lognormal_distribution", "normal_distribution", "log_returns"], "tier": "understood", "overdue": true, "downstream_count": 24}, {"id": "the_greeks", "name": "Option Greeks: sensitivities that drive P&L decomposition", "layer": 2, "requires": ["black_scholes_formula"], "tier": "untested", "overdue": false, "downstream_count": 5}, {"id": "implied_volatility", "name": "Implied volatility: the market's price of uncertainty, not a forecast", "layer": 2, "requires": ["black_scholes_formula", "variance_and_std_dev"], "tier": "understood", "overdue": true, "downstream_count": 20}, {"id": "iv_surface", "name": "The implied volatility surface: where Black-Scholes breaks down visibly", "layer": 2, "requires": ["implied_volatility", "option_contracts_payoffs"], "tier": "understood", "overdue": true, "downstream_count": 8}, {"id": "vol_skew_and_smile", "name": "Volatility skew and smile: why OTM puts cost more than OTM calls", "layer": 2, "requires": ["iv_surface", "leverage_effect", "fat_tails"], "tier": "untested", "overdue": false, "downstream_count": 4}, {"id": "iv_term_structure", "name": "IV term structure: short-dated fear vs long-dated mean reversion", "layer": 2, "requires": ["iv_surface", "vol_clustering"], "tier": "recognized", "overdue": false, "downstream_count": 3}, {"id": "butterfly_spread", "name": "Butterfly spread: measuring symmetric tail thickness (kurtosis demand)", "layer": 2, "requires": ["vol_skew_and_smile", "higher_moments"], "tier": "untested", "overdue": false, "downstream_count": 3}, {"id": "svi_parametrization", "name": "SVI: parsimonious parametric fit to the volatility smile", "layer": 2, "requires": ["iv_surface"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "pca_iv_surface", "name": "PCA of the IV surface: level, slope, curvature explain 95%", "layer": 2, "requires": ["iv_surface", "covariance_correlation"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "model_free_implied_variance", "name": "Model-free implied variance: no Black-Scholes needed", "layer": 2, "requires": ["option_contracts_payoffs", "implied_volatility", "rv_construction"], "tier": "recognized", "overdue": false, "downstream_count": 13}, {"id": "vix_construction", "name": "VIX: CBOE's discrete approximation of 30-day risk-neutral variance", "layer": 2, "requires": ["model_free_implied_variance"], "tier": "recognized", "overdue": false, "downstream_count": 11}, {"id": "variance_swaps", "name": "Variance swaps: the pure bet on realized variance", "layer": 2, "requires": ["model_free_implied_variance", "rv_construction"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "vrp_definition", "name": "Variance risk premium: the wedge between risk-neutral and physical volatility", "layer": 2, "requires": ["vix_construction", "rv_construction", "implied_volatility"], "tier": "recognized", "overdue": false, "downstream_count": 10}, {"id": "vrp_predicts_returns", "name": "Why high VRP predicts future equity returns", "layer": 2, "requires": ["vrp_definition"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "vrp_predicts_vol", "name": "VRP as a mean reversion signal for realized volatility", "layer": 2, "requires": ["vrp_definition", "vol_clustering"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "vrp_decomposition", "name": "Decomposing VRP: diffusive, jump, and tail components", "layer": 2, "requires": ["vrp_definition", "jumps_vs_diffusion"], "tier": "untested", "overdue": false, "downstream_count": 4}, {"id": "vvix_vol_of_vol", "name": "VVIX and vol-of-vol: uncertainty about uncertainty", "layer": 2, "requires": ["vix_construction", "vrp_decomposition"], "tier": "untested", "overdue": false, "downstream_count": 3}, {"id": "layer2_feature_set", "name": "Layer 2 feature engineering: the complete options-implied feature pipeline", "layer": 2, "requires": ["implied_volatility", "vrp_definition", "vol_skew_and_smile", "iv_term_structure", "butterfly_spread", "vvix_vol_of_vol"], "tier": "untested", "overdue": false, "downstream_count": 2}, {"id": "horizon_dependence_options", "name": "Why options features matter more at longer forecast horizons", "layer": 2, "requires": ["layer2_feature_set", "har_model", "vol_clustering"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "vrp_as_ml_feature", "name": "VRP as ML feature: better forecasts create cleaner signals", "layer": 2, "requires": ["vrp_definition", "layer2_feature_set", "qlike_loss"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "gamma_pnl_formula", "name": "Gamma P&L: the fundamental equation of vol trading profit", "layer": 99, "requires": ["the_greeks", "black_scholes_formula", "rv_construction"], "tier": "untested", "overdue": false, "downstream_count": 4}, {"id": "atm_straddle_gamma", "name": "ATM straddle gamma: peak sensitivity at-the-money", "layer": 99, "requires": ["the_greeks", "option_contracts_payoffs", "gamma_pnl_formula"], "tier": "untested", "overdue": false, "downstream_count": 3}, {"id": "delta_hedged_straddle", "name": "Delta-hedged straddle: converting RV forecasts into vol trading P&L", "layer": 99, "requires": ["gamma_pnl_formula", "atm_straddle_gamma", "vrp_definition", "retransformation_bias"], "tier": "untested", "overdue": false, "downstream_count": 2}, {"id": "vol_trading_transaction_costs", "name": "Transaction costs in vol trading: the breakeven for forecast edge", "layer": 99, "requires": ["delta_hedged_straddle", "the_greeks"], "tier": "untested", "overdue": false, "downstream_count": 1}, {"id": "why_delta_hedged_straddle_works", "name": "Why selling delta-hedged straddles is profitable: VRP mechanics", "layer": 99, "requires": ["delta_hedged_straddle", "vrp_definition", "vol_trading_transaction_costs"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "ewma_baseline", "name": "EWMA: the industry baseline that vol-targeting must beat", "layer": 99, "requires": ["variance_and_std_dev", "vol_clustering", "conditional_variance"], "tier": "untested", "overdue": false, "downstream_count": 6}, {"id": "vol_targeting_formula", "name": "Vol-targeting position sizing: inversely proportional to forecast vol", "layer": 99, "requires": ["ewma_baseline", "retransformation_bias"], "tier": "untested", "overdue": false, "downstream_count": 5}, {"id": "why_vol_targeting_adds_sharpe", "name": "Why vol-targeting improves Sharpe: truncating the left tail", "layer": 99, "requires": ["vol_targeting_formula", "ewma_baseline", "leverage_effect"], "tier": "untested", "overdue": false, "downstream_count": 4}, {"id": "vol_targeting_failure_modes", "name": "Vol-targeting failure modes: when inverse-vol sizing backfires", "layer": 99, "requires": ["vol_targeting_formula", "why_vol_targeting_adds_sharpe"], "tier": "untested", "overdue": false, "downstream_count": 0}, {"id": "tsmom_connection", "name": "Connection to time-series momentum: vol-inverse sizing everywhere", "layer": 99, "requires": ["why_vol_targeting_adds_sharpe"], "tier": "untested", "overdue": false, "downstream_count": 0}], "edges": [{"source": "random_variables", "target": "pdf_and_cdf"}, {"source": "summation_notation", "target": "expected_value"}, {"source": "pdf_and_cdf", "target": "expected_value"}, {"source": "pdf_and_cdf", "target": "normal_distribution"}, {"source": "normal_distribution", "target": "lognormal_distribution"}, {"source": "logarithm_properties", "target": "lognormal_distribution"}, {"source": "expected_value", "target": "higher_moments"}, {"source": "expected_value", "target": "variance_and_std_dev"}, {"source": "variance_and_std_dev", "target": "degrees_of_freedom_bessel"}, {"source": "variance_and_std_dev", "target": "bias_consistency_mse"}, {"source": "variance_and_std_dev", "target": "independence_variance_addition"}, {"source": "variance_and_std_dev", "target": "covariance_correlation"}, {"source": "normal_distribution", "target": "hypothesis_testing"}, {"source": "normal_distribution", "target": "central_limit_theorem"}, {"source": "variance_and_std_dev", "target": "central_limit_theorem"}, {"source": "expected_value", "target": "jensens_inequality"}, {"source": "logarithm_properties", "target": "jensens_inequality"}, {"source": "covariance_correlation", "target": "autocorrelation"}, {"source": "expected_value", "target": "ols_linear_regression"}, {"source": "variance_and_std_dev", "target": "ols_linear_regression"}, {"source": "covariance_correlation", "target": "ols_linear_regression"}, {"source": "logarithm_properties", "target": "log_returns"}, {"source": "degrees_of_freedom_bessel", "target": "variance_as_spread"}, {"source": "variance_and_std_dev", "target": "variance_as_spread"}, {"source": "independence_variance_addition", "target": "annualizing_vol"}, {"source": "variance_and_std_dev", "target": "annualizing_vol"}, {"source": "variance_as_spread", "target": "vol_clustering"}, {"source": "autocorrelation", "target": "vol_clustering"}, {"source": "variance_as_spread", "target": "fat_tails"}, {"source": "normal_distribution", "target": "fat_tails"}, {"source": "higher_moments", "target": "fat_tails"}, {"source": "variance_as_spread", "target": "leverage_effect"}, {"source": "variance_as_spread", "target": "integrated_variance"}, {"source": "log_returns", "target": "rv_construction"}, {"source": "variance_as_spread", "target": "rv_construction"}, {"source": "integrated_variance", "target": "rv_construction"}, {"source": "central_limit_theorem", "target": "rv_construction"}, {"source": "rv_construction", "target": "five_min_convention"}, {"source": "rv_construction", "target": "rv_is_noisy"}, {"source": "bias_consistency_mse", "target": "rv_is_noisy"}, {"source": "rv_construction", "target": "microstructure_noise_concept"}, {"source": "five_min_convention", "target": "microstructure_noise_concept"}, {"source": "microstructure_noise_concept", "target": "signature_plot"}, {"source": "rv_construction", "target": "log_rv_transform"}, {"source": "jensens_inequality", "target": "log_rv_transform"}, {"source": "lognormal_distribution", "target": "log_rv_transform"}, {"source": "vol_clustering", "target": "heterogeneous_market_hypothesis"}, {"source": "rv_construction", "target": "har_model"}, {"source": "log_rv_transform", "target": "har_model"}, {"source": "heterogeneous_market_hypothesis", "target": "har_model"}, {"source": "ols_linear_regression", "target": "har_model"}, {"source": "har_model", "target": "har_approximates_long_memory"}, {"source": "vol_clustering", "target": "har_approximates_long_memory"}, {"source": "har_model", "target": "har_hard_to_beat"}, {"source": "rv_is_noisy", "target": "realized_quarticity"}, {"source": "rv_construction", "target": "realized_quarticity"}, {"source": "har_model", "target": "harq_model"}, {"source": "realized_quarticity", "target": "harq_model"}, {"source": "realized_quarticity", "target": "harq_feature"}, {"source": "harq_model", "target": "harq_feature"}, {"source": "microstructure_noise_concept", "target": "noise_robust_estimators"}, {"source": "signature_plot", "target": "noise_robust_estimators"}, {"source": "rv_construction", "target": "semivariances"}, {"source": "leverage_effect", "target": "semivariances"}, {"source": "indicator_functions", "target": "semivariances"}, {"source": "har_model", "target": "shar_model"}, {"source": "semivariances", "target": "shar_model"}, {"source": "rv_construction", "target": "jumps_vs_diffusion"}, {"source": "hypothesis_testing", "target": "jumps_vs_diffusion"}, {"source": "jumps_vs_diffusion", "target": "bpv_jump_robustness"}, {"source": "rv_construction", "target": "bpv_jump_robustness"}, {"source": "bpv_jump_robustness", "target": "pi_over_2_scaling"}, {"source": "bpv_jump_robustness", "target": "jump_component_feature"}, {"source": "indicator_functions", "target": "jump_component_feature"}, {"source": "har_model", "target": "har_j_model"}, {"source": "jump_component_feature", "target": "har_j_model"}, {"source": "har_j_model", "target": "har_cj_model"}, {"source": "jump_component_feature", "target": "signed_jumps"}, {"source": "leverage_effect", "target": "signed_jumps"}, {"source": "rv_construction", "target": "triple_expansion"}, {"source": "logarithm_properties", "target": "simple_returns"}, {"source": "variance_as_spread", "target": "conditional_variance"}, {"source": "vol_clustering", "target": "conditional_variance"}, {"source": "log_returns", "target": "price_process"}, {"source": "variance_as_spread", "target": "variance_vs_volatility"}, {"source": "rv_construction", "target": "variance_vs_volatility"}, {"source": "rv_construction", "target": "overnight_return"}, {"source": "rv_construction", "target": "feature_alignment"}, {"source": "har_model", "target": "feature_alignment"}, {"source": "har_model", "target": "har_core_layer_outputs"}, {"source": "realized_quarticity", "target": "har_core_layer_outputs"}, {"source": "rv_construction", "target": "bns_jump_test"}, {"source": "bpv_jump_robustness", "target": "bns_jump_test"}, {"source": "realized_quarticity", "target": "bns_jump_test"}, {"source": "realized_quarticity", "target": "realized_tripower_quarticity"}, {"source": "bpv_jump_robustness", "target": "realized_tripower_quarticity"}, {"source": "bpv_jump_robustness", "target": "lee_mykland_test"}, {"source": "bns_jump_test", "target": "lee_mykland_test"}, {"source": "rv_construction", "target": "realized_skewness_kurtosis"}, {"source": "realized_quarticity", "target": "realized_skewness_kurtosis"}, {"source": "har_model", "target": "lasso_har"}, {"source": "har_hard_to_beat", "target": "lasso_har"}, {"source": "noise_robust_estimators", "target": "noise_gap_feature"}, {"source": "rv_construction", "target": "noise_gap_feature"}, {"source": "semivariances", "target": "asymmetry_layer_outputs"}, {"source": "bpv_jump_robustness", "target": "asymmetry_layer_outputs"}, {"source": "jump_component_feature", "target": "asymmetry_layer_outputs"}, {"source": "rv_construction", "target": "qlike_loss"}, {"source": "log_rv_transform", "target": "qlike_loss"}, {"source": "qlike_loss", "target": "diebold_mariano"}, {"source": "diebold_mariano", "target": "model_confidence_set"}, {"source": "qlike_loss", "target": "mincer_zarnowitz"}, {"source": "retransformation_bias", "target": "mincer_zarnowitz"}, {"source": "log_rv_transform", "target": "retransformation_bias"}, {"source": "qlike_loss", "target": "vol_targeting_sharpe"}, {"source": "retransformation_bias", "target": "vol_targeting_sharpe"}, {"source": "vol_targeting_formula", "target": "vol_targeting_sharpe"}, {"source": "why_vol_targeting_adds_sharpe", "target": "vol_targeting_sharpe"}, {"source": "vol_targeting_sharpe", "target": "deflated_sharpe"}, {"source": "har_model", "target": "purged_kfold_cv"}, {"source": "feature_alignment", "target": "purged_kfold_cv"}, {"source": "harq_model", "target": "why_harq_helps_h1_not_h5"}, {"source": "har_approximates_long_memory", "target": "why_harq_helps_h1_not_h5"}, {"source": "rv_is_noisy", "target": "why_harq_helps_h1_not_h5"}, {"source": "shar_model", "target": "why_shar_needs_pooling"}, {"source": "semivariances", "target": "why_shar_needs_pooling"}, {"source": "har_hard_to_beat", "target": "why_shar_needs_pooling"}, {"source": "jump_component_feature", "target": "continuous_vs_jump_persistence"}, {"source": "vol_clustering", "target": "continuous_vs_jump_persistence"}, {"source": "har_cj_model", "target": "continuous_vs_jump_persistence"}, {"source": "triple_expansion", "target": "feature_count_vs_sample_size"}, {"source": "har_hard_to_beat", "target": "feature_count_vs_sample_size"}, {"source": "lasso_har", "target": "feature_count_vs_sample_size"}, {"source": "harq_model", "target": "noise_quality_vs_asymmetry"}, {"source": "shar_model", "target": "noise_quality_vs_asymmetry"}, {"source": "price_process", "target": "option_contracts_payoffs"}, {"source": "normal_distribution", "target": "option_contracts_payoffs"}, {"source": "option_contracts_payoffs", "target": "black_scholes_formula"}, {"source": "lognormal_distribution", "target": "black_scholes_formula"}, {"source": "normal_distribution", "target": "black_scholes_formula"}, {"source": "log_returns", "target": "black_scholes_formula"}, {"source": "black_scholes_formula", "target": "the_greeks"}, {"source": "black_scholes_formula", "target": "implied_volatility"}, {"source": "variance_and_std_dev", "target": "implied_volatility"}, {"source": "implied_volatility", "target": "iv_surface"}, {"source": "option_contracts_payoffs", "target": "iv_surface"}, {"source": "iv_surface", "target": "vol_skew_and_smile"}, {"source": "leverage_effect", "target": "vol_skew_and_smile"}, {"source": "fat_tails", "target": "vol_skew_and_smile"}, {"source": "iv_surface", "target": "iv_term_structure"}, {"source": "vol_clustering", "target": "iv_term_structure"}, {"source": "vol_skew_and_smile", "target": "butterfly_spread"}, {"source": "higher_moments", "target": "butterfly_spread"}, {"source": "iv_surface", "target": "svi_parametrization"}, {"source": "iv_surface", "target": "pca_iv_surface"}, {"source": "covariance_correlation", "target": "pca_iv_surface"}, {"source": "option_contracts_payoffs", "target": "model_free_implied_variance"}, {"source": "implied_volatility", "target": "model_free_implied_variance"}, {"source": "rv_construction", "target": "model_free_implied_variance"}, {"source": "model_free_implied_variance", "target": "vix_construction"}, {"source": "model_free_implied_variance", "target": "variance_swaps"}, {"source": "rv_construction", "target": "variance_swaps"}, {"source": "vix_construction", "target": "vrp_definition"}, {"source": "rv_construction", "target": "vrp_definition"}, {"source": "implied_volatility", "target": "vrp_definition"}, {"source": "vrp_definition", "target": "vrp_predicts_returns"}, {"source": "vrp_definition", "target": "vrp_predicts_vol"}, {"source": "vol_clustering", "target": "vrp_predicts_vol"}, {"source": "vrp_definition", "target": "vrp_decomposition"}, {"source": "jumps_vs_diffusion", "target": "vrp_decomposition"}, {"source": "vix_construction", "target": "vvix_vol_of_vol"}, {"source": "vrp_decomposition", "target": "vvix_vol_of_vol"}, {"source": "implied_volatility", "target": "layer2_feature_set"}, {"source": "vrp_definition", "target": "layer2_feature_set"}, {"source": "vol_skew_and_smile", "target": "layer2_feature_set"}, {"source": "iv_term_structure", "target": "layer2_feature_set"}, {"source": "butterfly_spread", "target": "layer2_feature_set"}, {"source": "vvix_vol_of_vol", "target": "layer2_feature_set"}, {"source": "layer2_feature_set", "target": "horizon_dependence_options"}, {"source": "har_model", "target": "horizon_dependence_options"}, {"source": "vol_clustering", "target": "horizon_dependence_options"}, {"source": "vrp_definition", "target": "vrp_as_ml_feature"}, {"source": "layer2_feature_set", "target": "vrp_as_ml_feature"}, {"source": "qlike_loss", "target": "vrp_as_ml_feature"}, {"source": "the_greeks", "target": "gamma_pnl_formula"}, {"source": "black_scholes_formula", "target": "gamma_pnl_formula"}, {"source": "rv_construction", "target": "gamma_pnl_formula"}, {"source": "the_greeks", "target": "atm_straddle_gamma"}, {"source": "option_contracts_payoffs", "target": "atm_straddle_gamma"}, {"source": "gamma_pnl_formula", "target": "atm_straddle_gamma"}, {"source": "gamma_pnl_formula", "target": "delta_hedged_straddle"}, {"source": "atm_straddle_gamma", "target": "delta_hedged_straddle"}, {"source": "vrp_definition", "target": "delta_hedged_straddle"}, {"source": "retransformation_bias", "target": "delta_hedged_straddle"}, {"source": "delta_hedged_straddle", "target": "vol_trading_transaction_costs"}, {"source": "the_greeks", "target": "vol_trading_transaction_costs"}, {"source": "delta_hedged_straddle", "target": "why_delta_hedged_straddle_works"}, {"source": "vrp_definition", "target": "why_delta_hedged_straddle_works"}, {"source": "vol_trading_transaction_costs", "target": "why_delta_hedged_straddle_works"}, {"source": "variance_and_std_dev", "target": "ewma_baseline"}, {"source": "vol_clustering", "target": "ewma_baseline"}, {"source": "conditional_variance", "target": "ewma_baseline"}, {"source": "ewma_baseline", "target": "vol_targeting_formula"}, {"source": "retransformation_bias", "target": "vol_targeting_formula"}, {"source": "vol_targeting_formula", "target": "why_vol_targeting_adds_sharpe"}, {"source": "ewma_baseline", "target": "why_vol_targeting_adds_sharpe"}, {"source": "leverage_effect", "target": "why_vol_targeting_adds_sharpe"}, {"source": "vol_targeting_formula", "target": "vol_targeting_failure_modes"}, {"source": "why_vol_targeting_adds_sharpe", "target": "vol_targeting_failure_modes"}, {"source": "why_vol_targeting_adds_sharpe", "target": "tsmom_connection"}], "layers": [{"id": -1, "name": "Layer -1", "total": 19, "untested": 0, "recognized": 0, "understood": 19, "mastered": 0}, {"id": 0, "name": "HAR Core", "total": 24, "untested": 1, "recognized": 0, "understood": 23, "mastered": 0}, {"id": 1, "name": "Noise + Asymmetry", "total": 26, "untested": 25, "recognized": 1, "understood": 0, "mastered": 0}, {"id": 2, "name": "Options", "total": 21, "untested": 13, "recognized": 5, "understood": 3, "mastered": 0}, {"id": 99, "name": "Evaluation", "total": 18, "untested": 16, "recognized": 2, "understood": 0, "mastered": 0}], "due_today": ["logarithm_properties", "summation_notation", "indicator_functions", "random_variables", "pdf_and_cdf", "expected_value", "normal_distribution", "lognormal_distribution", "variance_and_std_dev", "degrees_of_freedom_bessel", "bias_consistency_mse", "independence_variance_addition", "covariance_correlation", "central_limit_theorem", "jensens_inequality", "autocorrelation", "log_returns", "variance_as_spread", "annualizing_vol", "vol_clustering", "rv_construction", "five_min_convention", "rv_is_noisy", "log_rv_transform", "realized_quarticity", "price_process", "qlike_loss", "retransformation_bias", "black_scholes_formula", "implied_volatility", "iv_surface"], "detail": {"logarithm_properties": {"chapter": "1", "key_points": ["ln is the inverse of exp: ln(e^x) = x, e^{ln x} = x", "Product rule: ln(AB) = ln(A) + ln(B) -- turns multiplication into addition", "Quotient rule: ln(A/B) = ln(A) - ln(B) -- turns division into subtraction", "Taylor approximation: ln(1+x) ≈ x for small x (why log and simple returns are close)", "Shape: ln(x) is concave, grows slowly, compresses large values", "exp(x) is convex, grows explosively -- exp(a+b) = exp(a)*exp(b)"], "why_it_matters": "Every formula in this project uses ln. If you can't manipulate logs fluently, you'll be stuck on page 1.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "summation_notation": {"chapter": "1", "key_points": ["Σ_{i=1}^{n} x_i means x_1 + x_2 + ... + x_n", "Index variable (i), lower bound, upper bound -- three parts to read", "Constants pull out: Σ c*x_i = c * Σ x_i", "Splitting sums: Σ(a_i + b_i) = Σa_i + Σb_i", "Σ_{i=1}^{n} c = n*c (summing a constant n times)", "Double sums: Σ_i Σ_j means iterate over all (i,j) pairs"], "why_it_matters": "RV = Σ r²_i, BPV = Σ|r_i||r_{i-1}|, sample mean = (1/n)Σx_i. You'll read Σ hundreds of times.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "indicator_functions": {"chapter": "4", "key_points": ["I(condition) = 1 if condition is true, 0 otherwise", "Multiplying by I(A) keeps the term only when A holds: x*I(x>0) = x if positive, else 0", "Summing indicators counts events: Σ I(r_i > threshold) = number of exceedances", "Enables 'conditional sums' without if-statements in formulas", "Equivalent to filtering/masking in code: df[df['r'] > 0]"], "why_it_matters": "Semivariances, signed jumps, and jump detection all use indicator functions to partition returns.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "random_variables": {"chapter": "1", "key_points": ["A random variable X assigns a number to each possible outcome", "Discrete: countable values (coin flip: 0 or 1). Continuous: any value in a range", "X ~ Distribution notation means 'X follows this distribution'", "Realization vs. random variable: x is the observed value, X is the uncertain quantity", "i.i.d. = independent and identically distributed (same distribution, no influence on each other)", "A sample {x_1, ..., x_n} is n realizations of the same random variable"], "why_it_matters": "Returns, volatility, and noise are all modeled as random variables. This is the foundational abstraction.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "pdf_and_cdf": {"chapter": "1", "key_points": ["PDF f(x): probability density -- height shows relative likelihood, NOT probability itself", "Area under PDF between a and b = P(a ≤ X ≤ b); total area = 1", "P(X = exact value) = 0 for continuous variables (need intervals)", "CDF F(x) = P(X ≤ x): starts at 0, ends at 1, always non-decreasing", "Relationship: F'(x) = f(x), and F(b) - F(a) = P(a ≤ X ≤ b)", "Quantile = inverse CDF: 'what value has 5% probability below it?'", "Percentile/quantile is how critical values (1.645, 1.96) are defined"], "why_it_matters": "Every significance test uses quantiles. BPV scaling uses E[|Z|] which requires integrating the normal PDF.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "expected_value": {"chapter": "1", "key_points": ["Discrete: E[X] = Σ x_i * P(X=x_i) -- each value weighted by its probability", "Continuous: E[X] = ∫ x * f(x) dx -- same idea with density", "Linearity: E[aX + bY] = aE[X] + bE[Y] (always, even if dependent)", "E[X²] ≠ (E[X])² in general -- the gap is the variance", "Law of the unconscious statistician: E[g(X)] = ∫ g(x)*f(x) dx", "Sample mean x̄ = (1/n)Σx_i is the estimator of E[X]"], "why_it_matters": "Every theoretical result uses E[·]. Variance, covariance, bias, CLT -- all defined through expected values.", "next_review": "2026-05-23T09:00:00Z", "last_tested": "2026-05-22", "consecutive_passes": 2}, "normal_distribution": {"chapter": "1, 2", "key_points": ["N(μ,σ²): PDF = (1/√(2πσ²)) * exp(-(x-μ)²/(2σ²))", "Symmetric, bell-shaped; completely described by mean and variance", "Standard normal Z ~ N(0,1): subtract mean, divide by SD to standardize any normal", "Key facts: E[Z²] = 1, E[|Z|] = √(2/π) ≈ 0.798", "Quantiles: z_{0.05}=1.645, z_{0.025}=1.96 (critical values for tests)", "68-95-99.7 rule: ±1σ/±2σ/±3σ capture these percentages", "The 'benchmark' distribution -- deviations from normal reveal real-world structure"], "why_it_matters": "The normal is the reference distribution for all of finance. Fat tails, BPV scaling (π/2), test statistics, CLT limits -- all defined relative to the normal.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "lognormal_distribution": {"chapter": "2, 6", "key_points": ["If ln(X) ~ N(μ,σ²) then X is log-normal", "Right-skewed, strictly positive, heavy right tail -- looks like RV's distribution", "E[X] = exp(μ + σ²/2) -- NOT exp(μ); the σ²/2 term is Jensen's correction", "Multiplicative processes: X = e^{Z1+Z2+...} where Z_i ~ Normal → X is log-normal", "Why we model in log space: log-normal X becomes Gaussian after ln transform", "Median = exp(μ) < Mean = exp(μ+σ²/2) due to right skew"], "why_it_matters": "RV is approximately log-normal. The entire project trains in log-RV space because of this. Retransformation bias (the σ²/2 correction) is a direct consequence.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "higher_moments": {"chapter": "1", "key_points": ["kth moment: E[X^k]; kth central moment: E[(X-μ)^k]", "Skewness = E[(X-μ)³]/σ³: negative = left tail heavier (equity returns are negatively skewed)", "Kurtosis = E[(X-μ)⁴]/σ⁴: measures tail weight relative to normal", "Normal has kurtosis = 3; excess kurtosis = κ - 3 (how much fatter than normal)", "Equities: excess kurtosis 5-10 (extreme events are 5-10x more likely than normal predicts)", "4th power amplifies large deviations dramatically -- one outlier dominates the sum"], "why_it_matters": "Realized quarticity (RQ) in your pipeline is the intraday analog of kurtosis. Fat tails (kurtosis >> 3) are why normal-based models fail.", "next_review": "2026-05-28T18:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 1}, "variance_and_std_dev": {"chapter": "1", "key_points": ["Population variance: Var(X) = E[(X-μ)²] -- the 'true' spread", "Standard deviation: SD = √Var (same units as X; variance is in squared units)", "Var(aX) = a² Var(X) -- scaling by a multiplies variance by a²", "Var(X+c) = Var(X) -- shifting doesn't change spread", "Sample variance: s² = (1/(n-1)) Σ(x_i - x̄)² -- estimator of population Var", "SD is NOT half the range; variance is NOT the same as volatility (vol = annualized SD of returns)"], "why_it_matters": "Your forecast target is variance. The entire pipeline manipulates variances and their estimators.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "degrees_of_freedom_bessel": {"chapter": "1", "key_points": ["Degrees of freedom (df) = number of independent pieces of information in a sample", "n observations, but we estimated the mean from the same data → 1 df used → n-1 remain", "The sample mean 'pulls' all residuals toward zero: they must sum to zero (one constraint)", "Dividing by n underestimates variance (biased low); dividing by n-1 corrects this", "Proof sketch: E[Σ(x_i - x̄)²] = (n-1)σ², so E[s²] = σ² only when dividing by n-1", "For large n, the difference is negligible (1000 vs 999), but for small samples it matters", "Same concept appears in t-tests, chi-squared tests, regression (df = n - p)"], "why_it_matters": "The n-1 in sample variance is Bessel's correction. RV skips it because intraday mean ≈ 0. Understanding when and why to apply it prevents subtle estimation bugs.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "bias_consistency_mse": {"chapter": "2, 3", "key_points": ["Bias = E[θ̂] - θ: average error of estimator (systematic over- or under-estimation)", "Unbiased: E[θ̂] = θ (correct on average, but could be noisy)", "Consistent: θ̂ →_p θ as n→∞ (gets arbitrarily close with enough data)", "MSE = Bias² + Variance: total error = systematic error + noise", "A slightly biased estimator with much lower variance can have lower MSE (the tradeoff)", "Example: RV_5min is slightly biased (microstructure noise) but has low variance; tick-RV is severely biased upward"], "why_it_matters": "The sampling frequency choice (5-min vs 1-min vs tick) is literally a bias-variance tradeoff. This concept explains the signature plot and why noise-robust estimators exist.", "next_review": "2026-05-23T09:00:00Z", "last_tested": "2026-05-22", "consecutive_passes": 2}, "independence_variance_addition": {"chapter": "1", "key_points": ["Independent events: knowing one tells you nothing about the other -- P(A∩B) = P(A)·P(B)", "Independent random variables: E[XY] = E[X]·E[Y], so Cov(X,Y) = 0", "THE key result: Var(X+Y) = Var(X) + Var(Y) when X,Y are independent", "Extends: Var(Σ X_i) = n·Var(X_i) for n i.i.d. variables", "Does NOT hold for SD: SD(X+Y) ≠ SD(X) + SD(Y); instead SD(sum) = SD·√n", "Fails when variables are dependent (autocorrelated returns violate this)", "i.i.d. shorthand: independent AND identically distributed (same law, no memory)"], "why_it_matters": "The √252 annualization rule is a direct consequence. When vol clusters (dependence), the rule breaks -- this is exactly what your models exploit.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "covariance_correlation": {"chapter": "1", "key_points": ["Cov(X,Y) = E[(X-μ_X)(Y-μ_Y)] = E[XY] - E[X]E[Y]", "Positive cov: both above or both below average together; negative: one up, other down", "Correlation: ρ = Cov(X,Y) / (SD(X)·SD(Y)) -- normalized to [-1, +1]", "ρ = ±1 means perfect linear relationship; ρ = 0 means no LINEAR relationship", "Var(X+Y) = Var(X) + Var(Y) + 2Cov(X,Y) -- general formula (independence sets Cov=0)", "Sample correlation: r = Σ(x_i-x̄)(y_i-ȳ) / [√Σ(x_i-x̄)² · √Σ(y_i-ȳ)²]"], "why_it_matters": "The leverage effect is Corr(r_t, σ²_{t+1}) < 0. Multicollinearity (ρ>0.99 between features) explains why SHAR fails without pooling. Covariance is everywhere.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "hypothesis_testing": {"chapter": "4", "key_points": ["Null hypothesis H₀: the default/boring explanation (e.g., 'no jumps today')", "Alternative H₁: what we're looking for (e.g., 'a jump occurred')", "Test statistic: a number computed from data, with KNOWN distribution under H₀", "Significance level α: probability of rejecting H₀ when it's actually true (false positive rate)", "Critical value: boundary -- if test stat exceeds it, reject H₀ (e.g., Z > 1.645 at 5%)", "p-value: probability of seeing data this extreme if H₀ were true (small p → reject)", "Type I error (α): false positive. Type II (β): false negative. Power = 1-β", "One-sided vs two-sided: testing > threshold vs testing ≠ threshold"], "why_it_matters": "Jump detection (BNS, Lee-Mykland), Diebold-Mariano tests, and Mincer-Zarnowitz regression all require this logic. Without it, you can't interpret any statistical significance claim.", "next_review": "2026-05-28T18:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 1}, "central_limit_theorem": {"chapter": "2", "key_points": ["Take n i.i.d. draws from ANY distribution with mean μ and variance σ²", "Their sample mean X̄ satisfies: √n(X̄ - μ)/σ → N(0,1) as n→∞", "The distribution of X̄ becomes approximately normal regardless of the original shape", "Convergence rate: standard error of mean = σ/√n (halving error needs 4x more data)", "This is why 'more observations = less noise' -- but you need √n more for half the error", "RV uses a related CLT: √n(RV_t - IV_t) → Normal (sampling error of RV shrinks)"], "why_it_matters": "The entire justification for why more intraday observations improve RV is a CLT result. The 1/√n rate explains why 5-min (78 obs) is so much better than hourly (6.5 obs).", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "jensens_inequality": {"chapter": "2, 6", "key_points": ["For convex f: E[f(X)] ≥ f(E[X]) -- the average of outputs ≥ output of the average", "For concave f (like ln): E[f(X)] ≤ f(E[X]) -- flipped direction", "Intuition: a convex function 'amplifies' variation, pushing the mean up", "Key case: E[e^X] > e^{E[X]} because exp is convex", "Key case: E[ln X] < ln(E[X]) because ln is concave", "Direct consequence: exp(mean of log-RV) ≠ mean of RV -- systematically too low", "The σ²/2 Duan correction fixes this bias: E[e^X] = e^{μ + σ²/2} for X ~ Normal"], "why_it_matters": "You train in log-RV space but forecast in RV space. Without Jensen's correction (Duan retransformation), predictions are systematically 5-30% too low. You already hit this bug.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "autocorrelation": {"chapter": "1, 6", "key_points": ["ACF(k) = Corr(X_t, X_{t-k}): correlation of a series with itself lagged k steps", "ACF(0) = 1 always (perfect self-correlation)", "Fast decay (exponential): AR(1) with |φ|<1 has ACF = φ^k", "Slow decay (power-law): ACF ~ k^{-d} -- still non-zero at long lags (long memory)", "For returns: ACF ≈ 0 at all lags (EMH -- can't predict direction)", "For |returns| or r²: ACF is strongly positive and decays slowly (vol clustering)", "Partial ACF (PACF): correlation at lag k after removing shorter lags", "Stationarity: the unconditional distribution doesn't change over time (required for ACF to be well-defined)"], "why_it_matters": "HAR exists because vol has strong, slow-decaying autocorrelation. The daily/weekly/monthly decomposition approximates this slow decay with three simple terms.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "ols_linear_regression": {"chapter": "5", "key_points": ["Goal: find coefficients b that minimize sum of squared residuals: min_b Σ(y_i - x_i'b)²", "Closed-form solution: b_hat = (X'X)^{-1} X'y -- no iteration needed, instant for small p", "WHY squared residuals: differentiable, convex, unique minimum (same logic as variance); absolute values have no closed form", "Geometric view: b_hat is the projection of y onto the column space of X; residuals are orthogonal to features", "Assumption 1 (linearity): E[y|X] = Xb -- linear in parameters, features can be nonlinear transforms like log, x²", "Assumption 2 (homoskedasticity): Var(ε_i) = σ² for all i -- residual spread doesn't change with X (violated by raw vol data!)", "Assumption 3 (no perfect multicollinearity): X'X must be invertible -- columns can't be exact linear combos", "Assumption 4 (normality of residuals): ε ~ N(0, σ²I) -- needed for t-tests/F-tests, NOT for point estimates", "When assumptions fail: heteroskedasticity → GLS/HAC; multicollinearity → Ridge/Lasso; nonlinearity → trees", "Key diagnostic: R² = 1 - SS_res/SS_tot = fraction of variance explained (HAR gets 0.40-0.60)"], "why_it_matters": "HAR is literally OLS with 3 features. Ridge/Lasso add a penalty to OLS. Understanding this tells you what HAR does, why multicollinearity breaks SHAR, and why regularization helps.", "next_review": "2026-05-28T18:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 1}, "log_returns": {"chapter": "1", "key_points": ["Time additivity: multi-period log return = sum of single-period log returns", "ln(AB) = ln(A) + ln(B) makes the math work; simple returns compound multiplicatively", "Approximate symmetry: +5% then -5% nets to zero exactly (simple returns don't)", "For small returns (<5%), log and simple returns are nearly identical"], "why_it_matters": "Every RV computation squares log returns. If you don't understand why log, you can't explain why RV works.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "variance_as_spread": {"chapter": "1", "key_points": ["Average squared distance from mean", "Squaring makes negatives positive AND amplifies outliers (by design)", "Bessel's correction (T-1) compensates for estimating mean from same data", "Variance is in squared units; std dev = sqrt(variance) restores original units"], "why_it_matters": "Variance is literally the quantity you're forecasting in this entire project.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "annualizing_vol": {"chapter": "1", "key_points": ["Variances add for independent returns (not standard deviations)", "sqrt(252) comes from 252 trading days per year", "Only valid under the independence assumption", "'VIX at 20' means 20% annualized volatility", "Fails when vol is autocorrelated -- multi-day vol deviates from sqrt(T) prediction"], "why_it_matters": "You need this to compare daily RV with VIX and IV benchmarks.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "vol_clustering": {"chapter": "1", "key_points": ["Returns are uncorrelated but squared/absolute returns show strong positive autocorrelation", "Decay is power-law (~lag^-0.3), not exponential -- much slower", "Cont (2001) documented across all asset classes and decades", "This persistence is what makes vol forecastable at all", "Returns themselves approximately uncorrelated (EMH) -- only |returns| and r^2 cluster"], "why_it_matters": "If vol didn't cluster, HAR wouldn't work and your entire project would be pointless.", "next_review": "2026-05-22T09:00:00Z", "last_tested": "2026-05-21", "consecutive_passes": 2}, "fat_tails": {"chapter": "1", "key_points": ["Kurtosis > 3 (excess kurtosis 5-10 for equities)", "4-sigma daily move: once per 63 years under normal, several times per year in reality", "Q-Q plot shows S-shaped departure from normal line", "Mandelbrot (1963) first documented for cotton prices"], "why_it_matters": "Any model assuming normality will catastrophically underestimate tail risk.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "leverage_effect": {"chapter": "1", "key_points": ["Corr(r_t, sigma^2_{t+1}) < 0", "Black (1976) leverage mechanism: price drop -> higher debt/equity -> riskier", "Also driven by margin calls, stop-losses, hedging cascades", "Asymmetric: 'fear is louder than greed'", "Strongest in equities, weaker or reversed in FX/commodities"], "why_it_matters": "Symmetric models systematically underpredict vol after selloffs.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "integrated_variance": {"chapter": "2", "key_points": ["Integral of instantaneous variance over the day", "Latent: never directly observed", "Speedometer analogy -- IV accumulates total price wiggle", "Distinct from quadratic variation (QV also captures jumps)"], "why_it_matters": "IV is the theoretical gold standard. Every estimator is trying to get closer to it.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "rv_construction": {"chapter": "2", "key_points": ["RV_t = sum of r^2_{t,i} for all intraday returns", "Each squared return approximates local variance because E[epsilon^2]=1", "Converges to quadratic variation as n->infinity (Andersen et al. 2001, BNS 2002)", "No mean subtraction needed (intraday mean is approximately zero)", "With no jumps: QV=IV. With jumps: QV=IV+sum(J^2)", "WHY squaring not absolute values -- QV convergence theorem requires squared increments", "n=78 for 5-min sampling (6.5h x 12/hr)", "CLT: sqrt(n)(RV-IV) -> N(0, 2*integral(sigma^4 ds)) -- error shrinks at 1/sqrt(n)"], "why_it_matters": "This is the dependent variable (y) in your entire forecasting project.", "next_review": "2026-05-23T09:00:00Z", "last_tested": "2026-05-22", "consecutive_passes": 2}, "five_min_convention": {"chapter": "2", "key_points": ["Bias-variance tradeoff: too fast = noise, too slow = imprecise", "Liu Patton Sheppard (2015) tested ~400 estimators; 5-min RV 'hard to beat'", "Not derived from theory -- empirical finding", "78 observations per 6.5-hour US equity trading day", "Key distinction: noise-robust estimators improve estimation accuracy but rarely improve forecast accuracy"], "why_it_matters": "Choosing the wrong frequency makes your RV target garbage, poisoning every downstream model.", "next_review": "2026-05-23T09:00:00Z", "last_tested": "2026-05-22", "consecutive_passes": 2}, "rv_is_noisy": {"chapter": "2", "key_points": ["Estimation error shrinks as 1/sqrt(n)", "Error variance involves integrated quarticity (integral of sigma^4)", "Days when vol-of-vol is high have less precise RV estimates", "This means RV is a noisy label for your model to train on", "WHY sigma^4 in CLT variance -- computing variance-of-a-variance involves squaring something already squared"], "why_it_matters": "If you treat all RV values as equally trustworthy, your model trains on noise.", "next_review": "2026-05-23T09:00:00Z", "last_tested": "2026-05-22", "consecutive_passes": 2}, "microstructure_noise_concept": {"chapter": "2-3", "key_points": ["Three sources: bid-ask bounce, discrete tick sizes, price staleness", "Observed price = true price + noise (additive model)", "Noise has constant variance omega^2 regardless of interval length", "At high frequency, noise dominates signal", "RV diverges to 2*n*omega^2 as n->infinity"], "why_it_matters": "This is why you can't just sample every tick.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "signature_plot": {"chapter": "2-3", "key_points": ["x-axis: sampling interval, y-axis: average RV", "Three regions: noise-inflated (left), flat sweet spot (center), imprecise (right)", "If curve still rising as frequency increases, you're in the noise zone", "First diagnostic to run on any new dataset before computing RV"], "why_it_matters": "This is the first diagnostic you run before computing RV on any new data.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "log_rv_transform": {"chapter": "2, 6", "key_points": ["Stabilizes variance (variance-of-variance is highly skewed)", "Makes distribution closer to Gaussian (helps OLS)", "Guarantees positive forecasts (exp(x) > 0)", "Most HAR papers use log specification", "Retransformation bias: E[exp(X)] > exp(E[X]) (Jensen's inequality) -- needs Duan correction when converting back to levels", "Implementation: safe_log clips to 1e-20 before log (ln(1e-20)~=-46, finite but below any realistic RV)"], "why_it_matters": "Without this, HAR residuals are badly behaved and forecasts can go negative.", "next_review": "2026-05-23T09:00:00Z", "last_tested": "2026-05-22", "consecutive_passes": 2}, "heterogeneous_market_hypothesis": {"chapter": "6", "key_points": ["Muller et al. (1993): market is a superposition of participants at different time scales", "Day traders (daily), portfolio managers (weekly), institutional allocators (monthly)", "Each responds to vol at their own horizon; interactions create multi-scale autocorrelation", "Explains why AR(1) is insufficient for vol forecasting"], "why_it_matters": "This is the economic intuition behind HAR's three time scales. Without it, the model looks ad hoc.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "har_model": {"chapter": "6", "key_points": ["RV_{t+1} = b0 + b_d*RV_t + b_w*RV^(w)_t + b_m*RV^(m)_t + epsilon", "Estimated by OLS -- no MLE, no iteration, no latent variables", "Typical coefficients ~0.36/0.28/0.28; all three contribute meaningfully", "In-sample R^2 of 0.40-0.60 from just three predictors", "Estimated in log-RV in practice", "WHY avg then log not log then avg -- Jensen's inequality, ln(x_bar) != mean(ln x), want average variance", "Computation order: rolling(w).mean() THEN safe_log -- average in variance space first"], "why_it_matters": "THE baseline. Every ML model must beat it. If yours can't beat 3 OLS coefficients, you've overfit.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "har_approximates_long_memory": {"chapter": "6", "key_points": ["Weekly average implicitly includes lags 1-5, monthly includes lags 1-22", "Overlapping averages create smooth decay that mimics power-law autocorrelation", "Achieves similar fit to FIGARCH with much simpler estimation"], "why_it_matters": "Understanding this tells you why HAR works so well with so few parameters.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "har_hard_to_beat": {"chapter": "6", "key_points": ["Reason 1: vol is highly persistent and approximately linear", "Reason 2: low signal-to-noise means complex models overfit", "Reason 3: with only past RV at h=1, there's little nonlinear structure", "ML gains come from richer features AND/OR longer horizons", "Bollerslev et al. (2024): well-tuned HAR 'hard to beat' at h=1", "Litmus test: if ML can't beat HAR on same features/horizon, it overfit noise"], "why_it_matters": "If you don't understand this, you'll waste weeks trying to beat a badly-tuned baseline.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "realized_quarticity": {"chapter": "2, 6, 10", "key_points": ["RQ = (n/3) * sum(r^4) -- fourth power massively upweights extreme moves", "Converges to integral of sigma^4 (integrated quarticity)", "High RQ = vol-of-vol was high within the day = noisy RV estimate", "The asymptotic variance of RV is proportional to RQ", "WHY n/3 scaling -- E[epsilon^4]=3 for standard normal, correction ensures unbiasedness for integrated quarticity"], "why_it_matters": "Without RQ, you can't distinguish a trustworthy RV reading from a garbage one.", "next_review": "2026-05-22T21:00:00Z", "last_tested": "2026-05-22", "consecutive_passes": 0}, "harq_model": {"chapter": "6", "key_points": ["Effective daily coefficient = beta_d + beta_dQ * sqrt(RQ_t)", "beta_dQ is negative: high noise shrinks coefficient toward zero", "On noisy days, weight shifts to more stable weekly/monthly averages", "Confidence-weighted HAR", "Bollerslev Patton Quaedvlieg (2016): improves QLIKE by 5-15%", "WHY only daily coefficient varies -- weekly/monthly already smooth (averaging over 5/22 days reduces noise)"], "why_it_matters": "THE paper your project builds on. Measurement quality should modulate feature weights.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "harq_feature": {"chapter": "10", "key_points": ["Trees split on sqrt(RQ) to learn adaptive weighting without explicit interactions", "Provides data-quality signal no other feature captures", "Double duty: noise proxy AND regime indicator", "HARQ hard-codes the interaction; ML can discover more general patterns", "Interaction formula: log_rv_d * sqrt(RQ) implements beta_dQ*sqrt(RQ)*RV from HARQ"], "why_it_matters": "The single most important extension beyond baseline HAR for your project.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "noise_robust_estimators": {"chapter": "3", "key_points": ["TSRV subsamples at two frequencies and subtracts the bias", "Realized kernel uses autocovariance weighting", "Pre-averaging smooths prices before computing returns", "All converge to IV at rates between n^{-1/4} and n^{-1/5}", "Liu Patton Sheppard (2015): none reliably beats 5-min RV for forecasting", "RK: Parzen flat-top kernel, bandwidth H proportional to n^(3/5), rate n^(-1/4)", "TSRV: fast/slow scale subtraction, rate n^(-1/6), first consistent estimator with noise", "Pre-avg: triangular window L proportional to n^(1/2), rate n^(-1/4) optimal"], "why_it_matters": "You need to know these exist even if 5-min RV is your default.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "semivariances": {"chapter": "6, 10", "key_points": ["RV+ = sum of r^2 for positive returns, RV- = sum for negative", "RV+ + RV- = RV by construction", "RV- carries ~2x the predictive weight (Patton Sheppard 2015)", "Reduces QLIKE by 3-8%", "WHY squared not counts -- captures magnitude of directional moves", "Signed jump = RS+ - RS- = net directional pressure"], "why_it_matters": "Simplest way to capture asymmetry in your feature set.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "shar_model": {"chapter": "6", "key_points": ["Replaces daily RV with RS+ and RS- as separate regressors", "beta_d^- > beta_d^+ (bad vol predicts more future vol)", "Weekly and monthly terms stay as total RV", "Patton and Sheppard (2015): strongest gains on equity indices", "WHY asymmetry: selloffs trigger cascading margin calls, stop-losses, portfolio insurance, panic selling"], "why_it_matters": "Demonstrates that asymmetric treatment is worth the extra parameter for equity vol.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "jumps_vs_diffusion": {"chapter": "4", "key_points": ["Diffusion = smooth continuous price movement", "Jump = sudden discontinuity (earnings, FOMC, flash crash)", "QV = IV + sum(J^2), so RV captures both", "Continuous component is persistent and forecastable; jumps are largely transient"], "why_it_matters": "Without separating C from J, your forecast signal is diluted by unpredictable events.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "bpv_jump_robustness": {"chapter": "4", "key_points": ["BPV = (pi/2) * sum(|r_i| * |r_{i-1}|)", "Jump hits one interval but its neighbor is normal-sized, so the product is small", "Converges to IV (not QV) even with jumps", "The 'dilution' mechanism: isolated events get dampened", "Barndorff-Nielsen and Shephard (2004)", "Contrast with RV: RV -> IV+sum(J^2) (picks up jumps), BPV -> IV even with jumps"], "why_it_matters": "BPV is the workhorse for constructing the continuous component feature.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "pi_over_2_scaling": {"chapter": "4", "key_points": ["E[|Z|] = sqrt(2/pi) for Z~N(0,1)", "So E[|Z|]^2 = 2/pi, not 1", "Multiplying absolute returns introduces this bias vs. squaring", "pi/2 = 1/(2/pi) is the exact correction"], "why_it_matters": "Understanding this shows BPV is a principled estimator, not a hack.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "jump_component_feature": {"chapter": "4, 6", "key_points": ["J_t = max(RV_t - BPV_t, 0)", "max() ensures non-negativity (measurement error can make RV < BPV on jumpless days)", "C_t = BPV_t is the continuous component", "Jumps are transient; continuous component carries the forecasting signal", "WHY gate by jump_indicator -- only assign J^2 when BNS formally rejects, prevents estimation noise leaking", "C autocorrelation 0.6-0.7, J autocorrelation 0.0-0.1"], "why_it_matters": "This gives you separate C and J features where the model learns that C predicts and J doesn't.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "har_j_model": {"chapter": "6", "key_points": ["Adds J_t as 4th regressor to standard HAR", "beta_J typically negative and small (jumps don't persist)", "Andersen Bollerslev Diebold (2007)", "Most predictive power still from continuous component", "WHY include if weak -- prevents jump contamination from inflating beta_d coefficient on jump days"], "why_it_matters": "Demonstrates that explicitly modeling jumps helps, even if the coefficient is small.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "har_cj_model": {"chapter": "6", "key_points": ["6 slope coefficients: C_d, C_w, C_m, J_d, J_w, J_m", "Continuous coefficients large and significant", "Jump coefficients small and often insignificant at weekly/monthly", "Corsi Pirino Reno (2010)"], "why_it_matters": "Most complete linear C/J decomposition -- your ML model is the nonlinear generalization.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "signed_jumps": {"chapter": "4, 10", "key_points": ["J+ = squared returns from large positive moves > threshold", "J- = squared returns from large negative moves > threshold", "J- substantially more predictive of future vol", "Adds 1-3% QLIKE improvement", "Requires Lee-Mykland -- BNS can't assign direction to individual jumps"], "why_it_matters": "Cheap feature capturing asymmetric tail risk beyond what semivariances provide.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "triple_expansion": {"chapter": "10", "key_points": ["Level = current state, change = momentum, z-score = anomaly", "Same value means different things at different scales (5c spread alarming for 3c stock, normal for 6c)", "Multicollinearity harmless for trees (they pick best split)", "Triples feature count from ~20 base to ~60-80"], "why_it_matters": "Primary reason your feature count grows from ~10 base features to ~30-40 model inputs.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "simple_returns": {"chapter": "1", "key_points": ["Formula: R_t = (P_t - P_{t-1}) / P_{t-1}", "Dimensionless fractions for cross-asset comparison", "Don't add over time: (1+R1)(1+R2)-1 != R1+R2", "Needed as contrast to motivate log returns"], "why_it_matters": "Understanding the limitation of simple returns motivates why the entire RV literature uses log returns.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "conditional_variance": {"chapter": "1", "key_points": ["Unconditional sigma^2 = long-run average, single constant", "Conditional sigma_t^2 = Var(r_t | F_{t-1}), time-varying, what we forecast", "F_{t-1} = filtration, everything observable through yesterday", "Weather analogy: unconditional = annual avg rainfall, conditional = tomorrow's forecast", "Law of total variance links them: sigma^2 = E[sigma_t^2] + Var(E[r_t|F])"], "why_it_matters": "The entire forecasting enterprise -- HAR, HARQ, LightGBM -- is about predicting sigma_t^2, not sigma^2. Without this distinction, the project motivation is unclear.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "price_process": {"chapter": "2", "key_points": ["dp_t = mu_t dt + sigma_t dW_t (Ito diffusion, no jumps)", "mu_t dt = predictable drift, negligible at intraday frequency", "sigma_t dW_t = random shock of magnitude sigma_t -- the volatility part", "Each intraday return: r_{t,i} approx sigma_{t,i} * epsilon_i where epsilon~N(0,1)", "With jumps: dp_t = mu dt + sigma dW + J dN (Poisson jump component)"], "why_it_matters": "This is the data-generating model underlying RV convergence, BPV, and jump tests. Without it, the r^2 approx sigma^2*epsilon^2 step is unmotivated.", "next_review": "2026-05-27T18:00:00Z", "last_tested": "2026-05-27", "consecutive_passes": 1}, "variance_vs_volatility": {"chapter": "2", "key_points": ["RV = realized VARIANCE (sum r^2, units of return^2)", "Realized volatility = sqrt(RV) (units of return)", "Typical daily SPX RV ~ 1e-4, typical daily vol ~ 0.01 (1%)", "Confusing them = factor-of-100 error daily, factor-of-10 annualized"], "why_it_matters": "Dimensional analysis errors silently corrupt QLIKE, position sizing, and VaR -- and are hard to catch because code still runs.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "overnight_return": {"chapter": "3", "key_points": ["Formula: ln(open_t / close_{t-1})", "17.5 hours of information arrival not in intraday RV", "Captures earnings, FOMC, geopolitical events", "Not double-counting: RV measures within-day only", "Data quality issue: corrupted if open unadjusted but close split-adjusted"], "why_it_matters": "After-hours information (especially earnings surprises) drives next-day vol but is invisible to pure intraday RV.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "feature_alignment": {"chapter": "3", "key_points": ["Features computed as-of end-of-day t (available after market close)", "Target: RV_{t+h} at horizons h=1, 5, 22", "Shift applied at TRAINING time by pipeline, NOT in layer code", "First 21 rows = NaN due to 22-day rolling window requirement", "Violating alignment = lookahead bias = inflated backtest results"], "why_it_matters": "Lookahead bias is the #1 cause of unreproducible ML results in finance -- this pattern prevents it at the architecture level.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-28", "consecutive_passes": 2}, "har_core_layer_outputs": {"chapter": "6", "key_points": ["Always emits: log_rv_d, log_rv_w, log_rv_m", "If RQ exists and not all-NaN: + sqrt_rq_d, rq_rv_interaction_d", "If open/close exist and uncorrupted: + overnight_return", "Corruption detection: warns and drops overnight_return if any |r| > 0.5"], "why_it_matters": "Know exactly what features are available for downstream models depending on data quality.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "bns_jump_test": {"chapter": "4", "key_points": ["Z = (RV - BPV) / sqrt(vartheta * RTQ / n)", "vartheta = pi^2/4 + pi - 5 ~ 0.6090 (from Var(RV-BPV) under null)", "Under H0 (no jumps): Z -> N(0,1)", "Conservative alpha=0.999 (Z>3.09) to minimize false positives", "WHY RTQ not RQ: RQ contaminated by jumps (4th power amplifies), RTQ jump-robust"], "why_it_matters": "Gates the jump_component_feature -- without formal testing, negative estimation noise leaks into the jump series.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "realized_tripower_quarticity": {"chapter": "4", "key_points": ["Formula: n * mu_{4/3}^{-3} * sum(|r_i|^{4/3} * |r_{i-1}|^{4/3} * |r_{i-2}|^{4/3})", "mu_{4/3} = 2^{2/3} * Gamma(7/6) / Gamma(1/2) -- moment constant for |Z|^{4/3}", "WHY 4/3: powers in [1,2) are jump-robust; 4/3 * 3 = 4 recovers quarticity", "WHY three neighbors: extends BPV neighbor-dampening to 3 consecutive returns"], "why_it_matters": "Required for BNS test denominator -- without RTQ, jump test is unreliable on jump-contaminated days.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "lee_mykland_test": {"chapter": "4", "key_points": ["L_{t,i} = r_{t,i} / sigma_hat_{t,i} where sigma_hat = sqrt(local BPV over K returns / K)", "Local window K=156 (~2 trading days of context)", "Threshold C_n = sqrt(2 ln n) from Gumbel extreme-value theory", "WHY Gumbel: distribution of max of n normals -- proper multiple-testing correction", "WHY local BPV: vol changes within the day, whole-day estimate misses intraday regimes", "Outputs: per-return binary flag, r^2 (size), sign (direction)", "vs BNS: BNS=daily binary, LM=intraday timing+sizes"], "why_it_matters": "Required for signed jump variation -- BNS can only say 'a jump happened today' but not which return or what direction.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "realized_skewness_kurtosis": {"chapter": "4", "key_points": ["RSkew = sqrt(N) * (1/N)sum(r^3) / ((1/N)sum(r^2))^{3/2}", "RKurt = N * (1/N)sum(r^4) / ((1/N)sum(r^2))^2", "WHY sqrt(N) for skewness: makes it scale-invariant to sampling frequency", "Negative skewness = leftward asymmetry = crash likelihood -> elevated future vol", "High kurtosis = tail risk -> elevated future vol", "RKurt vs RQ: RKurt is NORMALIZED (ratio), RQ is UNnormalized (estimates integral sigma^4)"], "why_it_matters": "Provides distributional information beyond variance level -- negative skew and excess kurtosis signal regime shifts.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "lasso_har": {"chapter": "6", "key_points": ["HAR-X: RV_{t+1} = HAR terms + sum(gamma_j * X_{j,t}) -- extend with extra features", "Common X_j: VIX, VIX innovation, signed return, overnight, volume", "Lasso penalty: min sum(y-y_hat)^2 + lambda*sum|gamma_j| -- L1 sets weak predictors exactly to zero", "Automatic variable selection while keeping core HAR features intact", "Bridge to ML: if Lasso-HAR beats HAR, extra features carry signal; ML tests nonlinear interactions"], "why_it_matters": "The simplest test of whether extra features carry signal before committing to full ML complexity.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "noise_gap_feature": {"chapter": "5", "key_points": ["Formula: (RK - RV_5min) / RV_5min", "WHY as feature: measures microstructure noise intensity", "High noise_gap = illiquid stock/day = higher future vol risk", "Currently 100% NaN in dataset (requires RK computation from tick data)"], "why_it_matters": "A direct liquidity/noise proxy that tree models can split on -- once populated, may improve forecasts on illiquid symbols.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "asymmetry_layer_outputs": {"chapter": "6", "key_points": ["log_rs_positive_d/w/m, log_rs_negative_d/w/m (6 semivariance features)", "log_bpv_d/w (bipower at 2 horizons)", "log_jump_d (jump variation daily only)", "log_cont_d/w (continuous variation at 2 horizons)", "signed_return_d (daily log return as leverage proxy)"], "why_it_matters": "Maps conceptual features to actual column names for experiment configuration and debugging.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "qlike_loss": {"chapter": "16", "key_points": ["Variance-space: (sigma^2/h - ln(sigma^2/h) - 1); log-space: exp(y-y_hat) - (y-y_hat) - 1", "WHY not MSE: MSE dominated by outlier crisis days (quadratic), QLIKE linear in ratio", "Asymmetric: underestimation penalized more (risk management priority)", "Proxy-robust: correct rankings even with noisy RV (Patton 2011)", "Optimal forecast = true variance (asymmetry shapes curve, not minimum)", "Improvement in bps: (Q_base - Q_model)/Q_base * 10000", "Implementation clip: np.clip(diff, -10.0, 30.0) before exp to prevent overflow"], "why_it_matters": "The entire tournament ranking depends on QLIKE -- choosing the wrong metric can reverse model rankings.", "next_review": "2026-05-22T20:00:00Z", "last_tested": "2026-05-22", "consecutive_passes": 0}, "diebold_mariano": {"chapter": "16", "key_points": ["d_t = L(sigma^2, h_A) - L(sigma^2, h_B); DM = d_bar / sqrt(Var_HAC(d_bar))", "WHY HAC standard errors: forecast errors cluster (vol clustering -> error clustering)", "Plain variance biased downward -> over-rejection without HAC", "Bandwidth l = h-1 (MA(h-1) structure in multi-step errors), Bartlett kernel", "Threshold: |DM|>1.96 at 5%, |DM|>2.58 at 1%", "Positive DM = model B better"], "why_it_matters": "Prevents reporting noise as signal -- a 2% QLIKE improvement may not survive a DM test with 3 years of data.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "model_confidence_set": {"chapter": "16", "key_points": ["Sequential elimination: start with all M models, test equal loss, remove worst, repeat", "Range statistic T_R = max|t_ij| over surviving models", "WHY MCS not many DM tests: C(M,2) pairwise tests -> multiple testing problem", "Block bootstrap preserves serial dependence (block length ~ sqrt(T))", "p-value = smallest alpha at which model would be excluded; p>0.10 = survives", "Key insight: many models often statistically indistinguishable"], "why_it_matters": "Controls familywise error rate across the full model tournament -- the formal way to declare winners.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "mincer_zarnowitz": {"chapter": "16", "key_points": ["Regression: sigma^2 = alpha + beta*h + epsilon; efficient if alpha=0, beta=1 jointly (F-test)", "alpha>0 = systematic under-prediction; alpha<0 = over-prediction", "beta<1 = too smooth/conservative; beta>1 = too reactive (chasing noise)", "WHY HAC: same serial correlation issue as DM", "Inputs must be variance-space (apply Duan retransformation first)", "Pooled MZ warning: N>10K makes even beta=1.12 significant (Lindley's paradox)"], "why_it_matters": "Detects systematic bias and miscalibration that QLIKE alone may miss -- a model can have good QLIKE but biased forecasts.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "retransformation_bias": {"chapter": "16", "key_points": ["Problem: E[exp(X)] > exp(E[X]) -- Jensen's inequality, exp is convex", "Parametric: exp(y_hat + sigma^2_epsilon/2) -- assumes Gaussian residuals", "Non-parametric (preferred): exp(y_hat) * mean(exp(residuals)) -- distribution-free", "WHY non-parametric: residuals fat-tailed (kurtosis~1.3), parametric underestimates ~5.3%", "Verified: parametric beta=1.176, non-parametric beta=1.117 (closer to 1.0)"], "why_it_matters": "Every log-space model needs this correction before level-space evaluation (MZ, vol-targeting) -- without it, forecasts are systematically biased.", "next_review": "2026-05-22T20:00:00Z", "last_tested": "2026-05-22", "consecutive_passes": 0}, "vol_targeting_sharpe": {"chapter": "17", "key_points": ["Strategy: w_t = min(sigma_target / sigma_hat_t, max_leverage) -- scale inversely with predicted vol", "Portfolio return: r_VT = w_t * r_asset; Sharpe = mean(r_VT)/std(r_VT) * sqrt(252)", "WHY this test: bridges statistical -> economic significance", "Parameters: target vol 10% ann, max leverage 2x, floor at 1e-8", "Conversion: log-RV -> ann vol: sigma_hat_ann = sqrt(252 * exp(y_hat))"], "why_it_matters": "Answers the trading desk question: does this model make money? A model with 50bps better QLIKE but same Sharpe has academic but not practical value.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "deflated_sharpe": {"chapter": "17", "key_points": ["E[max SR over N trials] ~ sqrt(2 ln N) -- even with zero skill", "N=30 trials -> expected max SR from luck alone ~ 2.61", "Rule of thumb: observed SR must exceed sqrt(2 ln N) to be credible", "Bailey & Lopez de Prado 2014"], "why_it_matters": "Guards against p-hacking in backtest research -- without this correction, every tournament with 30+ models will find a 'winner' by chance.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "purged_kfold_cv": {"chapter": "16", "key_points": ["WHY random k-fold fails: training on day 501 while testing day 500 = future predicting past", "Label overlap: 5-day forward RV for day 498 shares returns with day 502's label", "Purging: remove training obs whose labels overlap with test period (gap = h days)", "Embargo: additional buffer after test fold end (1-2% of sample ~ 10-50 days)", "Expanding window: min_train=504, test=63, step=63, purge_gap=5", "WHY expanding not sliding: more training data per fold, sliding wastes early data"], "why_it_matters": "The #1 methodological error in ML finance papers -- random k-fold produces 20-40% inflated R^2 that vanishes out-of-sample.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "why_harq_helps_h1_not_h5": {"chapter": "2, 6", "key_points": ["Daily RV is a single noisy observation; weekly/monthly averages already smooth over 5/22 days", "At h=1, today's noisy daily RV dominates the forecast (beta_d ~ 0.36)", "At h=5+, weekly/monthly terms carry most weight and they're already noise-averaged", "HARQ's noise-modulation (beta_dQ * sqrt(RQ)) only matters where noise is worst: daily", "Averaging IS denoising -- weekly RV averages 5 independent noise draws, reducing variance by 1/5", "Implication: noise-aware features add value at short horizons, less at long horizons"], "why_it_matters": "You saw HARQ improve at h=1 (+12.7 bps) but overfit at h>=5. This explains why -- and tells you which features to prioritize per horizon.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "why_shar_needs_pooling": {"chapter": "6, 10", "key_points": ["SHAR adds 2 extra parameters (RS+_d, RS-_d replace RV_d) on top of HAR's 3", "On single-stock (~2,500 rows), RS+_m and RS-_m are collinear (rho=0.977)", "Extreme collinearity makes OLS coefficients unstable and meaningless", "Pooled panel (30K+ rows) varies the RS+/RS- ratio across assets, breaking collinearity", "General principle: extra parameters need proportionally more data to estimate reliably", "Alternative fix: Ridge-SHAR (regularization stabilizes without pooling)"], "why_it_matters": "You saw beta_neg/beta_pos = 0.88 on SPY vs 2.0 in the paper (which used pooled panel). This pattern recurs in any extra-parameter extension.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "continuous_vs_jump_persistence": {"chapter": "4, 6", "key_points": ["Vol clustering = autocorrelation driven by persistent market participants and regimes", "Continuous component inherits clustering: same institutional flows, margin pressure, hedging activity drive it day after day", "Jumps are event-driven (earnings, FOMC, flash crash) -- once resolved, the discontinuity doesn't repeat", "C_t autocorrelation 0.6-0.7 vs J_t autocorrelation 0.0-0.1", "This is why HAR-CJ keeps C coefficients large/significant but J coefficients near zero at weekly/monthly", "For ML: continuous variation features dominate importance; jump features provide marginal lift"], "why_it_matters": "This explains why your feature importance shows continuous variation features dominating, with jump features providing marginal lift.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "feature_count_vs_sample_size": {"chapter": "10, 11", "key_points": ["Triple expansion takes ~20 base features to ~60 (level + change + z-score)", "On single-stock SPY (~1,700 rows), feature-to-sample ratio is 1:28", "Trees with depth>3 partition into cells with <50 samples -- splits become noise-driven", "Minimum viable ratio for trees: ~1:50 to 1:100 per feature", "Ridge/Lasso cope by shrinking coefficients toward zero (implicit feature selection)", "Pooling to 30K+ rows fixes the ratio to 1:500, making trees viable", "Alternative: reduce features (use only ~20 raw, no expansion) for small-sample regime"], "why_it_matters": "You saw all 8 LightGBM configs lose by +2700 to +7700 bps on single-stock SPY. Ridge-HAR (3 features) won because it doesn't need to discover splits in thin data.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "noise_quality_vs_asymmetry": {"chapter": "6, 10", "key_points": ["HARQ answers: how much should I trust today's RV signal? (measurement quality dimension)", "SHAR answers: was today's vol driven by fear or calm? (directional decomposition dimension)", "Orthogonal because: a high-noise day can be symmetric or asymmetric; a crash day can have clean or noisy RV", "Empirically: sqrt_rq_d and log_rs_negative_d have correlation < 0.3", "Combining both = adaptively weight AND capture leverage effect", "Ridge-SHAR with RQ interaction is the natural combination (measurement quality + asymmetry)", "For ML: include both feature families; trees will discover when quality modulates asymmetry signal"], "why_it_matters": "Understanding orthogonality tells you which features to combine rather than choosing between them -- the foundation of feature stacking in your pipeline.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "option_contracts_payoffs": {"chapter": "8", "key_points": ["Call option: right to BUY at strike K. Payoff = max(S_T - K, 0). Unlimited upside, zero downside.", "Put option: right to SELL at strike K. Payoff = max(K - S_T, 0). Profits from decline.", "Moneyness: ITM (intrinsic value > 0), ATM (S ~ K), OTM (intrinsic = 0). Options trade in moneyness terms.", "Put-call parity: C - P = S - K*e^{-rT}. Connects calls and puts; violation = arbitrage.", "Time value = option price - intrinsic value. Always non-negative. Decays as T approaches 0.", "American vs European: early exercise matters for puts (rates) and dividends. Most analysis uses European."], "why_it_matters": "Options are the instruments from which IV is extracted -- understanding payoffs is prerequisite to understanding why IV exists and what it represents.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-27", "consecutive_passes": 0}, "black_scholes_formula": {"chapter": "8", "key_points": ["C = S*Phi(d1) - K*e^{-rT}*Phi(d2) where d1 = [ln(S/K) + (r + sigma^2/2)T] / (sigma*sqrt(T)), d2 = d1 - sigma*sqrt(T)", "Assumptions: constant sigma, continuous trading, no jumps, GBM for S, no transaction costs, risk-free rate r constant", "EVERY assumption is violated in practice -- but model is still used as a TRANSLATION DEVICE (price to vol and back)", "Role: not a physical model of reality but a common language. Everyone quotes options in implied-vol units using BS inversion.", "Risk-neutral pricing: E^Q[payoff] discounted at r. The Q-measure probability is NOT the real-world probability.", "Volatility is the ONLY unobservable input. All others (S, K, T, r) are known. Hence 'implied' vol."], "why_it_matters": "BS is the Rosetta Stone of vol trading -- you need it to convert between option prices and IV, which is the raw input to Layer 2 features.", "next_review": "2026-05-27T18:00:00Z", "last_tested": "2026-05-27", "consecutive_passes": 1}, "the_greeks": {"chapter": "8", "key_points": ["Delta (d = dC/dS): first-order price sensitivity. ATM call ~ 0.5. Used for hedging directional exposure.", "Gamma (G = d2C/dS2 = dDelta/dS): curvature. How much delta changes per $1 move. Drives convexity P&L.", "Theta (Th = dC/dT): time decay. Always negative for long options. The 'cost of gamma' -- mirrors G*sigma^2.", "Vega (v = dC/dsigma): sensitivity to implied vol. Most important Greek for vol trading. ATM vega ~ S*sqrt(T)*phi(d1).", "BS PDE equilibrium: Theta + 0.5*G*S^2*sigma^2 + r*S*Delta - r*C = 0. Links theta and gamma -- you pay theta to own gamma.", "Rho (rho = dC/dr): rate sensitivity. Small for short-dated options. Matters for LEAPS.", "For vol forecasting: Vega tells you HOW MUCH a vol forecast error costs in dollar terms."], "why_it_matters": "Greeks are how you convert a vol forecast into trading decisions -- vega gives IV exposure, gamma gives RV exposure, and theta is the cost of being wrong.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "implied_volatility": {"chapter": "8", "key_points": ["Definition: sigma_imp such that BS(S, K, T, r, sigma_imp) = market_price. Unique solution (BS monotone in sigma).", "Numerical inversion: Newton-Raphson using vega as derivative. sigma_{n+1} = sigma_n - (BS(sigma_n) - P_mkt) / vega(sigma_n). Converges in 3-5 iterations.", "IV is NOT a forecast of future RV. It is a PRICE that includes risk premium. Systematically IV > RV.", "Rebonato's 'wrong number in wrong formula': IV is the wrong sigma put into the wrong model to recover the right price.", "IV is quoted in annualized percent terms. To convert to daily: sigma_daily = sigma_ann / sqrt(252).", "For ATM options: IV approximates the market's best guess of future annualized vol PLUS a risk premium.", "IV responds to supply/demand: bid for protection (puts) raises IV even without fundamental vol change."], "why_it_matters": "IV is the raw signal from options markets -- it carries FORWARD-LOOKING information that lagged RV cannot, making it the most powerful single feature for RV forecasting at h=5 and h=22.", "next_review": "2026-05-27T18:00:00Z", "last_tested": "2026-05-27", "consecutive_passes": 1}, "iv_surface": {"chapter": "8", "key_points": ["sigma_imp(K, T) is a 2D surface: strike K (or moneyness) on x-axis, maturity T on y-axis, IV on z-axis.", "If BS were correct (GBM with constant vol): surface would be FLAT. Any shape != flat reveals model failure.", "Strike dimension: skew (equities) or smile (FX) -- driven by fat tails, jumps, leverage effect.", "Maturity dimension: term structure -- driven by mean reversion of vol and event scheduling.", "The surface is NOT static -- it moves in level, slope, and curvature (3 factor structure).", "Quoting conventions: delta-space (25dP, ATM, 25dC) preferred over absolute strike for cross-asset comparison.", "Arbitrage constraints: no calendar spread arb (forward variance > 0), no butterfly arb (convex in strike)."], "why_it_matters": "The IV surface is the raw data from which ALL Layer 2 features are extracted -- skew, term slope, butterfly, and VRP all come from reading this surface.", "next_review": "2026-05-27T18:00:00Z", "last_tested": "2026-05-27", "consecutive_passes": 1}, "vol_skew_and_smile": {"chapter": "8", "key_points": ["Equity skew: IV_OTM_put > IV_ATM > IV_OTM_call. Monotonically decreasing in moneyness. Post-1987 crash phenomenon.", "Causes: (1) leverage effect (falling prices raise vol), (2) crash protection demand, (3) fat left tail in returns.", "Risk reversal: RR_25d = sigma_25dC - sigma_25dP. Negative for equities (put skew). Typical: -3 to -8 vol points.", "FX smile: U-shaped (jumps in both directions). RR approximately 0. Butterfly captures the symmetric kurtosis.", "Skew as regime indicator: steepening skew = rising fear. Flattening = complacency. Inversion = panic.", "In code: iv_skew_d = iv_1m_25dp - iv_1m_25dc (put minus call wing, positive = put skew dominant)."], "why_it_matters": "Skew (risk reversal) is a Layer 2 feature capturing directional crash fear -- when skew steepens without RV rising, it signals expected future volatility increase.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "iv_term_structure": {"chapter": "8", "key_points": ["Normal: upward sloping (long-dated IV > short-dated). Reflects vol mean reversion to long-run level.", "Crisis: inverted (short-dated IV spikes above long-dated). Short-dated captures immediate fear.", "Mean reversion mechanism: if current RV is high, market expects it to decay so long-dated < short-dated.", "Term slope = sigma_long - sigma_short. Positive in calm markets, negative in stress. Key predictive signal.", "Short-dated IV is more volatile than long-dated (vol-of-vol decreases with tenor).", "In code: iv_term_slope_d = iv_3m_atm - iv_1m_atm. Also iv_term_slope_w = 5-day rolling mean.", "VTS ratio (Bennett 2014): VTS = ATM_3m / ATM_1m. VTS > 1 = contango. VTS < 1 = backwardation."], "why_it_matters": "Term structure slope signals the speed of mean reversion priced by the market -- steep positive slope after a spike says 'RV will decay fast', which directly informs forecast horizons h=5 and h=22.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-27", "consecutive_passes": 0}, "butterfly_spread": {"chapter": "8", "key_points": ["BF_25d = 0.5 * (sigma_25dP + sigma_25dC) - sigma_ATM. Average wing IV minus center. Measures smile curvature.", "Interpretation: high BF = market pricing fat tails in BOTH directions (kurtosis premium).", "Orthogonal to skew: RR captures asymmetry (left vs right tail), BF captures symmetric tail weight.", "Typical values: equity BF_25d ~ 1-3 vol points. Spikes to 5+ in crisis (Oct 2008, Mar 2020).", "In code: iv_butterfly_d = 0.5 * (iv_1m_25dp + iv_1m_25dc) - iv_1m_atm. Also iv_butterfly_w = 5-day rolling.", "Crisis detector: BF rising while ATM flat means market expects jumps (either direction) without a directional view."], "why_it_matters": "Butterfly captures jump probability pricing that is orthogonal to directional skew -- it signals when the market expects large moves without knowing the direction, directly relevant to jump-driven RV spikes.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "svi_parametrization": {"chapter": "8", "key_points": ["SVI formula: w(k) = a + b{rho*(k-m) + sqrt((k-m)^2 + sigma^2)} where k = ln(K/F), w = sigma_imp^2 * T.", "5 parameters: a (overall level), b (slope magnitude), rho (rotation/skew), m (translation), sigma (curvature at ATM).", "Fits one maturity slice. Full surface = SVI per slice + interpolation across T.", "Arbitrage-free: constraints on parameters ensure no butterfly or calendar spread arbitrage.", "Lee's moment formula: w(k) ~ 2|k| as |k| large. SVI automatically satisfies this asymptotic limit.", "Industry standard: Gatheral (2004). Used by exchanges (CBOE) and market makers for interpolation.", "Connection to Heston: in the Heston limit, SVI parameters map to vol-of-vol, correlation, and mean reversion."], "why_it_matters": "SVI provides a compact 5-number summary of each smile slice -- these parameters can serve as features instead of raw IV values, reducing dimensionality while preserving arbitrage-free structure.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "pca_iv_surface": {"chapter": "8", "key_points": ["Cont and da Fonseca (2002): 3 principal components explain 95% of daily IV surface changes.", "PC1 (~70% variance): LEVEL shift -- entire surface moves up/down. Correlates with VIX changes.", "PC2 (~15% variance): SLOPE -- short-dated vs long-dated diverge. Term structure steepening/flattening.", "PC3 (~10% variance): CURVATURE -- wings move relative to center. Smile widening/narrowing.", "Implication for features: ATM IV (level), term slope (PC2), butterfly (PC3) together span the surface information.", "Why only 3-4 features suffice: RR (skew) captures the strike-asymmetric part PCA misses.", "Stability: factor structure is stable across equity indices globally. Less stable for single stocks."], "why_it_matters": "Validates our Layer 2 feature choice: ATM IV + term slope + butterfly + skew together reconstruct essentially all the information in the full IV surface with just 4 numbers.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "model_free_implied_variance": {"chapter": "8, 9", "key_points": ["Britten-Jones and Neuberger (2000): E^Q[integral of sigma^2 dt] = 2*integral of OTM_price/K^2 dK.", "No model assumptions needed -- derived purely from no-arbitrage. Works even if BS is wrong.", "Requires a continuum of strikes (liquid OTM options at all K). In practice: discrete sum over available strikes.", "The integral weights OTM options by 1/K^2 -- deep OTM options contribute more per dollar of premium.", "Key insight: the OPTIONS MARKET implicitly prices a VARIANCE expectation, not a vol expectation.", "Demeterfi et al (1999): connects to log-contract replication for variance swap payoff."], "why_it_matters": "Model-free variance is the theoretically correct measure of options-implied vol -- VIX is just its discrete approximation. Understanding this clarifies what VIX actually measures.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-27", "consecutive_passes": 0}, "vix_construction": {"chapter": "8, 9", "key_points": ["VIX^2 = (2/T) * sum(dK_i/K_i^2) * e^{rT} * midpoint(K_i) -- sum over OTM calls and puts.", "30-day horizon: interpolates between two nearest monthly expirations to get exactly 30 calendar days.", "VIX is quoted in annualized vol points (not variance). VIX=20 means expected 30-day annualized vol ~ 20%.", "Systematically overestimates RV: mean VIX ~ 19%, mean 30-day RV ~ 15%. Gap = VRP ~ 4 vol points.", "VIX spikes are asymmetric: can double in days but takes months to halve.", "VIX is NOT directly tradeable -- only via futures/options. VIX futures != VIX spot (term structure premium).", "CBOE truncation: includes strikes until two consecutive zero-bid strikes encountered."], "why_it_matters": "VIX is the most accessible options-implied feature and the numerator of VRP -- understanding its construction reveals what information it actually contains.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-27", "consecutive_passes": 0}, "variance_swaps": {"chapter": "9", "key_points": ["Payoff = N_var * (RV^2 - K_var) where K_var = strike (fair variance), RV = realized variance over period.", "Fair strike K_var = model-free implied variance. At inception, swap has zero value. VIX^2 ~ K_var for SPX.", "Vega notional conversion: N_vega = N_var * 2*sqrt(K_var). Industry quotes in vega notional ($ per vol point).", "Long var swap: profits when RV > IV (realized moves exceed implied). Short var swap: collects VRP.", "Convexity: payoff is LINEAR in variance but CONVEX in volatility. Long var swap benefits from vol spikes disproportionately.", "Replication: achieved by continuously delta-hedging a strip of OTM options weighted by 1/K^2.", "Mark-to-market: during life, value depends on current implied variance for remaining period + accrued RV."], "why_it_matters": "Variance swaps are the cleanest instrument for isolating the variance risk premium -- understanding them clarifies why VRP exists and how our model's RV forecast translates to trading profit.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "vrp_definition": {"chapter": "9", "key_points": ["Definition: VRP = E^Q[RV] - E^P[RV]. Unobservable in both terms -- must be estimated.", "Operational proxy: VRP_t = (VIX_t/100)^2 - RV_forecast_t. Better RV forecast produces cleaner VRP estimate.", "Sign: VRP is positive ~85% of the time (Carr and Wu 2009). IV systematically exceeds subsequent RV.", "Magnitude: mean VRP ~ 15-25 variance points (~4 vol points annualized). Time-varying.", "Intuition: investors pay insurance premium for downside protection. Sellers earn this for bearing crash risk.", "In code: vrp_d = (atm_iv/100)^2 - rv*252. Also vrp_w (5-day) and vrp_m (22-day) rolling means.", "Cross-sectional: VRP larger for high-beta stocks, smaller for low-vol names. Varies by sector."], "why_it_matters": "VRP is the bridge between statistical forecasting (QLIKE) and economic value (P&L) -- our model's improved RV forecast produces a cleaner VRP signal that drives trading decisions.", "next_review": "2026-05-29T09:00:00Z", "last_tested": "2026-05-27", "consecutive_passes": 0}, "vrp_predicts_returns": {"chapter": "9", "key_points": ["Bollerslev, Tauchen, Zhou (2009): VRP predicts quarterly equity returns with R^2 = 4-15%.", "Mechanism: high VRP = elevated risk aversion -> investors demand higher expected returns -> future returns higher.", "Time horizon: predictive power strongest at 3-12 month horizons. Weak at daily frequency.", "Alternative to dividend yield: VRP captures short-run risk appetite changes; DY captures long-run valuation.", "Drechsler and Yaron (2011): long-run risk model generates VRP from preference for early resolution of uncertainty.", "Not directly used in our RV forecasting -- but motivates WHY VRP time-variation matters economically."], "why_it_matters": "Establishes that VRP is not noise but a genuine risk factor with economic significance -- motivating its inclusion as a feature and its role in economic value tests.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "vrp_predicts_vol": {"chapter": "9", "key_points": ["Mechanism: high VRP -> IV >> RV -> market expects RV to RISE toward IV. VIX carries forward event info.", "Conversely: low/negative VRP -> IV < RV -> market expects RV to FALL. Post-spike normalization signal.", "Why better than lagged RV alone: IV incorporates scheduled events (earnings, FOMC) that lagged RV cannot see.", "Predictive horizon: strongest at h=5 and h=22 days. At h=1 day, lagged RV persistence dominates.", "Empirical: adding VRP to HAR models improves QLIKE by 3-8% at h=5 (Bekaert and Hoerova 2014).", "Direction: when VIX >> RV_recent (high VRP), expect RV to increase toward VIX level over coming weeks."], "why_it_matters": "This is the core mechanism by which Layer 2 features improve RV forecasts -- options markets see scheduled events and regime shifts BEFORE they appear in realized volatility.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "vrp_decomposition": {"chapter": "9", "key_points": ["Bekaert and Hoerova (2014): VRP = expected variance component + pure risk premium component.", "Bollerslev and Todorov (2011): VRP = diffusive VRP + jump-tail VRP. Most time-variation from tail component.", "Diffusive VRP: compensation for bearing continuous variance risk. Relatively stable over time.", "Jump-tail VRP: compensation for bearing crash risk (large negative jumps). Spikes dramatically in crises.", "Implication: during 'normal' times, VRP ~ constant. During stress, tail VRP dominates all variation.", "For feature engineering: total VRP + a tail-specific measure (VVIX or deep OTM put IV) captures both."], "why_it_matters": "Explains why multiple options features are needed: ATM IV captures level, VRP captures the gap, but VVIX and butterfly specifically target the TAIL component that drives crisis dynamics.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "vvix_vol_of_vol": {"chapter": "9", "key_points": ["VVIX = implied volatility of VIX options. Computed the same way as VIX but using VIX options as underlying.", "Interpretation: how uncertain is the market about FUTURE vol? High VVIX = vol could go anywhere.", "Typical range: VVIX 80-100 (calm), 100-120 (elevated), 120-170 (crisis). Mean ~ 90.", "Realized vol-of-VIX: in code, computed from 22-day rolling sum of squared VIX log-returns * 252.", "VVIX risk premium (in code: vvix_rp_d) = VVIX/100 - realized_vol_of_vix. Implied minus realized vol-of-vol.", "Predictive power: high VVIX predicts larger VIX moves (both up and down) -- useful for RV forecasting at h=5+.", "Captures the TAIL component of VRP (Bollerslev-Todorov): jump risk uncertainty specifically."], "why_it_matters": "VVIX adds information orthogonal to VIX level -- it captures the market's uncertainty about whether vol will spike or collapse, directly relevant to forecast confidence at h=5 and h=22.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "layer2_feature_set": {"chapter": "5, 9", "key_points": ["Core features (from code): log_atm_iv_{d,w,m}, vrp_{d,w,m}, iv_skew_{d,w}, iv_term_slope_{d,w}, iv_butterfly_{d,w}, vvix_d, iv_rv_gap_d, iv_momentum_d.", "Interaction features: atm_iv_x_log_rv_d (per-symbol ATM IV * log RV -- CSV 2023 #1 ML gain source), vix_x_log_rv_d (market-wide).", "Vol-of-vol features: vvix_innovation_d, realized_vol_of_vix_d, vvix_rp_d (implied - realized vol-of-vol).", "Market-wide context: iv_dispersion_d (cross-sectional IV std), vix (raw level for interactions).", "Term structure extras: VTS = ATM_3m/ATM_1m (Bennett 2014), forward_vol_1m3m = sqrt(max(sigma_3m^2*T3-sigma_1m^2*T1,0)/(T3-T1)).", "ALL features use t-1 close (shift(1) in code) to prevent look-ahead bias. Same-day IV is not available at forecast time.", "Data source: Marquee EDRVOL_PERCENT_STANDARD for SPX; per-symbol ATM IV from IVSurfaceLayer cache."], "why_it_matters": "This is the complete specification of Layer 2 in our feature pipeline -- these features represent the options market's forward view and provide the largest QLIKE improvement at h=5 and h=22.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "horizon_dependence_options": {"chapter": "5, 9", "key_points": ["h=1 day: lagged RV persistence is very strong (~0.6 autocorrelation). Hard for options to beat yesterday's RV. Gain: +1-3% QLIKE.", "h=5 days: persistence decays. HAR's weekly component weakens. Options fill gap with EVENT info. Gain: +5-8% QLIKE.", "h=22 days: persistence nearly gone. Monthly RV unpredictable from past alone. Options provide most signal. Gain: +5-10% QLIKE.", "Mechanism: options price SCHEDULED events (FOMC in 2 weeks, earnings in 10 days). These are invisible to lagged RV.", "Analogy: weather -- tomorrow's ~ today's (persistence). Next month's needs atmospheric models (forward info).", "Implication for model design: at h=1, weight Layer 0-1 heavily. At h=5+, weight Layer 2 features more."], "why_it_matters": "Explains the strategic value of Layer 2: our biggest QLIKE gains (5-10%) come at h=5 and h=22 where options features shine -- this is where academic novelty and trading desk value converge.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "vrp_as_ml_feature": {"chapter": "9", "key_points": ["Circular feedback: VRP = IV^2 - E^P[RV]. ML gives better E^P[RV] so VRP estimate becomes less noisy.", "Fouhy (2024): hierarchical XGBoost pipeline -- first model forecasts RV, VRP drives trading signal.", "Standard VRP proxy (VIX^2 - lagged_RV^2) is noisy because lagged RV != expected future RV. ML fixes denominator.", "In practice: first estimate RV_hat from Layer 0-1 features. Then compute VRP_hat = IV^2 - RV_hat. Use VRP_hat in Layer 2.", "This is a SEQUENTIAL pipeline, not simultaneous: base forecast first, then VRP feature second.", "The atm_iv_x_log_rv interaction (in code) directly captures the non-linear relationship between IV level and RV state."], "why_it_matters": "This creates a virtuous cycle: better QLIKE -> cleaner VRP -> better trading signal -> higher Sharpe. It's the mechanism by which statistical improvement translates to economic value.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "gamma_pnl_formula": {"chapter": "17", "key_points": ["Daily P&L = 0.5 * Gamma * S^2 * (sigma^2_realized - sigma^2_implied) * dt. The core formula of vol trading.", "Derivation: from BS PDE, theta + 0.5*G*S^2*sigma^2 = cost of carry. If RV != IV, there's a P&L residual.", "Long gamma (positive G): profits when realized moves EXCEED implied. Lose when markets are quiet.", "Short gamma (negative G): profits when realized moves are SMALLER than implied. Lose on big moves.", "Path dependence: Gamma changes with S (moneyness drift). Total P&L = sum of daily gamma P&L, each with different G_t.", "KEY INSIGHT: P&L is proportional to (RV^2 - IV^2). Our model forecasts RV. If forecast > IV, buy gamma.", "In code: raw_pnl = 0.5 * gamma * spot^2 * (realized_var - iv^2 * dt) per day in economic_value.py."], "why_it_matters": "This formula directly connects our RV forecast to dollar P&L -- every basis point of QLIKE improvement translates to a better estimate of (sigma^2_real - sigma^2_imp), which IS the trading signal.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "atm_straddle_gamma": {"chapter": "17", "key_points": ["Gamma_straddle = 2 * Gamma_call = 2 / (S * sigma_imp * sqrt(T)) for ATM straddle (call + put at same strike).", "Peak at ATM: gamma is maximized when S = K. Falls off as |S-K| increases.", "Maturity effect: Gamma proportional to 1/sqrt(T). Short-dated options have HIGHER gamma.", "Dollar gamma: $G = 0.5 * Gamma * S^2 = S / (sigma_imp * sqrt(T)). Times (sigma^2_real - sigma^2_imp)*dt = daily P&L.", "Practical: with 1-month ATM straddle, 1 variance point difference ~ 3-5 bps P&L per day on notional.", "In code: gamma = 2.0 / (spot * iv_safe * sqrt(T)) where T = tenor_days/252.", "As spot moves from strike: gamma decreases -> P&L sensitivity drops -> 'gamma bleed' from moneyness drift."], "why_it_matters": "Quantifies how much P&L we extract per unit forecast accuracy -- the higher the gamma, the more our RV forecast edge translates into realized trading profit.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "delta_hedged_straddle": {"chapter": "17", "key_points": ["Strategy: Buy (or sell) ATM straddle + delta-hedge. Removes directional S exposure entirely.", "Signal: SELL straddle when ML forecast of RV < IV (expect low vol). BUY when RV_forecast > IV.", "In code: signal = +1 (sell vol) when gap > threshold, -1 (buy vol) when gap < -threshold, 0 otherwise.", "P&L per day = -signal * 0.5 * Gamma * S^2 * (realized_var - iv^2*dt). Normalized by spot for returns.", "Holding period: typically match forecast horizon (h=5 -> hold 1 week, h=22 -> hold 1 month).", "Duan correction: must apply retransformation bias when converting log-RV forecast to variance for IV comparison.", "In code: delta_hedged_sharpe() takes log_rv_predictions, converts to annualized vol, computes signal and P&L."], "why_it_matters": "This is the PRIMARY economic value test for our ML model -- it directly monetizes the RV forecast by trading the gap between our prediction and the market's implied expectation.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "vol_trading_transaction_costs": {"chapter": "17", "key_points": ["Option bid-ask: SPX ATM straddle spread ~ 0.3-0.5 vol points. Per leg: ~0.15-0.25 vol points.", "In code: cost_vol_points = 0.5 per leg. Vega_norm = sqrt(T)*0.3989. Daily cost = 2*cost*vega_norm/holding_period.", "Delta-hedging cost: each hedge ~ 0.5-1 bp of notional. Daily hedging for 22 days ~ 15-22 bp total.", "Amortization: spread paid at entry, amortized over holding_period (22 days default in code).", "Breakeven: need RV forecast error < (bid-ask + hedge costs). Typically ~20-30 var bps accuracy edge.", "QLIKE gains of 30-80 bps over HAR translate to ~ 10-25 var bps better accuracy -> marginal after costs.", "Regime-dependent: costs lower in calm markets but VRP also lower. Costs higher in crisis but VRP wider."], "why_it_matters": "Sets the bar for how much forecast improvement is economically meaningful -- our 30-80 bps QLIKE target translates to barely enough edge to cover costs, making every bps valuable.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "why_delta_hedged_straddle_works": {"chapter": "17", "key_points": ["VRP is positive ~85% of the time (Carr and Wu 2009). Short straddle collects theta > average realized gamma losses.", "Base rate: unconditional short vol earns ~ 4 vol points/year (VRP). Sharpe ~ 0.3-0.5. But left tail is brutal.", "ML edge: better RV forecast identifies WHEN premium is genuinely rich (VRP > cost) vs fair (VRP ~ cost).", "Hit rate: with ML timing, hit rate ~ 88.8% vs 85% unconditional. Small improvement, large P&L impact.", "Conditional entry: only sell when model confidence is high AND VRP exceeds cost threshold. Reduces drawdown.", "Risk management: max position limits, stop-losses, circuit breakers for VIX > 40.", "Key insight: model only needs to correctly rank whether RV will be above or below IV, not predict exact level."], "why_it_matters": "Connects statistical forecasting to real money: the model needs to identify rich premium with high hit rate -- this is the ultimate test of whether our QLIKE improvement has practical value.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "ewma_baseline": {"chapter": "17", "key_points": ["Formula: sigma^2_t = (1-lambda)*r^2_{t-1} + lambda*sigma^2_{t-1}. Exponential decay of past squared returns.", "One parameter: lambda (decay factor). Higher lambda = longer memory. RiskMetrics default: lambda = 0.94 (half-life ~ 11 days).", "Half-life: h = -ln(2)/ln(lambda). Typical range for vol-targeting: 20-60 days. lambda=0.97 -> h~23 days.", "Strengths: simple, no estimation needed, daily updates, captures vol clustering mechanically.", "Weaknesses: symmetric (no leverage effect), equal weighting of up/down, no regime detection, no forward-looking info.", "Industry standard: most risk systems use EWMA or GARCH(1,1) for position sizing. Must beat this or ML adds no value.", "Calibration: optimize lambda to minimize QLIKE over training period. Or use half-life=20 as reasonable default."], "why_it_matters": "EWMA is the practical bar: trading desks already use it for position sizing. Our ML model must demonstrate CLEAR OOS Sharpe improvement over EWMA-based vol-targeting to justify complexity.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "vol_targeting_formula": {"chapter": "17", "key_points": ["Core formula: w_t = sigma_target / sigma_hat_t. Position weight inversely proportional to forecast vol.", "sigma_target: desired portfolio vol level (e.g., 10% annualized). Chosen to match risk budget.", "sigma_hat_t: forecast of next-period vol. From pipeline: sqrt(252 * exp(log_rv_hat)) after Duan correction.", "Leverage cap: w_t = min(sigma_target / sigma_hat_t, max_leverage). Typically max_leverage = 2.0.", "Portfolio return: r_VT_t = w_t * r_asset_t. Realized portfolio vol ~ sigma_target if forecast is accurate.", "In code: vol_targeting_pnl() takes returns + vol_forecast, returns weighted portfolio returns.", "In code: vol_targeting_sharpe() converts log-RV predictions to annualized vol via sqrt(252*exp(log_rv))."], "why_it_matters": "This formula is the mechanism by which every log-RV forecast we produce becomes a portfolio allocation decision -- the entire statistical pipeline terminates here for the vol-targeting economic value test.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "why_vol_targeting_adds_sharpe": {"chapter": "17", "key_points": ["Moreira and Muir (2017): vol-targeting adds +0.3 Sharpe across equities, bonds, FX, commodities.", "Mechanism 1: vol is PREDICTABLE (clustering). Rising vol -> reduce exposure BEFORE drawdown.", "Mechanism 2: leverage effect. Rising vol IS correlated with falling prices. Cutting high-vol = cutting before losses.", "Mechanism 3: return/vol ratio is NOT constant. High-vol periods don't proportionally reward risk.", "The Sharpe gain comes almost entirely from REDUCING LEFT TAIL exposure, not from increasing right returns.", "Better forecast -> earlier detection of vol rise -> more timely position cut -> larger left-tail truncation.", "Quantification: HAR-based targeting gives Sharpe ~ 0.65. EWMA gives ~ 0.55. ML target: >= 0.70."], "why_it_matters": "This is the economic mechanism behind our evaluation target: ML's ability to detect vol spikes EARLIER than EWMA (via forward-looking features) translates directly to Sharpe through left-tail truncation.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "vol_targeting_failure_modes": {"chapter": "17", "key_points": ["Failure mode 1: UNDERPREDICTION in crisis onset. Model slow to detect regime shift -> overweight INTO drawdown.", "Failure mode 2: OVERPREDICTION in recovery. Model keeps predicting high vol during recovery -> underweight rebound.", "Failure mode 3: Low-vol leverage. VIX < 12 -> formula implies leverage > 2x -> amplifies sudden jumps.", "Mitigation FM1: safety floor -- vol_estimate = max(ML_forecast, 1.5*EWMA). Never trust ML below 1.5x EWMA alone.", "Mitigation FM3: hard leverage cap at 2x. In code: np.minimum(target_vol / vol_safe, max_leverage).", "COVID example: models trained on normal data badly underestimated; levered 2x on Feb 19 lost 30%+ by Mar 23.", "Key lesson: vol-targeting Sharpe is NOT free -- it trades left-tail truncation for liquidity/leverage risk."], "why_it_matters": "Understanding failure modes ensures we interpret backtest Sharpe honestly -- and build in safety mechanisms (vol floor, leverage cap) required for any live deployment.", "next_review": null, "last_tested": null, "consecutive_passes": 0}, "tsmom_connection": {"chapter": "17", "key_points": ["Moskowitz, Ooi, Pedersen (2012): TSMOM = sign(r_past) * (sigma_target/sigma_hat). Signal * inverse-vol sizing.", "Every TSMOM implementation uses vol-inverse position sizing as the denominator. QLIKE improvement -> better TSMOM sizing.", "Our project connection: vol-targeting IS the TSMOM sizing engine stripped of the directional signal.", "AQR, Man, Winton all use vol-inverse sizing in CTA/managed-futures strategies. Industry-wide application.", "Implication: any improvement to vol forecasting scales across ALL strategies using inverse-vol sizing.", "Not just equities: TSMOM applies to commodities, FX, fixed income -- all benefit from better vol estimates."], "why_it_matters": "Broadens the project's impact: our vol forecasting improvement doesn't just help one strategy -- it improves position sizing across the entire managed-futures/TSMOM industry.", "next_review": null, "last_tested": null, "consecutive_passes": 0}}, "generated": "2026-05-28T10:22:09", "today": "2026-05-28"};
+
+// ===== CONSTANTS =====
+const TIER_COLORS = {
+  untested: '#f85149',
+  recognized: '#e07d3c',
+  understood: '#f0db4f',
+  mastered: '#3fb950'
+};
+
+const LAYER_COLORS = {
+  0: '#58a6ff',
+  1: '#bc8cff',
+  99: '#f778ba'
+};
+
+// ===== STATE =====
+let selectedNode = null;
+let highlightedNodes = new Set();
+let activeLayer = null;
+
+// ===== INIT =====
+function init() {
+  renderHeader();
+  renderGraph();
+  document.getElementById('gen-stamp').textContent = `Generated: ${DATA.generated}`;
+  document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
+  document.getElementById('graph-container').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget || e.target.tagName === 'svg') {
+      closeSidebar();
+      clearHighlight();
+    }
+  });
+}
+
+// ===== HEADER =====
+function renderHeader() {
+  const totalNodes = DATA.nodes.length;
+  const masteredCount = DATA.nodes.filter(n => n.tier === 'mastered').length;
+  document.getElementById('mastered-count').textContent = `${masteredCount}/${totalNodes}`;
+
+  const dueCount = DATA.due_today.length;
+  const dueEl = document.getElementById('due-count');
+  dueEl.textContent = dueCount;
+  if (dueCount > 0) dueEl.classList.add('urgent');
+
+  const barsEl = document.getElementById('layer-bars');
+  DATA.layers.forEach(layer => {
+    const pct = layer.total > 0 ? ((layer.mastered + layer.understood) / layer.total * 100) : 0;
+    const color = layer.mastered > 0 ? TIER_COLORS.mastered :
+                  layer.understood > 0 ? TIER_COLORS.understood :
+                  layer.recognized > 0 ? TIER_COLORS.recognized : TIER_COLORS.untested;
+    const div = document.createElement('div');
+    div.className = 'layer-bar';
+    div.dataset.layer = layer.id;
+    div.innerHTML = `
+      <span>L${layer.id === 99 ? 'E' : layer.id}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <span>${layer.understood + layer.mastered}/${layer.total}</span>
+    `;
+    div.addEventListener('click', () => toggleLayerFilter(layer.id));
+    barsEl.appendChild(div);
+  });
+}
+
+// ===== GRAPH =====
+function renderGraph() {
+  const container = document.getElementById('graph-container');
+  let width = container.clientWidth;
+  let height = container.clientHeight;
+
+  const svg = d3.select(container)
+    .append('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+  // Zoom
+  const g = svg.append('g');
+  const zoom = d3.zoom()
+    .scaleExtent([0.2, 5])
+    .on('zoom', (event) => g.attr('transform', event.transform));
+  svg.call(zoom);
+
+  // Center initially
+  svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.7));
+
+  // Resize handler (debounced)
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      width = container.clientWidth;
+      height = container.clientHeight;
+      svg.attr('width', width).attr('height', height);
+      const currentTransform = d3.zoomTransform(svg.node());
+      svg.call(zoom.transform, d3.zoomIdentity
+        .translate(width / 2, height / 2)
+        .scale(currentTransform.k));
+    }, 150);
+  });
+
+  // Arrow marker (adjusted refX for line endpoints)
+  svg.append('defs').append('marker')
+    .attr('id', 'arrow')
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 20)
+    .attr('refY', 0)
+    .attr('markerWidth', 4)
+    .attr('markerHeight', 4)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,-4L10,0L0,4')
+    .attr('fill', '#6e7681')
+    .attr('class', 'link-arrow');
+
+  // Build node map for lookup
+  const nodeMap = new Map(DATA.nodes.map(n => [n.id, n]));
+
+  // Compute topological depth for Y positioning
+  const depths = computeDepths(DATA.nodes, nodeMap);
+  const maxDepth = Math.max(...Object.values(depths), 1);
+
+  // Prepare link data
+  const links = DATA.edges.filter(e => nodeMap.has(e.source) && nodeMap.has(e.target));
+
+  // Simulation — structured top-down layout
+  const simulation = d3.forceSimulation(DATA.nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(90).strength(0.15))
+    .force('charge', d3.forceManyBody().strength(-350).distanceMax(350))
+    .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 12).strength(0.7))
+    .force('x', d3.forceX(d => layerXPosition(d.layer, width)).strength(0.12))
+    .force('y', d3.forceY(d => depthYPosition(depths[d.id] || 0, maxDepth, height)).strength(0.35))
+    .velocityDecay(0.55)
+    .alphaDecay(0.06)
+    .alphaMin(0.02)
+    .stop();  // Don't auto-start — we batch ticks off-screen
+
+  // Batch simulation off-screen (no DOM updates until settled)
+  for (let i = 0; i < 300; i++) simulation.tick();
+
+  // Layer hull groups
+  const hullGroup = g.append('g').attr('class', 'hulls');
+
+  // Links — straight lines (much faster than curved paths per frame)
+  const linkGroup = g.append('g').attr('class', 'links');
+  const link = linkGroup.selectAll('line')
+    .data(links)
+    .join('line')
+    .attr('class', 'link')
+    .attr('stroke', '#6e7681')
+    .attr('stroke-width', 1.4)
+    .attr('marker-end', 'url(#arrow)');
+
+  // Nodes
+  const nodeGroup = g.append('g').attr('class', 'nodes');
+  const node = nodeGroup.selectAll('g')
+    .data(DATA.nodes)
+    .join('g')
+    .attr('class', d => {
+      let cls = 'node-group';
+      if (d.overdue) cls += ' node-overdue';
+      return cls;
+    });
+
+  node.append('circle')
+    .attr('class', 'node-circle')
+    .attr('r', d => nodeRadius(d))
+    .attr('fill', d => TIER_COLORS[d.tier] || TIER_COLORS.untested)
+    .attr('stroke', d => d.overdue ? TIER_COLORS.untested : darken(TIER_COLORS[d.tier] || TIER_COLORS.untested))
+    .attr('stroke-width', d => d.overdue ? 2.5 : 1.5);
+
+  node.append('text')
+    .attr('class', 'node-label')
+    .attr('dy', d => nodeRadius(d) + 14)
+    .text(d => formatLabel(d.id));
+
+  // Render settled positions in one paint
+  function renderPositions() {
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  }
+
+  renderPositions();
+  updateHulls(hullGroup, DATA.nodes);
+
+  // Interactions — tooltip with RAF-debounced mousemove
+  const tooltip = document.getElementById('tooltip');
+  let tooltipRaf = false;
+
+  node.on('mouseenter', (event, d) => {
+    tooltip.innerHTML = `<div class="node-name">${d.name}</div><div class="node-tier">${d.tier}${d.overdue ? ' • OVERDUE' : ''}</div>`;
+    tooltip.classList.add('visible');
+  })
+  .on('mousemove', (event) => {
+    if (tooltipRaf) return;
+    tooltipRaf = true;
+    requestAnimationFrame(() => {
+      tooltipRaf = false;
+      const rect = container.getBoundingClientRect();
+      tooltip.style.left = (event.clientX - rect.left + 12) + 'px';
+      tooltip.style.top = (event.clientY - rect.top - 8) + 'px';
+    });
+  })
+  .on('mouseleave', () => {
+    tooltip.classList.remove('visible');
+  })
+  .on('click', (event, d) => {
+    event.stopPropagation();
+    selectNode(d);
+    highlightPrereqs(d, nodeMap, links);
+  });
+
+  // Drag — restart simulation only during drag, freeze after
+  node.call(d3.drag()
+    .on('start', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0.1).restart();
+      d.fx = d.x; d.fy = d.y;
+    })
+    .on('drag', (event, d) => {
+      d.fx = event.x; d.fy = event.y;
+    })
+    .on('end', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null; d.fy = null;
+    })
+  );
+
+  // Tick handler — only active during drag interactions
+  let rafScheduled = false;
+  simulation.on('tick', () => {
+    if (!rafScheduled) {
+      rafScheduled = true;
+      requestAnimationFrame(() => {
+        rafScheduled = false;
+        renderPositions();
+      });
+    }
+  });
+
+  simulation.on('end', () => {
+    renderPositions();
+    updateHulls(hullGroup, DATA.nodes);
+  });
+
+  // Store references for highlight and resize
+  window._graph = { node, link, nodeMap, svg: g, simulation, zoom, svgEl: svg };
+}
+
+function nodeRadius(d) {
+  const base = 10;
+  const extra = Math.min(d.downstream_count * 1.2, 12);
+  return base + extra;
+}
+
+function layerXPosition(layer, w) {
+  // Spread layers horizontally across available space
+  const spread = Math.min(w || 1200, 1400) * 0.35;
+  const positions = { 0: -spread, 1: 0, 99: spread };
+  return positions[layer] || 0;
+}
+
+function depthYPosition(depth, maxDepth, h) {
+  // Roots at top, deepest nodes at bottom
+  const usable = Math.min(h || 800, 1000) * 0.7;
+  return -usable / 2 + (depth / Math.max(maxDepth, 1)) * usable;
+}
+
+function computeDepths(nodes, nodeMap) {
+  // BFS from roots to assign depth (longest path from any root)
+  const depths = {};
+  const children = {};
+  nodes.forEach(n => { depths[n.id] = 0; children[n.id] = []; });
+  nodes.forEach(n => {
+    n.requires.forEach(req => {
+      if (children[req]) children[req].push(n.id);
+    });
+  });
+  // Topological sort via Kahn's
+  const inDegree = {};
+  nodes.forEach(n => { inDegree[n.id] = n.requires.filter(r => nodeMap.has(r)).length; });
+  const queue = nodes.filter(n => inDegree[n.id] === 0).map(n => n.id);
+  while (queue.length) {
+    const id = queue.shift();
+    children[id].forEach(childId => {
+      depths[childId] = Math.max(depths[childId], depths[id] + 1);
+      inDegree[childId]--;
+      if (inDegree[childId] === 0) queue.push(childId);
+    });
+  }
+  return depths;
+}
+
+function formatLabel(id) {
+  // Convert snake_case to readable: "har_model" -> "HAR Model"
+  return id.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function darken(hex) {
+  // Return a slightly darker/more transparent version for stroke
+  return hex + '99';
+}
+
+function truncate(str, max) {
+  return str.length > max ? str.slice(0, max - 1) + '…' : str;
+}
+
+function updateHulls(hullGroup, nodes) {
+  const layerGroups = {};
+  nodes.forEach(n => {
+    if (n.x === undefined) return;
+    if (!layerGroups[n.layer]) layerGroups[n.layer] = [];
+    layerGroups[n.layer].push([n.x, n.y]);
+  });
+
+  hullGroup.selectAll('path').remove();
+  Object.entries(layerGroups).forEach(([layer, points]) => {
+    if (points.length < 3) return;
+    const hull = d3.polygonHull(points);
+    if (!hull) return;
+    const color = LAYER_COLORS[layer] || '#8b949e';
+    hullGroup.append('path')
+      .attr('class', 'layer-hull')
+      .attr('d', hullPath(hull, 30))
+      .attr('fill', color)
+      .attr('stroke', color);
+  });
+}
+
+function hullPath(hull, padding) {
+  // Expand hull outward by padding
+  const centroid = d3.polygonCentroid(hull);
+  const expanded = hull.map(p => {
+    const dx = p[0] - centroid[0];
+    const dy = p[1] - centroid[1];
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const scale = (dist + padding) / dist;
+    return [centroid[0] + dx * scale, centroid[1] + dy * scale];
+  });
+  return `M${expanded.map(p => p.join(',')).join('L')}Z`;
+}
+
+// ===== HIGHLIGHT =====
+function highlightPrereqs(d, nodeMap, links) {
+  const ancestors = new Set();
+  const queue = [...d.requires];
+  while (queue.length) {
+    const id = queue.pop();
+    if (ancestors.has(id)) continue;
+    ancestors.add(id);
+    const n = nodeMap.get(id);
+    if (n) queue.push(...n.requires);
+  }
+  ancestors.add(d.id);
+
+  const { node, link, svg } = window._graph;
+  svg.classed('graph-highlight', true);
+  node.classed('node-highlighted', n => ancestors.has(n.id));
+  link.classed('link-highlighted', l => ancestors.has(l.source.id) && ancestors.has(l.target.id));
+}
+
+function clearHighlight() {
+  const { node, link, svg } = window._graph;
+  if (!svg) return;
+  svg.classed('graph-highlight', false);
+  node.classed('node-highlighted', false);
+  link.classed('link-highlighted', false);
+}
+
+// ===== SIDEBAR =====
+function selectNode(d) {
+  selectedNode = d;
+  const sidebar = document.getElementById('sidebar');
+  const content = document.getElementById('sidebar-content');
+  const nodeMap = window._graph.nodeMap;
+  const detail = DATA.detail[d.id] || {};
+
+  const prereqsHtml = d.requires.length > 0
+    ? d.requires.map(rid => {
+        const rn = nodeMap.get(rid);
+        const met = rn && (rn.tier === 'understood' || rn.tier === 'mastered');
+        return `<li><span class="prereq-icon ${met ? 'met' : 'unmet'}">${met ? '✓' : '✗'}</span>${rn ? rn.name : rid}</li>`;
+      }).join('')
+    : '<li style="color:var(--text-muted)">None (root node)</li>';
+
+  const keyPoints = detail.key_points || [];
+  const whyItMatters = detail.why_it_matters || '';
+  const chapter = detail.chapter || '';
+  const consecutivePasses = detail.consecutive_passes || 0;
+  const lastTested = detail.last_tested || 'never';
+  const nextReview = detail.next_review || '—';
+
+  content.innerHTML = `
+    <h2>${d.name}</h2>
+    <span class="tier-badge tier-${d.tier}">${d.tier}</span>
+
+    <section>
+      <h3>Key Points</h3>
+      <ul>${keyPoints.map(kp => `<li>${kp}</li>`).join('')}</ul>
+    </section>
+
+    ${whyItMatters ? `<section><h3>Why It Matters</h3><p class="why-text">${whyItMatters}</p></section>` : ''}
+
+    ${chapter ? `<section><h3>Chapter</h3><span class="chapter-ref">Ch. ${chapter}</span></section>` : ''}
+
+    <section>
+      <h3>Mastery</h3>
+      <div class="mastery-info">
+        <div class="mastery-item"><div class="label">Tier</div><div class="value">${d.tier}</div></div>
+        <div class="mastery-item"><div class="label">Passes</div><div class="value">${consecutivePasses}</div></div>
+        <div class="mastery-item"><div class="label">Last tested</div><div class="value">${lastTested}</div></div>
+        <div class="mastery-item"><div class="label">Next review</div><div class="value">${nextReview}</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h3>Prerequisites</h3>
+      <ul class="prereq-list">${prereqsHtml}</ul>
+    </section>
+  `;
+
+  sidebar.classList.add('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  selectedNode = null;
+  clearHighlight();
+}
+
+// ===== LAYER FILTER =====
+function toggleLayerFilter(layerId) {
+  const bars = document.querySelectorAll('.layer-bar');
+  if (activeLayer === layerId) {
+    activeLayer = null;
+    bars.forEach(b => b.classList.remove('active'));
+    window._graph.node.style('display', null);
+    window._graph.link.style('display', null);
+  } else {
+    activeLayer = layerId;
+    bars.forEach(b => b.classList.toggle('active', parseInt(b.dataset.layer) === layerId));
+    window._graph.node.style('display', d => d.layer === layerId ? null : 'none');
+    window._graph.link.style('display', l => {
+      const sameLayer = l.source.layer === layerId && l.target.layer === layerId;
+      const crossesIn = l.target.layer === layerId;
+      return (sameLayer || crossesIn) ? null : 'none';
+    });
+  }
+}
+
+// ===== GO =====
+init();
+</script>
+</body>
+</html>

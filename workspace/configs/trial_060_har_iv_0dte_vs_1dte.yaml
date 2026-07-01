@@ -1,0 +1,73 @@
+# Trial-060: HAR-IV 0DTE vs 1DTE comparison
+#
+# Hypothesis: har_iv_1dte (using tomorrow's expiry IV) produces better
+# h=1 forecasts than har_iv_0dte (using today's expiry IV) because:
+#   - 0DTE IV at close is backward-looking (option already expired or near-zero
+#     remaining time → model IV is stale/interpolated)
+#   - 1DTE IV at close is forward-looking (option's remaining time value
+#     directly prices E[variance over next trading day])
+#
+# The 0DTE premium over 1W has structurally inverted since Jul 2025
+# (from +0.83 pts historically to -0.20 pts), suggesting the 0DTE signal
+# has degraded. 1DTE should be immune to this because it's always
+# pricing tomorrow's variance regardless of intraday microstructure changes.
+#
+# Design: Linear-only tournament comparing all HAR-IV variants at h=1.
+# No LightGBM — isolates the pure IV tenor signal quality.
+#
+# Requires: iv_1dte column in SPX.parquet (run vol ingest-iv --force first)
+
+name: trial_060_har_iv_0dte_vs_1dte
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-06-15"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options]
+
+model:
+  name: har_iv_1dte
+  params: {}
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0
+  dh_enabled: false
+  vt_enabled: false
+  models:
+    - har
+    - har_iv
+    - har_iv_1w
+    - har_iv_0dte
+    - har_iv_1dte
+  baseline: har_iv_0dte
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_060_har_iv_0dte_vs_1dte

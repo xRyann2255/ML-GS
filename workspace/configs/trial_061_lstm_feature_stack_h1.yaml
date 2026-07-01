@@ -1,0 +1,262 @@
+# Trial-061: LSTM Feature Stacking Ablation (Per-Model Output Selection)
+#
+# Hypothesis: LSTM-derived features (prediction, attention entropy, peak time,
+# embedding) improve LightGBM QLIKE when stacked as additional columns.
+# The LSTM encodes intraday temporal patterns (via rolling_vpin + price_accel)
+# that daily aggregates cannot capture.
+#
+# Design: Single tournament config. Each LightGBM variant sees a DIFFERENT
+# subset of LSTM features via tournament.model_configs.feature_stack_outputs.
+# The LSTM trains ONCE per fold (output-agnostic cache) and each model just
+# filters to its requested columns.
+#
+# Models:
+#   1. lstm           — Standalone LSTM (full sequence model test)
+#   2. lgbm_control   — Champion LightGBM WITHOUT any LSTM features (control)
+#   3. lgbm_pred      — + lstm_prediction only
+#   4. lgbm_pred_attn — + prediction + attention_entropy + peak_time
+#   5. lgbm_all       — ALL LSTM outputs (prediction + attn + embedding)
+#
+# Baselines (from trial-047 reseed envelope):
+#   h=1  har_iv_0dte = 0.1521  lgbm_champion_mean = 0.13679
+#
+# Architecture:
+#   LSTM (independent, trains on intraday bars) → extract features
+#   → LightGBM (128 daily features + LSTM features) → final prediction
+#
+# Sequence features (7 channels):
+#   v2: log_ret, vol_share, buy_ratio, log_n_trades, abs_ret
+#   v3: rolling_vpin (50-bar order flow toxicity), price_accel (momentum change)
+
+name: trial_061_lstm_feature_stack_h1
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+# ---------------------------------------------------------------------------
+# Main model: LightGBM CHAMPION config (used as default for tournament entries)
+# ---------------------------------------------------------------------------
+model:
+  name: lightgbm
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    num_leaves: 16
+    max_depth: 4
+    min_child_samples: 150
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 3
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    base_model: har_iv_0dte
+
+# ---------------------------------------------------------------------------
+# LSTM Feature Stacking: train LSTM on intraday bars, extract ALL features
+# Pipeline-level outputs = superset; per-model filtering via model_configs
+# ---------------------------------------------------------------------------
+feature_stack:
+  source_model: lstm
+  outputs: [prediction, attention_entropy, attention_peak_time, embedding]
+  embedding_dim: 16
+  independent: true
+  model_params:
+    hidden_dim: 128
+    n_layers: 2
+    dropout: 0.3
+    bidirectional: true
+    learning_rate: 3.0e-4
+    weight_decay: 5.0e-4
+    max_epochs: 40
+    batch_size: 256
+    val_fraction: 0.15
+    early_stopping_rounds: 5
+    loss: qlike
+    device: auto
+    precision: auto
+    seed: 42
+  sequences:
+    features:
+      - log_ret
+      - vol_share
+      - buy_ratio
+      - log_n_trades
+      - abs_ret
+      - rolling_vpin
+      - price_accel
+    max_bars: 2340
+
+# ---------------------------------------------------------------------------
+# CV: expanding window, same as champion
+# ---------------------------------------------------------------------------
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_061_lstm_feature_stack_h1
+fold_cache_enabled: true
+
+# ---------------------------------------------------------------------------
+# Sequences: for standalone LSTM model in tournament
+# ---------------------------------------------------------------------------
+sequences:
+  features:
+    - log_ret
+    - vol_share
+    - buy_ratio
+    - log_n_trades
+    - abs_ret
+    - rolling_vpin
+    - price_accel
+  max_bars: 2340
+
+# ---------------------------------------------------------------------------
+# Tournament: ablation across LSTM output subsets
+# ---------------------------------------------------------------------------
+tournament:
+  models:
+    - har                        # Baseline (no LSTM features, own regressors)
+    - har_iv_0dte                # Best linear for h=1
+    - lstm                       # Standalone LSTM (full sequence model)
+    - lgbm_control               # Champion LightGBM, NO lstm features (control)
+    - lgbm_pred                  # + lstm_prediction only
+    - lgbm_pred_attn             # + prediction + attention entropy + peak time
+    - lgbm_all                   # ALL LSTM outputs (pred + attn + 16d embedding)
+
+  model_configs:
+    lstm:
+      name: lstm
+      params:
+        hidden_dim: 128
+        n_layers: 2
+        dropout: 0.3
+        bidirectional: true
+        learning_rate: 3.0e-4
+        weight_decay: 5.0e-4
+        max_epochs: 40
+        batch_size: 256
+        val_fraction: 0.15
+        early_stopping_rounds: 5
+        loss: qlike
+        device: auto
+        precision: auto
+        seed: 42
+      feature_stack_outputs: []    # LSTM model doesn't use feature stacking
+
+    lgbm_control:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_0dte
+      feature_stack_outputs: []    # No LSTM features (pure tabular control)
+
+    lgbm_pred:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_0dte
+      feature_stack_outputs: [prediction]  # Only lstm_prediction
+
+    lgbm_pred_attn:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_0dte
+      feature_stack_outputs: [prediction, attention_entropy, attention_peak_time]
+
+    lgbm_all:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_0dte
+      feature_stack_outputs: [prediction, attention_entropy, attention_peak_time, embedding]
+
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  gsvivs_iv_source: edrvs
+  gsvivs_signal_space: variance
+
+# NOTE: No horizon_overrides needed — each model_configs entry already has
+# base_model: har_iv_0dte in its params. A top-level horizon_override would
+# inject base_model into ALL tournament models (including LSTM, which doesn't
+# accept that param).

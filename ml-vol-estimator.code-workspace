@@ -1,0 +1,404 @@
+{
+    "folders": [
+        {
+            "name": "Slang Databases",
+            "uri": "slang:/"
+        },
+        {
+            "name": "Slang Temporary",
+            "uri": "slang-temporary:/"
+        },
+        {
+            "name": "Slang Favorites",
+            "uri": "slang-favorites:/"
+        },
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "chat.promptFiles": true,
+        "github.copilot.chat.additionalReadAccessPaths": [
+            "h:/"
+        ],
+        "github.copilot.chat.commandAllowlist": {
+            "terminal": ["*"]
+        },
+        "files.exclude": {
+            "**/__pycache__": true,
+            "**/*.pyc": true
+        },
+        "search.exclude": {
+            "workspace/docs/enghub": true
+        },
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false,
+        "[markdown]": {
+            "files.trimTrailingWhitespace": false
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-python.python",
+            "yzhang.markdown-all-in-one",
+            "davidanson.vscode-markdownlint",
+            "redhat.vscode-yaml"
+        ]
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "lint-workspace",
+                "type": "shell",
+                "command": "workspace/lint/lint_task.sh",
+                "windows": { "command": "workspace\\lint\\lint_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/lint_args.json"],
+                "group": "test",
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "lint-slang",
+                "type": "shell",
+                "command": "skills/SLANG_LINT/src/lint_task.sh",
+                "windows": { "command": "skills\\SLANG_LINT\\src\\lint_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/slang_lint_args.json"],
+                "group": "test",
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "lint-validate-memory",
+                "type": "shell",
+                "command": "workspace/lint/lint_task.sh",
+                "windows": { "command": "workspace\\lint\\lint_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/lint_args.json"],
+                "group": "test",
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "search",
+                "type": "shell",
+                "command": "skills/SEARCH/src/search_task.sh",
+                "windows": { "command": "skills\\SEARCH\\src\\search_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/search_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "git",
+                "type": "shell",
+                "command": "skills/GIT/src/git_task.sh",
+                "windows": { "command": "skills\\GIT\\src\\git_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/git_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "git-commit",
+                "type": "shell",
+                "command": "skills/GIT_COMMIT/src/commit_task.sh",
+                "windows": { "command": "skills\\GIT_COMMIT\\src\\commit_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/git_commit_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "gitlab-mr",
+                "type": "shell",
+                "command": "skills/GIT/src/mr_task.sh",
+                "windows": { "command": "skills\\GIT\\src\\mr_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/mr_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "slang-edit",
+                "type": "shell",
+                "command": "skills/SLANG_EDIT/src/edit_task.sh",
+                "windows": { "command": "skills\\SLANG_EDIT\\src\\edit_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/edit_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "slang-review",
+                "type": "shell",
+                "command": "skills/SLANG_REVIEW/src/review_task.sh",
+                "windows": { "command": "skills\\SLANG_REVIEW\\src\\review_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/review_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "slang-regtest",
+                "type": "shell",
+                "command": "skills/SLANG_REGTEST_FIX/src/regtest_fix_task.sh",
+                "windows": { "command": "skills\\SLANG_REGTEST_FIX\\src\\regtest_fix_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/regtest_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "glimpse",
+                "type": "shell",
+                "command": "skills/SLANG_GLIMPSE/src/glimpse_task.sh",
+                "windows": { "command": "skills\\SLANG_GLIMPSE\\src\\glimpse_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/glimpse_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "gitlab-search",
+                "type": "shell",
+                "command": "skills/GITLAB_SEARCH/src/gitlab-search_task.sh",
+                "windows": { "command": "skills\\GITLAB_SEARCH\\src\\gitlab-search_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/gitlab_search_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "gssso-auth",
+                "type": "shell",
+                "command": "skills/GSSSO_AUTH/src/get-cookie_task.sh",
+                "windows": { "command": "skills\\GSSSO_AUTH\\src\\get-cookie_task.cmd" },
+                "args": ["--out-file", "workspace/tmp/gssso_cookie.txt"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "secdb-inspect",
+                "type": "shell",
+                "command": "skills/SECDB_INSPECT/src/inspect_task.sh",
+                "windows": { "command": "skills\\SECDB_INSPECT\\src\\inspect_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/secdb_inspect_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "secdb-diff",
+                "type": "shell",
+                "command": "skills/SECDB_DIFF/src/diff_task.sh",
+                "windows": { "command": "skills\\SECDB_DIFF\\src\\diff_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/secdb_diff_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "canvas",
+                "type": "shell",
+                "command": "skills/CANVAS/src/canvas_task.sh",
+                "windows": { "command": "skills\\CANVAS\\src\\canvas_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/canvas_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "dirget",
+                "type": "shell",
+                "command": "skills/DIRGET/src/dirget_task.sh",
+                "windows": { "command": "skills\\DIRGET\\src\\dirget_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/dirget_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "slang-test-coverage",
+                "type": "shell",
+                "command": "skills/SLANG_TEST_COVERAGE/src/coverage_task.sh",
+                "windows": { "command": "skills\\SLANG_TEST_COVERAGE\\src\\coverage_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/slang_test_coverage_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "forward-network",
+                "type": "shell",
+                "command": "skills/FORWARD_NETWORK/src/fwd_api_task.sh",
+                "windows": { "command": "skills\\FORWARD_NETWORK\\src\\fwd_api_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/forward_network_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "nds-infra",
+                "type": "shell",
+                "command": "skills/NDS_INFRA/src/nds_task.sh",
+                "windows": { "command": "skills\\NDS_INFRA\\src\\nds_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/nds_infra_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "pdf-reader",
+                "type": "shell",
+                "command": "skills/PDF_READER/src/read_pdf_task.sh",
+                "windows": { "command": "skills\\PDF_READER\\src\\read_pdf_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/pdf_reader_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "prime-query",
+                "type": "shell",
+                "command": "skills/PRIME_QUERY/src/prime_task.sh",
+                "windows": { "command": "skills\\PRIME_QUERY\\src\\prime_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/prime_query_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "secdb-position",
+                "type": "shell",
+                "command": "skills/SECDB_POSITION/src/position_task.sh",
+                "windows": { "command": "skills\\SECDB_POSITION\\src\\position_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/secdb_position_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "secdb-translog",
+                "type": "shell",
+                "command": "skills/SECDB_TRANSLOG/src/translog_task.sh",
+                "windows": { "command": "skills\\SECDB_TRANSLOG\\src\\translog_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/secdb_translog_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "slang-eval",
+                "type": "shell",
+                "command": "skills/SLANG_EVAL/src/eval_task.sh",
+                "windows": { "command": "skills\\SLANG_EVAL\\src\\eval_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/slang_eval_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "slang-review-inspect",
+                "type": "shell",
+                "command": "skills/SLANG_REVIEW_INSPECT/src/review_inspect_task.sh",
+                "windows": { "command": "skills\\SLANG_REVIEW_INSPECT\\src\\review_inspect_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/review_inspect_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "symphony",
+                "type": "shell",
+                "command": "skills/SYMPHONY/src/symphony_task.sh",
+                "windows": { "command": "skills\\SYMPHONY\\src\\symphony_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/symphony_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "tmd",
+                "type": "shell",
+                "command": "skills/TMD/src/tmd_task.sh",
+                "windows": { "command": "skills\\TMD\\src\\tmd_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/tmd_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "etask",
+                "type": "shell",
+                "command": "skills/ETASK/src/etask_task.sh",
+                "windows": { "command": "skills\\ETASK\\src\\etask_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/etask_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "procmon-jobs",
+                "type": "shell",
+                "command": "skills/PROCMON_JOBS/src/procmon_jobs_task.sh",
+                "windows": { "command": "skills\\PROCMON_JOBS\\src\\procmon_jobs_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/procmon_jobs_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "kill-orphans",
+                "type": "shell",
+                "command": "skills/KILL_ORPHANS/src/kill_orphans_task.sh",
+                "windows": { "command": "skills\\KILL_ORPHANS\\src\\kill_orphans_task.cmd" },
+                "args": [],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "gitlab-pipelines",
+                "type": "shell",
+                "command": "skills/GITLAB_PIPELINES/src/pipelines_task.sh",
+                "windows": { "command": "skills\\GITLAB_PIPELINES\\src\\pipelines_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/gitlab_pipelines_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "cvs",
+                "type": "shell",
+                "command": "skills/CVS/src/cvs_task.sh",
+                "windows": { "command": "skills\\CVS\\src\\cvs_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/cvs_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "enghub",
+                "type": "shell",
+                "command": "skills/ENGHUB/src/enghub_task.sh",
+                "windows": { "command": "skills\\ENGHUB\\src\\enghub_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/enghub_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "slang-copilot",
+                "type": "shell",
+                "command": "skills/SLANG_COPILOT/src/copilot_task.sh",
+                "windows": { "command": "skills\\SLANG_COPILOT\\src\\copilot_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/slang_copilot_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "data-ingest",
+                "type": "shell",
+                "command": "skills/DATA_INGEST/src/ingest_task.sh",
+                "windows": { "command": "skills\\DATA_INGEST\\src\\ingest_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/ingest_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "feature-build",
+                "type": "shell",
+                "command": "skills/FEATURE_BUILD/src/feature_task.sh",
+                "windows": { "command": "skills\\FEATURE_BUILD\\src\\feature_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/feature_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "model-train",
+                "type": "shell",
+                "command": "skills/MODEL_TRAIN/src/train_task.sh",
+                "windows": { "command": "skills\\MODEL_TRAIN\\src\\train_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/train_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "evaluate",
+                "type": "shell",
+                "command": "skills/EVALUATE/src/eval_task.sh",
+                "windows": { "command": "skills\\EVALUATE\\src\\eval_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/eval_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "backtest",
+                "type": "shell",
+                "command": "skills/BACKTEST/src/backtest_task.sh",
+                "windows": { "command": "skills\\BACKTEST\\src\\backtest_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/backtest_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "research",
+                "type": "shell",
+                "command": "skills/RESEARCH/src/research_task.sh",
+                "windows": { "command": "skills\\RESEARCH\\src\\research_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/research_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "notebook",
+                "type": "shell",
+                "command": "skills/NOTEBOOK/src/notebook_task.sh",
+                "windows": { "command": "skills\\NOTEBOOK\\src\\notebook_task.cmd" },
+                "args": ["--args-file", "workspace/tmp/notebook_args.json"],
+                "presentation": { "reveal": "always", "panel": "new", "close": true, "showReuseMessage": false }
+            },
+            {
+                "label": "post-open",
+                "type": "shell",
+                "command": "workspace/bin/post-open.sh",
+                "windows": { "command": "workspace\\bin\\post-open.cmd" },
+                "presentation": { "reveal": "silent", "panel": "shared", "close": true, "showReuseMessage": false },
+                "runOptions": { "runOn": "folderOpen" }
+            }
+        ],
+        "inputs": []
+    }
+}

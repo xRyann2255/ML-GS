@@ -1,0 +1,138 @@
+# Trial-063: XGBoost mirror of trial-036 champion (LightGBM)
+#
+# Hypothesis: XGBoost with identical architecture (custom QLIKE objective,
+# per-horizon tenor-matched HAR-IV init, same regularization) produces
+# comparable or better QLIKE than the LightGBM champion.
+#
+# This is a direct comparison of the gradient boosting framework —
+# same features, same CV, same base models, same hyperparameters (mapped
+# to XGBoost equivalents).
+#
+# Param mapping from LightGBM -> XGBoost:
+#   num_leaves=16      -> max_leaves=16 (with grow_policy=lossguide)
+#   max_depth=4         -> max_depth=4
+#   min_child_samples=150 -> min_child_weight=150 (approx: QLIKE hessian ≈ 1)
+#   feature_fraction=0.8 -> colsample_bytree=0.8
+#   bagging_fraction=0.8 -> subsample=0.8
+#   bagging_freq=3      -> (XGBoost subsamples every round by default)
+#   reg_lambda=5.0      -> reg_lambda=5.0
+#   reg_alpha=0.1       -> reg_alpha=0.1
+#   learning_rate=0.01  -> learning_rate=0.01
+#
+# Baseline: trial_036_CHAMPION.yaml (LightGBM)
+
+name: trial_063_xgboost_champion
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    max_leaves: 16
+    max_depth: 4
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv_1w
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# Per-horizon init: exact tenor matching (same as trial-036)
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0
+  gsvivs_iv_sources:
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+    - spx_atm_iv_1w
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+  explainability:
+    enabled: true
+    methods: [treeshap, ale]
+    treeshap_max_samples: 500
+    ale_features: top_20
+    models: [xgb_hariv0dte_init]
+  models:
+    - ewma
+    - har
+    - har_iv
+    - har_iv_1w
+    - har_iv_0dte
+    - same_day_rv
+    - xgb_hariv0dte_init
+  baseline: har_iv
+  mcs_bootstrap: 10000
+  model_configs:
+    xgb_hariv0dte_init:
+      name: xgboost
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 16
+        max_depth: 4
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_063_xgboost_champion

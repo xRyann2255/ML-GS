@@ -1,0 +1,2440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - Tournament Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" charset="utf-8"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: { primaryColor: '#0f3460', primaryTextColor: '#e4e4e4', primaryBorderColor: '#4fc3f7', lineColor: '#4fc3f7', secondaryColor: '#16213e', tertiaryColor: '#1a1a2e' } });</script>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --text-primary: #e4e4e4;
+            --text-secondary: #a0a0b0;
+            --border: #2a2a4a;
+            --accent: #4fc3f7;
+            --success: #66bb6a;
+            --danger: #ef5350;
+            --warning: #ffa726;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Fira Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+        }
+        .header h1 { margin: 0; font-size: 1.5rem; color: var(--accent); }
+        .header .subtitle { color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.3rem; }
+        .main-layout {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+            max-width: 2200px;
+            margin: 0 auto;
+            height: calc(100vh - 80px);
+        }
+        .chart-area {
+            flex: 7;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .stats-panel {
+            flex: 6;
+            min-width: 920px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        /* Tabs and selectors row */
+        .selector-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .tab-bar {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .tab-btn {
+            padding: 0.5rem 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.15s;
+        }
+        .tab-btn:hover { background: var(--bg-card); }
+        .tab-btn.active {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+            font-weight: 600;
+        }
+        .symbol-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .symbol-selector label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .symbol-selector select {
+            padding: 0.45rem 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        .symbol-selector select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        /* Chart container */
+        .chart-container {
+            flex: 1;
+            min-height: 400px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        /* Controls */
+        .controls {
+            margin-top: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 1rem;
+        }
+        .controls-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-right: 0.5rem;
+        }
+        .model-checks {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.4rem 0.8rem;
+            align-items: center;
+        }
+        .model-check {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .model-check input[type="checkbox"] {
+            accent-color: var(--accent);
+            width: 14px;
+            height: 14px;
+        }
+        .model-check .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .btn-group {
+            display: flex;
+            gap: 0.4rem;
+            margin-left: auto;
+        }
+        .btn-sm {
+            padding: 0.35rem 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.15s;
+        }
+        .btn-sm:hover { background: var(--accent); color: #000; }
+        /* Stats panel */
+        .stats-panel h3 {
+            margin: 0 0 0.75rem 0;
+            font-size: 1rem;
+            color: var(--accent);
+        }
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+        .stats-table th {
+            text-align: left;
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: var(--bg-secondary);
+        }
+        .stats-table td {
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid var(--border);
+            font-variant-numeric: tabular-nums;
+        }
+        .stats-table tbody tr:nth-child(even) td { background: rgba(15,52,96,0.3); }
+        .stats-table tbody tr:hover td { background: rgba(79,195,247,0.08); }
+        .stats-table tr.best td { color: var(--success); font-weight: 600; }
+        .stats-table tr.worst td { color: var(--danger); }
+        .stats-table tr.baseline td { color: var(--text-secondary); font-style: italic; opacity: 0.8; }
+        .stats-table .rank { color: var(--text-secondary); }
+        .stats-table .model-name {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        /* Divergence markers legend */
+        .divergence-note {
+            margin-top: 1rem;
+            padding: 0.6rem;
+            background: var(--bg-card);
+            border-radius: 4px;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+        .divergence-note span { color: var(--warning); }
+        /* Statistical test indicators */
+        .stats-table-wrap { overflow-x: auto; }
+        .bps-pos { color: var(--success); }
+        .bps-neg { color: var(--danger); }
+        .bps-zero { color: var(--text-secondary); }
+        .sig-stars { color: #ffd54f; font-weight: 600; }
+        .badge-mcs {
+            display: inline-block;
+            width: 1.1em;
+            text-align: center;
+            font-weight: 700;
+        }
+        .badge-mcs.included { color: var(--success); }
+        .badge-mcs.excluded { color: var(--text-secondary); }
+        .mz-pass { color: var(--success); }
+        .mz-reject { color: var(--danger); }
+        .vt-good { color: var(--success); font-weight: 600; }
+        .vt-bad { color: var(--danger); }
+        .stats-table th[title] { cursor: help; }
+        .clickable-header {
+            cursor: pointer !important;
+            position: relative;
+            user-select: none;
+            transition: color 0.15s;
+        }
+        .clickable-header:hover {
+            color: var(--accent);
+        }
+        .clickable-header .info-icon {
+            display: inline-block;
+            width: 12px; height: 12px;
+            border: 1px solid var(--text-secondary);
+            border-radius: 50%;
+            font-size: 0.55rem;
+            line-height: 12px;
+            text-align: center;
+            vertical-align: super;
+            margin-left: 2px;
+            opacity: 0;
+            transition: opacity 0.15s;
+            font-style: italic;
+            font-weight: 700;
+        }
+        .clickable-header:hover .info-icon {
+            opacity: 1;
+        }
+        /* Explainer box (inline within stats panel) */
+        .explainer-box {
+            margin-top: 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            animation: explainerIn 0.2s ease;
+        }
+        @keyframes explainerIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .explainer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.7rem 1rem;
+            border-bottom: 1px solid var(--border);
+            background: rgba(79,195,247,0.06);
+        }
+        .explainer-header h4 {
+            margin: 0;
+            font-size: 0.88rem;
+            color: var(--accent);
+        }
+        .explainer-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0 0.2rem;
+            line-height: 1;
+            transition: color 0.15s;
+        }
+        .explainer-close:hover { color: var(--text-primary); }
+        .explainer-body {
+            padding: 0.8rem 1rem;
+        }
+        .explainer-body h5 {
+            color: var(--accent);
+            font-size: 0.78rem;
+            margin: 0.9rem 0 0.3rem 0;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .explainer-body h5:first-child { margin-top: 0; }
+        .explainer-body p {
+            color: var(--text-primary);
+            font-size: 0.82rem;
+            line-height: 1.5;
+            margin: 0 0 0.5rem 0;
+        }
+        .explainer-body .formula {
+            background: var(--bg-primary);
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            margin: 0.4rem 0 0.7rem 0;
+            overflow-x: auto;
+            text-align: center;
+        }
+        .explainer-body .formula .katex { font-size: 0.95rem; }
+        .explainer-body .example {
+            background: rgba(79,195,247,0.06);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 4px 4px 0;
+            padding: 0.5rem 0.8rem;
+            font-size: 0.8rem;
+            margin: 0.4rem 0 0.7rem 0;
+            line-height: 1.45;
+        }
+        .explainer-body .example strong { color: var(--accent); }
+        .explainer-body .mini-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+            margin: 0.4rem 0 0.6rem 0;
+        }
+        .explainer-body .mini-table th {
+            text-align: left;
+            padding: 0.25rem 0.4rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+        }
+        .explainer-body .mini-table td {
+            padding: 0.25rem 0.4rem;
+            border-bottom: 1px solid rgba(42,42,74,0.4);
+        }
+        .explainer-body .mini-table .color-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.3rem;
+        }
+        .explainer-body .assumptions {
+            margin: 0.3rem 0;
+            padding-left: 1rem;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+        .explainer-body .assumptions li { margin-bottom: 0.15rem; }
+        /* Footer */
+        footer {
+            padding: 0.75rem 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            text-align: center;
+        }
+        /* Transition matrix cards */
+        #transition-matrix-container {
+            display: none;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            padding: 1rem;
+            min-height: 400px;
+            overflow-y: auto;
+        }
+        .transition-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 1rem;
+        }
+        .transition-card {
+            background: var(--bg-card);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+        }
+        .transition-card-title {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .transition-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            font-variant-numeric: tabular-nums;
+        }
+        .transition-table th {
+            padding: 0.3rem 0.4rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+        .transition-table th:first-child {
+            text-align: left;
+        }
+        .transition-table td {
+            padding: 0.35rem 0.4rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(42,42,74,0.5);
+        }
+        .transition-table td:first-child {
+            text-align: left;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+        }
+        .transition-table .corner-cell {
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            opacity: 0.6;
+        }
+        /* Model detail panel */
+        .clickable-row { cursor: pointer; transition: background 0.15s; }
+        .clickable-row:hover { background: rgba(79, 195, 247, 0.08) !important; }
+        .model-detail-card { line-height: 1.6; }
+        .model-detail-card h4 { margin: 0 0 0.5rem; color: var(--accent); display: flex; align-items: center; gap: 0.5rem; }
+        .model-detail-card .family-pill {
+            display: inline-block; padding: 0.15rem 0.6rem; border-radius: 10px;
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .family-pill.har { background: #2e7d32; color: #c8e6c9; }
+        .family-pill.lightgbm { background: #1565c0; color: #bbdefb; }
+        .family-pill.xgboost { background: #e65100; color: #ffe0b2; }
+        .family-pill.lstm { background: #6a1b9a; color: #e1bee7; }
+        .family-pill.unknown { background: #455a64; color: #cfd8dc; }
+        .model-detail-card .at-a-glance { display: flex; gap: 1.5rem; flex-wrap: wrap; margin: 0.75rem 0; padding: 0.5rem 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        .model-detail-card .at-a-glance .stat { text-align: center; }
+        .model-detail-card .at-a-glance .stat-value { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
+        .model-detail-card .at-a-glance .stat-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+        .model-detail-card .section-title { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin: 1rem 0 0.4rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .model-detail-card .layer-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+        .model-detail-card .chip { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary); }
+        .model-detail-card .params-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.4rem; margin-bottom: 0.75rem; }
+        .model-detail-card .param-item { display: flex; justify-content: space-between; padding: 0.25rem 0.5rem; background: var(--bg-card); border-radius: 4px; font-size: 0.8rem; }
+        .model-detail-card .param-key { color: var(--text-secondary); }
+        .model-detail-card .param-val { color: var(--text-primary); font-weight: 500; font-family: 'SF Mono', 'Fira Code', monospace; }
+        .model-detail-card .importance-bar-container { margin: 0.2rem 0; display: flex; align-items: center; gap: 0.5rem; }
+        .model-detail-card .importance-bar { height: 14px; background: var(--accent); border-radius: 2px; min-width: 2px; transition: width 0.3s; }
+        .model-detail-card .importance-label { font-size: 0.75rem; color: var(--text-secondary); min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .model-detail-card .importance-pct { font-size: 0.75rem; color: var(--text-primary); min-width: 40px; text-align: right; font-family: monospace; }
+        .model-detail-card .shap-bar-chart { margin: 0.5rem 0; }
+        .model-detail-card .beeswarm-details { margin: 0.5rem 0; }
+        .model-detail-card .beeswarm-details summary { cursor: pointer; color: var(--accent); font-size: 0.8rem; padding: 0.3rem 0; }
+        .model-detail-card .beeswarm-container { margin-top: 0.3rem; }
+        .model-detail-card .ale-grid { margin: 0.5rem 0; }
+        .model-detail-card .coef-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 0.5rem 0; }
+        .model-detail-card .coef-table th { text-align: left; padding: 0.3rem 0.5rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+        .model-detail-card .coef-table td { padding: 0.3rem 0.5rem; font-family: monospace; }
+        .model-detail-card .lineage-graph { margin: 0.75rem 0; padding: 0.5rem; background: var(--bg-card); border-radius: 6px; border: 1px solid var(--border); }
+        .model-detail-card .lineage-graph .mermaid { text-align: center; }
+        .model-detail-card .attribution-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 0.5rem 0; }
+        .model-detail-card .attribution-table th, .model-detail-card .attribution-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); }
+        .model-detail-card .attribution-table th { color: var(--text-secondary); text-align: left; }
+        .model-detail-card .no-data { color: var(--text-secondary); font-style: italic; font-size: 0.8rem; }
+
+        /* Feature description panel */
+        .feature-desc-panel {
+            margin-top: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            display: none;
+        }
+        .feature-desc-panel.visible { display: block; }
+        .feature-desc-panel .feat-name { font-size: 0.9rem; font-weight: 600; color: var(--accent); font-family: 'SF Mono', 'Fira Code', monospace; margin-bottom: 0.3rem; }
+        .feature-desc-panel .feat-formula { font-size: 0.82rem; color: var(--text-primary); margin-bottom: 0.3rem; }
+        .feature-desc-panel .feat-layer { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem; }
+        .feature-desc-panel .feat-interp { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; }
+        .feature-desc-panel .feat-close { float: right; cursor: pointer; color: var(--text-secondary); font-size: 0.9rem; }
+        .feature-desc-panel .feat-close:hover { color: var(--accent); }
+        .shap-bar-chart { cursor: pointer; }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-layout { flex-direction: column; height: auto; }
+            .stats-panel { max-height: 300px; min-width: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <div class="subtitle">{{ subtitle }}</div>
+    </div>
+
+    <div class="main-layout">
+        <div class="chart-area">
+            <!-- Horizon tabs + Symbol selector -->
+            <div class="selector-row">
+                <div class="tab-bar">
+                    {% for h in horizons %}
+                    <button class="tab-btn{% if loop.first %} active{% endif %}"
+                            onclick="switchHorizon({{ h }})" id="tab-h{{ h }}">
+                        h = {{ h }}
+                    </button>
+                    {% endfor %}
+                </div>
+
+                <div class="symbol-selector">
+                    <label for="symbol-select">Symbol:</label>
+                    <select id="symbol-select" onchange="switchSymbol(this.value)">
+                        <option value="__pooled__">All Symbols (pooled median)</option>
+                        {% for sym in symbols %}
+                        <option value="{{ sym }}">{{ sym }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Plotly chart -->
+            <div class="chart-container" id="chart"></div>
+            <!-- Transition matrix grid (hidden by default, shown when gsvivs_matrix mode active) -->
+            <div id="transition-matrix-container"></div>
+
+            <!-- Model controls -->
+            <div class="controls">
+                <span class="controls-label">Models:</span>
+                <div class="model-checks" id="model-checks">
+                    {% for model in models %}
+                    <label class="model-check" title="{{ model.description }}">
+                        <input type="checkbox" checked
+                               onchange="toggleModel('{{ model.name }}', this.checked)"
+                               id="chk-{{ model.name }}">
+                        <span class="color-dot" style="background: {{ model.color }}"></span>
+                        {{ model.name }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="btn-group">
+                    <button class="btn-sm" onclick="showBestOnly()">Best Only</button>
+                    <button class="btn-sm" onclick="showAll()">Show All</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats panel -->
+        <div class="stats-panel">
+            <h3 style="display: flex; justify-content: space-between; align-items: center;">Model Rankings <span id="stats-horizon-label" style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 400;">h={{ horizons[0] }}</span></h3>
+            {% for h in horizons %}
+            <div class="stats-horizon" id="stats-h{{ h }}" style="{% if not loop.first %}display:none{% endif %}">
+              <div class="stats-table-wrap">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Model</th>
+                            <th title="Quasi-likelihood loss, lower is better" class="clickable-header" onclick="openExplainer('qlike')">QLIKE<span class="info-icon">i</span></th>
+                            <th title="QLIKE improvement vs baseline in basis points" class="clickable-header" onclick="openExplainer('bps')">&Delta; bps<span class="info-icon">i</span></th>
+                            <th title="Out-of-sample R-squared" class="clickable-header" onclick="openExplainer('r2')">R&sup2;<span class="info-icon">i</span></th>
+                            <th title="Diebold-Mariano test vs baseline" class="clickable-header" onclick="openExplainer('dm')">DM<span class="info-icon">i</span></th>
+                            <th title="Model Confidence Set membership" class="clickable-header" onclick="openExplainer('mcs')">MCS<span class="info-icon">i</span></th>
+                            <th title="Mincer-Zarnowitz forecast efficiency" class="clickable-header" onclick="openExplainer('mz')">MZ<span class="info-icon">i</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in stats[h] %}
+                        <tr class="{{ row.css_class }} clickable-row" onclick="openModelDetails('{{ row.name }}')">
+                            <td class="rank">{{ row.rank }}</td>
+                            <td>
+                                <div class="model-name">
+                                    <span class="color-dot" style="background: {{ row.color }}"></span>
+                                    {{ row.name }}
+                                </div>
+                            </td>
+                            <td>{{ "%.6f" | format(row.qlike) }}</td>
+                            <td class="{% if row.qlike_bps > 0 %}bps-pos{% elif row.qlike_bps < 0 %}bps-neg{% else %}bps-zero{% endif %}">{{ "%+.1f" | format(row.qlike_bps) }}</td>
+                            <td>{{ "%.4f" | format(row.r_squared) }}</td>
+                            <td><span class="sig-stars">{{ row.dm_stars }}</span> {{ "%.3f" | format(row.dm_pvalue) }}</td>
+                            <td><span class="badge-mcs {% if row.mcs_included %}included{% else %}excluded{% endif %}">{% if row.mcs_included %}&#10003;{% else %}-{% endif %}</span></td>
+                            <td class="{% if row.mz_label == 'Pass' %}mz-pass{% else %}mz-reject{% endif %}" title="{{ row.mz_tooltip }}">{{ row.mz_label }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+              </div>
+            </div>
+            {% endfor %}
+
+            <!-- Vol-Targeting P&L Table -->
+            {% if has_vt_data %}
+            <h3 style="margin-top: 1.5rem; cursor: pointer;" onclick="openExplainer('vt')" title="Click for strategy details">Vol-Targeting P&L <span class="info-icon" style="opacity:0.7">i</span></h3>
+            {% for h in horizons %}
+            <div class="stats-horizon econ-vt-h{{ h }}" id="econ-vt-h{{ h }}" style="{% if not loop.first %}display:none{% endif %}">
+              <div class="stats-table-wrap">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Model</th>
+                            <th title="Annualized Sharpe of portfolio sized by inverse forecast vol (target=10%, max leverage=2x)">Sharpe</th>
+                            <th title="Annualized return (%) of the vol-targeting strategy">Ann Ret</th>
+                            <th title="Annualized volatility (%) of the vol-targeting strategy">Ann Vol</th>
+                            <th title="Total return (%) of the vol-targeting strategy over the test period">Cum P&amp;L</th>
+                            <th title="Maximum drawdown of the vol-targeting strategy">Max DD</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in vt_stats[h] %}
+                        <tr class="{{ row.css_class }}">
+                            <td class="rank">{{ row.rank }}</td>
+                            <td>
+                                <div class="model-name">
+                                    <span class="color-dot" style="background: {{ row.color }}"></span>
+                                    {{ row.name }}
+                                </div>
+                            </td>
+                            <td class="{% if row.vt_sharpe > 0.5 %}vt-good{% elif row.vt_sharpe < 0 %}vt-bad{% endif %}">{{ "%.2f" | format(row.vt_sharpe) }}</td>
+                            <td class="{% if row.vt_ann_ret is not none and row.vt_ann_ret > 0 %}vt-good{% elif row.vt_ann_ret is not none and row.vt_ann_ret < 0 %}vt-bad{% endif %}">{% if row.vt_ann_ret is not none %}{{ "%+.1f" | format(row.vt_ann_ret) }}%{% else %}&mdash;{% endif %}</td>
+                            <td>{% if row.vt_ann_vol is not none %}{{ "%.1f" | format(row.vt_ann_vol) }}%{% else %}&mdash;{% endif %}</td>
+                            <td class="{% if row.vt_pnl is not none and row.vt_pnl > 0 %}vt-good{% elif row.vt_pnl is not none and row.vt_pnl < 0 %}vt-bad{% endif %}">{% if row.vt_pnl is not none %}{{ "%+.1f" | format(row.vt_pnl) }}%{% else %}&mdash;{% endif %}</td>
+                            <td>{% if row.vt_max_dd is not none %}{{ "%.1f" | format(row.vt_max_dd) }}%{% else %}&mdash;{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+              </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <!-- Delta-Hedged Straddle P&L Table -->
+            {% if has_dh_data %}
+            <h3 style="margin-top: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+                <span style="cursor: pointer;" onclick="openExplainer('dh')" title="Click for strategy details">Delta-Hedged Straddle P&L <span class="info-icon" style="opacity:0.7">i</span></span>
+                <button class="btn-sm" onclick="openExplainer('dh_methodology')" title="Full methodology, formulas, and assumptions" style="font-size:0.7rem; padding:0.2rem 0.6rem;">Methodology</button>
+                {% if dh_symbols %}
+                <select id="dh-symbol-select" onchange="switchDHSymbol(this.value)" style="font-size: 0.8rem; padding: 0.2rem 0.5rem; background: #1a1a2e; color: #ccc; border: 1px solid #333; border-radius: 4px;">
+                    <option value="__pooled__">All Symbols (pooled)</option>
+                    {% for sym in dh_symbols %}
+                    <option value="{{ sym }}"{% if sym == 'SPX' %} selected{% endif %}>{{ sym }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </h3>
+
+            <!-- Pooled DH table -->
+            <div class="dh-symbol-view" id="dh-view-__pooled__" style="{% if dh_symbols and 'SPX' in dh_symbols %}display:none{% endif %}">
+            {% for h in horizons %}
+            <div class="stats-horizon econ-dh-h{{ h }}" id="econ-dh-h{{ h }}" style="{% if not loop.first %}display:none{% endif %}">
+              <div class="stats-table-wrap">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Model</th>
+                            <th title="Annualized Sharpe of delta-hedged straddle strategy trading the IV-RV gap">Sharpe</th>
+                            <th title="Annualized return (%) of the delta-hedged straddle strategy">Ann Ret</th>
+                            <th title="Annualized volatility (%) of the delta-hedged straddle strategy">Ann Vol</th>
+                            <th title="Total return (%) of delta-hedged straddle over the test period">Cum P&amp;L</th>
+                            <th title="Maximum drawdown of the straddle strategy">Max DD</th>
+                            <th title="Proportion of trades with positive P&amp;L">Hit Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in dh_stats[h] %}
+                        <tr class="{{ row.css_class }}">
+                            <td class="rank">{{ row.rank }}</td>
+                            <td>
+                                <div class="model-name">
+                                    <span class="color-dot" style="background: {{ row.color }}"></span>
+                                    {{ row.name }}
+                                </div>
+                            </td>
+                            <td class="{% if row.dh_sharpe > 0.5 %}vt-good{% elif row.dh_sharpe < 0 %}vt-bad{% endif %}">{{ "%.2f" | format(row.dh_sharpe) }}</td>
+                            <td class="{% if row.dh_ann_ret is not none and row.dh_ann_ret > 0 %}vt-good{% elif row.dh_ann_ret is not none and row.dh_ann_ret < 0 %}vt-bad{% endif %}">{% if row.dh_ann_ret is not none %}{{ "%+.1f" | format(row.dh_ann_ret) }}%{% else %}&mdash;{% endif %}</td>
+                            <td>{% if row.dh_ann_vol is not none %}{{ "%.1f" | format(row.dh_ann_vol) }}%{% else %}&mdash;{% endif %}</td>
+                            <td class="{% if row.dh_pnl is not none and row.dh_pnl > 0 %}vt-good{% elif row.dh_pnl is not none and row.dh_pnl < 0 %}vt-bad{% endif %}">{% if row.dh_pnl is not none %}{{ "%+.1f" | format(row.dh_pnl) }}%{% else %}&mdash;{% endif %}</td>
+                            <td>{% if row.dh_max_dd is not none %}{{ "%.1f" | format(row.dh_max_dd) }}%{% else %}&mdash;{% endif %}</td>
+                            <td>{% if row.dh_hit_rate is not none %}{{ "%.1f" | format(row.dh_hit_rate * 100) }}%{% else %}&mdash;{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+              </div>
+            </div>
+            {% endfor %}
+            </div>
+
+            <!-- Per-symbol DH tables -->
+            {% for sym in dh_symbols %}
+            <div class="dh-symbol-view" id="dh-view-{{ sym }}" style="{% if sym != 'SPX' %}display:none{% elif 'SPX' not in dh_symbols %}display:none{% endif %}">
+            {% for h in horizons %}
+            {% if h in dh_symbol_stats.get(sym, {}) %}
+            <div class="stats-horizon dh-sym-horizon" data-dh-h="{{ h }}" style="{% if not loop.first %}display:none{% endif %}">
+              <div class="stats-table-wrap">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Model</th>
+                            <th title="Annualized Sharpe of delta-hedged straddle strategy trading the IV-RV gap">Sharpe</th>
+                            <th title="Annualized return (%) of the delta-hedged straddle strategy">Ann Ret</th>
+                            <th title="Annualized volatility (%) of the delta-hedged straddle strategy">Ann Vol</th>
+                            <th title="Total return (%) of delta-hedged straddle over the test period">Cum P&amp;L</th>
+                            <th title="Maximum drawdown of the straddle strategy">Max DD</th>
+                            <th title="Proportion of trades with positive P&amp;L">Hit Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in dh_symbol_stats[sym][h] %}
+                        <tr class="{{ row.css_class }}">
+                            <td class="rank">{{ row.rank }}</td>
+                            <td>
+                                <div class="model-name">
+                                    <span class="color-dot" style="background: {{ row.color }}"></span>
+                                    {{ row.name }}
+                                </div>
+                            </td>
+                            <td class="{% if row.dh_sharpe > 0.5 %}vt-good{% elif row.dh_sharpe < 0 %}vt-bad{% endif %}">{{ "%.2f" | format(row.dh_sharpe) }}</td>
+                            <td class="{% if row.dh_ann_ret is not none and row.dh_ann_ret > 0 %}vt-good{% elif row.dh_ann_ret is not none and row.dh_ann_ret < 0 %}vt-bad{% endif %}">{% if row.dh_ann_ret is not none %}{{ "%+.1f" | format(row.dh_ann_ret) }}%{% else %}&mdash;{% endif %}</td>
+                            <td>{% if row.dh_ann_vol is not none %}{{ "%.1f" | format(row.dh_ann_vol) }}%{% else %}&mdash;{% endif %}</td>
+                            <td class="{% if row.dh_pnl is not none and row.dh_pnl > 0 %}vt-good{% elif row.dh_pnl is not none and row.dh_pnl < 0 %}vt-bad{% endif %}">{% if row.dh_pnl is not none %}{{ "%+.1f" | format(row.dh_pnl) }}%{% else %}&mdash;{% endif %}</td>
+                            <td>{% if row.dh_max_dd is not none %}{{ "%.1f" | format(row.dh_max_dd) }}%{% else %}&mdash;{% endif %}</td>
+                            <td>{% if row.dh_hit_rate is not none %}{{ "%.1f" | format(row.dh_hit_rate * 100) }}%{% else %}&mdash;{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+              </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <div class="divergence-note">
+                <span>&#9646;</span> Vertical markers = dates where model predictions diverge most
+                (spread > 95th percentile).
+            </div>
+
+            <!-- GSVIVS01 Variance Swap Signal P&L Table -->
+            {% if has_gsvivs_data %}
+            <div class="gsvivs-toolbar" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: nowrap; overflow-x: auto;">
+                <h3 style="margin: 0; cursor: pointer; white-space: nowrap;" onclick="openExplainer('gsvivs')" title="Click for strategy details">Variance Swap Signal P&L (GSVIVS01) <span class="info-icon" style="opacity:0.7">i</span></h3>
+                <button class="tab-btn" style="white-space: nowrap;" id="gsvivs-pnl-btn" onclick="setGsvivsChartMode('gsvivs_pnl')" title="Show cumulative wealth chart">&#x1f4c8; P&L Chart</button>
+                <button class="tab-btn" style="white-space: nowrap;" id="gsvivs-signal-btn" onclick="setGsvivsChartMode('gsvivs_signal')" title="Show signal time series (+1 / -1)">&#x21c5; Signal Chart</button>
+                <button class="tab-btn" style="white-space: nowrap;" id="gsvivs-matrix-btn" onclick="setGsvivsChartMode('gsvivs_matrix')" title="Show signal transition matrix per model">&#x229e; Transitions</button>
+            </div>
+            {% if gsvivs_sizing_labels and gsvivs_sizing_labels|length > 1 %}
+            <div class="gsvivs-sizing-toolbar" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; flex-wrap: nowrap; overflow-x: auto;">
+                <span style="opacity:0.6; white-space: nowrap;">Sizing:</span>
+                {% for label in gsvivs_sizing_labels %}
+                <button class="tab-btn gsvivs-sizing-btn{% if label == gsvivs_default_sizing %} active{% endif %}"
+                        style="white-space: nowrap;"
+                        data-sizing="{{ label }}"
+                        onclick="setGsvivsSizing('{{ label }}')"
+                        title="Filter table and chart to the {{ label }} sizing variant">{{ label }}</button>
+                {% endfor %}
+                <span style="opacity:0.6; white-space: nowrap; margin-left: 1rem;" title="Dead-band threshold (signal_space units). Only affects [binary] and [long_flat] modes.">Threshold: {{ gsvivs_short_threshold }}</span>
+            </div>
+            {% else %}
+            <div style="margin-top: 0.5rem; opacity: 0.6; font-size: 0.85em;" title="Dead-band threshold (signal_space units). Only affects [binary] and [long_flat] modes.">Threshold: {{ gsvivs_short_threshold }}</div>
+            {% endif %}
+            {% if gsvivs_iv_labels and gsvivs_iv_labels|length > 1 %}
+            <div class="gsvivs-iv-toolbar" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; flex-wrap: nowrap; overflow-x: auto;">
+                <span style="opacity:0.6; white-space: nowrap;">IV Source:</span>
+                {% for iv_label in gsvivs_iv_labels %}
+                <button class="tab-btn gsvivs-iv-btn{% if loop.first %} active{% endif %}"
+                        style="white-space: nowrap;"
+                        data-iv-idx="{{ loop.index0 }}"
+                        onclick="switchGsvivsIv({{ loop.index0 }})"
+                        title="Show signal results using {{ iv_label }}">{{ iv_label }}</button>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if gsvivs_iv_labels %}
+            {% for iv_label in gsvivs_iv_labels %}
+            {% set iv_idx = loop.index0 %}
+            {% set is_first_iv = loop.first %}
+            {% for h in horizons %}
+            <div class="stats-horizon econ-gsvivs-iv econ-gsvivs-iv-{{ iv_idx }}-h{{ h }}" id="econ-gsvivs-iv-{{ iv_idx }}-h{{ h }}" style="{% if not (is_first_iv and loop.first) %}display:none{% endif %}">
+              <div class="stats-table-wrap">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Model</th>
+                            <th title="Annualized Sharpe (0% risk-free rate)">Sharpe (0%RF)</th>
+                            <th title="Annualized Sharpe (5% risk-free rate)">Sharpe (5%RF)</th>
+                            <th title="Annualized return (%)">Ann Ret</th>
+                            <th title="Annualized volatility (%)">Ann Vol</th>
+                            <th title="Total cumulative return (%) since inception">Total Ret</th>
+                            <th title="Maximum drawdown (%)">Max DD</th>
+                            <th title="Positive days ratio (active days with positive PnL)">Pos Days</th>
+                            <th title="Percentage of days the model goes flat (signal=0, no position)">Flat %</th>
+                            <th title="Precision = TP/(TP+FP). TP: signal=&minus; &amp; index down. FP: signal=&minus; &amp; index up.">Prec</th>
+                            <th title="Recall = TP/(TP+FN). TP: signal=&minus; &amp; index down. FN: signal=+ &amp; index down.">Recall</th>
+                            <th title="F1 = 2&middot;Prec&middot;Recall/(Prec+Recall)">F1</th>
+                            <th title="Matthews Correlation Coefficient. Ranges -1 to +1.">MCC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if iv_label in gsvivs_iv_stats and h in gsvivs_iv_stats[iv_label] %}
+                        {% for row in gsvivs_iv_stats[iv_label][h] %}
+                        <tr class="{{ row.css_class }} gsvivs-row" data-sizing="{{ row.sizing_label }}">
+                            <td class="rank">{{ row.rank }}</td>
+                            <td>
+                                <div class="model-name">
+                                    <span class="color-dot" style="background: {{ row.color }}"></span>
+                                    {{ row.name }}
+                                </div>
+                            </td>
+                            <td class="{% if row.sharpe_0rf > 0.5 %}vt-good{% elif row.sharpe_0rf < 0 %}vt-bad{% endif %}">{{ "%.2f" | format(row.sharpe_0rf) }}</td>
+                            <td class="{% if row.sharpe_5rf > 0.5 %}vt-good{% elif row.sharpe_5rf < 0 %}vt-bad{% endif %}">{{ "%.2f" | format(row.sharpe_5rf) }}</td>
+                            <td class="{% if row.ann_return > 0 %}vt-good{% elif row.ann_return < 0 %}vt-bad{% endif %}">{{ "%+.1f" | format(row.ann_return) }}%</td>
+                            <td>{{ "%.1f" | format(row.ann_vol) }}%</td>
+                            <td class="{% if row.total_return > 0 %}vt-good{% elif row.total_return < 0 %}vt-bad{% endif %}">{{ "%+.1f" | format(row.total_return) }}%</td>
+                            <td>{{ "%.1f" | format(row.max_drawdown) }}%</td>
+                            <td>{{ row.positive_days }}</td>
+                            <td>{{ "%.1f" | format(row.flat_pct) }}%</td>
+                            <td class="{% if row.precision > 0.55 %}vt-good{% elif row.precision < 0.45 %}vt-bad{% endif %}">{{ "%.1f" | format(row.precision * 100) }}%</td>
+                            <td class="{% if row.recall > 0.55 %}vt-good{% elif row.recall < 0.45 %}vt-bad{% endif %}">{{ "%.1f" | format(row.recall * 100) }}%</td>
+                            <td class="{% if row.f1 > 0.55 %}vt-good{% elif row.f1 < 0.45 %}vt-bad{% endif %}">{{ "%.1f" | format(row.f1 * 100) }}%</td>
+                            <td class="{% if row.mcc > 0.2 %}vt-good{% elif row.mcc < 0 %}vt-bad{% endif %}">{{ "%.3f" | format(row.mcc) }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+              </div>
+            </div>
+            {% endfor %}
+            {% endfor %}
+            {% else %}
+            {% for h in horizons %}
+            <div class="stats-horizon econ-gsvivs-h{{ h }}" id="econ-gsvivs-h{{ h }}" style="{% if not loop.first %}display:none{% endif %}">
+              <div class="stats-table-wrap">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Model</th>
+                            <th title="Annualized Sharpe (0% risk-free rate)">Sharpe (0%RF)</th>
+                            <th title="Annualized Sharpe (5% risk-free rate)">Sharpe (5%RF)</th>
+                            <th title="Annualized return (%)">Ann Ret</th>
+                            <th title="Annualized volatility (%)">Ann Vol</th>
+                            <th title="Total cumulative return (%) since inception">Total Ret</th>
+                            <th title="Maximum drawdown (%)">Max DD</th>
+                            <th title="Positive days ratio (active days with positive PnL)">Pos Days</th>
+                            <th title="Percentage of days the model goes flat (signal=0, no position)">Flat %</th>
+                            <th title="Precision = TP/(TP+FP). TP: signal=− &amp; index down. FP: signal=− &amp; index up. How often short calls are correct.">Prec</th>
+                            <th title="Recall = TP/(TP+FN). TP: signal=− &amp; index down. FN: signal=+ &amp; index down. What fraction of drawdowns we caught.">Recall</th>
+                            <th title="F1 = 2·Prec·Recall/(Prec+Recall). Harmonic mean — balances precision and recall for drawdown detection.">F1</th>
+                            <th title="Matthews Correlation Coefficient. Ranges -1 to +1. Uses all 4 cells of confusion matrix. 0 = no better than random.">MCC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in gsvivs_stats[h] %}
+                        <tr class="{{ row.css_class }} gsvivs-row" data-sizing="{{ row.sizing_label }}">
+                            <td class="rank">{{ row.rank }}</td>
+                            <td>
+                                <div class="model-name">
+                                    <span class="color-dot" style="background: {{ row.color }}"></span>
+                                    {{ row.name }}
+                                </div>
+                            </td>
+                            <td class="{% if row.sharpe_0rf > 0.5 %}vt-good{% elif row.sharpe_0rf < 0 %}vt-bad{% endif %}">{{ "%.2f" | format(row.sharpe_0rf) }}</td>
+                            <td class="{% if row.sharpe_5rf > 0.5 %}vt-good{% elif row.sharpe_5rf < 0 %}vt-bad{% endif %}">{{ "%.2f" | format(row.sharpe_5rf) }}</td>
+                            <td class="{% if row.ann_return > 0 %}vt-good{% elif row.ann_return < 0 %}vt-bad{% endif %}">{{ "%+.1f" | format(row.ann_return) }}%</td>
+                            <td>{{ "%.1f" | format(row.ann_vol) }}%</td>
+                            <td class="{% if row.total_return > 0 %}vt-good{% elif row.total_return < 0 %}vt-bad{% endif %}">{{ "%+.1f" | format(row.total_return) }}%</td>
+                            <td>{{ "%.1f" | format(row.max_drawdown) }}%</td>
+                            <td>{{ row.positive_days }}</td>
+                            <td>{{ "%.1f" | format(row.flat_pct) }}%</td>
+                            <td class="{% if row.precision > 0.55 %}vt-good{% elif row.precision < 0.45 %}vt-bad{% endif %}">{{ "%.1f" | format(row.precision * 100) }}%</td>
+                            <td class="{% if row.recall > 0.55 %}vt-good{% elif row.recall < 0.45 %}vt-bad{% endif %}">{{ "%.1f" | format(row.recall * 100) }}%</td>
+                            <td class="{% if row.f1 > 0.55 %}vt-good{% elif row.f1 < 0.45 %}vt-bad{% endif %}">{{ "%.1f" | format(row.f1 * 100) }}%</td>
+                            <td class="{% if row.mcc > 0.2 %}vt-good{% elif row.mcc < 0 %}vt-bad{% endif %}">{{ "%.3f" | format(row.mcc) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+              </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endif %}
+
+            <!-- Inline explainer box (populated by JS) -->
+            <div id="explainer-container"></div>
+        </div>
+    </div>
+
+    <footer>
+        Generated {{ generated_at }} &middot; volforecast &middot; {{ symbol_label }}
+        &middot; {{ n_obs }} observations
+    </footer>
+
+    <script>
+        // ---- Data injected by Python ----
+        const traceDataBySymbol = {{ trace_data_by_symbol | safe }};
+        const horizons = {{ horizons | safe }};
+        const modelNames = {{ model_names | safe }};
+        // Map model name -> swatch color, built from the same metadata used in
+        // the sidebar checkboxes so chart colors match the legend dots.
+        const modelColors = {
+            {% for model in models %}"{{ model.name }}": "{{ model.color }}"{% if not loop.last %}, {% endif %}{% endfor %}
+        };
+
+        // GSVIVS PnL traces use names like "har [binary]" or
+        // "lgbm [asym_long L=2]". Strip the trailing "[...]" suffix so the
+        // lookup hits the bare model name in modelColors.
+        function lookupModelColor(name) {
+            if (modelColors[name]) return modelColors[name];
+            const stripped = stripSizingSuffix(name);
+            return modelColors[stripped] || '#e4e4e4';
+        }
+
+        // Strip a trailing " [...]" sizing suffix from a model name so the
+        // bare name can be used for sidebar checkbox / color lookups.
+        function stripSizingSuffix(name) {
+            return name.replace(/\s*\[[^\]]+\]\s*$/, '');
+        }
+        const bestModels = {{ best_models | safe }};
+        const divergenceLines = {{ divergence_lines | safe }};
+        const statsByHorizon = {{ stats | tojson | safe }};
+        const modelDetailsByHorizon = {{ model_details_json | safe }};
+        const statMeta = {{ stat_meta | tojson | safe }};
+        const econAssumptions = {{ econ_assumptions | tojson | safe }};
+        {% if has_vt_data %}
+        const vtStatsByHorizon = {{ vt_stats | tojson | safe }};
+        {% else %}
+        const vtStatsByHorizon = {};
+        {% endif %}
+        {% if has_dh_data %}
+        const dhStatsByHorizon = {{ dh_stats | tojson | safe }};
+        {% else %}
+        const dhStatsByHorizon = {};
+        {% endif %}
+        {% if has_gsvivs_data %}
+        const gsvivsStatsByHorizon = {{ gsvivs_stats | tojson | safe }};
+        const gsvivsPnlTraces = {{ gsvivs_traces | safe }};
+        const gsvivsIvTraces = {{ gsvivs_iv_traces | safe }};
+        const gsvivsIvLabels = {{ gsvivs_iv_labels | tojson | safe }};
+        const gsvivsSizingLabels = {{ gsvivs_sizing_labels | tojson | safe }};
+        const gsvivsDefaultSizing = {{ gsvivs_default_sizing | tojson | safe }};
+        const gsvivsTransitionData = {{ gsvivs_transition_data | safe }};
+        {% else %}
+        const gsvivsStatsByHorizon = {};
+        const gsvivsPnlTraces = {};
+        const gsvivsIvTraces = {};
+        const gsvivsIvLabels = [];
+        const gsvivsSizingLabels = [];
+        const gsvivsDefaultSizing = '';
+        const gsvivsTransitionData = {};
+        {% endif %}
+
+        // ---- Feature Descriptions ----
+        const FEATURE_DESCRIPTIONS = {
+            // Layer 0: HAR Core
+            "log_rv_d": {layer: "HAR Core", formula: "\\log(RV_t)", desc: "Today's log realized variance, the daily memory component of the HAR model.", source: "5-min returns from tick data"},
+            "log_rv_w": {layer: "HAR Core", formula: "\\log\\bigl(\\tfrac{1}{5}\\sum_{i=0}^{4} RV_{t-i}\\bigr)", desc: "5-day rolling mean of RV, log-transformed. The weekly memory component capturing medium-term vol persistence.", source: "5-min returns from tick data"},
+            "log_rv_m": {layer: "HAR Core", formula: "\\log\\bigl(\\tfrac{1}{22}\\sum_{i=0}^{21} RV_{t-i}\\bigr)", desc: "22-day rolling mean of RV, log-transformed. The monthly memory component capturing long-term vol regime.", source: "5-min returns from tick data"},
+            "sqrt_rq_d": {layer: "HAR Core", formula: "\\sqrt{RQ_t},\\quad RQ = \\tfrac{n}{3}\\sum r_i^4", desc: "Realized quarticity measures the precision of the RV estimate. High RQ = jumpy/illiquid day where RV is noisy.", source: "5-min returns"},
+            "rq_rv_interaction_d": {layer: "HAR Core", formula: "\\log(RV_t) \\times \\sqrt{RQ_t}", desc: "Signal quality interaction (HARQ, Bollerslev, Patton & Quaedvlieg 2016). Tells the model to discount today's RV when measurement quality is poor.", source: "Computed"},
+            "overnight_return": {layer: "HAR Core", formula: "\\log(\\mathrm{Open}_t \\,/\\, \\mathrm{Close}_{t-1})", desc: "Overnight gap captures information released between sessions (earnings, macro news, geopolitical events).", source: "OHLCV"},
+            // Layer 1: Asymmetry
+            "log_rs_positive_d": {layer: "Asymmetry", formula: "\\log\\bigl(\\sum r_i^2 \\cdot \\mathbf{1}_{r_i > 0}\\bigr)", desc: "Daily upside semivariance. Vol from positive returns only. Part of the SHAR decomposition (Barndorff-Nielsen et al. 2010).", source: "5-min returns"},
+            "log_rs_positive_w": {layer: "Asymmetry", formula: "\\log\\bigl(\\overline{RS^+}_{5d}\\bigr)", desc: "Weekly upside semivariance. 5-day average of upside vol.", source: "5-min returns"},
+            "log_rs_positive_m": {layer: "Asymmetry", formula: "\\log\\bigl(\\overline{RS^+}_{22d}\\bigr)", desc: "Monthly upside semivariance. 22-day average of upside vol.", source: "5-min returns"},
+            "log_rs_negative_d": {layer: "Asymmetry", formula: "\\log\\bigl(\\sum r_i^2 \\cdot \\mathbf{1}_{r_i < 0}\\bigr)", desc: "Daily downside semivariance. Vol from negative returns. Leverage effect: negative returns predict higher future vol (Black 1976).", source: "5-min returns"},
+            "log_rs_negative_w": {layer: "Asymmetry", formula: "\\log\\bigl(\\overline{RS^-}_{5d}\\bigr)", desc: "Weekly downside semivariance. Persistent downside vol is a stronger predictor than upside.", source: "5-min returns"},
+            "log_rs_negative_m": {layer: "Asymmetry", formula: "\\log\\bigl(\\overline{RS^-}_{22d}\\bigr)", desc: "Monthly downside semivariance. Long-term asymmetric vol component.", source: "5-min returns"},
+            "log_bpv_d": {layer: "Asymmetry", formula: "\\log(BPV_t),\\; BPV = \\tfrac{\\pi}{2}\\cdot\\tfrac{1}{n-1}\\sum|r_i||r_{i+1}|", desc: "Daily bipower variation. Continuous variation estimator robust to jumps. Barndorff-Nielsen & Shephard (2004).", source: "5-min returns"},
+            "log_bpv_w": {layer: "Asymmetry", formula: "\\log\\bigl(\\overline{BPV}_{5d}\\bigr)", desc: "Weekly bipower variation. 5-day average of jump-robust continuous vol.", source: "5-min returns"},
+            "log_jump_d": {layer: "Asymmetry", formula: "\\log\\bigl(\\max(RV_t - BPV_t,\\, 0)\\bigr)", desc: "Daily jump variation. The discontinuous component of price moves. Large jumps predict short-term vol persistence.", source: "5-min returns"},
+            "log_cont_d": {layer: "Asymmetry", formula: "\\log(CV_t),\\; CV = RV - J \\text{ if jump, else } RV", desc: "Daily continuous variation. Smooth volatility after removing detected jumps.", source: "5-min returns"},
+            "log_cont_w": {layer: "Asymmetry", formula: "\\log\\bigl(\\overline{CV}_{5d}\\bigr)", desc: "Weekly continuous variation. Persistent smooth vol component.", source: "5-min returns"},
+            "signed_return_d": {layer: "Asymmetry", formula: "\\log(C_t / C_{t-1})", desc: "Daily signed return captures the leverage effect. Negative returns predict vol increases, positive returns predict decreases.", source: "OHLCV"},
+            "abs_ret_d": {layer: "Asymmetry", formula: "|\\log(C_t / C_{t-1})|", desc: "Absolute daily return. Daily shock magnitude regardless of direction.", source: "OHLCV"},
+            "abs_ret_w": {layer: "Asymmetry", formula: "\\tfrac{1}{5}\\sum_{i=0}^{4}|r_{t-i}|", desc: "Weekly average absolute return. Captures persistent shock intensity over the past week.", source: "OHLCV"},
+            "ret_5d": {layer: "Asymmetry", formula: "\\sum_{i=0}^{4} r_{t-i}", desc: "Cumulative 5-day return (weekly momentum). Sustained selloffs predict vol continuation.", source: "OHLCV"},
+            // Layer 2: IV Surface + Options
+            "log_atm_iv_d": {layer: "IV Surface", formula: "\\log(IV^{ATM}_{1m})", desc: "Daily log ATM implied vol (1-month tenor). The market's forward-looking estimate of future vol. Single strongest predictor.", source: "Marquee EDRVOL_PERCENT"},
+            "log_atm_iv_w": {layer: "IV Surface", formula: "\\log\\bigl(\\overline{IV^{ATM}_{1m}}_{5d}\\bigr)", desc: "Weekly average of ATM 1-month IV. Smooths out daily noise in implied vol.", source: "Marquee EDRVOL_PERCENT"},
+            "log_atm_iv_m": {layer: "IV Surface", formula: "\\log\\bigl(\\overline{IV^{ATM}_{1m}}_{22d}\\bigr)", desc: "Monthly average of ATM 1-month IV. Long-term implied vol regime.", source: "Marquee EDRVOL_PERCENT"},
+            "log_atm_iv_1w_d": {layer: "IV Surface", formula: "\\log(IV^{ATM}_{1w})", desc: "1-week ATM IV. Best tenor match for h=1/h=5 forecasts. Less term premium contamination than 1-month.", source: "EDRVOL 1-week tenor"},
+            "log_atm_iv_0dte_d": {layer: "IV Surface", formula: "\\log(IV^{ATM}_{0DTE})", desc: "Same-day expiry ATM IV. Prices exactly today's realized vol with zero term premium. Noisy (2.5x daily std vs 1W) but carries gamma/pinning signal.", source: "EDRVOL same-day expiry"},
+            "log_atm_iv_1dte_d": {layer: "IV Surface", formula: "\\log(IV^{ATM}_{1DTE})", desc: "Next-day expiry ATM IV. Prices tomorrow's realized vol. Best single-feature predictor for h=1.", source: "EDRVOL next-day expiry"},
+            "iv_term_slope_d": {layer: "IV Surface", formula: "IV^{ATM}_{3m} - IV^{ATM}_{1m}", desc: "IV term structure slope. Positive = contango (market expects vol to rise), negative = backwardation (mean-reversion expected).", source: "Marquee EDRVOL_PERCENT"},
+            "iv_term_slope_w": {layer: "IV Surface", formula: "\\overline{(IV_{3m} - IV_{1m})}_{5d}", desc: "Weekly average term slope. Persistent term structure shape.", source: "Marquee EDRVOL_PERCENT"},
+            "iv_term_slope_1w1m_d": {layer: "IV Surface", formula: "IV_{1m} - IV_{1w}", desc: "Short-end slope. Captures near-term contango/backwardation. Positive = event premium at 1W that rolls off by 1M.", source: "Marquee EDRVOL_PERCENT"},
+            "iv_term_slope_0dte1w_d": {layer: "IV Surface", formula: "IV_{1w} - IV_{0dte}", desc: "Ultra-short slope. Detects gamma spikes. When 0DTE > 1W (negative slope), near-term fear is elevated.", source: "Marquee EDRVOL_PERCENT"},
+            "log_iv_0dte_1w_ratio_d": {layer: "IV Surface", formula: "\\log(IV_{0dte}) - \\log(IV_{1w})", desc: "De-biased event signal. Log-ratio removes level dependence. High = event day premium, low = calm near-term.", source: "Computed"},
+            "iv_0dte_accel_d": {layer: "IV Surface", formula: "IV_{0dte,t} - MA_5(IV_{0dte})", desc: "0-DTE IV acceleration. Deviation from 5-day moving average. Positive = vol regime change, market repricing near-term risk.", source: "Computed"},
+            "vrp_d": {layer: "IV Surface", formula: "(IV/100)^2 - RV \\times 252", desc: "Daily variance risk premium (Carr & Wu 2009). Positive = IV overprices RV (normal), negative = market underpricing risk.", source: "Computed"},
+            "vrp_w": {layer: "IV Surface", formula: "\\overline{VRP}_{5d}", desc: "Weekly average VRP. Smoothed premium level.", source: "Computed"},
+            "vrp_m": {layer: "IV Surface", formula: "\\overline{VRP}_{22d}", desc: "Monthly average VRP. Structural premium level. Persistent low VRP precedes vol spikes.", source: "Computed"},
+            "iv_rv_gap_d": {layer: "IV Surface", formula: "IV_{ATM} - \\sqrt{RV \\times 252}\\times 100", desc: "Vol-space gap (signal proxy). The raw gap between implied and realized in vol points. Core signal for GSVIVS01.", source: "Computed"},
+            "iv_skew_d": {layer: "Options", formula: "IV_{25\\delta P} - IV_{25\\delta C}", desc: "Daily risk reversal (25-delta). Measures tail demand. High skew = market paying for downside protection.", source: "Marquee EDRVOL_PERCENT"},
+            "iv_skew_w": {layer: "Options", formula: "\\overline{\\text{Skew}}_{5d}", desc: "Weekly average skew. Persistent tail demand.", source: "Marquee EDRVOL_PERCENT"},
+            "iv_butterfly_d": {layer: "Options", formula: "\\tfrac{1}{2}(IV_{25\\delta P} + IV_{25\\delta C}) - IV_{ATM}", desc: "Daily butterfly spread. Measures kurtosis premium (convexity demand). High = fat tails priced in.", source: "Marquee EDRVOL_PERCENT"},
+            "iv_butterfly_w": {layer: "Options", formula: "\\overline{\\text{Butterfly}}_{5d}", desc: "Weekly average butterfly. Persistent convexity premium.", source: "Marquee EDRVOL_PERCENT"},
+            "iv_momentum_d": {layer: "Options", formula: "IV_t - IV_{t-1}", desc: "Daily IV change. Vol trend signal. Rising IV tends to persist short-term.", source: "Computed"},
+            "vvix_d": {layer: "Options", formula: "\\text{VVIX} / 100", desc: "Vol-of-vol (VVIX). Uncertainty about future volatility. Strongest h=22 single feature (p=0.007 in ablation).", source: "CBOE VVIX"},
+            "vvix_innovation_d": {layer: "Options", formula: "\\text{VVIX}_t - \\text{VVIX}_{t-1}", desc: "VVIX daily shock. Sudden jumps in vol-of-vol precede RV spikes.", source: "CBOE VVIX"},
+            "vvix_accel_d": {layer: "Options", formula: "\\text{VVIX}_t - MA_5(\\text{VVIX})", desc: "VVIX acceleration. Deviation from 5-day norm. Positive = vol uncertainty rising faster than trend.", source: "Computed"},
+            "realized_vol_of_vix_d": {layer: "Options", formula: "\\sqrt{252 \\cdot MA_{22}\\bigl((\\log \\tfrac{VIX_t}{VIX_{t-1}})^2\\bigr)}", desc: "Physical vol-of-vol. Realized volatility of VIX itself. Measures actual (not implied) uncertainty about vol.", source: "Computed from VIX"},
+            "vvix_rp_d": {layer: "Options", formula: "\\text{VVIX}/100 - \\sigma^{RV}_{VIX}", desc: "Vol-of-vol risk premium. VVIX overpricing vs physical. High premium = market overpaying for vol protection.", source: "Computed"},
+            "atm_iv_x_log_rv_d": {layer: "Options", formula: "IV_{ATM} \\times \\log(RV)", desc: "IV x RV interaction (daily). #1 ML gain source. Captures regime-dependent IV-RV relationship: when both are high, VRP behaves differently.", source: "Computed"},
+            "atm_iv_x_log_rv_w": {layer: "Options", formula: "\\overline{IV_{ATM}}_w \\times \\log(\\overline{RV}_w)", desc: "IV x RV interaction (weekly). Weekly-scale regime indicator.", source: "Computed"},
+            "atm_iv_x_log_rv_m": {layer: "Options", formula: "\\overline{IV_{ATM}}_m \\times \\log(\\overline{RV}_m)", desc: "IV x RV interaction (monthly). Structural regime indicator at monthly scale.", source: "Computed"},
+            "vix_x_log_rv_d": {layer: "Options", formula: "VIX \\times \\log(RV)", desc: "VIX x RV interaction (daily). Systematic fear x realized vol. High VIX + high RV = crisis mode.", source: "Computed"},
+            "vix_x_log_rv_w": {layer: "Options", formula: "\\overline{VIX}_w \\times \\log(\\overline{RV}_w)", desc: "VIX x RV interaction (weekly). Weekly systematic fear x RV.", source: "Computed"},
+            "vix_x_log_rv_m": {layer: "Options", formula: "\\overline{VIX}_m \\times \\log(\\overline{RV}_m)", desc: "VIX x RV interaction (monthly). Long-term fear x RV regime.", source: "Computed"},
+            "iv_dispersion_d": {layer: "Options", formula: "\\sigma_{\\text{cross-section}}(IV^{ATM}_i)", desc: "Market dispersion. High dispersion = stock-specific risk dominates, low = macro factor drives all vol.", source: "Computed across symbols"},
+            "vix_change_x_abs_ret": {layer: "Options", formula: "\\Delta VIX \\times |r_t|", desc: "VIX change x shock interaction. Captures days where VIX spikes coincide with large moves (regime shift signal).", source: "Computed"},
+            // Layer 3: Noise-Robust
+            "log_rk_d": {layer: "Noise-Robust", formula: "\\log(RK_t)", desc: "Daily realized kernel (Barndorff-Nielsen et al. 2008). Parzen-kernel weighted autocovariances of HF returns, correcting for bid-ask bounce.", source: "Tick data"},
+            "log_rk_w": {layer: "Noise-Robust", formula: "\\log\\bigl(\\overline{RK}_{5d}\\bigr)", desc: "Weekly average realized kernel. Smoothed noise-corrected vol.", source: "Tick data"},
+            "noise_gap_d": {layer: "Noise-Robust", formula: "RV_t - RK_t", desc: "Daily microstructure noise estimate. How much of today's RV is 'real' signal vs bid-ask bounce noise.", source: "Tick data"},
+            "noise_gap_w": {layer: "Noise-Robust", formula: "\\overline{(RV - RK)}_{5d}", desc: "Weekly average noise gap. Persistent microstructure noise level.", source: "Tick data"},
+            "vol_anomaly": {layer: "Noise-Robust", formula: "\\log(N_{\\text{ticks}}) - MA_{22}(\\log N_{\\text{ticks}})", desc: "Tick count deviation from 22-day norm. Flags unusual trading activity. Liquidity shocks (high or low) predict next-day vol.", source: "Tick data"},
+            // Layer 4: Calendar
+            "days_to_fomc": {layer: "Calendar", formula: "\\text{Trading days until next FOMC}", desc: "FOMC proximity. Vol compresses before the meeting (dealers hedge by selling options), then spikes on announcement.", source: "Fed calendar"},
+            "fomc_week": {layer: "Calendar", formula: "\\mathbf{1}_{\\text{FOMC} \\leq 5d}", desc: "Binary FOMC week indicator. Elevated gamma around FOMC creates distinct vol dynamics.", source: "Fed calendar"},
+            "days_to_nfp": {layer: "Calendar", formula: "\\text{Trading days until next NFP}", desc: "Non-Farm Payrolls proximity. Labor data is the second-strongest macro catalyst for equity vol.", source: "BLS calendar"},
+            "nfp_week": {layer: "Calendar", formula: "\\mathbf{1}_{\\text{NFP} \\leq 5d}", desc: "Binary NFP week indicator.", source: "BLS calendar"},
+            "days_to_opex": {layer: "Calendar", formula: "\\text{Trading days until OpEx}", desc: "OpEx proximity. Pin risk and gamma unwind create distinct vol patterns around monthly expiration (3rd Friday).", source: "Exchange calendar"},
+            "opex_week": {layer: "Calendar", formula: "\\mathbf{1}_{\\text{OpEx} \\leq 5d}", desc: "Binary OpEx week indicator. Gamma effects concentrate in the final week.", source: "Exchange calendar"},
+            "day_of_week": {layer: "Calendar", formula: "d \\in \\{0,1,2,3,4\\}", desc: "Day-of-week seasonality. Monday tends to have higher vol (weekend gap), Friday lower (position squaring).", source: "Calendar"},
+            "month": {layer: "Calendar", formula: "m \\in \\{1,\\ldots,12\\}", desc: "Month seasonality. September/October historically higher vol, summer months lower.", source: "Calendar"},
+            "quarter_end": {layer: "Calendar", formula: "\\mathbf{1}_{\\text{last 5d of quarter}}", desc: "Quarter-end rebalancing flag. Pension fund and index rebalancing creates vol from large flows.", source: "Calendar"},
+            "year_end": {layer: "Calendar", formula: "\\mathbf{1}_{\\text{last 10d of Dec}}", desc: "Year-end flag. Tax-loss selling, portfolio window-dressing, and reduced liquidity affect vol in late December.", source: "Calendar"},
+        };
+
+        // Generate descriptions for tree expansion features (_change and _zscore suffixes)
+        (function() {
+            const baseFeats = Object.keys(FEATURE_DESCRIPTIONS);
+            baseFeats.forEach(function(feat) {
+                const info = FEATURE_DESCRIPTIONS[feat];
+                // _change variant
+                FEATURE_DESCRIPTIONS[feat + "_change"] = {
+                    layer: "Tree Expansion",
+                    formula: "\\Delta\\," + feat.replace(/_/g, '\\_') + " = x_t - x_{t-1}",
+                    desc: "First difference (momentum) of " + feat + ". Captures whether the feature is rising or falling day-over-day.",
+                    source: "Computed from " + info.layer
+                };
+                // _zscore variant
+                FEATURE_DESCRIPTIONS[feat + "_zscore"] = {
+                    layer: "Tree Expansion",
+                    formula: "z = \\frac{x_t - MA_{20}(x)}{\\sigma_{20}(x)}",
+                    desc: "Z-score of " + feat + ". Standardized deviation from 20-day rolling mean. Tells the model whether this feature is unusually high or low relative to recent history.",
+                    source: "Computed from " + info.layer
+                };
+            });
+        })();
+
+        function getFeatureDescription(featName) {
+            if (FEATURE_DESCRIPTIONS[featName]) return FEATURE_DESCRIPTIONS[featName];
+            // Try pattern matching for suffixed variants
+            if (featName.endsWith('_change')) {
+                var base = featName.replace(/_change$/, '');
+                return {layer: "Tree Expansion", formula: "\\Delta\\," + base.replace(/_/g, '\\_') + " = x_t - x_{t-1}", desc: "First difference (momentum) of " + base + ".", source: "Computed"};
+            }
+            if (featName.endsWith('_zscore')) {
+                var base2 = featName.replace(/_zscore$/, '');
+                return {layer: "Tree Expansion", formula: "z = \\frac{x_t - MA_{20}(x)}{\\sigma_{20}(x)}", desc: "Z-score of " + base2 + ". Standardized deviation from 20-day norm.", source: "Computed"};
+            }
+            return {layer: "Unknown", formula: featName.replace(/_/g, '\\_'), desc: "Feature from the model's input matrix.", source: ""};
+        }
+
+        function showFeatureDescription(featName, containerEl) {
+            var panel = containerEl.querySelector('.feature-desc-panel');
+            if (!panel) {
+                panel = document.createElement('div');
+                panel.className = 'feature-desc-panel';
+                containerEl.appendChild(panel);
+            }
+            var info = getFeatureDescription(featName);
+            panel.innerHTML = '<span class="feat-close" onclick="this.parentElement.classList.remove(\'visible\')">&times;</span>'
+                + '<div class="feat-name">' + featName + '</div>'
+                + '<div class="feat-layer">Layer: ' + info.layer + ' | Source: ' + info.source + '</div>'
+                + '<div class="feat-formula"><span class="katex-render" data-formula="' + info.formula.replace(/"/g, '&quot;') + '"></span></div>'
+                + '<div class="feat-interp">' + info.desc + '</div>';
+            panel.classList.add('visible');
+            // Render KaTeX in the panel
+            panel.querySelectorAll('.katex-render').forEach(function(el) {
+                try {
+                    katex.render(el.getAttribute('data-formula'), el, {throwOnError: false, displayMode: false});
+                } catch(e) {}
+            });
+        }
+
+        function attachTickLabelClickHandlers(plotEl, features, containerEl) {
+            // After Plotly renders, attach click handlers to y-axis tick labels
+            setTimeout(function() {
+                var ticks = plotEl.querySelectorAll('.ytick text, .yaxislayer-above text');
+                ticks.forEach(function(tick) {
+                    tick.style.cursor = 'pointer';
+                    tick.addEventListener('click', function() {
+                        var featName = tick.textContent || tick.innerHTML;
+                        showFeatureDescription(featName.trim(), containerEl);
+                    });
+                });
+            }, 100);
+        }
+
+        // ---- State ----
+        let currentHorizon = horizons[0];
+        let currentSymbol = '__pooled__';
+        let currentGsvivsIv = 0;  // index into gsvivsIvLabels
+        // Active GSVIVS sizing variant. Empty string == "no toggle" (no sized
+        // variants present); otherwise filters the GSVIVS table+chart to rows
+        // and traces whose sizing_label matches. Baselines (sizing_label ==
+        // "") always pass the filter.
+        let currentGsvivsSizing = gsvivsDefaultSizing;
+        let modelVisible = {};
+        let chartMode = 'forecast';  // 'forecast' | 'gsvivs_pnl' | 'gsvivs_signal' | 'gsvivs_matrix'
+        modelNames.forEach(m => { modelVisible[m] = true; });
+
+        // ---- Initialize chart ----
+        const layout = {
+            paper_bgcolor: '#16213e',
+            plot_bgcolor: '#1a1a2e',
+            font: { color: '#e4e4e4', size: 11 },
+            xaxis: {
+                title: 'Date',
+                gridcolor: '#2a2a4a',
+                type: 'date',
+                rangeslider: { visible: true, bgcolor: '#1e2a4a' },
+            },
+            yaxis: { title: 'Log Realized Variance', gridcolor: '#2a2a4a' },
+            hovermode: 'x unified',
+            legend: { visible: false },
+            margin: { t: 20, b: 50, l: 60, r: 20 },
+            shapes: [],
+        };
+
+        function getVisibleTraces() {
+            const symData = traceDataBySymbol[currentSymbol] || {};
+            const hTraces = symData[currentHorizon] || [];
+            return hTraces.map(t => {
+                const vis = (t.name === 'Actual RV') ? true : modelVisible[t.name];
+                return Object.assign({}, t, { visible: vis });
+            });
+        }
+
+        function getGsvivsPnlTraces() {
+            // Use multi-IV traces if available, otherwise fall back to flat traces
+            let hTraces;
+            if (gsvivsIvLabels.length > 0) {
+                const ivLabel = gsvivsIvLabels[currentGsvivsIv];
+                const ivTraces = gsvivsIvTraces[ivLabel] || {};
+                hTraces = ivTraces[currentHorizon] || [];
+            } else {
+                hTraces = gsvivsPnlTraces[currentHorizon] || [];
+            }
+            // Filter to the active sizing variant. Baselines (empty
+            // _sizing_label) always pass; un-tagged traces also pass for
+            // backward compat with iv_acceleration / classifier paths.
+            if (currentGsvivsSizing && currentGsvivsSizing !== '') {
+                hTraces = hTraces.filter(t => {
+                    const tag = t._sizing_label;
+                    if (tag === undefined || tag === null) return true;
+                    if (tag === '') return true;
+                    return tag === currentGsvivsSizing;
+                });
+            }
+            return hTraces.map(t => {
+                const isBaseline = t.name.startsWith('[baseline]');
+                // Sidebar checkboxes are keyed by the bare model name; PnL
+                // trace names carry the sizing suffix (e.g. "lgbm [binary]").
+                // Strip the suffix before the visibility lookup so the
+                // checkboxes actually control the GSVIVS chart.
+                const bareName = isBaseline ? t.name : stripSizingSuffix(t.name);
+                const vis = isBaseline
+                    ? true
+                    : (modelVisible[bareName] !== undefined ? modelVisible[bareName] : true);
+                // Inject color so the line, inline label, and sidebar swatch
+                // all agree. Baselines keep a muted gray to stay visually
+                // distinct from model traces.
+                const existingLine = t.line || {};
+                let color = existingLine.color;
+                if (!color) {
+                    color = isBaseline ? '#9e9e9e' : lookupModelColor(t.name);
+                }
+                const line = Object.assign({}, existingLine, { color: color });
+                // Drop the sizing suffix from the displayed trace name so the
+                // inline chart label matches the table (the active sizing is
+                // already shown by the highlighted toolbar button).
+                const displayName = isBaseline ? t.name : bareName;
+                return Object.assign({}, t, { visible: vis, line: line, name: displayName });
+            });
+        }
+
+        // Build per-trace inline labels at the rightmost visible point so the
+        // chart is self-contained without relying on a separate legend.
+        function buildInlineLabels(traces) {
+            const annos = [];
+            traces.forEach(t => {
+                if (!t.visible || !t.x || t.x.length === 0) return;
+                // For y, find last non-null value (mirrors plotly's display).
+                let yi = t.y.length - 1;
+                while (yi >= 0 && (t.y[yi] === null || Number.isNaN(t.y[yi]))) yi--;
+                if (yi < 0) return;
+                const color = (t.line && t.line.color) || '#e4e4e4';
+                annos.push({
+                    x: t.x[yi],
+                    y: t.y[yi],
+                    xref: 'x',
+                    yref: 'y',
+                    text: ' ' + t.name,
+                    xanchor: 'left',
+                    yanchor: 'middle',
+                    showarrow: false,
+                    font: { color: color, size: 10 },
+                    bgcolor: 'rgba(22,33,62,0.65)',
+                    borderpad: 1,
+                });
+            });
+            return annos;
+        }
+
+        // Build step-style signal traces (+1 / -1) from the signal arrays
+        // attached to each PnL trace by the Python backend.
+        function getGsvivsSignalTraces() {
+            const wealthTraces = getGsvivsPnlTraces();
+            return wealthTraces
+                .filter(t => !t.name.startsWith('[baseline]'))
+                .map(t => {
+                    const sx = t._signal_x || t.x;
+                    const sy = t._signal_y || t.y;
+                    return {
+                        x: sx,
+                        y: sy,
+                        mode: 'lines',
+                        name: t.name,
+                        line: Object.assign({}, t.line || {}, { shape: 'hv' }),
+                        visible: t.visible,
+                        hovertemplate: '%{x|%Y-%m-%d}<br>' + t.name + ': %{y:+.0f}<extra></extra>',
+                        opacity: 0.9,
+                    };
+                });
+        }
+
+        function getDivergenceShapes() {
+            const lines = divergenceLines[currentHorizon] || [];
+            return lines.map(date => ({
+                type: 'line',
+                x0: date, x1: date,
+                y0: 0, y1: 1,
+                xref: 'x', yref: 'paper',
+                line: { color: '#ffa726', width: 1, dash: 'dot' },
+                opacity: 0.5,
+            }));
+        }
+
+        function renderChart() {
+            if (chartMode === 'gsvivs_pnl') {
+                const traces = getGsvivsPnlTraces();
+                const annos = buildInlineLabels(traces);
+                const l = Object.assign({}, layout, {
+                    shapes: [],
+                    yaxis: { title: 'Cumulative Wealth', gridcolor: '#2a2a4a' },
+                    annotations: annos,
+                    margin: { t: 20, b: 50, l: 60, r: 140 },
+                });
+                Plotly.react('chart', traces, l, { responsive: true });
+            } else if (chartMode === 'gsvivs_signal') {
+                const traces = getGsvivsSignalTraces();
+                const annos = buildInlineLabels(traces);
+                // Scale y-axis to accommodate asym_long which ranges [-1, +max_leverage]
+                const isAsymLong = currentGsvivsSizing && currentGsvivsSizing.indexOf('asym_long') !== -1;
+                const yRange = isAsymLong ? [-1.3, 2.3] : [-1.3, 1.3];
+                const yTicks = isAsymLong ? [-1, 0, 1, 2] : [-1, 0, 1];
+                const yTitle = isAsymLong
+                    ? 'Signal (-1 short / +1 to +2 long)'
+                    : 'Signal (+1 long / \u22121 short)';
+                const l = Object.assign({}, layout, {
+                    shapes: [],
+                    yaxis: {
+                        title: yTitle,
+                        gridcolor: '#2a2a4a',
+                        range: yRange,
+                        tickvals: yTicks,
+                    },
+                    annotations: annos,
+                    margin: { t: 20, b: 50, l: 60, r: 140 },
+                });
+                Plotly.react('chart', traces, l, { responsive: true });
+            } else {
+                const traces = getVisibleTraces();
+                const shapes = getDivergenceShapes();
+                const l = Object.assign({}, layout, {
+                    shapes: shapes,
+                    annotations: [],
+                    margin: { t: 20, b: 50, l: 60, r: 20 },
+                });
+                Plotly.react('chart', traces, l, { responsive: true });
+            }
+        }
+
+        function setGsvivsChartMode(mode) {
+            const pnlBtn = document.getElementById('gsvivs-pnl-btn');
+            const sigBtn = document.getElementById('gsvivs-signal-btn');
+            const matBtn = document.getElementById('gsvivs-matrix-btn');
+            const chartEl = document.getElementById('chart');
+            const matrixEl = document.getElementById('transition-matrix-container');
+            if (chartMode === mode) {
+                // Toggle off -> return to forecast view
+                chartMode = 'forecast';
+            } else {
+                chartMode = mode;
+            }
+            if (pnlBtn) pnlBtn.classList.toggle('active', chartMode === 'gsvivs_pnl');
+            if (sigBtn) sigBtn.classList.toggle('active', chartMode === 'gsvivs_signal');
+            if (matBtn) matBtn.classList.toggle('active', chartMode === 'gsvivs_matrix');
+            if (chartMode === 'gsvivs_matrix') {
+                if (chartEl) chartEl.style.display = 'none';
+                if (matrixEl) matrixEl.style.display = 'block';
+                renderTransitionMatrices();
+            } else {
+                if (chartEl) chartEl.style.display = '';
+                if (matrixEl) matrixEl.style.display = 'none';
+                renderChart();
+            }
+        }
+
+        // Render transition matrix cards into the matrix container.
+        function renderTransitionMatrices() {
+            const container = document.getElementById('transition-matrix-container');
+            if (!container) return;
+            const h = currentHorizon;
+            const sizing = currentGsvivsSizing || '';
+            // Collect matching entries from gsvivsTransitionData
+            const cards = [];
+            Object.keys(gsvivsTransitionData).forEach(key => {
+                // key format: "bare_model|sizing_label|horizon"
+                const parts = key.split('|');
+                if (parts.length !== 3) return;
+                const bareName = parts[0];
+                const keySizing = parts[1];
+                const keyH = parseInt(parts[2], 10);
+                if (keyH !== h) return;
+                if (sizing && keySizing !== sizing) return;
+                if (!sizing && keySizing) return;
+                // Check model visibility
+                if (modelVisible[bareName] !== undefined && !modelVisible[bareName]) return;
+                cards.push({ name: bareName, sizing: keySizing, data: gsvivsTransitionData[key] });
+            });
+            // Sort by model rank (best Sharpe first, matching GSVIVS table order)
+            cards.sort((a, b) => (a.data.rank || 999) - (b.data.rank || 999));
+            if (cards.length === 0) {
+                container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No transition data available for this horizon/sizing combination.</div>';
+                return;
+            }
+            let html = '<div class="transition-grid">';
+            cards.forEach(card => {
+                const labels = card.data.labels || [];
+                const matrix = card.data.matrix || [];
+                const color = lookupModelColor(card.name);
+                html += '<div class="transition-card">';
+                html += '<div class="transition-card-title">';
+                html += '<span class="color-dot" style="background:' + color + ';width:8px;height:8px;border-radius:50%;display:inline-block;"></span>';
+                html += card.name;
+                html += '</div>';
+                html += '<table class="transition-table"><thead><tr>';
+                html += '<th class="corner-cell">From \\ To</th>';
+                labels.forEach(l => { html += '<th>' + l + '</th>'; });
+                html += '</tr></thead><tbody>';
+                matrix.forEach((row, ri) => {
+                    html += '<tr><td>' + labels[ri] + '</td>';
+                    row.forEach(val => {
+                        // Green intensity: 0% → transparent, 100% → full green
+                        const alpha = Math.min(val / 100, 1) * 0.7;
+                        const bg = 'rgba(102,187,106,' + alpha.toFixed(2) + ')';
+                        html += '<td style="background:' + bg + '">' + val.toFixed(1) + '%</td>';
+                    });
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div>';
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // Apply the active GSVIVS sizing filter to the visible table rows.
+        // Baseline rows (data-sizing="") always remain visible.
+        function applyGsvivsSizingFilter() {
+            document.querySelectorAll('tr.gsvivs-row').forEach(tr => {
+                const tag = tr.getAttribute('data-sizing') || '';
+                let show;
+                if (!currentGsvivsSizing || currentGsvivsSizing === '') {
+                    show = true;  // no filter active
+                } else {
+                    show = (tag === '' || tag === currentGsvivsSizing);
+                }
+                tr.style.display = show ? '' : 'none';
+                // When a sizing is active, strip the redundant " [..]" suffix
+                // from the displayed model name. The active sizing is already
+                // indicated by the highlighted toolbar button.
+                const cell = tr.querySelector('td .model-name');
+                if (cell) {
+                    const orig = tr.getAttribute('data-orig-name');
+                    if (orig === null) {
+                        // First call: capture the original textual name (minus
+                        // the color dot) so we can restore later.
+                        const txt = (cell.textContent || '').trim();
+                        tr.setAttribute('data-orig-name', txt);
+                    }
+                    const fullName = tr.getAttribute('data-orig-name') || '';
+                    const showName = (currentGsvivsSizing && currentGsvivsSizing !== '')
+                        ? fullName.replace(/\s*\[[^\]]+\]\s*$/, '')
+                        : fullName;
+                    // Rebuild the cell with the color dot + (possibly
+                    // stripped) name so existing styling carries over.
+                    const dot = cell.querySelector('.color-dot');
+                    cell.innerHTML = '';
+                    if (dot) cell.appendChild(dot);
+                    cell.appendChild(document.createTextNode(' ' + showName));
+                }
+            });
+            // Re-rank the still-visible model rows within each table so the
+            // "#" column reflects what the user sees, not the underlying order.
+            document.querySelectorAll('div.stats-horizon').forEach(section => {
+                const tables = section.querySelectorAll('table.stats-table');
+                tables.forEach(tbl => {
+                    let rank = 0;
+                    tbl.querySelectorAll('tbody tr.gsvivs-row').forEach(tr => {
+                        if (tr.style.display === 'none') return;
+                        const isBaseline = tr.classList.contains('baseline');
+                        const rankCell = tr.querySelector('td.rank');
+                        if (!rankCell) return;
+                        if (isBaseline) {
+                            rankCell.textContent = '';
+                        } else {
+                            rank += 1;
+                            rankCell.textContent = rank;
+                        }
+                    });
+                });
+            });
+        }
+
+        // Switch which IV source is active. Updates button highlight,
+        // toggles per-IV table visibility, and re-renders the chart.
+        function switchGsvivsIv(idx) {
+            currentGsvivsIv = idx;
+            document.querySelectorAll('.gsvivs-iv-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.getAttribute('data-iv-idx')) === idx);
+            });
+            // Show the selected IV source tables, hide others
+            const h = currentHorizon;
+            document.querySelectorAll('.econ-gsvivs-iv').forEach(el => {
+                const isTarget = el.id === 'econ-gsvivs-iv-' + idx + '-h' + h;
+                el.style.display = isTarget ? '' : 'none';
+            });
+            if (chartMode === 'gsvivs_matrix') {
+                renderTransitionMatrices();
+            } else {
+                renderChart();
+            }
+        }
+
+        // Switch which sizing variant is active. Updates button highlight,
+        // re-applies the table filter, and re-renders the chart.
+        function setGsvivsSizing(label) {
+            currentGsvivsSizing = label;
+            document.querySelectorAll('.gsvivs-sizing-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-sizing') === label);
+            });
+            applyGsvivsSizingFilter();
+            if (chartMode === 'gsvivs_matrix') {
+                renderTransitionMatrices();
+            } else {
+                renderChart();
+            }
+        }
+
+        // ---- Tab switching ----
+        function switchHorizon(h) {
+            currentHorizon = h;
+            // Limit to horizon tabs (tab-h{h}); exclude unrelated tab-btn
+            // toggles such as the GSVIVS P&L chart button.
+            document.querySelectorAll('.tab-btn[id^="tab-h"]').forEach(btn => {
+                btn.classList.toggle('active', btn.id === 'tab-h' + h);
+            });
+            const hlabel = document.getElementById('stats-horizon-label');
+            if (hlabel) hlabel.textContent = 'h=' + h;
+            document.querySelectorAll('.stats-horizon').forEach(el => {
+                const isMain = el.id === 'stats-h' + h;
+                const isVt = el.id === 'econ-vt-h' + h;
+                const isDh = el.id === 'econ-dh-h' + h;
+                const isGsvivs = el.id === 'econ-gsvivs-h' + h;
+                const isGsvivsIv = el.id === 'econ-gsvivs-iv-' + currentGsvivsIv + '-h' + h;
+                const isSymDh = el.classList.contains('dh-sym-horizon') && el.dataset.dhH == h;
+                el.style.display = (isMain || isVt || isDh || isGsvivs || isGsvivsIv || isSymDh) ? '' : 'none';
+            });
+            if (chartMode === 'gsvivs_matrix') {
+                renderTransitionMatrices();
+            } else {
+                renderChart();
+            }
+            // Refresh explainer if open
+            if (explainerOpen && explainerMetric) {
+                populateExplainer(explainerMetric);
+            }
+        }
+
+        // ---- DH Symbol dropdown switching ----
+        function switchDHSymbol(sym) {
+            document.querySelectorAll('.dh-symbol-view').forEach(el => {
+                el.style.display = (el.id === 'dh-view-' + sym) ? '' : 'none';
+            });
+            // Re-apply horizon filter within the newly visible view
+            const view = document.getElementById('dh-view-' + sym);
+            if (view) {
+                view.querySelectorAll('.stats-horizon, .dh-sym-horizon').forEach(el => {
+                    if (el.id) {
+                        el.style.display = el.id.endsWith('h' + currentHorizon) ? '' : 'none';
+                    } else if (el.dataset && el.dataset.dhH) {
+                        el.style.display = (el.dataset.dhH == currentHorizon) ? '' : 'none';
+                    }
+                });
+            }
+        }
+
+        // ---- Symbol switching ----
+        function switchSymbol(sym) {
+            currentSymbol = sym;
+            renderChart();
+        }
+
+        // ---- Model toggles ----
+        function toggleModel(name, visible) {
+            modelVisible[name] = visible;
+            if (chartMode === 'gsvivs_matrix') {
+                renderTransitionMatrices();
+            } else {
+                renderChart();
+            }
+        }
+
+        function showBestOnly() {
+            const best = bestModels[currentHorizon];
+            modelNames.forEach(m => {
+                modelVisible[m] = (m === best);
+                document.getElementById('chk-' + m).checked = (m === best);
+            });
+            if (chartMode === 'gsvivs_matrix') {
+                renderTransitionMatrices();
+            } else {
+                renderChart();
+            }
+        }
+
+        function showAll() {
+            modelNames.forEach(m => {
+                modelVisible[m] = true;
+                document.getElementById('chk-' + m).checked = true;
+            });
+            if (chartMode === 'gsvivs_matrix') {
+                renderTransitionMatrices();
+            } else {
+                renderChart();
+            }
+        }
+
+        // ---- Explainer (inline box in stats panel) ----
+        let explainerOpen = false;
+        let explainerMetric = null;
+
+        function openExplainer(metricId) {
+            if (modelDetailOpen) { closeModelDetails(); }
+            if (explainerOpen && explainerMetric === metricId) {
+                closeExplainer();
+                return;
+            }
+            explainerMetric = metricId;
+            explainerOpen = true;
+            populateExplainer(metricId);
+            const el = document.getElementById('explainer-container');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function closeExplainer() {
+            explainerOpen = false;
+            explainerMetric = null;
+            document.getElementById('explainer-container').innerHTML = '';
+        }
+
+        function miniTable(rows, valueKey, fmt, label) {
+            let html = '<table class="mini-table"><thead><tr><th>Model</th><th>' + label + '</th></tr></thead><tbody>';
+            rows.forEach(r => {
+                const val = typeof fmt === 'function' ? fmt(r[valueKey]) : r[valueKey];
+                html += '<tr><td><span class="color-dot" style="background:' + r.color + '"></span>' + r.name + '</td><td>' + val + '</td></tr>';
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function fmtNum(v, d) { return v == null ? '-' : v.toFixed(d); }
+        function fmtPct(v) { return v == null ? '-' : (v > 0 ? '+' : '') + v.toFixed(1); }
+        function fmtSharpe(v) { return v == null ? '-' : v.toFixed(2); }
+
+        function renderKatex(container) {
+            container.querySelectorAll('.katex-render').forEach(el => {
+                try {
+                    katex.render(el.getAttribute('data-formula'), el, {
+                        throwOnError: false,
+                        displayMode: el.classList.contains('display-mode')
+                    });
+                } catch(e) { /* fallback: raw latex text stays visible */ }
+            });
+        }
+
+        function tex(formula, display) {
+            const cls = display ? 'katex-render display-mode' : 'katex-render';
+            return '<span class="' + cls + '" data-formula="' + formula.replace(/"/g, '&quot;') + '"></span>';
+        }
+
+        function renderShapSelectionPanel(sel) {
+            // Renders the SHAP Feature Selection methodology panel
+            // sel = { stable_features, unstable_features, always_dropped, per_feature_selection_rate, mean_importances, n_folds }
+            let html = '';
+            html += '<details class="beeswarm-details" style="margin-top:1.5rem">';
+            html += '<summary style="font-weight:600;color:var(--accent)">SHAP Feature Selection Methodology</summary>';
+            html += '<div style="padding:0.75rem 0">';
+
+            // Step 1: Shapley Value
+            html += '<div class="section-title" style="margin-top:0.5rem">Step 1: Shapley Value Computation</div>';
+            html += '<p style="color:var(--text-secondary);font-size:0.85rem;margin:0.25rem 0">For each feature <em>i</em>, compute the Shapley value across all coalition subsets:</p>';
+            html += '<div style="text-align:center;margin:0.5rem 0">';
+            html += tex('\\phi_i = \\sum_{S \\subseteq N \\setminus \\{i\\}} \\frac{|S|!\\,(p-|S|-1)!}{p!} \\left[ v(S \\cup \\{i\\}) - v(S) \\right]', true);
+            html += '</div>';
+            html += '<p style="color:var(--text-secondary);font-size:0.85rem;margin:0.25rem 0">where <em>v(S)</em> is the model prediction using only features in <em>S</em>. TreeSHAP computes this exactly in O(TLD&sup2;) time for tree ensembles.</p>';
+
+            // Step 2: Feature importance score
+            html += '<div class="section-title" style="margin-top:1rem">Step 2: Feature Importance Score</div>';
+            html += '<p style="color:var(--text-secondary);font-size:0.85rem;margin:0.25rem 0">Aggregate across all <em>n</em> out-of-sample observations:</p>';
+            html += '<div style="text-align:center;margin:0.5rem 0">';
+            html += tex('I_i = \\frac{1}{n} \\sum_{j=1}^{n} |\\phi_i(x_j)|', true);
+            html += '</div>';
+
+            // Step 3: Shadow feature threshold
+            html += '<div class="section-title" style="margin-top:1rem">Step 3: Shadow Feature Threshold (Boruta)</div>';
+            html += '<p style="color:var(--text-secondary);font-size:0.85rem;margin:0.25rem 0">Generate <em>k</em> shadow features by randomly permuting real feature columns. Fit the model with real + shadow features and compute SHAP:</p>';
+            html += '<div style="text-align:center;margin:0.5rem 0">';
+            html += tex('\\text{threshold} = \\max_{s \\in \\text{shadows}} I_s \\times \\alpha', true);
+            html += '</div>';
+            html += '<p style="color:var(--text-secondary);font-size:0.85rem;margin:0.25rem 0">where &alpha; is the threshold multiplier (default 1.0). Shadow features are noise by construction, so any real feature with importance below the best shadow feature is indistinguishable from noise.</p>';
+
+            // Step 4: Selection rule
+            html += '<div class="section-title" style="margin-top:1rem">Step 4: Selection Rule</div>';
+            html += '<div style="text-align:center;margin:0.5rem 0">';
+            html += tex('\\text{Keep feature } i \\iff I_i > \\text{threshold}, \\quad |\\text{kept}| \\geq \\text{min\\_features}', true);
+            html += '</div>';
+
+            // Step 5: Per-fold execution
+            html += '<div class="section-title" style="margin-top:1rem">Step 5: Nested Purged CV Execution</div>';
+            html += '<p style="color:var(--text-secondary);font-size:0.85rem;margin:0.25rem 0">Selection runs <strong>independently inside each outer CV fold</strong> to prevent data leakage. Features are reported as "stable" if selected in &ge;' + Math.round((sel.stability_threshold || 0.8) * 100) + '% of folds.</p>';
+
+            // Results table
+            html += '<div class="section-title" style="margin-top:1.5rem">Results (' + (sel.n_folds || '?') + ' folds)</div>';
+
+            // Stable features
+            if (sel.stable_features && sel.stable_features.length > 0) {
+                html += '<p style="color:var(--success);font-size:0.85rem;margin:0.5rem 0"><strong>Stable features (' + sel.stable_features.length + '):</strong></p>';
+                html += '<div class="layer-chips" style="margin-bottom:0.5rem">';
+                sel.stable_features.forEach(function(f) {
+                    const imp = sel.mean_importances ? (sel.mean_importances[f] || 0).toFixed(4) : '?';
+                    html += '<span class="chip" title="Mean |SHAP| = ' + imp + '">' + f + '</span>';
+                });
+                html += '</div>';
+            }
+
+            // Unstable features
+            if (sel.unstable_features && sel.unstable_features.length > 0) {
+                html += '<p style="color:var(--warning, #f6ad55);font-size:0.85rem;margin:0.5rem 0"><strong>Unstable features (' + sel.unstable_features.length + '):</strong> selected in some but not enough folds</p>';
+                html += '<div class="layer-chips" style="margin-bottom:0.5rem">';
+                sel.unstable_features.forEach(function(f) {
+                    const rate = sel.per_feature_selection_rate ? ((sel.per_feature_selection_rate[f] || 0) * 100).toFixed(0) + '%' : '?';
+                    html += '<span class="chip" style="opacity:0.7" title="Selected in ' + rate + ' of folds">' + f + '</span>';
+                });
+                html += '</div>';
+            }
+
+            // Dropped features
+            if (sel.always_dropped && sel.always_dropped.length > 0) {
+                html += '<p style="color:var(--danger);font-size:0.85rem;margin:0.5rem 0"><strong>Dropped features (' + sel.always_dropped.length + '):</strong> never selected in any fold</p>';
+                html += '<div class="layer-chips" style="margin-bottom:0.5rem">';
+                sel.always_dropped.forEach(function(f) {
+                    html += '<span class="chip" style="opacity:0.5;text-decoration:line-through">' + f + '</span>';
+                });
+                html += '</div>';
+            }
+
+            html += '</div></details>';
+            return html;
+        }
+
+        function populateExplainer(metricId) {
+            const meta = statMeta[currentHorizon] || {};
+            const rows = statsByHorizon[currentHorizon] || [];
+            let title = '';
+            let html = '';
+
+            switch(metricId) {
+            case 'qlike':
+                title = 'QLIKE (Quasi-Likelihood Loss)';
+                html = '<h5>What it measures</h5>';
+                html += '<p>How well a volatility forecast matches realized variance. Penalizes underestimation more heavily than overestimation, since underestimating risk is more dangerous.</p>';
+                html += '<h5>Formula</h5>';
+                html += '<div class="formula">' + tex('\\text{QLIKE} = \\frac{1}{T}\\sum_{t=1}^{T}\\left[\\frac{RV_t}{\\widehat{RV}_t} - \\ln\\frac{RV_t}{\\widehat{RV}_t} - 1\\right]', true) + '</div>';
+                html += '<p>The ratio-minus-log structure is asymmetric: a forecast at half the actual RV scores worse than one at double. Lower is better.</p>';
+                html += '<h5>Why not MSE?</h5>';
+                html += '<p>MSE is symmetric and sensitive to proxy noise. QLIKE is robust to using 5-min RV as a proxy for true integrated variance (Patton 2011).</p>';
+                html += '<h5>h=' + currentHorizon + ' values</h5>';
+                html += miniTable(rows, 'qlike', v => fmtNum(v, 6), 'QLIKE');
+                break;
+
+            case 'bps':
+                title = '\u0394 bps (Improvement vs Baseline)';
+                const blName = meta.baseline_name || 'HAR';
+                const blQ = meta.baseline_qlike || 0;
+                html = '<h5>What it measures</h5>';
+                html += '<p>Percentage improvement in QLIKE relative to <strong>' + blName + '</strong>, in basis points (1 bp = 0.01%).</p>';
+                html += '<h5>Formula</h5>';
+                html += '<div class="formula">' + tex('\\Delta_{\\text{bps}} = \\frac{\\text{QLIKE}_{\\text{baseline}} - \\text{QLIKE}_{\\text{model}}}{\\text{QLIKE}_{\\text{baseline}}} \\times 10{,}000', true) + '</div>';
+                if (rows.length > 0) {
+                    const best = rows[0];
+                    html += '<div class="example"><strong>Example:</strong> ' + best.name + ' QLIKE = ' + fmtNum(best.qlike, 6) + ', baseline ' + blName + ' QLIKE = ' + fmtNum(blQ, 6) + '<br>';
+                    html += tex('\\Delta_{\\text{bps}}') + ' = (' + fmtNum(blQ, 6) + ' - ' + fmtNum(best.qlike, 6) + ') / ' + fmtNum(blQ, 6) + ' x 10,000 = <strong>' + fmtPct(best.qlike_bps) + ' bps</strong></div>';
+                }
+                html += '<p>Positive = better than baseline. +100 bps = 1% relative QLIKE reduction.</p>';
+                html += '<h5>h=' + currentHorizon + ' values</h5>';
+                html += miniTable(rows, 'qlike_bps', v => fmtPct(v) + ' bps', '\u0394 bps');
+                break;
+
+            case 'r2':
+                title = 'R\u00b2 (Out-of-Sample)';
+                html = '<h5>What it measures</h5>';
+                html += '<p>Proportion of variance in realized volatility explained by the model\'s out-of-sample forecasts.</p>';
+                html += '<h5>Formula</h5>';
+                html += '<div class="formula">' + tex('R^2_{\\text{OOS}} = 1 - \\frac{\\sum_t (RV_t - \\widehat{RV}_t)^2}{\\sum_t (RV_t - \\overline{RV})^2}', true) + '</div>';
+                html += '<p>R\u00b2 = 0.45 means 45% of day-to-day vol variation is captured. Can be negative if the model is worse than predicting the mean.</p>';
+                html += '<h5>h=' + currentHorizon + ' values</h5>';
+                html += miniTable(rows, 'r_squared', v => fmtNum(v, 4), 'R\u00b2');
+                break;
+
+            case 'dm':
+                title = 'DM (Diebold-Mariano Test)';
+                html = '<h5>What it measures</h5>';
+                html += '<p>Whether the QLIKE difference between two models is statistically significant, not just random noise.</p>';
+                html += '<h5>How it works</h5>';
+                html += '<div class="formula">' + tex('d_t = L(e_{1,t}) - L(e_{2,t}), \\quad \\text{DM} = \\frac{\\bar{d}}{\\sqrt{\\text{Var}(d_t)/T}} \\sim N(0,1)', true) + '</div>';
+                html += '<p>Computes the mean loss differential between model and baseline, tests whether it differs from zero using HAC standard errors.</p>';
+                html += '<h5>Significance levels</h5>';
+                html += '<div class="example">';
+                html += '*** p < 0.01: very strong evidence<br>';
+                html += '** p < 0.05: strong evidence<br>';
+                html += '* p < 0.10: weak evidence<br>';
+                html += '(blank) p >= 0.10: no significant difference</div>';
+                html += '<h5>h=' + currentHorizon + ' values</h5>';
+                html += '<table class="mini-table"><thead><tr><th>Model</th><th>DM stat</th><th>p-value</th><th></th></tr></thead><tbody>';
+                rows.forEach(r => {
+                    html += '<tr><td><span class="color-dot" style="background:' + r.color + '"></span>' + r.name + '</td>';
+                    html += '<td>' + fmtNum(r.dm_stat, 2) + '</td><td>' + fmtNum(r.dm_pvalue, 4) + '</td>';
+                    html += '<td class="sig-stars">' + r.dm_stars + '</td></tr>';
+                });
+                html += '</tbody></table>';
+                break;
+
+            case 'mcs':
+                title = 'MCS (Model Confidence Set)';
+                const mcsCount = meta.mcs_count || 0;
+                html = '<h5>What it measures</h5>';
+                html += '<p>Identifies the subset of models statistically indistinguishable from the best (Hansen, Lunde & Nason 2011). Like a confidence interval for model rankings.</p>';
+                html += '<h5>How it works</h5>';
+                html += '<p>Starting with all models, iteratively removes the worst performer if its inferiority is statistically significant. Survivors get a checkmark.</p>';
+                html += '<div class="example">' + mcsCount + ' of ' + (meta.n_models || rows.length) + ' models are in the MCS at 75% confidence. Included models are statistically tied for best.</div>';
+                html += '<h5>h=' + currentHorizon + ' values</h5>';
+                html += '<table class="mini-table"><thead><tr><th>Model</th><th>MCS p-value</th><th></th></tr></thead><tbody>';
+                rows.forEach(r => {
+                    const badge = r.mcs_included ? '\u2713' : '-';
+                    const cls = r.mcs_included ? 'color:var(--success)' : 'color:var(--text-secondary)';
+                    html += '<tr><td><span class="color-dot" style="background:' + r.color + '"></span>' + r.name + '</td>';
+                    html += '<td>' + fmtNum(r.mcs_pvalue, 3) + '</td>';
+                    html += '<td style="' + cls + ';font-weight:700">' + badge + '</td></tr>';
+                });
+                html += '</tbody></table>';
+                break;
+
+            case 'mz':
+                title = 'MZ (Mincer-Zarnowitz Regression)';
+                html = '<h5>What it measures</h5>';
+                html += '<p>Tests whether a forecast is unbiased: does it systematically over- or under-predict?</p>';
+                html += '<h5>The regression</h5>';
+                html += '<div class="formula">' + tex('RV_t = \\alpha + \\beta \\cdot \\widehat{RV}_t + \\varepsilon_t', true) + '</div>';
+                html += '<p>Ideal: ' + tex('\\alpha=0') + ' (no constant bias) and ' + tex('\\beta=1') + ' (one-to-one tracking). The F-test jointly tests ' + tex('H_0: \\alpha=0,\\, \\beta=1') + '.</p>';
+                html += '<div class="example"><strong>Pass</strong> = F-test p >= 0.05, cannot reject unbiasedness.<br><strong>Reject</strong> = p < 0.05, forecast has systematic bias.</div>';
+                html += '<h5>h=' + currentHorizon + ' values</h5>';
+                html += '<table class="mini-table"><thead><tr><th>Model</th><th>' + tex('\\alpha') + '</th><th>' + tex('\\beta') + '</th><th>F p</th><th></th></tr></thead><tbody>';
+                rows.forEach(r => {
+                    const cls = r.mz_label === 'Pass' ? 'color:var(--success)' : 'color:var(--danger)';
+                    html += '<tr><td><span class="color-dot" style="background:' + r.color + '"></span>' + r.name + '</td>';
+                    html += '<td>' + fmtNum(r.mz_alpha, 4) + '</td><td>' + fmtNum(r.mz_beta, 4) + '</td>';
+                    html += '<td>' + fmtNum(r.mz_f_pvalue, 4) + '</td>';
+                    html += '<td style="' + cls + ';font-weight:600">' + r.mz_label + '</td></tr>';
+                });
+                html += '</tbody></table>';
+                break;
+
+            case 'dh':
+                title = 'Delta-Hedged Straddle Strategy';
+                const dh = econAssumptions;
+                html = '<h5>How it works</h5>';
+                html += '<p>If the model predicts RV will be lower than implied vol, sell a straddle (collect premium). If higher, buy one. Delta-hedging removes directional exposure, isolating the vol view.</p>';
+                html += '<h5>1. Signal generation</h5>';
+                html += '<div class="formula">' + tex('\\text{IV} > \\widehat{\\sigma} \\Rightarrow \\text{sell vol} \\;(+1)', true) + '</div>';
+                html += '<div class="formula">' + tex('\\text{IV} < \\widehat{\\sigma} \\Rightarrow \\text{buy vol} \\;(-1)', true) + '</div>';
+                html += '<h5>2. Daily gamma P&L</h5>';
+                html += '<div class="formula">' + tex('\\text{PnL}_t = -\\text{signal} \\times \\tfrac{1}{2}\\,\\Gamma_t\\, S_t^2 \\left(RV_t - \\frac{IV^2}{252}\\right)', true) + '</div>';
+                html += '<p>Where ' + tex('\\Gamma = \\frac{2}{S \\cdot IV \\cdot \\sqrt{T}}') + ' is ATM straddle gamma. Short vol profits when realized variance < implied.</p>';
+                html += '<h5>3. Transaction costs</h5>';
+                html += '<p><strong>Option entry cost:</strong> The option bid-ask spread for SPX ATM straddles is approximately 0.3\u20130.5 vol points total, or ~0.15\u20130.25 vol points per leg (Muravyev &amp; Pearson 2020). We use ' + dh.cost_vol_points + ' vol points per leg as a conservative estimate.</p>';
+                html += '<p>The cost is converted to dollars via the option\'s vega and subtracted as a daily drag from P&amp;L:</p>';
+                html += '<div class="formula">' + tex('\\text{Option cost/day} = \\frac{2 \\times c_{\\text{vol}} \\times \\text{Vega}_{\\text{norm}}}{H}', true) + '</div>';
+                html += '<p>Where ' + tex('c_{\\text{vol}}') + ' = ' + dh.cost_vol_points + ' vol pts/leg, ' + tex('\\text{Vega}_{\\text{norm}} = \\sqrt{T} \\cdot N\'(0) \\approx 0.135') + ' (vega per unit spot for one ATM option), H = ' + dh.holding_period + ' days (holding period over which entry cost is amortized). The factor of 2 accounts for both legs of the straddle.</p>';
+                if (dh.dh_mode === 'discrete') {
+                    html += '<p><strong>Underlying hedge cost:</strong> Each of the 26 daily rebalances trades shares to adjust delta. The expected shares traded per rebalance and total daily cost:</p>';
+                    html += '<div class="formula">' + tex('\\mathbb{E}[|\\Delta\\delta|] = \\Gamma \\cdot S \\cdot \\sigma \\cdot \\sqrt{\\tfrac{1}{252 \\cdot N}} \\cdot \\sqrt{\\tfrac{2}{\\pi}}', true) + '</div>';
+                    html += '<div class="formula">' + tex('\\text{Hedge cost/day} = N \\cdot \\mathbb{E}[|\\Delta\\delta|] \\cdot S \\cdot \\frac{\\text{spread}_{\\text{bps}}}{10000}', true) + '</div>';
+                    html += '<p>With N=26, spread=2 bps round-trip. This dominates total costs (~5\u00d7 the option spread over a 22-day hold).</p>';
+                }
+                html += '<h5>Metrics</h5>';
+                html += '<ul class="assumptions">';
+                html += '<li><strong>Sharpe:</strong> annualized mean/std of daily net P&L</li>';
+                html += '<li><strong>Cum P&L:</strong> sum of daily returns over test period (%)</li>';
+                html += '<li><strong>Max DD:</strong> largest peak-to-trough decline</li>';
+                html += '<li><strong>Hit Rate:</strong> fraction of active days with positive P&L</li></ul>';
+                html += '<h5>Assumptions</h5>';
+                html += '<ul class="assumptions">';
+                html += '<li>Option tenor: ' + dh.tenor_days + ' trading days (1-month ATM)</li>';
+                html += '<li>Cost: ' + dh.cost_vol_points + ' vol pts/leg \u00d7 2 legs, amortized over ' + dh.holding_period + ' days (Muravyev &amp; Pearson 2020)</li>';
+                if (dh.dh_mode === 'discrete') {
+                    html += '<li>ATM straddle, discrete delta-hedging every 15 minutes with a 15-minute lag (26 rebalances/day, 2 bps underlying spread)</li>';
+                } else {
+                    html += '<li>ATM straddle, continuously delta-hedged (BS approximation)</li>';
+                }
+                html += '<li>Fixed notional, no compounding</li>';
+                html += '<li>All predictions are out-of-sample from expanding-window CV</li></ul>';
+                const dhRows = dhStatsByHorizon[currentHorizon] || [];
+                if (dhRows.length) {
+                    html += '<h5>h=' + currentHorizon + ' values</h5>';
+                    html += '<table class="mini-table"><thead><tr><th>Model</th><th>Sharpe</th><th>Cum P&L</th><th>Hit</th></tr></thead><tbody>';
+                    dhRows.forEach(r => {
+                        html += '<tr><td><span class="color-dot" style="background:' + r.color + '"></span>' + r.name + '</td>';
+                        html += '<td>' + fmtSharpe(r.dh_sharpe) + '</td>';
+                        html += '<td>' + (r.dh_pnl != null ? fmtPct(r.dh_pnl) + '%' : '-') + '</td>';
+                        html += '<td>' + (r.dh_hit_rate != null ? (r.dh_hit_rate * 100).toFixed(1) + '%' : '-') + '</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+                break;
+
+            case 'vt':
+                title = 'Vol-Targeting Strategy';
+                const vt = econAssumptions;
+                html = '<h5>How it works</h5>';
+                html += '<p>Scale equity position size inversely with predicted volatility to maintain constant portfolio risk.</p>';
+                html += '<h5>Position sizing</h5>';
+                html += '<div class="formula">' + tex('w_t = \\min\\!\\left(\\frac{\\sigma_{\\text{target}}}{\\hat{\\sigma}_t},\\; L_{\\max}\\right)', true) + '</div>';
+                html += '<p>Where ' + tex('\\sigma_{\\text{target}}') + ' = ' + (vt.target_vol * 100) + '% annualized, ' + tex('L_{\\max}') + ' = ' + vt.max_leverage + 'x max leverage. Forecast vol is converted from log-RV:</p>';
+                html += '<div class="formula">' + tex('\\hat{\\sigma}_t = \\sqrt{252 \\cdot \\exp(\\widehat{\\log RV}_t)}', true) + '</div>';
+                html += '<p>Portfolio return: ' + tex('r_t^p = w_t \\cdot r_t') + '. Better vol forecast = more accurate sizing = higher Sharpe.</p>';
+                html += '<h5>Assumptions</h5>';
+                html += '<ul class="assumptions">';
+                html += '<li>Target vol: ' + (vt.target_vol * 100) + '% annualized</li>';
+                html += '<li>Max leverage: ' + vt.max_leverage + 'x</li>';
+                html += '<li>Daily rebalancing, no transaction costs</li>';
+                html += '<li>OOS predictions only (expanding-window CV)</li></ul>';
+                const vtRows = vtStatsByHorizon[currentHorizon] || [];
+                if (vtRows.length) {
+                    html += '<h5>h=' + currentHorizon + ' values</h5>';
+                    html += miniTable(vtRows, 'vt_sharpe', v => fmtSharpe(v), 'Sharpe');
+                }
+                break;
+
+            case 'gsvivs':
+                title = 'Variance Swap Signal Strategy (GSVIVS01)';
+                html = '<h5>How it works</h5>';
+                html += '<p>Apply the model\u2019s IV\u2013RV gap signal to time entry and exit from a live variance swap selling strategy (GSVIVS01). Go long the index when vol is expensive (profitable to sell), go short or flat when vol is cheap (risk of spike).</p>';
+                html += '<h5>The Index</h5>';
+                html += '<p><strong>GSVIVS01</strong> is a MIDAS Managed Portfolio Asset (MPA) that sells equity variance via options and futures. It profits when realized volatility comes in below implied. The index has been live since May 2022 with a passive Sharpe of ~2.0.</p>';
+                html += '<div class="example">TSDB: <code>midas_.GSVIVS01</code> &mdash; daily index levels representing cumulative strategy performance.</div>';
+                html += '<h5>Signal generation</h5>';
+                html += '<p>Uses the same IV\u2013RV gap signal as the delta-hedged straddle:</p>';
+                html += '<div class="formula">' + tex('IV_t > \\hat{\\sigma}_t \\;\\Rightarrow\\; \\text{signal} = +1 \\;(\\text{long index: sell vol is profitable})', true) + '</div>';
+                html += '<div class="formula">' + tex('IV_t < \\hat{\\sigma}_t \\;\\Rightarrow\\; \\text{signal} = -1 \\;(\\text{short index: vol will spike})', true) + '</div>';
+                html += '<p>Where ' + tex('\\hat{\\sigma}_t = \\sqrt{252 \\cdot \\exp(\\widehat{\\log RV}_t)}') + ' is the model\u2019s annualized vol forecast.</p>';
+                html += '<h5>Daily P&amp;L</h5>';
+                html += '<div class="formula">' + tex('\\text{PnL}_t = \\text{signal}_t \\times \\left(\\frac{I_{t+1}}{I_t} - 1\\right)', true) + '</div>';
+                html += '<p>Where ' + tex('I_t') + ' is the GSVIVS01 index level. No synthetic P&amp;L model needed \u2014 this uses the actual production index returns.</p>';
+                html += '<h5>Value proposition</h5>';
+                html += '<p>Tests whether the RV forecast has <strong>economic value</strong> by timing a live production vol-selling strategy. If the model can predict vol spikes, it avoids drawdowns that the passive investor cannot.</p>';
+                html += '<h5>Metrics</h5>';
+                html += '<ul class="assumptions">';
+                html += '<li><strong>Sharpe (0% RF):</strong> annualized mean/std of daily signal-weighted returns</li>';
+                html += '<li><strong>Sharpe (5% RF):</strong> same but subtracting 5% annualized risk-free rate</li>';
+                html += '<li><strong>Ann Return:</strong> mean daily P&amp;L \u00d7 252 \u00d7 100</li>';
+                html += '<li><strong>Ann Vol:</strong> std \u00d7 \u221a252 \u00d7 100</li>';
+                html += '<li><strong>Total Return:</strong> compound cumulative return over test period</li>';
+                html += '<li><strong>Max DD:</strong> largest peak-to-trough decline</li>';
+                html += '<li><strong>Positive Days:</strong> fraction of active trading days with positive P&amp;L</li></ul>';
+                html += '<h5>Passive benchmark</h5>';
+                html += '<p><code>[baseline] always_long</code> = buy-and-hold the short-vol index (Sharpe \u2248 2.0, ann ret \u2248 8%). The model\u2019s value-add is <strong>timing alpha</strong> \u2014 avoiding drawdowns when RV is forecast to exceed IV.</p>';
+                html += '<h5>Assumptions</h5>';
+                html += '<ul class="assumptions">';
+                html += '<li>Binary signal (\u00b11), no graded sizing</li>';
+                html += '<li>No transaction costs on index entry/exit (tradeable product)</li>';
+                html += '<li>Daily rebalancing of signal</li>';
+                html += '<li>No leverage or margin constraints</li>';
+                html += '<li>All predictions are out-of-sample from expanding-window CV</li>';
+                html += '<li>Signal uses t\u22121 IV and t\u22121 forecast (no same-day look-ahead)</li></ul>';
+                const gsvRows = (typeof gsvivsStatsByHorizon !== 'undefined') ? (gsvivsStatsByHorizon[currentHorizon] || []) : [];
+                if (gsvRows.length) {
+                    html += '<h5>h=' + currentHorizon + ' values</h5>';
+                    html += '<table class="mini-table"><thead><tr><th>Model</th><th>Sharpe</th><th>Total Ret</th><th>Max DD</th></tr></thead><tbody>';
+                    gsvRows.forEach(r => {
+                        html += '<tr><td><span class="color-dot" style="background:' + r.color + '"></span>' + r.name + '</td>';
+                        html += '<td>' + fmtSharpe(r.sharpe_0rf) + '</td>';
+                        html += '<td>' + fmtPct(r.total_return) + '%</td>';
+                        html += '<td>' + fmtPct(r.max_drawdown) + '%</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+                break;
+
+            case 'dh_methodology':
+                title = 'Realistic Delta-Hedged Straddle: Full Methodology';
+                // ---- OVERVIEW ----
+                html = '<h5>Overview</h5>';
+                html += '<p>Three-phase engine transforming QLIKE-optimal RV forecasts into an economically meaningful P&amp;L backtest. Trades the IV\u2013RV gap via ATM straddles, delta-hedged to isolate the volatility view.</p>';
+
+                // ---- PHASE 1: ANALYTIC ENGINE ----
+                html += '<h5>Phase 1: Analytic P&amp;L Engine</h5>';
+                html += '<p><strong>1. Signal generation</strong></p>';
+                html += '<div class="formula">' + tex('\\text{gap}_t = IV_t - \\hat{\\sigma}_t, \\quad \\hat{\\sigma}_t = \\sqrt{252 \\cdot \\exp(\\widehat{\\log RV}_t)}', true) + '</div>';
+                html += '<p>Binary mode: sell vol if gap &gt; 0, buy if gap &lt; 0. Graded mode:</p>';
+                html += '<div class="formula">' + tex('w_t = \\text{clip}\\!\\left(\\frac{\\text{gap}_t}{\\sigma_{\\text{gap},\\,63d}},\\; -2,\\; +2\\right)', true) + '</div>';
+
+                html += '<p><strong>2. Tenor-decayed ATM straddle gamma</strong></p>';
+                html += '<div class="formula">' + tex('\\Gamma_{\\text{ATM}} = \\frac{2}{S_t \\cdot IV_t \\cdot \\sqrt{T_{\\text{rem}}/252}}', true) + '</div>';
+                html += '<p>Gamma increases as expiry nears (1/sqrt(T) effect). Straddle = 2 ATM options.</p>';
+
+                html += '<p><strong>3. Gross gamma P&amp;L</strong></p>';
+                html += '<div class="formula">' + tex('\\text{PnL}^{\\gamma}_t = -w_t \\cdot \\frac{1}{2}\\,\\Gamma_t\\, S_t^2 \\left(RV_t - \\frac{IV_t^2}{252}\\right) \\;/\\; S_t', true) + '</div>';
+                html += '<p>Short vol profits when realized variance &lt; implied daily variance.</p>';
+
+                html += '<p><strong>4. Vanna P&amp;L (spot\u2013vol correlation leakage)</strong></p>';
+                html += '<div class="formula">' + tex('\\text{Vanna} = -2\\,e^{-qT}\\, N\'(d_1)\\,\\frac{d_2}{\\sigma}', true) + '</div>';
+                html += '<div class="formula">' + tex('\\text{PnL}^{\\text{vanna}}_t = -w_t \\cdot \\text{Vanna}_t \\cdot \\Delta S_t \\cdot \\Delta IV_t \\;/\\; S_t', true) + '</div>';
+                html += '<p>Where ' + tex('d_1 = \\tfrac{1}{2}\\sigma\\sqrt{T}') + ', ' + tex('d_2 = -\\tfrac{1}{2}\\sigma\\sqrt{T}') + ' (ATM: K=S so log(S/K)=0).</p>';
+
+                html += '<p><strong>5. Volga P&amp;L (vol-of-vol convexity)</strong></p>';
+                html += '<div class="formula">' + tex('\\text{Vega}_{\\text{straddle}} = 2\\,S\\sqrt{T}\\,N\'(d_1)', true) + '</div>';
+                html += '<div class="formula">' + tex('\\text{Volga} = \\text{Vega} \\cdot \\frac{d_1 \\cdot d_2}{\\sigma}', true) + '</div>';
+                html += '<div class="formula">' + tex('\\text{PnL}^{\\text{volga}}_t = -w_t \\cdot \\tfrac{1}{2}\\,\\text{Volga}_t \\cdot (\\Delta IV_t)^2 \\;/\\; S_t', true) + '</div>';
+
+                html += '<p><strong>6. Delta-hedge transaction cost (Leland-style)</strong></p>';
+                html += '<div class="formula">' + tex('\\mathbb{E}[|\\Delta\\delta|] = \\Gamma \\cdot S \\cdot IV \\cdot \\sqrt{\\tfrac{1}{252 \\cdot N}} \\cdot \\sqrt{\\tfrac{2}{\\pi}}', true) + '</div>';
+                html += '<div class="formula">' + tex('\\text{Cost}^{\\text{hedge}}_t = N \\cdot \\mathbb{E}[|\\Delta\\delta|] \\cdot S \\cdot \\frac{\\text{spread}_{\\text{bps}}}{10000}', true) + '</div>';
+                html += '<p>N = rebalances/day. Spread is round-trip in basis points.</p>';
+
+                html += '<p><strong>7. Option cost (maturity-varying, event-driven)</strong></p>';
+                html += '<p>Per Doshi, Pari &amp; Shamsuddin (2025) schedule:</p>';
+                html += '<table class="mini-table"><thead><tr><th>T_rem (days)</th><th>Multiplier</th></tr></thead><tbody>';
+                html += '<tr><td>&le; 6</td><td>4.5&times; base</td></tr>';
+                html += '<tr><td>7\u201313</td><td>1.75&times; base</td></tr>';
+                html += '<tr><td>&ge; 14</td><td>1.0&times; base</td></tr>';
+                html += '</tbody></table>';
+                html += '<p>Charged on entry (2 legs), exit (2 legs), flip (4 legs), and roll (4 legs). Scaled by vega = ' + tex('S\\sqrt{T}\\,N\'(0)') + '.</p>';
+
+                html += '<p><strong>8. Hedge error variance (Boyle &amp; Emanuel 1980)</strong></p>';
+                html += '<div class="formula">' + tex('\\text{Var}(\\text{HE}_t) = \\left(\\tfrac{1}{2}\\Gamma S^2\\right)^2 \\cdot (\\kappa - 1) \\cdot \\frac{\\sigma^4}{252^2 \\cdot N}', true) + '</div>';
+                html += '<p>Where ' + tex('\\kappa') + ' = return kurtosis (default 4.0 for 15-min bars). This is zero-mean noise that inflates P&amp;L standard deviation but not mean.</p>';
+
+                html += '<p><strong>9. Adjusted Sharpe ratio</strong></p>';
+                html += '<div class="formula">' + tex('\\text{SR}_{\\text{adj}} = \\frac{\\bar{\\text{PnL}}}{\\sqrt{\\text{Var}(\\text{PnL}) + \\overline{\\text{Var}(\\text{HE})}}} \\cdot \\sqrt{252}', true) + '</div>';
+
+                // ---- PHASE 2: DISCRETE SIMULATOR ----
+                html += '<h5>Phase 2: Discrete Bar-by-Bar Simulation</h5>';
+                html += '<p><strong>10. VWAP aggregation (10s \u2192 15-min bars)</strong></p>';
+                html += '<div class="formula">' + tex('\\text{VWAP}_{15\\text{min}} = \\frac{\\sum_{i=1}^{90} \\text{vwap}_i \\cdot v_i}{\\sum_{i=1}^{90} v_i}, \\quad v_i = \\text{buy\\_vol}_i + \\text{sell\\_vol}_i', true) + '</div>';
+                html += '<p>90 ten-second bars per 15-minute bucket. Falls back to last price if zero volume.</p>';
+
+                html += '<p><strong>11. Full Black-Scholes delta hedging</strong></p>';
+                html += '<div class="formula">' + tex('\\delta_{\\text{straddle}} = 2\\,N(d_1) - 1, \\quad d_1 = \\frac{\\ln(S/K) + \\tfrac{1}{2}\\sigma^2 T}{\\sigma\\sqrt{T}}', true) + '</div>';
+                html += '<p>At each bar: observe price from bar ' + tex('i-1') + ' (15-min lag), compute BS delta at actual moneyness (not ATM approx), execute hedge at bar ' + tex('i') + ' VWAP.</p>';
+
+                html += '<p><strong>12. Per-day realized kurtosis (Amaya et al. 2015)</strong></p>';
+                html += '<div class="formula">' + tex('\\hat{\\kappa}_t = n \\cdot \\frac{\\sum_{i=1}^n r_i^4}{\\left(\\sum_{i=1}^n r_i^2\\right)^2}', true) + '</div>';
+                html += '<p>Where ' + tex('r_i') + ' are intraday 15-min log returns. Replaces the fixed kappa=4 assumption with data-driven values.</p>';
+
+                html += '<p><strong>13. Hedging-error floor (Broden &amp; Tankov 2010)</strong></p>';
+                html += '<div class="formula">' + tex('\\text{Var}(\\text{HE}) = \\frac{a}{N} + b', true) + '</div>';
+                html += '<p>Under pure diffusion, ' + tex('b \\approx 0') + '. Under jumps, ' + tex('b > 0') + ' is a variance floor that does not vanish with faster hedging. Detected when ' + tex('b > 0.1 \\cdot \\overline{\\text{Var}}') + '.</p>';
+
+                // ---- PHASE 3: EVALUATION RIGOR ----
+                html += '<h5>Phase 3: Evaluation Rigor</h5>';
+                html += '<p><strong>14. Cost-band experiment (Muravyev &amp; Pearson 2020)</strong></p>';
+                html += '<table class="mini-table"><thead><tr><th>Band</th><th>Vol pts</th><th>Interpretation</th></tr></thead><tbody>';
+                html += '<tr><td>Timing-aware</td><td>0.5</td><td>Optimistic: 1/3 of quoted spread (patient execution)</td></tr>';
+                html += '<tr><td>Effective</td><td>1.0</td><td>Empirically grounded: what market-makers actually pay</td></tr>';
+                html += '<tr><td>Quoted</td><td>1.5</td><td>Pessimistic: full half-spread (aggressive lifting)</td></tr>';
+                html += '</tbody></table>';
+                html += '<p>Pass criterion: SR &gt; 0.5 at the effective band level.</p>';
+
+                html += '<p><strong>15. Statistical\u2013economic link (OLS regression)</strong></p>';
+                html += '<div class="formula">' + tex('\\text{PnL}_t = \\alpha + \\beta_{\\text{gap}}\\,(RV_t - IV_t^2/252) + \\beta_{\\text{err}}\\,(RV_t - \\widehat{RV}_t) + \\varepsilon_t', true) + '</div>';
+                html += '<p>' + tex('\\beta_{\\text{gap}} > 0') + ' confirms the strategy monetizes the volatility risk premium. ' + tex('\\beta_{\\text{err}} < 0') + ' shows forecast errors hurt P&amp;L (validating the forecast matters).</p>';
+
+                html += '<p><strong>16. Deflated Sharpe Ratio (Bailey &amp; Lopez de Prado 2014)</strong></p>';
+                html += '<div class="formula">' + tex('\\text{DSR} = \\Phi\\!\\left(\\frac{\\widehat{SR} - SR_0}{\\sqrt{\\text{Var}(\\widehat{SR})}}\\right)', true) + '</div>';
+                html += '<div class="formula">' + tex('\\text{Var}(\\widehat{SR}) = \\frac{1 - \\hat{\\gamma}_3\\,SR + \\frac{\\hat{\\gamma}_4 - 1}{4}\\,SR^2}{T-1}', true) + '</div>';
+                html += '<div class="formula">' + tex('SR_0 = \\sqrt{\\text{Var}(\\widehat{SR})}\\left[(1-\\gamma_E)\\,\\Phi^{-1}\\!\\left(1-\\tfrac{1}{N}\\right) + \\gamma_E\\,\\Phi^{-1}\\!\\left(1-\\tfrac{1}{Ne}\\right)\\right]', true) + '</div>';
+                html += '<p>Where ' + tex('\\gamma_E = 0.5772') + ' (Euler\u2013Mascheroni), ' + tex('\\hat{\\gamma}_3') + ' = skewness, ' + tex('\\hat{\\gamma}_4') + ' = kurtosis, N = number of strategy configs tested. DSR &gt; 0.95 is required to reject the null that the Sharpe is due to multiple testing.</p>';
+
+                html += '<p><strong>17. Sharpe aggregation</strong></p>';
+                html += '<p>Pooled Sharpe: concatenate all per-symbol daily P&amp;L, compute single Sharpe. Per-symbol Sharpe: mean across symbols. Block-bootstrap CI (block size = 5 days) preserves short-horizon autocorrelation.</p>';
+
+                html += '<p><strong>18. Kappa sensitivity</strong></p>';
+                html += '<p>Report adjusted Sharpe and DSR at ' + tex('\\kappa \\in \\{3, 4, 6\\}') + '. A stable signal should not collapse when kurtosis assumptions change.</p>';
+
+                // ---- ASSUMPTIONS ----
+                html += '<h5>Complete Assumption List</h5>';
+                html += '<ul class="assumptions">';
+                html += '<li><strong>Option model:</strong> Black-Scholes (log-normal diffusion). No stochastic vol, no jumps in the pricing model. Greeks are BS greeks.</li>';
+                html += '<li><strong>Straddle structure:</strong> ATM (K=S at entry/roll). No skew adjustment to strike selection.</li>';
+                html += '<li><strong>Tenor:</strong> 30 trading days (~6 weeks calendar). Roll when T_rem &le; 5 days.</li>';
+                html += '<li><strong>Delta-hedge frequency:</strong> 26 rebalances/day (every 15 min during 6.5h trading). Phase 1 uses expected cost; Phase 2 simulates bar-by-bar.</li>';
+                html += '<li><strong>Execution model:</strong> VWAP fill at 15-min bar level. No market impact, no slippage beyond spread.</li>';
+                html += '<li><strong>Spread (underlying):</strong> 2.0 bps round-trip for delta hedges. Fixed, not state-dependent.</li>';
+                html += '<li><strong>Option spread:</strong> 1.0 vol pts base (effective band). Maturity-adjusted per Doshi schedule above.</li>';
+                html += '<li><strong>IV source:</strong> 1-month ATM implied vol (iv_1m_atm). Lagged by 1 day to avoid look-ahead.</li>';
+                html += '<li><strong>Risk-free rate:</strong> r=0 throughout (negligible for 1-month tenor).</li>';
+                html += '<li><strong>Dividends:</strong> q=0 (continuous dividend yield ignored).</li>';
+                html += '<li><strong>Kurtosis (Phase 1):</strong> Fixed kappa=4.0 (leptokurtic assumption for 15-min returns). Phase 2 measures per-day realized kurtosis.</li>';
+                html += '<li><strong>Normalization:</strong> All P&amp;L in % of spot (dollar P&amp;L / S_t). Sharpe annualized by sqrt(252).</li>';
+                html += '<li><strong>Position sizing:</strong> Binary (&plusmn;1) or graded (clip to &plusmn;2). Fixed notional per trade, no compounding.</li>';
+                html += '<li><strong>No margin constraints:</strong> No initial margin, variation margin, or funding cost for the straddle position.</li>';
+                html += '<li><strong>No early exercise:</strong> European-style options only (consistent with SPX, but equity names have American early-exercise).</li>';
+                html += '<li><strong>Vanna/Volga P&amp;L:</strong> Second-order Taylor expansion. Assumes continuous rebalancing of these greeks (not hedged separately).</li>';
+                html += '<li><strong>Roll mechanics:</strong> Instantaneous roll at new ATM strike. No bid-ask crossing penalty beyond the maturity-adjusted spread.</li>';
+                html += '<li><strong>Signal timing:</strong> Signal uses t-1 IV and t-1 forecast (no same-day look-ahead). Position changes on open of day t.</li>';
+                html += '<li><strong>COVID handling:</strong> No special regime — included in backtest. COVID days (Feb\u2013Jun 2020) may dominate P&amp;L if present in data.</li>';
+                html += '<li><strong>Bootstrap:</strong> Block size=5 days for CI. Circular block bootstrap not used (truncated blocks).</li>';
+                html += '<li><strong>Multiple testing:</strong> N_trials=10 assumed for DSR. Should match actual number of strategy configs tested.</li>';
+                html += '<li><strong>OLS standard errors:</strong> Homoskedastic (not HAC). Statistical-economic link t-stats may be understated under heteroskedasticity.</li>';
+                html += '<li><strong>Gamma P&amp;L approximation:</strong> Uses realized daily variance vs implied daily variance. Intraday path dependency captured only in Phase 2.</li>';
+                html += '</ul>';
+
+                // ---- REFERENCES ----
+                html += '<h5>References</h5>';
+                html += '<ul class="assumptions">';
+                html += '<li>Boyle &amp; Emanuel (1980): discrete hedging error, ' + tex('1/N') + ' scaling</li>';
+                html += '<li>Leland (1985): modified volatility for transaction costs</li>';
+                html += '<li>Broden &amp; Tankov (2010): jump floor in hedging error</li>';
+                html += '<li>Bailey &amp; Lopez de Prado (2014): Deflated Sharpe Ratio</li>';
+                html += '<li>Amaya, Christoffersen, Jacobs &amp; Vasquez (2015): realized kurtosis</li>';
+                html += '<li>Muravyev &amp; Pearson (2020): option effective spreads and cost bands</li>';
+                html += '<li>Doshi, Pari &amp; Shamsuddin (2025): maturity-dependent option spreads</li>';
+                html += '</ul>';
+                break;
+            }
+
+            const container = document.getElementById('explainer-container');
+            container.innerHTML = '<div class="explainer-box">' +
+                '<div class="explainer-header"><h4>' + title + '</h4>' +
+                '<button class="explainer-close" onclick="closeExplainer()" title="Close">&times;</button></div>' +
+                '<div class="explainer-body">' + html + '</div></div>';
+            renderKatex(container);
+        }
+        // ---- Model Details Panel ----
+        let modelDetailOpen = false;
+        let modelDetailName = null;
+
+        function openModelDetails(name) {
+            if (explainerOpen) {
+                explainerOpen = false;
+                explainerMetric = null;
+            }
+            if (modelDetailOpen && modelDetailName === name) {
+                closeModelDetails();
+                return;
+            }
+            modelDetailName = name;
+            modelDetailOpen = true;
+            renderModelDetails(name);
+            const el = document.getElementById('explainer-container');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function closeModelDetails() {
+            modelDetailOpen = false;
+            modelDetailName = null;
+            document.getElementById('explainer-container').innerHTML = '';
+        }
+
+        function renderModelDetails(name) {
+            const details = (modelDetailsByHorizon[currentHorizon] || {})[name];
+            if (!details) {
+                document.getElementById('explainer-container').innerHTML =
+                    '<div class="explainer-box"><div class="explainer-header"><h4>Model Details</h4>' +
+                    '<button class="explainer-close" onclick="closeModelDetails()" title="Close">&times;</button></div>' +
+                    '<div class="explainer-body"><p class="no-data">No detail data available for this model.</p></div></div>';
+                return;
+            }
+
+            let html = '';
+
+            // Header: name + family pill + description
+            html += '<h4>' + name + ' <span class="family-pill ' + details.family + '">' + details.family + '</span></h4>';
+            if (details.description) {
+                html += '<p style="color:var(--text-secondary);margin:0 0 0.5rem;font-size:0.85rem;">' + details.description + '</p>';
+            }
+
+            // At-a-glance row (pull from stats)
+            const statsRow = (statsByHorizon[currentHorizon] || []).find(r => r.name === name);
+            if (statsRow) {
+                html += '<div class="at-a-glance">';
+                html += '<div class="stat"><div class="stat-value">' + statsRow.qlike.toFixed(5) + '</div><div class="stat-label">QLIKE</div></div>';
+                html += '<div class="stat"><div class="stat-value">' + (statsRow.qlike_bps > 0 ? '+' : '') + statsRow.qlike_bps.toFixed(1) + '</div><div class="stat-label">\u0394 bps</div></div>';
+                html += '<div class="stat"><div class="stat-value">' + (statsRow.mcs_included ? '\u2713' : '\u2717') + '</div><div class="stat-label">MCS</div></div>';
+                html += '<div class="stat"><div class="stat-value">' + statsRow.r_squared.toFixed(4) + '</div><div class="stat-label">R\u00B2</div></div>';
+                html += '</div>';
+            }
+
+            // Lineage graph (Mermaid)
+            if (details.lineage_mermaid) {
+                html += '<div class="section-title">Model Lineage</div>';
+                html += '<div class="lineage-graph"><div class="mermaid" id="mermaid-' + name.replace(/[^a-zA-Z0-9]/g,'_') + '">' + details.lineage_mermaid + '</div></div>';
+            }
+
+            // Feature layers
+            if (details.feature_layers && details.feature_layers.length > 0) {
+                html += '<div class="section-title">Feature Layers' + (details.n_features ? ' (' + details.n_features + ' columns)' : '') + '</div>';
+                html += '<div class="layer-chips">';
+                details.feature_layers.forEach(function(layer) {
+                    html += '<span class="chip">' + layer + '</span>';
+                });
+                html += '</div>';
+            }
+
+            // Hyperparameters
+            if (details.effective_params && Object.keys(details.effective_params).length > 0) {
+                html += '<div class="section-title">Hyperparameters</div>';
+                html += '<div class="params-grid">';
+                const skipKeys = ['base_model'];
+                Object.entries(details.effective_params).forEach(function([k, v]) {
+                    if (skipKeys.includes(k)) return;
+                    const displayVal = (v === null || v === undefined) ? 'null' : String(v);
+                    html += '<div class="param-item"><span class="param-key">' + k + '</span><span class="param-val">' + displayVal + '</span></div>';
+                });
+                html += '</div>';
+            }
+
+            // Family-specific stats
+            if (details.family_stats) {
+                if (details.family === 'har' && details.family_stats.coefficients) {
+                    html += '<div class="section-title">Fitted Coefficients</div>';
+                    html += '<table class="coef-table"><thead><tr><th>Feature</th><th>Coefficient</th></tr></thead><tbody>';
+                    if (details.family_stats.intercept !== undefined) {
+                        html += '<tr><td>intercept</td><td>' + details.family_stats.intercept.toFixed(6) + '</td></tr>';
+                    }
+                    Object.entries(details.family_stats.coefficients).forEach(function([feat, coef]) {
+                        const color = coef >= 0 ? 'var(--success)' : 'var(--danger)';
+                        html += '<tr><td>' + feat + '</td><td style="color:' + color + '">' + coef.toFixed(6) + '</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                } else if ((details.family === 'lightgbm' || details.family === 'xgboost') && details.family_stats.shap_summary) {
+                    // SHAP-based feature importance (replaces gain bars when available)
+                    html += '<div class="section-title">Feature Importance (SHAP)</div>';
+                    html += '<p style="color:var(--text-secondary);font-size:0.75rem;margin:0 0 0.3rem 0;">Click any feature bar for a detailed explanation.</p>';
+                    html += '<div id="shap-bar-' + name.replace(/[^a-zA-Z0-9]/g,'_') + '-' + currentHorizon + '" class="shap-bar-chart"></div>';
+
+                    // Feature description panel (populated on click)
+                    html += '<div class="feature-desc-panel"></div>';
+
+                    // Collapsible beeswarm
+                    if (details.family_stats.shap_beeswarm) {
+                        html += '<details class="beeswarm-details"><summary>SHAP Value Distribution (click to expand)</summary>';
+                        html += '<p style="color:var(--text-secondary);font-size:0.75rem;margin:0.3rem 0;">Click any point cluster to see the feature description.</p>';
+                        html += '<div id="shap-beeswarm-' + name.replace(/[^a-zA-Z0-9]/g,'_') + '-' + currentHorizon + '" class="beeswarm-container"></div>';
+                        html += '</details>';
+                    }
+
+                    // ALE curves
+                    if (details.family_stats.ale_curves) {
+                        html += '<div class="section-title" style="margin-top:1rem">Accumulated Local Effects</div>';
+                        html += '<div id="ale-grid-' + name.replace(/[^a-zA-Z0-9]/g,'_') + '-' + currentHorizon + '" class="ale-grid"></div>';
+                    }
+
+                    // SHAP Feature Selection methodology (if model was SHAP-optimised)
+                    if (details.family_stats.shap_selection) {
+                        html += renderShapSelectionPanel(details.family_stats.shap_selection);
+                    }
+                } else if ((details.family === 'lightgbm' || details.family === 'xgboost') && details.family_stats.importance_top20) {
+                    // Fallback: gain-based importance when SHAP not computed
+                    html += '<div class="section-title">Feature Importance (Top 20 by Gain)</div>';
+                    const maxPct = Math.max(...details.family_stats.importance_top20.map(function(x) { return x[1]; }));
+                    details.family_stats.importance_top20.forEach(function(item) {
+                        const pct = item[1];
+                        const width = (pct / maxPct * 100).toFixed(1);
+                        html += '<div class="importance-bar-container">';
+                        html += '<span class="importance-label">' + item[0] + '</span>';
+                        html += '<div class="importance-bar" style="width:' + width + '%;"></div>';
+                        html += '<span class="importance-pct">' + pct.toFixed(1) + '%</span>';
+                        html += '</div>';
+                    });
+
+                    // SHAP Feature Selection methodology (gain-based fallback path)
+                    if (details.family_stats.shap_selection) {
+                        html += renderShapSelectionPanel(details.family_stats.shap_selection);
+                    }
+                } else if (details.family === 'lstm') {
+                    html += '<div class="section-title">Architecture Summary</div>';
+                    html += '<div class="params-grid">';
+                    Object.entries(details.family_stats).forEach(function([k, v]) {
+                        if (v !== null && v !== undefined) {
+                            html += '<div class="param-item"><span class="param-key">' + k + '</span><span class="param-val">' + v + '</span></div>';
+                        }
+                    });
+                    html += '</div>';
+                }
+            } else {
+                html += '<div class="section-title">Model Statistics</div>';
+                html += '<p class="no-data">Model artifacts not persisted for this run. Re-run with output_dir to enable detailed statistics.</p>';
+            }
+
+            // Attribution
+            if (details.attribution) {
+                html += '<div class="section-title">Example Prediction (' + details.attribution.date + ', ' + details.attribution.symbol + ')</div>';
+                html += '<table class="attribution-table"><thead><tr><th>Component</th><th>Value (log-RV)</th></tr></thead><tbody>';
+                if (details.attribution.components) {
+                    details.attribution.components.forEach(function(c) {
+                        html += '<tr><td>' + c.name + '</td><td>' + c.value.toFixed(6) + '</td></tr>';
+                    });
+                }
+                html += '<tr style="border-top:2px solid var(--accent)"><td><strong>Prediction</strong></td><td><strong>' + details.attribution.prediction.toFixed(6) + '</strong></td></tr>';
+                html += '<tr><td>Actual RV</td><td>' + details.attribution.rv_actual.toFixed(6) + '</td></tr>';
+                html += '</tbody></table>';
+            }
+
+            const container = document.getElementById('explainer-container');
+            container.innerHTML = '<div class="explainer-box model-detail-card">' +
+                '<div class="explainer-header"><h4 style="display:none"></h4>' +
+                '<button class="explainer-close" onclick="closeModelDetails()" title="Close">&times;</button></div>' +
+                '<div class="explainer-body">' + html + '</div></div>';
+
+            // Render Mermaid if present
+            if (details.lineage_mermaid) {
+                try {
+                    const mermaidEl = container.querySelector('.mermaid');
+                    if (mermaidEl && typeof mermaid !== 'undefined') {
+                        mermaid.run({ nodes: [mermaidEl] });
+                    }
+                } catch(e) { console.warn('Mermaid render failed:', e); }
+            }
+
+            // Render KaTeX formulas (SHAP selection methodology panel)
+            renderKatex(container);
+
+            // Render SHAP bar chart
+            if (details.family_stats && details.family_stats.shap_summary) {
+                const barId = 'shap-bar-' + name.replace(/[^a-zA-Z0-9]/g,'_') + '-' + currentHorizon;
+                const barEl = document.getElementById(barId);
+                if (barEl && typeof Plotly !== 'undefined') {
+                    const shapData = details.family_stats.shap_summary;
+                    const features = shapData.map(function(x) { return x[0]; }).reverse();
+                    const values = shapData.map(function(x) { return x[1]; }).reverse();
+                    const barTrace = {
+                        y: features, x: values, type: 'bar', orientation: 'h',
+                        marker: { color: 'rgba(99,179,237,0.8)' },
+                        hovertemplate: '%{y}: %{x:.4f}<extra></extra>'
+                    };
+                    const barLayout = {
+                        margin: {l: 180, r: 20, t: 10, b: 30}, height: Math.max(300, features.length * 22),
+                        xaxis: {title: 'Mean |SHAP value|', color: '#ccc', gridcolor: '#333'},
+                        yaxis: {color: '#ccc', tickfont: {size: 11}},
+                        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: {color: '#ccc'}
+                    };
+                    Plotly.newPlot(barEl, [barTrace], barLayout, {displayModeBar: false, responsive: true});
+                    // Click handler: show feature description on bar click
+                    var barContainer = barEl.closest('.model-detail-card');
+                    barEl.on('plotly_click', function(data) {
+                        if (data.points && data.points.length > 0) {
+                            var featName = data.points[0].y;
+                            showFeatureDescription(featName, barContainer);
+                        }
+                    });
+                    // Also handle clicks on y-axis tick labels
+                    attachTickLabelClickHandlers(barEl, features, barContainer);
+                }
+            }
+
+            // Render SHAP beeswarm
+            if (details.family_stats && details.family_stats.shap_beeswarm) {
+                const beeId = 'shap-beeswarm-' + name.replace(/[^a-zA-Z0-9]/g,'_') + '-' + currentHorizon;
+                const beeEl = document.getElementById(beeId);
+                if (beeEl && typeof Plotly !== 'undefined') {
+                    const bee = details.family_stats.shap_beeswarm;
+                    const nFeats = bee.features.length;
+                    const nSamples = bee.shap_values.length;
+                    const beeTraces = [];
+                    // Flatten into single scatter: x=SHAP, y=feature index (jittered)
+                    const xs = [], ys = [], colors = [];
+                    for (let fi = 0; fi < nFeats; fi++) {
+                        for (let si = 0; si < nSamples; si++) {
+                            xs.push(bee.shap_values[si][fi]);
+                            ys.push(nFeats - 1 - fi + (Math.random() - 0.5) * 0.3);
+                            colors.push(bee.feature_values[si][fi]);
+                        }
+                    }
+                    beeTraces.push({
+                        x: xs, y: ys, mode: 'markers', type: 'scattergl',
+                        marker: { size: 3, color: colors, colorscale: [[0,'#3182ce'],[1,'#e53e3e']], opacity: 0.6 },
+                        hoverinfo: 'skip'
+                    });
+                    const beeLayout = {
+                        margin: {l: 180, r: 20, t: 10, b: 30}, height: Math.max(300, nFeats * 25),
+                        xaxis: {title: 'SHAP value', color: '#ccc', gridcolor: '#333', zeroline: true, zerolinecolor: '#666'},
+                        yaxis: {tickvals: Array.from({length: nFeats}, function(_,i){return i;}),
+                                ticktext: bee.features.slice().reverse(),
+                                color: '#ccc', tickfont: {size: 10}},
+                        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: {color: '#ccc'}
+                    };
+                    Plotly.newPlot(beeEl, beeTraces, beeLayout, {displayModeBar: false, responsive: true});
+                    // Click handler: map clicked y-position to feature name
+                    var beeContainer = beeEl.closest('.model-detail-card');
+                    beeEl.on('plotly_click', function(data) {
+                        if (data.points && data.points.length > 0) {
+                            var yVal = data.points[0].y;
+                            var featIdx = Math.round(yVal);
+                            var reversedFeats = bee.features.slice().reverse();
+                            if (featIdx >= 0 && featIdx < reversedFeats.length) {
+                                showFeatureDescription(reversedFeats[featIdx], beeContainer);
+                            }
+                        }
+                    });
+                    // Also handle clicks on y-axis tick labels
+                    attachTickLabelClickHandlers(beeEl, bee.features, beeContainer);
+                }
+            }
+
+            // Render ALE curves
+            if (details.family_stats && details.family_stats.ale_curves) {
+                const aleId = 'ale-grid-' + name.replace(/[^a-zA-Z0-9]/g,'_') + '-' + currentHorizon;
+                const aleEl = document.getElementById(aleId);
+                if (aleEl && typeof Plotly !== 'undefined') {
+                    const aleCurves = details.family_stats.ale_curves;
+                    const aleFeatures = Object.keys(aleCurves);
+                    aleEl.style.display = 'grid';
+                    aleEl.style.gridTemplateColumns = 'repeat(2, 1fr)';
+                    aleEl.style.gap = '0.5rem';
+                    aleFeatures.forEach(function(feat) {
+                        const curve = aleCurves[feat];
+                        const cellDiv = document.createElement('div');
+                        cellDiv.style.minHeight = '180px';
+                        aleEl.appendChild(cellDiv);
+                        const aleTrace = {
+                            x: curve.grid, y: curve.ale, type: 'scatter', mode: 'lines',
+                            line: {color: '#63b3ed', width: 2},
+                            hovertemplate: feat + ': %{x:.3f}<br>ALE: %{y:.4f}<extra></extra>'
+                        };
+                        // Rug as bar chart at bottom
+                        const maxRug = Math.max(...curve.rug);
+                        const rugTrace = {
+                            x: curve.grid, y: curve.rug.map(function(r){ return -Math.abs(Math.min(...curve.ale)) * 0.3 * r / (maxRug || 1); }),
+                            type: 'bar', marker: {color: 'rgba(160,160,160,0.3)'}, hoverinfo: 'skip', showlegend: false
+                        };
+                        const aleLayout = {
+                            margin: {l: 45, r: 10, t: 25, b: 30}, height: 180,
+                            title: {text: feat, font: {size: 11, color: '#aaa'}},
+                            xaxis: {color: '#999', gridcolor: '#333', tickfont: {size: 9}},
+                            yaxis: {title: 'ALE', color: '#999', gridcolor: '#333', tickfont: {size: 9}, zeroline: true, zerolinecolor: '#555'},
+                            paper_bgcolor: 'transparent', plot_bgcolor: 'transparent', font: {color: '#ccc'},
+                            showlegend: false, bargap: 0
+                        };
+                        Plotly.newPlot(cellDiv, [aleTrace, rugTrace], aleLayout, {displayModeBar: false, responsive: true});
+                    });
+                }
+            }
+        }
+
+        // ---- Init ----
+        applyGsvivsSizingFilter();
+        renderChart();
+    </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+TypeDefine( "Wing Info" )
+{
+    Members()
+    {
+        Array(  Table   ),  // Matrix of vol win data
+        Array(  Headers ),  // Info for each col in Table
+        Array(  Tags    ),  // Info for each row in Table
+        String( Cross   ),  // Cross this Table is for
+    };
+};
+
+TypeDefine( "CalcView" )
+{
+    Members()
+    {
+        Structure( EmptyValues ), // Initial values
+        Array(     Info        ), // Array of CalcViewItems
+        Structure( LabelToItem ), // Struct to index info by Label
+    };
+};
+
+TypeDefine( "Silly Example" )
+{
+    Members()
+    {
+        String( A String ) := "Something",
+        Any(    Anything ) := 3.7,  // Can be any type
+        Double( A Double ) := 1.0,
+    };
+};
+
+/*
+**  Print info for all types
+*/
+
+ForEach( Type, TypeInfo() )
+{
+    Print( "========= ", Type, " ==========\n" );
+    Print( TypeInfo( Type ), "\n" );
+};
+
+
+/*
+**  Show some stuff related to Silly Example type
+*/
+
+Silly Value = Typed Structure( "Silly Example" );
+Print( "====== Silly Value ======\n", Silly Value, "\n" );
+Silly Value.Anything = [ 3, 4 ];
+If( Defined( Silly Value.A Double = "Foo" ))
+    Print( "*** Yikes!  Type checking is broken\n" )
+:
+    Print( "--> Type check error (correct):\n", LastError(), "\n" );
+
+If( TypeUndefine( "Silly Example" ))
+    Print( "*** Yikes!  TypeUndefine checking is broken\n" )
+:
+    Print( "--> Illegal to undefine right now (correct):\n", LastError(), "\n" );
+
+Destroy( Silly Value );
+
+If( TypeUndefine( "Silly Example" ))
+    Print( "--> 'Silly Example' type removed\n" )
+:
+    Print( "*** Yikes!  Can't TypeUndefine( Silly Example )\n", LastError(), "\n" );
+
+
+/*
+**  Undefine the other types just so the script can be run again
+*/
+
+TypeUndefine( "Wing Info" );
+TypeUndefine( "CalcView" );

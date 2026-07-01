@@ -1,0 +1,154 @@
+ //example typr structure mock
+Link( "_LIB FasTest" );
+Link( "_LIB RegTest Fns" );
+Link( "_TYPE Moxie" );
+
+/***************************************************************
+**  DB Connection type which we will mock.
+**
+***************************************************************/
+AtParseTime
+TypeDefineInterface( "Example::DB Connection" )
+{
+    Connect = Func(
+        Self,
+        String( Host ),
+        Double( Port ),
+    )
+    Returns( Double() )
+    {
+    };
+
+    Send = Func(
+        Self,
+        String( Command )
+    )
+    Returns( Double() )
+    {
+    };
+    [];
+};
+
+/***************************************************************
+**  Code under test.
+**
+***************************************************************/
+AtParseTime
+TypeDefine( "Example::Sql Connector" )
+{
+    Msg From = Func(
+        Self,
+        Example::DB Connection( DB Connector ),
+    )
+    Returns()
+    {
+        Self.DB Connection = DB Connector;
+        // Bad, bad, bad... Doing this in a constructor!!  Mocks to the rescue...
+        Self.DB Connection.Connect( "db.gs.com", 8080 );
+    };
+
+    Insert = Func(
+        Self,
+        Structure( Data )
+    )
+    Returns( Double() )
+    {
+        Key = Data.key;
+        Value = Data.value;
+        Return( Self.DB Connection.Send( Sprintf( "INSERT INTO table (%s) VALUES (%s);", Key, Value ) ) );
+    };
+
+
+    Members()
+    {
+        Example::DB Connection( DB Connection );
+    };
+};
+
+/****************************************************************
+**  Routine: Private::Test Connect
+**
+**  A simple test of the Connect() function.  Not really a
+**  useful test since we only hit Mock code.  See the other
+**  tests in this script for how to make more interesting tests
+**  based on the behaviour of this test.
+****************************************************************/
+Private::Test Connect = Func()
+Returns()
+{
+    // Build the mock
+    Mock Builder = Moxie::Typed Structure( Target Type := "Example::DB Connection" );
+
+    // Set Expectations
+    Mock Builder
+        .Call( "Connect", "db.gs.com", 8080 ).Returning( True )
+        .Call( "Connect", "false_db.gs.com", 8080 ).Throwing( "DB Error - Host not Found" )
+        .Call( "Connect", "db.gs.com", -1 ).Throwing( "DB Error - Invalid Port" )
+        .Call( "Connect", "db.gs.com", 8081 ).Returning( False )
+    ;
+
+    // Get the Mock
+    Mock DB Connection = Mock Builder.Get Mock();
+
+    // Perform Tests for Connect function
+    Assert( "Connecting with proper host and port", Mock DB Connection.Connect( "db.gs.com", 8080 ) );
+
+    @RegTest::Assert Exception(
+        "Exception thrown on bad Host name",
+        \->Mock DB Connection.Connect( "false_db.gs.com", 8080 ),
+        "DB Error - Host not Found",
+        Exact := True,
+    );
+
+    @RegTest::Assert Exception(
+        "Exception thrown on bad Port",
+        \->Mock DB Connection.Connect( "db.gs.com", -1 ),
+        "DB Error - Invalid Port",
+        Exact := True,
+    );
+
+    Assert( "Could not connect with proper host and port", !Mock DB Connection.Connect( "db.gs.com", 8081 ) );
+
+    Mock Builder.Verify();
+};
+
+/****************************************************************
+**  Routine: Private::Test Insert
+**
+**  Unit test for Example::Sql Connector.Insert()
+**
+**  This is an example test to demonstrate how to combine
+**  Dependency injection with Mocking to break an Object's
+**  dependency on another object (in this case, an Object which
+**  makes real DB connections).
+**
+**  The key benefit here is that you don't need to worry about
+**  hitting a real DB, or about setting up a dev DV, in order to
+**  test the functionality of Example::Sql Connector.
+****************************************************************/
+Private::Test Insert = Func(
+)
+Returns()
+{
+    // Build the mock
+    Mock Builder = Moxie::Typed Structure( Target Type := "Example::DB Connection" );
+
+    // Set Expectations
+    Mock Builder
+        .Call Any( "Connect" ).Returning( True ) // suppose we don't care what the exact arguments were to .connect()
+        .Call( "Send", "INSERT INTO table (xyz) VALUES (abc);" ).Returning( True )
+    ;
+
+    // Get the Mock
+    Mock DB Connection = Mock Builder.Get Mock();
+
+    // Perform Tests for Insert
+    Sql Connector = Example::Sql Connector( Mock DB Connection );
+    // (Notice that we built Example::DB Connection (or refactored it) to allow us to inject the Example::DB Connection().)
+
+    Assert( True == Sql Connector.Insert( Structure( "key", "xyz", "value", "abc" ) ) );
+
+    Mock Builder.Verify();
+};
+
+@Fastest::Go( "QA.TestLib" );

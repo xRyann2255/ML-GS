@@ -1,0 +1,105 @@
+# Trial-074 LSTM — single-fold eval aligned to GSVIVS01 inception (2022-05-25)
+#
+# Purpose: Train on ALL data before 2022-05-25, evaluate from 2022-05-25 onward.
+# Mirrors trial_067_xgb_gsvivs01_eval.yaml so both models are evaluated on the
+# exact same OOS period (the GSVIVS01 live window).
+#
+# Approach: train_size=1855 covers ~2015-01-02 through mid-May 2022.
+# With purge_gap=10, first test date lands ~2022-05-25.
+# test_size=1200 forces a single stub fold covering all post-inception data.
+#
+# Model: Identical to trial_074_lstm_maxwin_h1.yaml (bidirectional LSTM,
+# 78×12 5-min sequences, attention pooling, MLP head).
+
+name: trial_074_lstm_gsvivs01_eval
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [har_core]
+
+model:
+  name: lstm
+  params:
+    hidden_dim: 128
+    n_layers: 2
+    dropout: 0.2
+    bidirectional: true
+    learning_rate: 5.0e-4
+    weight_decay: 1.0e-4
+    max_epochs: 80
+    batch_size: 128
+    val_fraction: 0.15
+    early_stopping_rounds: 8
+    loss: qlike
+    device: auto
+    precision: auto
+    compile: false
+    seed: 42
+    pool_mode: attention
+    head_mode: mlp
+
+sequences:
+  features:
+    - log_ret
+    - abs_ret
+    - vol_share
+    - buy_ratio
+    - order_flow_imbalance
+    - rolling_vpin
+    - cum_rv
+    - session_frac
+    - price_accel
+    - log_n_trades
+    - intrabar_rv
+    - volume_surprise
+  max_bars: 78
+  bar_interval: 300
+  norm_mode: per_symbol
+  source: parquet
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  # ~1855 trading dates covers 2015-01-02 through ~mid-May 2022.
+  # With purge_gap=10, first test date lands around 2022-05-25 (GSVIVS01 inception).
+  train_size: 1855
+  # Larger than remaining dates — forces single stub fold covering all post-inception data.
+  test_size: 1200
+
+training_mode: pooled
+seed: 42
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0
+  gsvivs_iv_sources:
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+    - spx_atm_iv_1w
+  dh_enabled: false
+  vt_enabled: false
+
+output_dir: data/models/trial_074_lstm_gsvivs01
