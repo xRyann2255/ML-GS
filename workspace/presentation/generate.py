@@ -139,6 +139,24 @@ p.dim {{ color: {t['muted2']}; }}
   position: fixed; right: 18px; bottom: 12px; z-index: 30;
   font-family: {t['sans']}; font-size: 12px; color: {t['muted']};
 }}
+#dashboard-toggle {{
+  position: fixed; top: 14px; right: 18px; z-index: 40;
+  background: transparent; color: {t['muted']};
+  border: 1px solid {t['hairline']}; padding: 6px 14px;
+  font-family: {t['sans']}; font-size: 12px; letter-spacing: 1px;
+  cursor: pointer;
+}}
+#dashboard-toggle:hover {{ color: {t['amber']}; border-color: {t['amber']}; }}
+#dashboard-overlay {{
+  position: fixed; inset: 0; z-index: 35; display: none; background: {t['bg']};
+}}
+#dashboard-overlay.visible {{ display: block; }}
+#dashboard-frame {{ width: 100%; height: 100%; border: 0; }}
+#dashboard-placeholder {{
+  height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  color: {t['muted']}; font-size: 16px;
+}}
 """
 
 
@@ -161,9 +179,25 @@ addEventListener('resize', fit);
 addEventListener('keydown', (e) => {{
   if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') show(idx + 1);
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp') show(idx - 1);
+  else if (e.key === 'd' || e.key === 'D') toggleDashboard();
+  else if (e.key === 'Escape' && dashVisible) toggleDashboard();
 }});
 fit();
 show(0);
+const DASHBOARD_PATH = '{safe}';
+const DASHBOARD_AVAILABLE = {str(dashboard_available).lower()};
+let dashVisible = false;
+function toggleDashboard() {{
+  dashVisible = !dashVisible;
+  const overlay = document.getElementById('dashboard-overlay');
+  if (dashVisible) {{
+    const frame = document.getElementById('dashboard-frame');
+    if (frame && !frame.getAttribute('src')) frame.setAttribute('src', DASHBOARD_PATH);
+    overlay.classList.add('visible');
+  }} else {{
+    overlay.classList.remove('visible');
+  }}
+}}
 """
 
 
@@ -174,6 +208,16 @@ def generate(dashboard_path: str, output_path: Path) -> str:
     resolved at build time (missing file -> placeholder panel, Task 2).
     """
     dashboard_available = (Path(output_path).parent / dashboard_path).exists()
+    if dashboard_available:
+        overlay_inner = '<iframe id="dashboard-frame" loading="lazy"></iframe>'
+    else:
+        overlay_inner = (
+            '<div id="dashboard-placeholder">'
+            "<div>Dashboard not found at build time.</div>"
+            f"<div>Expected (relative to this file): {dashboard_path}</div>"
+            "<div>Rebuild with --dashboard-path once the dashboard exists.</div>"
+            "</div>"
+        )
     html = (
         "<!DOCTYPE html>\n"
         '<html lang="en">\n'
@@ -186,6 +230,8 @@ def generate(dashboard_path: str, output_path: Path) -> str:
         '<div id="stage">\n'
         f"{_get_slides()}\n"
         "</div>\n"
+        '<button id="dashboard-toggle" onclick="toggleDashboard()">Dashboard [D]</button>\n'
+        f'<div id="dashboard-overlay">{overlay_inner}</div>\n'
         '<div id="counter"></div>\n'
         f"<script>{_get_js(dashboard_available, dashboard_path)}</script>\n"
         "</body>\n"

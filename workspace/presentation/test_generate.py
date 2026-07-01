@@ -68,3 +68,32 @@ def test_em_dash_guard(monkeypatch):
             dashboard_path="tournament_dashboard_mock.html",
             output_path=HERE / "presentation.html",
         )
+
+
+@pytest.fixture(scope="module")
+def html_missing_dash() -> str:
+    return generate.generate(
+        dashboard_path="does_not_exist/nowhere.html",
+        output_path=HERE / "presentation.html",
+    )
+
+
+def test_mock_fixture_exists():
+    assert (HERE / "tournament_dashboard_mock.html").exists()
+
+
+def test_dashboard_iframe_when_available(html):
+    assert 'id="dashboard-frame"' in html
+    assert "tournament_dashboard_mock.html" in html
+    assert 'id="dashboard-placeholder"' not in html
+
+
+def test_placeholder_when_missing(html_missing_dash):
+    assert 'id="dashboard-placeholder"' in html_missing_dash
+    assert 'id="dashboard-frame"' not in html_missing_dash
+    assert "does_not_exist/nowhere.html" in html_missing_dash
+
+
+def test_d_key_toggles(html):
+    assert "toggleDashboard" in html
+    assert "'d'" in html.lower()
