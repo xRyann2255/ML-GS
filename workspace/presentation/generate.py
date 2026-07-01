@@ -174,7 +174,7 @@ def generate(dashboard_path: str, output_path: Path) -> str:
     resolved at build time (missing file -> placeholder panel, Task 2).
     """
     dashboard_available = (Path(output_path).parent / dashboard_path).exists()
-    return (
+    html = (
         "<!DOCTYPE html>\n"
         '<html lang="en">\n'
         "<head>\n"
@@ -191,6 +191,9 @@ def generate(dashboard_path: str, output_path: Path) -> str:
         "</body>\n"
         "</html>\n"
     )
+    if "—" in html:
+        raise ValueError("em dash (U+2014) found in generated HTML; the deck bans em dashes")
+    return html
 
 
 def main() -> None:
