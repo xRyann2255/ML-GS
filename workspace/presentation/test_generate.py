@@ -97,3 +97,28 @@ def test_placeholder_when_missing(html_missing_dash):
 def test_d_key_toggles(html):
     assert "toggleDashboard" in html
     assert "'d'" in html.lower()
+
+
+def test_no_magic_numbers(html):
+    for bad in ("0.13679", "0.1289", "153 bps", "138 bps", "+153", "+138"):
+        assert bad not in html, f"magic number leaked: {bad}"
+
+
+def test_kickers_in_order(html):
+    order = ["ML Vol Forecasting", "The product and its problem", "The claim",
+             "The model", "The features", "Why trust the number",
+             "What it learned", "Results", "The fine print, and the point"]
+    positions = [html.index(k) for k in order]
+    assert positions == sorted(positions)
+
+
+def test_key_copy_present(html):
+    for phrase in (
+        "sells a strip of same-day SPX options",
+        "stand aside for the day",
+        "A linear spine and a tree overlay",
+        "lucky seed looked 6% better than the truth",
+        "the identical model trained on MSE instead of QLIKE trades at Sharpe 0.3",
+        "7 of 10",
+    ):
+        assert phrase in html, f"missing copy: {phrase}"

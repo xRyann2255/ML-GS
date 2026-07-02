@@ -63,39 +63,128 @@ def _slide(kicker: str, title: str, body: str, cls: str = "") -> str:
 
 
 def _slide_01() -> str:
-    return _slide("ML Vol Forecasting", "Timing the Variance Seller", "", "title-slide")
+    body = (
+        '<div class="diagram" data-diagram="payoff_motif"></div>'
+        '<p class="subtitle-line">A machine-learned realized-variance forecast as a daily '
+        "trade / stand-aside signal for the GSVIVS01 index</p>"
+        '<p class="byline">Ryan &middot; July 2026</p>'
+    )
+    return _slide("ML Vol Forecasting", "Timing the Variance Seller", body, "title-slide")
 
 
 def _slide_02() -> str:
-    return _slide("The product and its problem", "GSVIVS01 sells variance every single day", "")
+    n = NUMBERS
+    body = (
+        "<p>Each morning it sells a strip of same-day SPX options that replicates a "
+        "variance swap, delta-hedges through the day, and settles at the close. "
+        f"Index level {n['index_path']} in four years, roughly {n['index_per_year']}.</p>"
+        "<p>The gains are steady. The losses arrive on the few days when realized "
+        "variance exceeds the strike it sold, and the index has no opinion about "
+        "when those days come.</p>"
+        '<div class="diagram" data-diagram="product_day"></div>'
+    )
+    return _slide("The product and its problem", "GSVIVS01 sells variance every single day", body)
 
 
 def _slide_03() -> str:
-    return _slide("The claim", "Every morning: compare the forecast to the strike", "")
+    n = NUMBERS
+    body = (
+        "<p>At 09:10, before the strip is sold, the model's overnight forecast of "
+        "today's realized variance is compared with the strike on offer. Variance "
+        "rich: sell as usual. Forecast above the strike: stand aside for the day.</p>"
+        '<div class="equation" data-eq="kvar"></div>'
+        '<p class="dim">the same OTM-option integral as the VIX, which is why the strike '
+        "sits above ATM implied vol: it inherits the skew</p>"
+        f'<p>Annualized Sharpe {n["sharpe_before"]} &rarr; '
+        f'<span class="g">{n["sharpe_after"]}</span>, backtest {n["backtest_window"]}</p>'
+    )
+    return _slide("The claim", "Every morning: compare the forecast to the strike", body)
 
 
 def _slide_04() -> str:
-    return _slide("The model", "A linear spine and a tree overlay", "")
+    body = (
+        "<p>The spine is HAR-IV: a four-parameter regression on today's, last week's "
+        "and last month's realized variance, plus implied vol. It alone carries most "
+        "of the forecast.</p>"
+        "<p>LightGBM starts from the spine's prediction and learns only what is left "
+        "over, trained end to end on the same loss we judge it by.</p>"
+        "<p>Each horizon reads the option tenor that expires with it: the 1-day "
+        "forecast uses same-day IV, the 5-day uses 1-week, the 22-day uses 1-month.</p>"
+        '<div class="diagram" data-diagram="architecture"></div>'
+    )
+    return _slide("The model", "A linear spine and a tree overlay", body)
 
 
 def _slide_05() -> str:
-    return _slide("The features", "Four things the market tells you", "")
+    n = NUMBERS
+    body = (
+        '<div class="diagram" data-diagram="feature_map"></div>'
+        "<p>About 128 inputs once every series also contributes its daily change "
+        "and how unusual it is against its own recent history.</p>"
+    )
+    return _slide("The features", "Four things the market tells you", body)
 
 
 def _slide_06() -> str:
-    return _slide("Why trust the number", "Walk-forward with a moat, five seeds", "")
+    n = NUMBERS
+    body = (
+        f"<p>Training always ends {n['purge_days']} before testing begins, on every fold, "
+        "because the target itself overlaps days. Splits are by date across all "
+        f"{n['n_symbols']} symbols, so no symbol leaks the future to another. Even the "
+        "early-stopping check sits behind its own gap.</p>"
+        '<div class="diagram" data-diagram="cv_folds"></div>'
+        '<div class="equation" data-eq="qlike"></div>'
+        "<p class=\"dim\">proportional error, so calm markets count as much as crises, and "
+        "underprediction hurts more, as it should for an option seller. "
+        f"One lucky seed looked {n['seed_inflation']}; every headline number is a five-seed mean.</p>"
+    )
+    return _slide("Why trust the number", "Walk-forward with a moat, five seeds", body)
 
 
 def _slide_07() -> str:
-    return _slide("What it learned", "Everything it learned has a name you know", "")
+    body = (
+        "<p>SHAP splits every individual forecast into named feature contributions "
+        "that sum exactly to the prediction, so we can audit what the trees add on "
+        "top of the linear spine.</p>"
+        "<p>What tops the list: the implied-to-realized relationship changing with "
+        "regime, extremes of the variance risk premium, Fed-meeting proximity, and "
+        "unusually-high-against-own-history flags.</p>"
+        '<div class="diagram" data-diagram="beeswarm_guide"></div>'
+    )
+    return _slide("What it learned", "Everything it learned has a name you know", body)
 
 
 def _slide_08() -> str:
-    return _slide("Results", "Where it wins, and where it honestly doesn't", "")
+    n = NUMBERS
+    body = (
+        f"<p><span class=\"a\">1-day ahead</span>: <span class=\"g\">{n['h1_improvement']}</span> "
+        "than the strongest linear baseline, statistically significant. "
+        f"<span class=\"a\">5-day</span>: <span class=\"g\">{n['h5_improvement']}</span>, significant. "
+        '<span class="a">22-day</span>: the four-parameter linear model wins; at a monthly '
+        "horizon the option market has already done the work.</p>"
+        '<div class="diagram" data-diagram="results_bars"></div>'
+        f"<p class=\"dim\">And the loss function is the product: the identical model trained on "
+        f"MSE instead of QLIKE trades at Sharpe {n['mse_sharpe']}.</p>"
+    )
+    return _slide("Results", "Where it wins, and where it honestly doesn't", body)
 
 
 def _slide_09() -> str:
-    return _slide("The fine print, and the point", "Three caveats, three numbers", "")
+    n = NUMBERS
+    body = (
+        "<p>The backtest strike is a proxy from the index's own marks; it tracks the "
+        f"real strike almost perfectly (correlation {n['kvar_proxy_corr']}) and the "
+        "production feed exists. The edge is concentrated in "
+        f"{n['transitions_per_year']} signal changes a year, so each call matters. "
+        "COVID only enters training from 2022 onward, by construction.</p>"
+        '<div class="footer-band">'
+        f"<span>Sharpe <span class=\"g\">{n['sharpe_after']}</span> with the signal vs "
+        f"{n['sharpe_before']} without</span>"
+        f"<span>stands aside on <span class=\"g\">{n['stand_aside_share']}</span> of days</span>"
+        f"<span><span class=\"g\">{n['precision']}</span> stand-asides preceded genuine drawdowns</span>"
+        "</div>"
+    )
+    return _slide("The fine print, and the point", "Three caveats, three numbers", body)
 
 
 def _get_slides() -> str:
@@ -135,6 +224,11 @@ p.dim {{ color: {t['muted2']}; }}
   display: flex; justify-content: space-between;
   font-size: 15px; color: {t['muted']};
 }}
+.title-slide h1 {{ font-size: 64px; margin-top: 140px; }}
+.title-slide .subtitle-line {{ font-size: 22px; color: {t['muted2']}; }}
+.title-slide .byline {{ position: absolute; bottom: 72px; font-size: 16px; color: {t['muted']}; }}
+.diagram {{ margin: 20px 0; }}
+.equation {{ margin: 18px 0; }}
 #counter {{
   position: fixed; right: 18px; bottom: 12px; z-index: 30;
   font-family: {t['sans']}; font-size: 12px; color: {t['muted']};
