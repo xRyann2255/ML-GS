@@ -455,6 +455,18 @@ def _slide_08() -> str:
     return _slide("Results", "Where it wins, and where it honestly doesn't", body)
 
 
+def _stat_cell(pre: str, num: str, label: str) -> str:
+    # Visible copy is frozen: pre + num + label must concatenate to the
+    # user-approved stat line, in reading order (top to bottom).
+    return (
+        '<div class="stat">'
+        f'<div class="stat-pre">{pre}</div>'
+        f'<div class="stat-num g">{num}</div>'
+        f'<div class="stat-label">{label}</div>'
+        "</div>"
+    )
+
+
 def _slide_09() -> str:
     n = NUMBERS
     body = (
@@ -463,12 +475,12 @@ def _slide_09() -> str:
         "production feed exists. The edge is concentrated in "
         f"{n['transitions_per_year']} signal changes a year, so each call matters. "
         "COVID only enters training from 2022 onward, by construction.</p>"
-        '<div class="footer-band">'
-        f"<span>Sharpe <span class=\"g\">{n['sharpe_after']}</span> with the signal vs "
-        f"{n['sharpe_before']} without</span>"
-        f"<span>stands aside on <span class=\"g\">{n['stand_aside_share']}</span> of days</span>"
-        f"<span><span class=\"g\">{n['precision']}</span> stand-asides preceded genuine drawdowns</span>"
-        "</div>"
+        '<div class="stat-row">'
+        + _stat_cell("Sharpe", n["sharpe_after"],
+                     f"with the signal vs {n['sharpe_before']} without")
+        + _stat_cell("stands aside on", n["stand_aside_share"], "of days")
+        + _stat_cell("", n["precision"], "stand-asides preceded genuine drawdowns")
+        + "</div>"
     )
     return _slide("The fine print, and the point", "Three caveats, three numbers", body)
 
@@ -508,12 +520,15 @@ p.claim-stat {{
 }}
 .g {{ color: {t['green']}; }}
 .a {{ color: {t['amber']}; }}
-.footer-band {{
-  position: absolute; left: 96px; right: 96px; bottom: 56px;
-  border-top: 1px solid {t['hairline']}; padding-top: 18px;
-  display: flex; justify-content: space-between;
-  font-size: 17px; color: {t['muted']};
+.stat-row {{
+  position: absolute; left: 96px; right: 96px; top: 430px;
+  border-top: 1px solid {t['hairline']}; padding-top: 38px;
+  display: flex; gap: 56px;
 }}
+.stat {{ flex: 1; }}
+.stat-pre {{ font-size: 16px; color: {t['muted']}; min-height: 24px; margin-bottom: 8px; }}
+.stat-num {{ font-family: {t['serif']}; font-size: 54px; line-height: 1.05; margin-bottom: 12px; }}
+.stat-label {{ font-size: 16px; color: {t['muted']}; line-height: 1.5; max-width: 340px; }}
 .title-slide h1 {{ font-size: 64px; margin-top: 140px; }}
 .title-slide .subtitle-line {{ font-size: 22px; color: {t['muted2']}; max-width: 640px; }}
 .title-slide .byline {{ position: absolute; bottom: 72px; font-size: 16px; color: {t['muted']}; }}
