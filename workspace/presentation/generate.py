@@ -91,6 +91,139 @@ def _equation_block(name: str) -> str:
     return f'<div class="equation" data-eq="{name}">{svg}</div>'
 
 
+def _svg_defs() -> str:
+    t = THEME
+    return (
+        "<defs>"
+        '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
+        'markerHeight="7" orient="auto-start-reverse">'
+        f'<path d="M0,0 L10,5 L0,10 z" fill="{t["muted"]}"/></marker>'
+        '<pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" '
+        'patternUnits="userSpaceOnUse">'
+        f'<line x1="0" y1="0" x2="0" y2="7" stroke="{t["amber"]}" stroke-width="2" opacity="0.55"/>'
+        "</pattern>"
+        "</defs>"
+    )
+
+
+def _diagram_block(name: str) -> str:
+    fn = {
+        "payoff_motif": _diagram_payoff_motif,
+        "product_day": _diagram_product_day,
+        "architecture": _diagram_architecture,
+        "feature_map": _diagram_feature_map,
+        "cv_folds": _diagram_cv_folds,
+        "beeswarm_guide": _diagram_beeswarm_guide,
+        "results_bars": _diagram_results_bars,
+    }[name]
+    return f'<div class="diagram" data-diagram="{name}">{fn()}</div>'
+
+
+def _diagram_payoff_motif() -> str:
+    # Short-variance payoff vs realized vol: flat premium left, cubic-ish left-tail loss right.
+    t = THEME
+    return (
+        '<svg viewBox="0 0 1280 300" style="position:absolute;left:0;bottom:0;width:1280px;'
+        'height:300px;opacity:0.09;pointer-events:none;">'
+        f'<path d="M60,80 C400,80 620,84 760,120 C900,158 1050,240 1200,290" '
+        f'fill="none" stroke="{t["amber"]}" stroke-width="3"/>'
+        f'<line x1="60" y1="150" x2="1200" y2="150" stroke="{t["ink"]}" stroke-width="1"/>'
+        "</svg>"
+    )
+
+
+def _diagram_product_day() -> str:
+    t = THEME
+    # Equity curve: 24 hardcoded points, 100 -> 138 with three drawdown dips.
+    # Source: GSVIVS01 shape per spec 3.5 [VERIFY on GS]; dips at COVID-era-free window are illustrative of drawdown DAYS, marked red.
+    pts = [(0, 100.0), (1, 101.2), (2, 102.5), (3, 103.1), (4, 104.6), (5, 103.2),
+           (6, 105.9), (7, 107.4), (8, 108.8), (9, 107.1), (10, 110.2), (11, 111.9),
+           (12, 113.5), (13, 115.2), (14, 113.8), (15, 117.3), (16, 119.4), (17, 121.6),
+           (18, 124.1), (19, 126.7), (20, 129.5), (21, 132.4), (22, 135.3), (23, 138.0)]
+    dips = [5, 9, 14]
+    x0, x1, y_lo, y_hi = 480, 1120, 100.0, 140.0
+    top, bot = 30, 210
+    def sx(i): return x0 + (x1 - x0) * i / 23
+    def sy(v): return bot - (bot - top) * (v - y_lo) / (y_hi - y_lo)
+    curve = " ".join(f"{sx(i):.0f},{sy(v):.0f}" for i, v in pts)
+    ticks = "".join(
+        f'<line x1="{sx(i):.0f}" y1="{sy(pts[i][1]) + 6:.0f}" x2="{sx(i):.0f}" '
+        f'y2="{sy(pts[i][1]) + 22:.0f}" stroke="{t["red"]}" stroke-width="3"/>'
+        for i in dips
+    )
+    # Left half: trading-day timeline with three nodes.
+    def node(x, label, sub):
+        return (
+            f'<circle cx="{x}" cy="120" r="7" fill="none" stroke="{t["amber"]}" stroke-width="1.5"/>'
+            f'<text x="{x}" y="95" text-anchor="middle" fill="{t["ink"]}" font-size="16">{label}</text>'
+            f'<text x="{x}" y="150" text-anchor="middle" fill="{t["muted"]}" font-size="14">{sub}</text>'
+        )
+    return (
+        '<svg viewBox="0 0 1180 240" style="width:1080px;height:220px;">'
+        + _svg_defs()
+        + f'<line x1="40" y1="120" x2="420" y2="120" stroke="{t["muted"]}" stroke-width="1.5" marker-end="url(#arr)"/>'
+        + node(70, "09:30", "sell the strip")
+        + node(230, "all day", "delta-hedge")
+        + node(390, "16:00", "settle at MOC")
+        + f'<polyline points="{curve}" fill="none" stroke="{t["ink"]}" stroke-width="1.5"/>'
+        + ticks
+        + f'<text x="{x0}" y="235" fill="{t["muted"]}" font-size="14">index level, four years, 100 to 138. '
+          f'red ticks: days where realized variance beat the strike</text>'
+        + "</svg>"
+    )
+
+
+def _diagram_architecture() -> str:
+    t = THEME
+    def box(x, y, w, h, title, sub, stroke):
+        return (
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="none" '
+            f'stroke="{stroke}" stroke-width="1.5"/>'
+            f'<text x="{x + w / 2}" y="{y + 30}" text-anchor="middle" fill="{t["ink"]}" font-size="17">{title}</text>'
+            f'<text x="{x + w / 2}" y="{y + 54}" text-anchor="middle" fill="{t["muted"]}" font-size="14">{sub}</text>'
+        )
+    def arrow(x1, y1, x2, y2, label=""):
+        lab = (f'<text x="{(x1 + x2) / 2}" y="{y1 - 12}" text-anchor="middle" '
+               f'fill="{t["muted"]}" font-size="13">{label}</text>') if label else ""
+        return (f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{t["muted"]}" '
+                f'stroke-width="1.5" marker-end="url(#arr)"/>' + lab)
+    tenor = (
+        f'<rect x="820" y="150" width="300" height="100" fill="none" stroke="{t["hairline"]}" stroke-width="1.5"/>'
+        f'<text x="970" y="175" text-anchor="middle" fill="{t["amber"]}" font-size="13" letter-spacing="2">TENOR MATCHING</text>'
+        f'<text x="970" y="200" text-anchor="middle" fill="{t["body"]}" font-size="14">1-day forecast &#8596; same-day IV</text>'
+        f'<text x="970" y="220" text-anchor="middle" fill="{t["body"]}" font-size="14">5-day &#8596; 1-week &#183; 22-day &#8596; 1-month</text>'
+    )
+    return (
+        '<svg viewBox="0 0 1180 270" style="width:1080px;height:247px;">'
+        + _svg_defs()
+        + box(20, 20, 200, 80, "market inputs", "prices, options, calendar", t["hairline"])
+        + arrow(220, 60, 300, 60)
+        + box(300, 20, 220, 80, "HAR-IV spine", "4 parameters, most of the forecast", t["amber"])
+        + arrow(520, 60, 600, 60, "init_score")
+        + box(600, 20, 220, 80, "LightGBM overlay", "learns only the residual", t["amber"])
+        + arrow(820, 60, 900, 60)
+        + box(900, 20, 220, 80, "forecast", "trained end to end on QLIKE", t["green"])
+        + tenor
+        + "</svg>"
+    )
+
+
+def _diagram_feature_map() -> str:
+    return "<svg viewBox='0 0 10 10'></svg>"
+
+
+def _diagram_cv_folds() -> str:
+    return "<svg viewBox='0 0 10 10'></svg>"
+
+
+def _diagram_beeswarm_guide() -> str:
+    return "<svg viewBox='0 0 10 10'></svg>"
+
+
+def _diagram_results_bars() -> str:
+    return "<svg viewBox='0 0 10 10'></svg>"
+
+
 def _slide(kicker: str, title: str, body: str, cls: str = "") -> str:
     klass = f"slide {cls}".strip()
     return (
@@ -105,8 +238,8 @@ def _slide(kicker: str, title: str, body: str, cls: str = "") -> str:
 
 def _slide_01() -> str:
     body = (
-        '<div class="diagram" data-diagram="payoff_motif"></div>'
-        '<p class="subtitle-line">A machine-learned realized-variance forecast as a daily '
+        _diagram_block("payoff_motif")
+        + '<p class="subtitle-line">A machine-learned realized-variance forecast as a daily '
         "trade / stand-aside signal for the GSVIVS01 index</p>"
         '<p class="byline">Ryan &middot; July 2026</p>'
     )
@@ -122,7 +255,7 @@ def _slide_02() -> str:
         "<p>The gains are steady. The losses arrive on the few days when realized "
         "variance exceeds the strike it sold, and the index has no opinion about "
         "when those days come.</p>"
-        '<div class="diagram" data-diagram="product_day"></div>'
+        + _diagram_block("product_day")
     )
     return _slide("The product and its problem", "GSVIVS01 sells variance every single day", body)
 
@@ -151,15 +284,15 @@ def _slide_04() -> str:
         "over, trained end to end on the same loss we judge it by.</p>"
         "<p>Each horizon reads the option tenor that expires with it: the 1-day "
         "forecast uses same-day IV, the 5-day uses 1-week, the 22-day uses 1-month.</p>"
-        '<div class="diagram" data-diagram="architecture"></div>'
+        + _diagram_block("architecture")
     )
     return _slide("The model", "A linear spine and a tree overlay", body)
 
 
 def _slide_05() -> str:
     body = (
-        '<div class="diagram" data-diagram="feature_map"></div>'
-        "<p>About 128 inputs once every series also contributes its daily change "
+        _diagram_block("feature_map")
+        + "<p>About 128 inputs once every series also contributes its daily change "
         "and how unusual it is against its own recent history.</p>"
     )
     return _slide("The features", "Four things the market tells you", body)
@@ -172,7 +305,7 @@ def _slide_06() -> str:
         "because the target itself overlaps days. Splits are by date across all "
         f"{n['n_symbols']} symbols, so no symbol leaks the future to another. Even the "
         "early-stopping check sits behind its own gap.</p>"
-        '<div class="diagram" data-diagram="cv_folds"></div>'
+        + _diagram_block("cv_folds")
         + _equation_block("qlike")
         + "<p class=\"dim\">proportional error, so calm markets count as much as crises, and "
         "underprediction hurts more, as it should for an option seller. "
@@ -189,7 +322,7 @@ def _slide_07() -> str:
         "<p>What tops the list: the implied-to-realized relationship changing with "
         "regime, extremes of the variance risk premium, Fed-meeting proximity, and "
         "unusually-high-against-own-history flags.</p>"
-        '<div class="diagram" data-diagram="beeswarm_guide"></div>'
+        + _diagram_block("beeswarm_guide")
     )
     return _slide("What it learned", "Everything it learned has a name you know", body)
 
@@ -202,8 +335,8 @@ def _slide_08() -> str:
         f"<span class=\"a\">5-day</span>: <span class=\"g\">{n['h5_improvement']}</span>, significant. "
         '<span class="a">22-day</span>: the four-parameter linear model wins; at a monthly '
         "horizon the option market has already done the work.</p>"
-        '<div class="diagram" data-diagram="results_bars"></div>'
-        f"<p class=\"dim\">And the loss function is the product: the identical model trained on "
+        + _diagram_block("results_bars")
+        + f"<p class=\"dim\">And the loss function is the product: the identical model trained on "
         f"MSE instead of QLIKE trades at Sharpe {n['mse_sharpe']}.</p>"
     )
     return _slide("Results", "Where it wins, and where it honestly doesn't", body)

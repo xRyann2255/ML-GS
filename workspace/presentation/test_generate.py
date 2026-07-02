@@ -133,3 +133,9 @@ def test_exactly_two_equation_svgs(html):
 def test_no_raw_latex(html):
     assert "$$" not in html
     assert "\\frac" not in html
+
+
+def test_first_three_diagrams_are_svg(html):
+    for name in ("payoff_motif", "product_day", "architecture"):
+        m = re.search(rf'<div class="diagram" data-diagram="{name}">(.*?)</div>', html, re.S)
+        assert m and "<svg" in m.group(1), f"diagram {name} not rendered"
