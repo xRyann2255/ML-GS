@@ -209,19 +209,122 @@ def _diagram_architecture() -> str:
 
 
 def _diagram_feature_map() -> str:
-    return "<svg viewBox='0 0 10 10'></svg>"
+    t = THEME
+    quads = [
+        (20, 20, "PRICE HISTORY", "how volatile we have been:",
+         "up-moves, down-moves, jumps"),
+        (600, 20, "OPTIONS SURFACE", "what the market pays for future vol:",
+         "term slope, skew, vol of vol"),
+        (20, 170, "MEASUREMENT QUALITY", "how much of today's reading is noise:",
+         "kernel estimates, tick anomalies"),
+        (600, 170, "CALENDAR", "what is scheduled:",
+         "Fed meetings, payrolls, expiries"),
+    ]
+    cells = "".join(
+        f'<rect x="{x}" y="{y}" width="540" height="130" fill="none" stroke="{t["hairline"]}" stroke-width="1.5"/>'
+        f'<text x="{x + 20}" y="{y + 34}" fill="{t["amber"]}" font-size="14" letter-spacing="3">{title}</text>'
+        f'<text x="{x + 20}" y="{y + 66}" fill="{t["ink"]}" font-size="16">{line1}</text>'
+        f'<text x="{x + 20}" y="{y + 92}" fill="{t["muted2"]}" font-size="16">{line2}</text>'
+        for x, y, title, line1, line2 in quads
+    )
+    return (
+        '<svg viewBox="0 0 1180 320" style="width:1080px;height:293px;">'
+        + _svg_defs() + cells
+        + "</svg>"
+    )
 
 
 def _diagram_cv_folds() -> str:
-    return "<svg viewBox='0 0 10 10'></svg>"
+    t = THEME
+    # 4 folds: expanding train bar, hatched purge gap, test bar.
+    rows = []
+    x0, gap_w, test_w, row_h = 40, 26, 150, 30
+    for k in range(4):
+        y = 20 + k * (row_h + 14)
+        train_w = 300 + k * 150
+        rows.append(
+            f'<rect x="{x0}" y="{y}" width="{train_w}" height="{row_h}" fill="{t["hairline"]}"/>'
+            f'<rect x="{x0 + train_w}" y="{y}" width="{gap_w}" height="{row_h}" fill="url(#hatch)"/>'
+            f'<rect x="{x0 + train_w + gap_w}" y="{y}" width="{test_w}" height="{row_h}" '
+            f'fill="none" stroke="{t["green"]}" stroke-width="1.5"/>'
+        )
+    labels = (
+        f'<text x="{x0}" y="212" fill="{t["muted"]}" font-size="14">grey: training, always in the past'
+        f' &#183; hatched: {NUMBERS["purge_days"]} purged &#183; green: out-of-sample test</text>'
+        f'<text x="{x0}" y="236" fill="{t["muted"]}" font-size="14">splits are by DATE across all '
+        f'{NUMBERS["n_symbols"]} symbols; the early-stopping split sits behind its own gap</text>'
+    )
+    return ('<svg viewBox="0 0 1180 250" style="width:1080px;height:229px;">'
+            + _svg_defs() + "".join(rows) + labels + "</svg>")
 
 
 def _diagram_beeswarm_guide() -> str:
-    return "<svg viewBox='0 0 10 10'></svg>"
+    t = THEME
+    # Three example feature rows; dot color encodes feature value (blue low, red high).
+    import random
+    rng = random.Random(7)
+    rows = [("feature pushing vol UP when high", 1), ("feature pushing vol DOWN when high", -1),
+            ("feature with regime-dependent effect", 0)]
+    dots = []
+    for r, (_, direction) in enumerate(rows):
+        y = 60 + r * 56
+        for _ in range(46):
+            v = rng.random()
+            if direction == 1:
+                x = 560 + (v - 0.5) * 700 * v
+            elif direction == -1:
+                x = 560 - (v - 0.5) * 700 * v
+            else:
+                x = 560 + (v - 0.5) * 500 * (1 if rng.random() > 0.5 else -1)
+            x = max(180, min(1000, x))
+            col = f"rgb({int(80 + 175 * v)},{int(120 - 40 * v)},{int(220 - 160 * v)})"
+            dots.append(f'<circle cx="{x:.0f}" cy="{y + rng.uniform(-9, 9):.0f}" r="3.4" '
+                        f'fill="{col}" opacity="0.85"/>')
+    row_labels = "".join(
+        f'<text x="165" y="{64 + r * 56}" text-anchor="end" fill="{t["body"]}" font-size="14">{label}</text>'
+        for r, (label, _) in enumerate(rows)
+    )
+    return (
+        '<svg viewBox="0 0 1180 240" style="width:1080px;height:220px;">'
+        + _svg_defs()
+        + f'<line x1="560" y1="30" x2="560" y2="190" stroke="{t["hairline"]}" stroke-width="1.5"/>'
+        + f'<text x="560" y="216" text-anchor="middle" fill="{t["muted"]}" font-size="14">'
+          "SHAP value: pushes this day's forecast down &#8592; 0 &#8594; up</text>"
+        + f'<text x="1020" y="40" fill="{t["muted"]}" font-size="13">dot color = feature value (blue low, red high)</text>'
+        + row_labels + "".join(dots)
+        + "</svg>"
+    )
 
 
 def _diagram_results_bars() -> str:
-    return "<svg viewBox='0 0 10 10'></svg>"
+    t = THEME
+    # Improvement vs HAR-IV baseline. h=22 flipped (linear wins). [VERIFY on GS]
+    bars = [
+        ("1-day", 10.0, "+10% vs baseline", t["green"]),
+        ("5-day", 11.3, "+11% vs baseline", t["green"]),
+        ("22-day", -0.4, "linear wins by 0.4%", t["amber"]),
+    ]
+    x0, zero_y, w, scale = 220, 120, 160, 9.0
+    parts = []
+    for k, (label, pct, bar_label, color) in enumerate(bars):
+        x = x0 + k * 300
+        h = abs(pct) * scale
+        y = zero_y - h if pct > 0 else zero_y
+        parts.append(
+            f'<rect x="{x}" y="{y:.0f}" width="{w}" height="{max(h, 4):.0f}" fill="{color}" opacity="0.85"/>'
+            f'<text x="{x + w / 2}" y="{(y - 10) if pct > 0 else (zero_y + h + 24):.0f}" text-anchor="middle" '
+            f'fill="{t["ink"]}" font-size="16">{bar_label}</text>'
+            f'<text x="{x + w / 2}" y="{zero_y + 50}" text-anchor="middle" fill="{t["muted2"]}" font-size="15">{label}</text>'
+        )
+    return (
+        '<svg viewBox="0 0 1180 200" style="width:1080px;height:183px;">'
+        + _svg_defs()
+        + f'<line x1="120" y1="{zero_y}" x2="1060" y2="{zero_y}" stroke="{t["hairline"]}" stroke-width="1.5"/>'
+        + f'<text x="120" y="30" fill="{t["muted"]}" font-size="14">forecast-loss reduction vs HAR-IV '
+          "(QLIKE, five-seed mean; positive = our model better)</text>"
+        + "".join(parts)
+        + "</svg>"
+    )
 
 
 def _slide(kicker: str, title: str, body: str, cls: str = "") -> str:

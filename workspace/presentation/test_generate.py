@@ -139,3 +139,12 @@ def test_first_three_diagrams_are_svg(html):
     for name in ("payoff_motif", "product_day", "architecture"):
         m = re.search(rf'<div class="diagram" data-diagram="{name}">(.*?)</div>', html, re.S)
         assert m and "<svg" in m.group(1), f"diagram {name} not rendered"
+
+
+def test_all_seven_diagrams_are_real_svg(html):
+    names = ("payoff_motif", "product_day", "architecture", "feature_map",
+             "cv_folds", "beeswarm_guide", "results_bars")
+    for name in names:
+        m = re.search(rf'<div class="diagram" data-diagram="{name}">(.*?)</div>', html, re.S)
+        assert m and "<svg" in m.group(1)
+        assert "viewBox='0 0 10 10'" not in m.group(1), f"{name} is still a stub"
