@@ -61,7 +61,7 @@ def test_cli_writes_output(tmp_path):
 def test_em_dash_guard(monkeypatch):
     monkeypatch.setattr(
         generate, "_get_slides",
-        lambda: '<section class="slide">bad — dash</section>',
+        lambda: '<section class="slide">bad \u2014 dash</section>',
     )
     with pytest.raises(ValueError, match="em dash"):
         generate.generate(

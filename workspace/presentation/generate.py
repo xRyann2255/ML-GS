@@ -13,6 +13,7 @@ the spec (docs/superpowers/specs/2026-07-02-presentation-rewrite-design.md 3.5).
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 THEME = {
@@ -405,7 +406,7 @@ def _slide_04() -> str:
 def _slide_05() -> str:
     body = (
         _diagram_block("feature_map")
-        + "<p>About 128 inputs once every series also contributes its daily change "
+        + f"<p>{NUMBERS['n_features'].capitalize()} inputs once every series also contributes its daily change "
         "and how unusual it is against its own recent history.</p>"
     )
     return _slide("The features", "Four things the market tells you", body)
@@ -563,7 +564,9 @@ p.claim-stat {{
 
 
 def _get_js(dashboard_available: bool, dashboard_path: str) -> str:
-    safe = dashboard_path.replace("'", "\\'")
+    # json.dumps supplies the quotes and escapes backslashes, so Windows-style
+    # paths cannot inject JS escape sequences into the string literal.
+    safe = json.dumps(dashboard_path)
     return f"""
 const slides = [...document.querySelectorAll('.slide')];
 let idx = 0;
@@ -586,8 +589,7 @@ addEventListener('keydown', (e) => {{
 }});
 fit();
 show(0);
-const DASHBOARD_PATH = '{safe}';
-const DASHBOARD_AVAILABLE = {str(dashboard_available).lower()};
+const DASHBOARD_PATH = {safe};
 let dashVisible = false;
 function toggleDashboard() {{
   dashVisible = !dashVisible;
@@ -639,7 +641,7 @@ def generate(dashboard_path: str, output_path: Path) -> str:
         "</body>\n"
         "</html>\n"
     )
-    if "—" in html:
+    if "\u2014" in html:
         raise ValueError("em dash (U+2014) found in generated HTML; the deck bans em dashes")
     return html
 

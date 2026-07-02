@@ -14,6 +14,13 @@
 cd ml-vol-estimator && ./vol shell ../workspace/presentation/generate.py --dashboard-path tournament_dashboard_mock.html
 ```
 
+## Before presenting (GS verification)
+
+- Reconcile the stand-aside counts: the "7 of 10" precision, the 2% share of days, and the "about ten signal changes a year" must describe the same thing. If the ten are stand-aside episodes rather than days, fix the "Of the ten days it stood aside" sentence in Section 7 accordingly.
+- Re-verify every number in the deck's NUMBERS dict (generate.py) against the live tournament dashboard; all of them carry [VERIFY on GS] in the spec.
+- Confirm the four dashboard tab names used in the cues (GSVIVS, Rankings, SHAP beeswarm, ALE) match the real dashboard's labels.
+- Iframe focus: once you click inside the dashboard iframe, keyboard focus stays there and the deck's D and arrow keys stop responding. The on-screen Dashboard [D] button is the way back to the slides.
+
 ## Section 1: The product and its problem (slides 1 to 2, ~2.5 min)
 
 > [SLIDE 1: Timing the Variance Seller]
