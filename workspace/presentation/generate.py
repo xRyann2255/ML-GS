@@ -49,6 +49,47 @@ NUMBERS = {
     "kvar_proxy_corr": "above 0.99",
 }
 
+EQ_KVAR = (
+    r"K_{\mathrm{var}} \;=\; \frac{2}{T}\left[\int_{0}^{F}\frac{P(K)}{K^{2}}\,dK"
+    r"\;+\;\int_{F}^{\infty}\frac{C(K)}{K^{2}}\,dK\right]"
+)
+EQ_QLIKE = (
+    r"\mathrm{QLIKE} \;=\; \frac{1}{T}\sum_{t=1}^{T}"
+    r"\left[\frac{RV_{t}}{\hat{h}_{t}} - \log\frac{RV_{t}}{\hat{h}_{t}} - 1\right]"
+)
+
+
+def render_equation_svg(latex: str, *, color: str, fontsize: float = 26.0) -> str:
+    """Render a LaTeX equation to an inline SVG string via matplotlib mathtext.
+
+    Build-time only; the output HTML has no runtime math dependency.
+    """
+    import io
+    import re
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib.figure import Figure
+
+    fig = Figure(figsize=(0.01, 0.01))
+    fig.text(0, 0, f"${latex}$", fontsize=fontsize, color=color,
+             math_fontfamily="cm")
+    buf = io.BytesIO()
+    fig.savefig(buf, format="svg", bbox_inches="tight", pad_inches=0.03,
+                transparent=True)
+    svg = buf.getvalue().decode("utf-8")
+    svg = svg[svg.index("<svg"):]
+    # The SVG backend echoes the source LaTeX in an XML comment; strip it so
+    # the deck contains no raw LaTeX (glyphs are already rendered as paths).
+    return re.sub(r"<!--.*?-->", "", svg, flags=re.S)
+
+
+def _equation_block(name: str) -> str:
+    latex = {"kvar": EQ_KVAR, "qlike": EQ_QLIKE}[name]
+    svg = render_equation_svg(latex, color=THEME["body"])
+    return f'<div class="equation" data-eq="{name}">{svg}</div>'
+
 
 def _slide(kicker: str, title: str, body: str, cls: str = "") -> str:
     klass = f"slide {cls}".strip()
@@ -92,8 +133,8 @@ def _slide_03() -> str:
         "<p>At 09:10, before the strip is sold, the model's overnight forecast of "
         "today's realized variance is compared with the strike on offer. Variance "
         "rich: sell as usual. Forecast above the strike: stand aside for the day.</p>"
-        '<div class="equation" data-eq="kvar"></div>'
-        '<p class="dim">the same OTM-option integral as the VIX, which is why the strike '
+        + _equation_block("kvar")
+        + '<p class="dim">the same OTM-option integral as the VIX, which is why the strike '
         "sits above ATM implied vol: it inherits the skew</p>"
         f'<p>Annualized Sharpe {n["sharpe_before"]} &rarr; '
         f'<span class="g">{n["sharpe_after"]}</span>, backtest {n["backtest_window"]}</p>'
@@ -132,8 +173,8 @@ def _slide_06() -> str:
         f"{n['n_symbols']} symbols, so no symbol leaks the future to another. Even the "
         "early-stopping check sits behind its own gap.</p>"
         '<div class="diagram" data-diagram="cv_folds"></div>'
-        '<div class="equation" data-eq="qlike"></div>'
-        "<p class=\"dim\">proportional error, so calm markets count as much as crises, and "
+        + _equation_block("qlike")
+        + "<p class=\"dim\">proportional error, so calm markets count as much as crises, and "
         "underprediction hurts more, as it should for an option seller. "
         f"One lucky seed looked {n['seed_inflation']}; every headline number is a five-seed mean.</p>"
     )
@@ -228,6 +269,7 @@ p.dim {{ color: {t['muted2']}; }}
 .title-slide .byline {{ position: absolute; bottom: 72px; font-size: 16px; color: {t['muted']}; }}
 .diagram {{ margin: 20px 0; }}
 .equation {{ margin: 18px 0; }}
+.equation svg {{ height: 74px; width: auto; }}
 #counter {{
   position: fixed; right: 18px; bottom: 12px; z-index: 30;
   font-family: {t['sans']}; font-size: 12px; color: {t['muted']};

@@ -122,3 +122,14 @@ def test_key_copy_present(html):
         "7 of 10",
     ):
         assert phrase in html, f"missing copy: {phrase}"
+
+
+def test_exactly_two_equation_svgs(html):
+    blocks = re.findall(r'<div class="equation"[^>]*>.*?</div>', html, re.S)
+    assert len(blocks) == 2
+    assert all("<svg" in b for b in blocks)
+
+
+def test_no_raw_latex(html):
+    assert "$$" not in html
+    assert "\\frac" not in html
