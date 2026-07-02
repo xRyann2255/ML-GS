@@ -116,7 +116,6 @@ def _slide_04() -> str:
 
 
 def _slide_05() -> str:
-    n = NUMBERS
     body = (
         '<div class="diagram" data-diagram="feature_map"></div>'
         "<p>About 128 inputs once every series also contributes its daily change "
