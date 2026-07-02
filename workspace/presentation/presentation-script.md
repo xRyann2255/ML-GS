@@ -30,7 +30,7 @@ Now the equity curve. The index goes from 100 to 138 over four years. That is ro
 
 Look how smooth that line is. The smoothness is not free. It is bought with the left tail.
 
-The red ticks are the drawdown days. Each one is a morning where the index sold a strike, and by the close realized variance had beaten it. The drawdowns are not bad luck sprinkled at random. They are exactly the days it sold variance anyway.
+The red ticks are the drawdown days. Each one is a morning where the index sold a strike, and by the close realized variance had beaten it. The drawdowns are not bad luck sprinkled at random. They are the mornings it should have stood aside, and it sold anyway.
 
 A handful of mornings a year do most of the damage. And the index walks into every one of them, because it has nothing that tells one morning from another.
 
@@ -72,7 +72,7 @@ The second layer is LightGBM, a gradient-boosted tree ensemble. Why trees at all
 
 But the design choice that matters is not the trees. It is what the trees are allowed to learn. They do not start from zero. They start from the spine's prediction, passed in as the init score. From there they learn only the residual: the part of the target the linear model leaves on the table.
 
-That buys us a floor. If the trees find nothing, we are left holding the desk classic. Anything they do find is pure addition. And it keeps the machine learning honest, because the trees never get to re-learn what the spine already knows.
+That buys us a floor. If the trees find nothing, we are left holding the desk classic. Anything they do find is pure addition. And it keeps the machine learning honest, because the trees never have to re-learn what the spine already knows.
 
 The whole stack trains end to end on the same loss we grade it on. There is no training on one metric and reporting another.
 
@@ -88,7 +88,7 @@ Price history: how volatile we have actually been, with up-moves, down-moves and
 
 The options surface: what the market is paying for future vol right now, term slope, skew, vol of vol. That family is the market's own forecast, and the model treats it as testimony, not truth.
 
-Measurement quality: how much of today's variance reading is signal and how much is microstructure noise, from kernel estimates and tick anomalies.
+Measurement quality: how much of today's variance reading is signal and how much is microstructure noise, from noise-robust estimators and unusual tick counts.
 
 And the calendar: what is scheduled, Fed meetings, payrolls, option expiries.
 
@@ -108,13 +108,13 @@ The protocol is an expanding walk-forward. Train on everything up to a date, tes
 
 Now the moat, the hatched gap on this diagram. Training always stops ten trading days before each test block, and resumes ten trading days after it. Purged, on every fold.
 
-Why? Because the target itself overlaps days. A five-day realized variance measured on Monday shares four sessions with one measured on Tuesday. Let training run right up to the boundary, and the last training labels contain pieces of the first test answers. The model would be graded on questions it partly saw. The purge removes that channel completely.
+Why? Because the target itself overlaps days. A five-day realized variance measured on Monday shares four sessions with one measured on Tuesday. Let training run right up to the boundary, and the last training labels contain pieces of the first test answers. The model would be graded on questions it partly saw. The purge removes that channel completely. That gap is the first guard.
 
 Second guard: the panel. We pool 21 symbols into one training panel, and splits are by date across all 21 at once. When a date is in test, it is in test for every name. So one symbol can never hand tomorrow's market to another.
 
 Third guard, and this is the paranoid one: early stopping. The routine internal check that decides when the trees stop growing runs on its own validation slice, and that slice sits behind its own purge gap. Even the model's housekeeping never peeks across the boundary.
 
-Now the scoreboard, because the metric matters as much as the protocol. We judge every forecast on QLIKE. Here it is in one line: a proportional loss, calm markets count as much as crises, underprediction hurts more than overprediction, and its rankings survive measured RV being a noisy proxy. That asymmetry is exactly right for a variance seller. The forecast that says calm before a storm is the expensive one.
+Now the scoreboard, because the metric matters as much as the protocol. We judge every forecast on QLIKE. Here it is in one line: a proportional loss, calm markets count as much as crises, underprediction hurts more than overprediction, and its rankings hold up even though measured RV is itself a noisy proxy. That asymmetry is exactly right for a variance seller. The forecast that says calm before a storm is the expensive one.
 
 Last guard: seeds. LightGBM is stochastic. Change the random seed and you grow a different forest. We ran five seeds on the final configuration, and one lucky seed looked 6% better than the truth, where the truth is the five-seed mean. If I had shown you that seed, you would have believed a number that does not exist. So the rule is fixed. Every headline number today is a five-seed mean, never a best seed.
 
@@ -170,7 +170,7 @@ At five days ahead, about 11% lower. Also significant, same window, same baselin
 
 At twenty-two days, the four-parameter linear model wins. I am not going to bury that. I want to argue it is a feature. At a monthly horizon, the month-ahead option market has already done the work. One good implied vol carries the forecast, and the trees have nothing left to add. A model that knows when to stop is a model you can trust when it speaks. It also tells you the evaluation is honest, because a rigged pipeline does not hand a win to the four-parameter baseline. And remember what we are timing: a daily product. The one-day horizon is the one that pays.
 
-One more result, and it is the punchline of the whole methodology. Take the identical model, identical features, identical protocol, and train it on MSE instead of QLIKE. It trades at a Sharpe of 0.3 on the same backtest, against 1.95 for the QLIKE version. Nothing else changed. Not one feature, not one split. The mechanism is simple. MSE chases the big days and shrugs at the calm ones, and calm days are where a variance seller lives. Get the calm days wrong and the signal misfires all summer. The loss function is not a detail. The loss function is the product.
+One more result, and it is the punchline of the whole methodology. Take the identical model, identical features, identical protocol, and train it on MSE instead of QLIKE. It trades at a Sharpe of 0.3 on the same backtest, against 1.95 for the QLIKE version. Nothing else changed. Not one feature, not one fold. The mechanism is simple. MSE chases the big days and shrugs at the calm ones, and calm days are where a variance seller lives. Get the calm days wrong and the signal misfires all summer. The loss function is not a detail. The loss function is the product.
 
 Three caveats before I stop, and then three numbers I want you to leave with.
 
