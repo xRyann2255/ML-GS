@@ -70,6 +70,8 @@ def render_equation_svg(latex: str, *, color: str, fontsize: float = 26.0) -> st
     import matplotlib
 
     matplotlib.use("Agg")
+    # Deterministic ids in the SVG output so rebuilds are byte-stable.
+    matplotlib.rcParams["svg.hashsalt"] = "volforecast-deck"
     from matplotlib.figure import Figure
 
     fig = Figure(figsize=(0.01, 0.01))
@@ -80,6 +82,9 @@ def render_equation_svg(latex: str, *, color: str, fontsize: float = 26.0) -> st
                 transparent=True)
     svg = buf.getvalue().decode("utf-8")
     svg = svg[svg.index("<svg"):]
+    # Drop the <metadata> block: it carries a <dc:date> build timestamp that
+    # breaks byte-stable rebuilds and adds ~0.5KB of dead weight per equation.
+    svg = re.sub(r"<metadata>.*?</metadata>", "", svg, flags=re.S)
     # The SVG backend echoes the source LaTeX in an XML comment; strip it so
     # the deck contains no raw LaTeX (glyphs are already rendered as paths).
     return re.sub(r"<!--.*?-->", "", svg, flags=re.S)
@@ -91,14 +96,17 @@ def _equation_block(name: str) -> str:
     return f'<div class="equation" data-eq="{name}">{svg}</div>'
 
 
-def _svg_defs() -> str:
+def _svg_defs(uid: str) -> str:
+    # ids are namespaced per diagram: url(#...) resolves document-wide in HTML,
+    # so duplicate ids would point into another slide's display:none SVG and
+    # Chromium then drops the marker/pattern entirely.
     t = THEME
     return (
         "<defs>"
-        '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
+        f'<marker id="arr-{uid}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
         'markerHeight="7" orient="auto-start-reverse">'
         f'<path d="M0,0 L10,5 L0,10 z" fill="{t["muted"]}"/></marker>'
-        '<pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" '
+        f'<pattern id="hatch-{uid}" width="7" height="7" patternTransform="rotate(45)" '
         'patternUnits="userSpaceOnUse">'
         f'<line x1="0" y1="0" x2="0" y2="7" stroke="{t["amber"]}" stroke-width="2" opacity="0.55"/>'
         "</pattern>"
@@ -159,15 +167,15 @@ def _diagram_product_day() -> str:
             f'<text x="{x}" y="150" text-anchor="middle" fill="{t["muted"]}" font-size="14">{sub}</text>'
         )
     return (
-        '<svg viewBox="0 0 1180 240" style="width:1080px;height:220px;">'
-        + _svg_defs()
-        + f'<line x1="40" y1="120" x2="420" y2="120" stroke="{t["muted"]}" stroke-width="1.5" marker-end="url(#arr)"/>'
+        '<svg viewBox="0 0 1180 252" style="width:1080px;height:231px;">'
+        + _svg_defs("pd")
+        + f'<line x1="40" y1="120" x2="420" y2="120" stroke="{t["muted"]}" stroke-width="1.5" marker-end="url(#arr-pd)"/>'
         + node(70, "09:30", "sell the strip")
         + node(230, "all day", "delta-hedge")
         + node(390, "16:00", "settle at MOC")
         + f'<polyline points="{curve}" fill="none" stroke="{t["ink"]}" stroke-width="1.5"/>'
         + ticks
-        + f'<text x="{x0}" y="235" fill="{t["muted"]}" font-size="14">index level, four years, 100 to 138. '
+        + f'<text x="{x0}" y="240" fill="{t["muted"]}" font-size="14">index level, four years, 100 to 138. '
           f'red ticks: days where realized variance beat the strike</text>'
         + "</svg>"
     )
@@ -186,7 +194,7 @@ def _diagram_architecture() -> str:
         lab = (f'<text x="{(x1 + x2) / 2}" y="{y1 - 12}" text-anchor="middle" '
                f'fill="{t["muted"]}" font-size="13">{label}</text>') if label else ""
         return (f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{t["muted"]}" '
-                f'stroke-width="1.5" marker-end="url(#arr)"/>' + lab)
+                f'stroke-width="1.5" marker-end="url(#arr-arch)"/>' + lab)
     tenor = (
         f'<rect x="820" y="150" width="300" height="100" fill="none" stroke="{t["hairline"]}" stroke-width="1.5"/>'
         f'<text x="970" y="175" text-anchor="middle" fill="{t["amber"]}" font-size="13" letter-spacing="2">TENOR MATCHING</text>'
@@ -195,14 +203,14 @@ def _diagram_architecture() -> str:
     )
     return (
         '<svg viewBox="0 0 1180 270" style="width:1080px;height:247px;">'
-        + _svg_defs()
+        + _svg_defs("arch")
         + box(20, 20, 200, 80, "market inputs", "prices, options, calendar", t["hairline"])
-        + arrow(220, 60, 300, 60)
-        + box(300, 20, 220, 80, "HAR-IV spine", "4 parameters, most of the forecast", t["amber"])
-        + arrow(520, 60, 600, 60, "init_score")
-        + box(600, 20, 220, 80, "LightGBM overlay", "learns only the residual", t["amber"])
-        + arrow(820, 60, 900, 60)
-        + box(900, 20, 220, 80, "forecast", "trained end to end on QLIKE", t["green"])
+        + arrow(220, 60, 296, 60)
+        + box(296, 20, 252, 80, "HAR-IV spine", "4 parameters, most of the forecast", t["amber"])
+        + arrow(548, 60, 620, 60, "init_score")
+        + box(620, 20, 220, 80, "LightGBM overlay", "learns only the residual", t["amber"])
+        + arrow(840, 60, 912, 60)
+        + box(912, 20, 220, 80, "forecast", "trained end to end on QLIKE", t["green"])
         + tenor
         + "</svg>"
     )
@@ -215,21 +223,21 @@ def _diagram_feature_map() -> str:
          "up-moves, down-moves, jumps"),
         (600, 20, "OPTIONS SURFACE", "what the market pays for future vol:",
          "term slope, skew, vol of vol"),
-        (20, 170, "MEASUREMENT QUALITY", "how much of today's reading is noise:",
+        (20, 184, "MEASUREMENT QUALITY", "how much of today's reading is noise:",
          "kernel estimates, tick anomalies"),
-        (600, 170, "CALENDAR", "what is scheduled:",
+        (600, 184, "CALENDAR", "what is scheduled:",
          "Fed meetings, payrolls, expiries"),
     ]
     cells = "".join(
-        f'<rect x="{x}" y="{y}" width="540" height="130" fill="none" stroke="{t["hairline"]}" stroke-width="1.5"/>'
-        f'<text x="{x + 20}" y="{y + 34}" fill="{t["amber"]}" font-size="14" letter-spacing="3">{title}</text>'
-        f'<text x="{x + 20}" y="{y + 66}" fill="{t["ink"]}" font-size="16">{line1}</text>'
-        f'<text x="{x + 20}" y="{y + 92}" fill="{t["muted2"]}" font-size="16">{line2}</text>'
+        f'<rect x="{x}" y="{y}" width="540" height="144" fill="none" stroke="{t["hairline"]}" stroke-width="1.5"/>'
+        f'<text x="{x + 22}" y="{y + 38}" fill="{t["amber"]}" font-size="14" letter-spacing="3">{title}</text>'
+        f'<text x="{x + 22}" y="{y + 74}" fill="{t["ink"]}" font-size="16">{line1}</text>'
+        f'<text x="{x + 22}" y="{y + 102}" fill="{t["muted2"]}" font-size="16">{line2}</text>'
         for x, y, title, line1, line2 in quads
     )
     return (
-        '<svg viewBox="0 0 1180 320" style="width:1080px;height:293px;">'
-        + _svg_defs() + cells
+        '<svg viewBox="0 0 1180 348" style="width:1080px;height:318px;">'
+        + _svg_defs("fm") + cells
         + "</svg>"
     )
 
@@ -238,24 +246,24 @@ def _diagram_cv_folds() -> str:
     t = THEME
     # 4 folds: expanding train bar, hatched purge gap, test bar.
     rows = []
-    x0, gap_w, test_w, row_h = 40, 26, 150, 30
+    x0, gap_w, test_w, row_h = 40, 26, 150, 26
     for k in range(4):
-        y = 20 + k * (row_h + 14)
+        y = 12 + k * (row_h + 10)
         train_w = 300 + k * 150
         rows.append(
             f'<rect x="{x0}" y="{y}" width="{train_w}" height="{row_h}" fill="{t["hairline"]}"/>'
-            f'<rect x="{x0 + train_w}" y="{y}" width="{gap_w}" height="{row_h}" fill="url(#hatch)"/>'
+            f'<rect x="{x0 + train_w}" y="{y}" width="{gap_w}" height="{row_h}" fill="url(#hatch-cv)"/>'
             f'<rect x="{x0 + train_w + gap_w}" y="{y}" width="{test_w}" height="{row_h}" '
             f'fill="none" stroke="{t["green"]}" stroke-width="1.5"/>'
         )
     labels = (
-        f'<text x="{x0}" y="212" fill="{t["muted"]}" font-size="14">grey: training, always in the past'
+        f'<text x="{x0}" y="182" fill="{t["muted"]}" font-size="14">grey: training, always in the past'
         f' &#183; hatched: {NUMBERS["purge_days"]} purged &#183; green: out-of-sample test</text>'
-        f'<text x="{x0}" y="236" fill="{t["muted"]}" font-size="14">splits are by DATE across all '
+        f'<text x="{x0}" y="206" fill="{t["muted"]}" font-size="14">splits are by DATE across all '
         f'{NUMBERS["n_symbols"]} symbols; the early-stopping split sits behind its own gap</text>'
     )
-    return ('<svg viewBox="0 0 1180 250" style="width:1080px;height:229px;">'
-            + _svg_defs() + "".join(rows) + labels + "</svg>")
+    return ('<svg viewBox="0 0 1180 216" style="width:1080px;height:198px;">'
+            + _svg_defs("cv") + "".join(rows) + labels + "</svg>")
 
 
 def _diagram_beeswarm_guide() -> str:
@@ -265,32 +273,34 @@ def _diagram_beeswarm_guide() -> str:
     rng = random.Random(7)
     rows = [("feature pushing vol UP when high", 1), ("feature pushing vol DOWN when high", -1),
             ("feature with regime-dependent effect", 0)]
+    zero_x = 685  # plot region shifted right to leave a full label gutter
     dots = []
     for r, (_, direction) in enumerate(rows):
         y = 60 + r * 56
         for _ in range(46):
             v = rng.random()
             if direction == 1:
-                x = 560 + (v - 0.5) * 700 * v
+                x = zero_x + (v - 0.5) * 700 * v
             elif direction == -1:
-                x = 560 - (v - 0.5) * 700 * v
+                x = zero_x - (v - 0.5) * 700 * v
             else:
-                x = 560 + (v - 0.5) * 500 * (1 if rng.random() > 0.5 else -1)
-            x = max(180, min(1000, x))
+                x = zero_x + (v - 0.5) * 500 * (1 if rng.random() > 0.5 else -1)
+            x = max(300, min(1070, x))
             col = f"rgb({int(80 + 175 * v)},{int(120 - 40 * v)},{int(220 - 160 * v)})"
             dots.append(f'<circle cx="{x:.0f}" cy="{y + rng.uniform(-9, 9):.0f}" r="3.4" '
                         f'fill="{col}" opacity="0.85"/>')
     row_labels = "".join(
-        f'<text x="165" y="{64 + r * 56}" text-anchor="end" fill="{t["body"]}" font-size="14">{label}</text>'
+        f'<text x="272" y="{64 + r * 56}" text-anchor="end" fill="{t["body"]}" font-size="14">{label}</text>'
         for r, (label, _) in enumerate(rows)
     )
     return (
         '<svg viewBox="0 0 1180 240" style="width:1080px;height:220px;">'
-        + _svg_defs()
-        + f'<line x1="560" y1="30" x2="560" y2="190" stroke="{t["hairline"]}" stroke-width="1.5"/>'
-        + f'<text x="560" y="216" text-anchor="middle" fill="{t["muted"]}" font-size="14">'
+        + _svg_defs("bee")
+        + f'<line x1="{zero_x}" y1="30" x2="{zero_x}" y2="190" stroke="{t["hairline"]}" stroke-width="1.5"/>'
+        + f'<text x="{zero_x}" y="216" text-anchor="middle" fill="{t["muted"]}" font-size="14">'
           "SHAP value: pushes this day's forecast down &#8592; 0 &#8594; up</text>"
-        + f'<text x="1020" y="40" fill="{t["muted"]}" font-size="13">dot color = feature value (blue low, red high)</text>'
+        + f'<text x="1160" y="40" text-anchor="end" fill="{t["muted"]}" font-size="13">'
+          "dot color = feature value (blue low, red high)</text>"
         + row_labels + "".join(dots)
         + "</svg>"
     )
@@ -304,7 +314,7 @@ def _diagram_results_bars() -> str:
         ("5-day", 11.3, "+11% vs baseline", t["green"]),
         ("22-day", -0.4, "linear wins by 0.4%", t["amber"]),
     ]
-    x0, zero_y, w, scale = 220, 120, 160, 9.0
+    x0, zero_y, w, scale = 220, 150, 160, 8.0
     parts = []
     for k, (label, pct, bar_label, color) in enumerate(bars):
         x = x0 + k * 300
@@ -317,10 +327,10 @@ def _diagram_results_bars() -> str:
             f'<text x="{x + w / 2}" y="{zero_y + 50}" text-anchor="middle" fill="{t["muted2"]}" font-size="15">{label}</text>'
         )
     return (
-        '<svg viewBox="0 0 1180 200" style="width:1080px;height:183px;">'
-        + _svg_defs()
+        '<svg viewBox="0 0 1180 240" style="width:1080px;height:220px;">'
+        + _svg_defs("rb")
         + f'<line x1="120" y1="{zero_y}" x2="1060" y2="{zero_y}" stroke="{t["hairline"]}" stroke-width="1.5"/>'
-        + f'<text x="120" y="30" fill="{t["muted"]}" font-size="14">forecast-loss reduction vs HAR-IV '
+        + f'<text x="120" y="24" fill="{t["muted"]}" font-size="14">forecast-loss reduction vs HAR-IV '
           "(QLIKE, five-seed mean; positive = our model better)</text>"
         + "".join(parts)
         + "</svg>"
@@ -372,7 +382,7 @@ def _slide_03() -> str:
         + _equation_block("kvar")
         + '<p class="dim">the same OTM-option integral as the VIX, which is why the strike '
         "sits above ATM implied vol: it inherits the skew</p>"
-        f'<p>Annualized Sharpe {n["sharpe_before"]} &rarr; '
+        f'<p class="claim-stat">Annualized Sharpe {n["sharpe_before"]} &rarr; '
         f'<span class="g">{n["sharpe_after"]}</span>, backtest {n["backtest_window"]}</p>'
     )
     return _slide("The claim", "Every morning: compare the forecast to the strike", body)
@@ -491,21 +501,27 @@ html, body {{ height: 100%; background: {t['bg']}; overflow: hidden; }}
 .rule {{ border-top: 1px solid {t['amber']}; width: 64px; margin: 18px 0 26px; opacity: .7; }}
 h1 {{ font-family: {t['serif']}; font-weight: normal; font-size: 46px; line-height: 1.15; color: {t['ink']}; margin-bottom: 26px; }}
 p {{ font-size: 20px; line-height: 1.6; color: {t['body']}; max-width: 1000px; margin-bottom: 16px; }}
-p.dim {{ color: {t['muted2']}; }}
+p.dim {{ color: {t['muted2']}; font-size: 18px; }}
+p.claim-stat {{
+  font-family: {t['serif']}; font-size: 30px; color: {t['ink']};
+  margin-top: 34px; letter-spacing: 0.3px;
+}}
 .g {{ color: {t['green']}; }}
 .a {{ color: {t['amber']}; }}
 .footer-band {{
   position: absolute; left: 96px; right: 96px; bottom: 56px;
-  border-top: 1px solid {t['hairline']}; padding-top: 16px;
+  border-top: 1px solid {t['hairline']}; padding-top: 18px;
   display: flex; justify-content: space-between;
-  font-size: 15px; color: {t['muted']};
+  font-size: 17px; color: {t['muted']};
 }}
 .title-slide h1 {{ font-size: 64px; margin-top: 140px; }}
-.title-slide .subtitle-line {{ font-size: 22px; color: {t['muted2']}; }}
+.title-slide .subtitle-line {{ font-size: 22px; color: {t['muted2']}; max-width: 640px; }}
 .title-slide .byline {{ position: absolute; bottom: 72px; font-size: 16px; color: {t['muted']}; }}
-.diagram {{ margin: 20px 0; }}
-.equation {{ margin: 18px 0; }}
-.equation svg {{ height: 74px; width: auto; }}
+.diagram {{ margin: 18px 0; }}
+.equation {{ margin: 14px 0; }}
+.equation svg {{ height: 72px; width: auto; }}
+.equation[data-eq="kvar"] {{ margin: 34px 0 28px; }}
+.equation[data-eq="kvar"] svg {{ height: 80px; }}
 #counter {{
   position: fixed; right: 18px; bottom: 12px; z-index: 30;
   font-family: {t['sans']}; font-size: 12px; color: {t['muted']};

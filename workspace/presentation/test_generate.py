@@ -135,6 +135,17 @@ def test_no_raw_latex(html):
     assert "\\frac" not in html
 
 
+def test_build_deterministic_and_no_metadata():
+    kwargs = dict(
+        dashboard_path="tournament_dashboard_mock.html",
+        output_path=HERE / "presentation.html",
+    )
+    first = generate.generate(**kwargs).encode("utf-8")
+    second = generate.generate(**kwargs).encode("utf-8")
+    assert first == second, "two builds are not byte-identical"
+    assert b"<metadata" not in first, "matplotlib <metadata> block leaked into the deck"
+
+
 def test_first_three_diagrams_are_svg(html):
     for name in ("payoff_motif", "product_day", "architecture"):
         m = re.search(rf'<div class="diagram" data-diagram="{name}">(.*?)</div>', html, re.S)
