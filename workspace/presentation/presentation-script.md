@@ -193,3 +193,16 @@ Now the three numbers, slowly.
 7 of 10. Of the ten days it stood aside, seven preceded genuine drawdowns.
 
 No slideware claims, no cherry picks: everything you saw is out of sample, purged, and five-seeded. The floor is open.
+
+## Beat Sheet (one page)
+
+| # | Slide | Beats | Transition out (verbatim) | The number |
+|---|-------|-------|---------------------------|------------|
+| 1-2 | Title / The product | sells daily, no view; 09:30 strip, 16:00 settle; 100 to 138; smoothness bought with the left tail; red ticks = mornings it should have stood aside | "So the question this project answers is simple. Can we tell, before nine thirty, which mornings are the wrong mornings to sell?" | 9.6 pts/yr |
+| 3 | The claim | 09:10 rule, forecast vs strike; binary, short or flat; Kvar = VIX-style integral, above ATM IV; dashboard: Sharpe column, then precision | "That is the claim. The rest of the talk is me earning it." | 1.60 to 1.95 |
+| 4 | The model | HAR-IV spine, desk classic; trees learn residual via init score; floor if trees find nothing; trained on the loss we grade on; tenor matching | (into features, same section) | 4 parameters |
+| 5 | The features | 4 families in trader words: price history, options surface, measurement quality, calendar; change + z-score expansion; nothing exotic | "That is the model. Here is why you should believe the numbers it produces." | ~128 inputs |
+| 6 | Why trust | purge moat, ten days both sides; panel splits by date, 21 symbols; QLIKE one-liner; 5 seeds, mean not best; dashboard: Rankings tab | "So the protocol is airtight. The next question is what the model actually learned." | 6% lucky seed |
+| 7 | What it learned | SHAP in 2 sentences; beeswarm read guide; live tour of top 5; one ALE: same-day IV, monotone, steepens in tail | "Which brings us to the honest scorecard." | top-5 features |
+| 8 | Results | 10% at 1d; 11% at 5d; linear wins at 22d, argued as a feature; MSE ablation: Sharpe 0.3 | "Three caveats before I stop, and then three numbers I want you to leave with." | Sharpe 0.3 (MSE) |
+| 9 | Close | proxy strike, corr above 0.99; concentrated edge, ~10 changes/yr; COVID never traded; three numbers, slowly | "The floor is open." | 1.95 / 2% / 7 of 10 |
