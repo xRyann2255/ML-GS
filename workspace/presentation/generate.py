@@ -1,10 +1,10 @@
 """Desk-pitch deck generator: Timing the Variance Seller.
 
 Builds ONE self-contained HTML file (no CDN, no network requests) for the
-GSVIVS01 presentation. 9 slides, dark serif theme, dashboard iframe toggle.
+GSVIVS01 presentation. 11 slides, dark serif theme, dashboard iframe toggle.
 
 Regenerate (GS):      ./vol present --dashboard-path '<rel path from output HTML>'
-Regenerate (local):   cd ml-vol-estimator && ./vol shell ../workspace/presentation/generate.py \
+Regenerate (local):   cd ml-vol-estimator && ./vol shell ../../workspace/presentation/generate.py \
                           --dashboard-path tournament_dashboard_mock.html
 
 Canonical numbers live in NUMBERS below and carry [VERIFY on GS] flags from
@@ -13,7 +13,11 @@ the spec (docs/superpowers/specs/2026-07-02-presentation-rewrite-design.md 3.5).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
+import shutil
+from datetime import date
 from pathlib import Path
 
 THEME = {
@@ -30,25 +34,107 @@ THEME = {
     "sans": "'Segoe UI', Verdana, sans-serif",
 }
 
-# Single source of truth for every number said or shown. [VERIFY on GS] before delivery.
+# Single source of truth for every number said or shown.
+# Source: src/data/models/trial_063_xgboost_champion (metrics.json + dashboard)
 NUMBERS = {
-    "sharpe_before": "1.60",
-    "sharpe_after": "1.95",
+    "sharpe_before": "1.96",
+    "sharpe_after": "2.35",
     "backtest_window": "May 2022 to Jun 2026",
-    "stand_aside_share": "2%",
-    "precision": "7 of 10",
-    "transitions_per_year": "about ten",
-    "index_path": "100 to 138",
-    "index_per_year": "9.6 points a year",
-    "h1_improvement": "about 10% lower forecast loss",
-    "h5_improvement": "about 11% lower",
+    "stand_aside_share": "35%",
+    "stand_aside_precision": "31% smaller max drawdown",
+    "transitions_per_year": "about 120",
+    "index_path": "100 to 136",
+    "index_per_year": "8.3 points a year",
+    "h1_improvement": "about 14% lower forecast loss",
+    "h5_improvement": "about 10% lower",
     "seed_inflation": "6% better than the truth",
-    "mse_sharpe": "0.3",
+    "mse_sharpe": "2.32",
+    "qlike_sharpe": "2.41",
     "n_symbols": "21",
     "n_features": "about 128",
     "purge_days": "ten trading days",
     "kvar_proxy_corr": "above 0.99",
 }
+
+
+def _parse_gsvivs_traces(html_text: str) -> dict | None:
+    """Extract the gsvivsPnlTraces JSON blob from a tournament dashboard HTML.
+
+    Coupled to the literal `const gsvivsPnlTraces` in the dashboard template
+    (src/volforecast/visualization/templates/tournament_dashboard.html). Any
+    failure returns None and the caller falls back to the synthetic series.
+    """
+    marker = "const gsvivsPnlTraces"
+    i = html_text.find(marker)
+    if i == -1:
+        return None
+    j = html_text.find("{", i)
+    if j == -1:
+        return None
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(html_text[j:])
+    except json.JSONDecodeError:
+        return None
+    return obj if isinstance(obj, dict) else None
+
+
+def _select_index_trace(traces_by_h: dict) -> dict | None:
+    """Pick the raw-index trace from the h=1 list.
+
+    [baseline] always_long holds the index every day (_signal_y all +1), so
+    its wealth curve IS the GSVIVS01 index normalized to its first date.
+    JSON keys are strings because the dashboard json.dumps's an int-keyed dict.
+    """
+    h_traces = traces_by_h.get("1") or traces_by_h.get(1) or []
+    for tr in h_traces:
+        sig = tr.get("_signal_y") or []
+        if "[baseline]" in str(tr.get("name", "")) and sig and all(s == 1.0 for s in sig):
+            return tr
+    for tr in h_traces:
+        if "always_long" in str(tr.get("name", "")):
+            return tr
+    return None
+
+
+def _extract_index_series(html_text: str) -> list[tuple[str, float]] | None:
+    """Return [(iso_date, index_level)] rescaled so the series starts at 100."""
+    traces = _parse_gsvivs_traces(html_text)
+    if not traces:
+        return None
+    tr = _select_index_trace(traces)
+    if tr is None:
+        return None
+    xs, ys = tr.get("x") or [], tr.get("y") or []
+    if len(xs) != len(ys) or len(xs) < 2 or not ys[0]:
+        return None
+    # Normalize/validate every point: dates may carry a time suffix (plotly/
+    # pandas datetime64 axes serialize as "YYYY-MM-DDTHH:MM:SS") and levels
+    # may be non-numeric; any parse failure means silent synthetic fallback,
+    # never a crashed build.
+    try:
+        y0 = float(ys[0])
+        if not (math.isfinite(y0) and y0 > 0):
+            return None
+        scale = 100.0 / y0
+    except (ValueError, TypeError):
+        return None
+    out: list[tuple[str, float]] = []
+    prev_ord = None
+    for d, v in zip(xs, ys):
+        ds = str(d)[:10]
+        try:
+            d_ord = date.fromisoformat(ds).toordinal()
+            lv = float(v) * scale
+        except (ValueError, TypeError):
+            return None
+        if not (math.isfinite(lv) and lv > 0):
+            return None
+        if prev_ord is not None and d_ord <= prev_ord:
+            return None
+        prev_ord = d_ord
+        out.append((ds, lv))
+    return out
+
 
 EQ_KVAR = (
     r"K_{\mathrm{var}} \;=\; \frac{2}{T}\left[\int_{0}^{F}\frac{P(K)}{K^{2}}\,dK"
@@ -118,9 +204,9 @@ def _svg_defs(uid: str) -> str:
 def _diagram_block(name: str) -> str:
     fn = {
         "payoff_motif": _diagram_payoff_motif,
-        "product_day": _diagram_product_day,
         "architecture": _diagram_architecture,
         "feature_map": _diagram_feature_map,
+        "feature_stack": _diagram_feature_stack,
         "cv_folds": _diagram_cv_folds,
         "beeswarm_guide": _diagram_beeswarm_guide,
         "results_bars": _diagram_results_bars,
@@ -141,45 +227,131 @@ def _diagram_payoff_motif() -> str:
     )
 
 
-def _diagram_product_day() -> str:
+# Fallback series for local builds where the dashboard is a stub: the same
+# 24-point 100->136 shape the deck used before real data, with plausible dates.
+SYNTHETIC_INDEX: list[tuple[str, float]] = [
+    ("2022-07-01", 100.0), ("2022-09-01", 101.0), ("2022-11-01", 102.1),
+    ("2023-01-02", 102.7), ("2023-03-01", 104.0), ("2023-05-01", 102.7),
+    ("2023-07-03", 105.2), ("2023-09-01", 106.6), ("2023-11-01", 107.9),
+    ("2024-01-02", 106.4), ("2024-03-01", 109.3), ("2024-05-01", 110.9),
+    ("2024-07-01", 112.3), ("2024-09-02", 113.9), ("2024-11-01", 112.5),
+    ("2025-01-02", 115.8), ("2025-03-03", 117.8), ("2025-05-01", 119.9),
+    ("2025-07-01", 122.2), ("2025-09-01", 124.6), ("2025-11-03", 127.2),
+    ("2026-01-02", 129.9), ("2026-03-02", 132.8), ("2026-05-01", 136.0),
+]
+
+MAX_RED_TICKS = 15
+
+
+def _diagram_product_day(series: list[tuple[str, float]] | None) -> str:
+    """Slide-2 chart: trading-day timeline strip + GSVIVS01 index with axes.
+
+    series is [(iso_date, level)] from the real dashboard, or None to render
+    the synthetic fallback through the same axis machinery.
+    """
     t = THEME
-    # Equity curve: 24 hardcoded points, 100 -> 138 with three drawdown dips.
-    # Source: GSVIVS01 shape per spec 3.5 [VERIFY on GS]; dips at COVID-era-free window are illustrative of drawdown DAYS, marked red.
-    pts = [(0, 100.0), (1, 101.2), (2, 102.5), (3, 103.1), (4, 104.6), (5, 103.2),
-           (6, 105.9), (7, 107.4), (8, 108.8), (9, 107.1), (10, 110.2), (11, 111.9),
-           (12, 113.5), (13, 115.2), (14, 113.8), (15, 117.3), (16, 119.4), (17, 121.6),
-           (18, 124.1), (19, 126.7), (20, 129.5), (21, 132.4), (22, 135.3), (23, 138.0)]
-    dips = [5, 9, 14]
-    x0, x1, y_lo, y_hi = 480, 1120, 100.0, 140.0
-    top, bot = 30, 210
-    def sx(i): return x0 + (x1 - x0) * i / 23
-    def sy(v): return bot - (bot - top) * (v - y_lo) / (y_hi - y_lo)
-    curve = " ".join(f"{sx(i):.0f},{sy(v):.0f}" for i, v in pts)
-    ticks = "".join(
-        f'<line x1="{sx(i):.0f}" y1="{sy(pts[i][1]) + 6:.0f}" x2="{sx(i):.0f}" '
-        f'y2="{sy(pts[i][1]) + 22:.0f}" stroke="{t["red"]}" stroke-width="3"/>'
-        for i in dips
+    is_real = series is not None
+    if series is None:
+        series = SYNTHETIC_INDEX
+
+    days = [date.fromisoformat(d).toordinal() for d, _ in series]
+    vals = [v for _, v in series]
+    d_lo, d_hi = days[0], days[-1]
+    y_lo = min(100.0, 10.0 * math.floor(min(vals) / 10.0))
+    y_hi = max(140.0, 10.0 * math.ceil(max(vals) / 10.0))
+
+    # top=104 clears the timeline strip and the axis title; bot=304 uses the
+    # slide's spare lower space for a taller plot (real data is 950+ points).
+    x0, x1, top, bot = 70, 1130, 104, 304
+
+    def sx(o: int) -> float:
+        return x0 + (x1 - x0) * (o - d_lo) / (d_hi - d_lo)
+
+    def sy(v: float) -> float:
+        return bot - (bot - top) * (v - y_lo) / (y_hi - y_lo)
+
+    # Y axis: gridlines + labels every 10 index points
+    grid = "".join(
+        f'<line x1="{x0}" y1="{sy(gv):.0f}" x2="{x1}" y2="{sy(gv):.0f}" '
+        f'stroke="{t["hairline"]}" stroke-width="1"/>'
+        f'<text x="{x0 - 12}" y="{sy(gv) + 5:.0f}" text-anchor="end" '
+        f'fill="{t["muted"]}" font-size="13">{gv:.0f}</text>'
+        for gv in range(int(y_lo), int(y_hi) + 1, 10)
     )
-    # Left half: trading-day timeline with three nodes.
-    def node(x, label, sub):
+    # anchored start at the left edge: right-anchoring at the label gutter
+    # (x0 - 12) clips the first glyphs at the viewBox boundary. top - 16 keeps
+    # clear vertical gaps to the timeline subs above and the y labels below.
+    axis_title = (f'<text x="8" y="{top - 16}" text-anchor="start" '
+                  f'fill="{t["muted"]}" font-size="13">index level</text>')
+
+    # X axis: a tick at Jan 1 of every year inside the span
+    year_ticks = []
+    for yr in range(date.fromordinal(d_lo).year + 1, date.fromordinal(d_hi).year + 1):
+        o = date(yr, 1, 1).toordinal()
+        if d_lo <= o <= d_hi:
+            year_ticks.append(
+                f'<line x1="{sx(o):.0f}" y1="{bot}" x2="{sx(o):.0f}" y2="{bot + 8}" '
+                f'stroke="{t["muted"]}" stroke-width="1"/>'
+                # bot + 26 sits clear below the axis; caption is further down at y=358
+                f'<text x="{sx(o):.0f}" y="{bot + 26}" text-anchor="middle" '
+                f'fill="{t["muted"]}" font-size="13">{yr}</text>'
+            )
+    x_axis = (f'<line x1="{x0}" y1="{bot}" x2="{x1}" y2="{bot}" '
+              f'stroke="{t["muted"]}" stroke-width="1"/>' + "".join(year_ticks))
+
+    curve = " ".join(f"{sx(o):.1f},{sy(v):.1f}" for o, v in zip(days, vals))
+
+    # Red ticks: the worst daily-return days (all-negative, capped for legibility)
+    rets = [(i, vals[i] / vals[i - 1] - 1.0) for i in range(1, len(vals))]
+    negative = sorted((p for p in rets if p[1] < 0), key=lambda p: p[1])
+    worst = negative[: min(MAX_RED_TICKS, len(negative))]
+    ticks = "".join(
+        f'<line x1="{sx(days[i]):.0f}" y1="{sy(vals[i]) + 5:.0f}" '
+        f'x2="{sx(days[i]):.0f}" y2="{sy(vals[i]) + 19:.0f}" '
+        f'stroke="{t["red"]}" stroke-width="2.5"/>'
+        for i, _ in worst
+    )
+
+    # Trading-day timeline, compressed to a strip above the chart
+    def node(x: int, label: str, sub: str) -> str:
         return (
-            f'<circle cx="{x}" cy="120" r="7" fill="none" stroke="{t["amber"]}" stroke-width="1.5"/>'
-            f'<text x="{x}" y="95" text-anchor="middle" fill="{t["ink"]}" font-size="16">{label}</text>'
-            f'<text x="{x}" y="150" text-anchor="middle" fill="{t["muted"]}" font-size="14">{sub}</text>'
+            f'<circle cx="{x}" cy="32" r="6" fill="none" stroke="{t["amber"]}" stroke-width="1.5"/>'
+            f'<text x="{x}" y="14" text-anchor="middle" fill="{t["ink"]}" font-size="15">{label}</text>'
+            f'<text x="{x}" y="56" text-anchor="middle" fill="{t["muted"]}" font-size="13">{sub}</text>'
         )
+    timeline = (
+        f'<line x1="40" y1="32" x2="640" y2="32" stroke="{t["muted"]}" '
+        f'stroke-width="1.5" marker-end="url(#arr-pd)"/>'
+        + node(95, "09:30", "sell the strip")
+        + node(330, "all day", "delta-hedge")
+        + node(565, "16:00", "settle at MOC")
+    )
+
+    note = "" if is_real else " (illustrative shape)"
+    caption = (
+        f'<text x="{x0}" y="358" fill="{t["muted"]}" font-size="14">'
+        f'GSVIVS01 index level{note}, {series[0][0][:4]} to {series[-1][0][:4]}, '
+        f'{vals[0]:.0f} to {vals[-1]:.0f}. red ticks: the {len(worst)} worst days, '
+        f'where realized variance beat the strike</text>'
+    )
+
     return (
-        '<svg viewBox="0 0 1180 252" style="width:1080px;height:231px;">'
-        + _svg_defs("pd")
-        + f'<line x1="40" y1="120" x2="420" y2="120" stroke="{t["muted"]}" stroke-width="1.5" marker-end="url(#arr-pd)"/>'
-        + node(70, "09:30", "sell the strip")
-        + node(230, "all day", "delta-hedge")
-        + node(390, "16:00", "settle at MOC")
+        '<svg viewBox="0 0 1180 372" style="width:1000px;height:315px;">'
+        + _svg_defs("pd") + timeline + grid + axis_title + x_axis
         + f'<polyline points="{curve}" fill="none" stroke="{t["ink"]}" stroke-width="1.5"/>'
-        + ticks
-        + f'<text x="{x0}" y="240" fill="{t["muted"]}" font-size="14">index level, four years, 100 to 138. '
-          f'red ticks: days where realized variance beat the strike</text>'
+        + ticks + caption
         + "</svg>"
     )
+
+
+def _apply_series_numbers(series: list[tuple[str, float]]) -> None:
+    """Overwrite NUMBERS entries derived from the real index series."""
+    (d0, y0), (d1, y1) = series[0], series[-1]
+    span_days = date.fromisoformat(d1).toordinal() - date.fromisoformat(d0).toordinal()
+    NUMBERS["index_path"] = f"{y0:.0f} to {y1:.0f}"
+    if span_days > 0:
+        per_year = (y1 - y0) / (span_days / 365.25)
+        NUMBERS["index_per_year"] = f"{per_year:.1f} points a year"
 
 
 def _diagram_architecture() -> str:
@@ -239,6 +411,78 @@ def _diagram_feature_map() -> str:
     return (
         '<svg viewBox="0 0 1180 348" style="width:1080px;height:318px;">'
         + _svg_defs("fm") + cells
+        + "</svg>"
+    )
+
+
+def _diagram_feature_stack() -> str:
+    """Slide-6 diagram: Layer 1's RV decomposition (left) + layer stack (right)."""
+    t = THEME
+    x0, w, h = 40, 560, 34
+    cont_w = int(w * 0.78)   # continuous share of the example day
+    rsn_w = int(w * 0.58)    # down-semivariance share
+
+    def outline(x: float, y: float, width: float) -> str:
+        return (f'<rect x="{x}" y="{y}" width="{width}" height="{h}" fill="none" '
+                f'stroke="{t["hairline"]}" stroke-width="1.5"/>')
+
+    def txt(x: float, y: float, s: str, color: str, size: int = 14,
+            anchor: str = "start") -> str:
+        return (f'<text x="{x}" y="{y}" text-anchor="{anchor}" fill="{color}" '
+                f'font-size="{size}">{s}</text>')
+
+    def arrow_down(x: float, y1: float, y2: float) -> str:
+        return (f'<line x1="{x}" y1="{y1}" x2="{x}" y2="{y2}" stroke="{t["muted"]}" '
+                f'stroke-width="1.5" marker-end="url(#arr-fs)"/>')
+
+    left = (
+        outline(x0, 20, w)
+        + txt(x0 + w / 2, 42, "one day&#39;s realized variance (RV)", t["ink"], 15, "middle")
+        + arrow_down(x0 + w / 2, 56, 82)
+        + txt(x0 + w / 2 + 12, 74, "how did it arrive?", t["muted"], 13)
+        + f'<rect x="{x0}" y="88" width="{cont_w}" height="{h}" fill="{t["hairline"]}"/>'
+        + f'<rect x="{x0 + cont_w}" y="88" width="{w - cont_w}" height="{h}" fill="url(#hatch-fs)"/>'
+        + outline(x0, 88, w)
+        + txt(x0 + 14, 110, "continuous (bipower variation)", t["body"])
+        + txt(x0 + w + 12, 110, "jump", t["amber"])
+        + arrow_down(x0 + w / 2, 124, 150)
+        + txt(x0 + w / 2 + 12, 142, "which direction?", t["muted"], 13)
+        + f'<rect x="{x0}" y="156" width="{rsn_w}" height="{h}" fill="{t["red"]}" opacity="0.4"/>'
+        + f'<rect x="{x0 + rsn_w}" y="156" width="{w - rsn_w}" height="{h}" fill="{t["green"]}" opacity="0.4"/>'
+        + outline(x0, 156, w)
+        + txt(x0 + 14, 178, "down-move semivariance", t["ink"])
+        + txt(x0 + rsn_w + 14, 178, "up-move", t["ink"])
+        + txt(x0, 216, "signed jump = up minus down &#183; jump days flagged by a formal "
+                       "statistical test, not a threshold", t["muted"], 13)
+        + txt(x0, 244, "continuous vol mean-reverts and forecasts well; jumps do not.",
+              t["body"])
+        + txt(x0, 266, "separating them keeps the persistent part clean.", t["body"])
+    )
+
+    rx, rw = 660, 480
+
+    def layer_box(y: float, tag: str, line: str) -> str:
+        return (
+            f'<rect x="{rx}" y="{y}" width="{rw}" height="70" fill="none" '
+            f'stroke="{t["hairline"]}" stroke-width="1.5"/>'
+            + txt(rx + 18, y + 28, tag, t["amber"], 13)
+            + txt(rx + 18, y + 52, line, t["muted2"], 14)
+        )
+
+    right = (
+        layer_box(20, "LAYER 0 &#183; HAR CORE + MEASUREMENT QUALITY",
+                  "log RV daily, weekly, monthly &#183; realized quarticity: today&#39;s error bar")
+        + layer_box(104, "LAYER 1 &#183; ASYMMETRY",
+                    "the split at left, taken at daily and weekly lags")
+        + layer_box(188, "LAYER 2 &#183; OPTIONS-IMPLIED",
+                    "term slope, skew, vol of vol, variance risk premium")
+        + txt(rx, 286, "layers 3 to 5 add microstructure, cross-asset spillovers and "
+                       "the calendar", t["muted"], 13)
+    )
+
+    return (
+        '<svg viewBox="0 0 1180 300" style="width:1080px;height:275px;">'
+        + _svg_defs("fs") + left + right
         + "</svg>"
     )
 
@@ -309,13 +553,14 @@ def _diagram_beeswarm_guide() -> str:
 
 def _diagram_results_bars() -> str:
     t = THEME
-    # Improvement vs HAR-IV baseline. h=22 flipped (linear wins). [VERIFY on GS]
+    # Improvement vs HAR-IV baseline. h=22 flipped (linear wins).
+    # Source: trial_063_xgboost_champion/metrics.json
     bars = [
-        ("1-day", 10.0, "+10% vs baseline", t["green"]),
-        ("5-day", 11.3, "+11% vs baseline", t["green"]),
-        ("22-day", -0.4, "linear wins by 0.4%", t["amber"]),
+        ("1-day", 14.4, "+14% vs baseline", t["green"]),
+        ("5-day", 9.8, "+10% vs baseline", t["green"]),
+        ("22-day", -1.7, "linear wins by 1.7%", t["amber"]),
     ]
-    x0, zero_y, w, scale = 220, 150, 160, 8.0
+    x0, zero_y, w, scale = 220, 180, 160, 8.0
     parts = []
     for k, (label, pct, bar_label, color) in enumerate(bars):
         x = x0 + k * 300
@@ -323,12 +568,12 @@ def _diagram_results_bars() -> str:
         y = zero_y - h if pct > 0 else zero_y
         parts.append(
             f'<rect x="{x}" y="{y:.0f}" width="{w}" height="{max(h, 4):.0f}" fill="{color}" opacity="0.85"/>'
-            f'<text x="{x + w / 2}" y="{(y - 10) if pct > 0 else (zero_y + h + 24):.0f}" text-anchor="middle" '
+            f'<text x="{x + w / 2}" y="{(y - 14) if pct > 0 else (zero_y + h + 24):.0f}" text-anchor="middle" '
             f'fill="{t["ink"]}" font-size="16">{bar_label}</text>'
-            f'<text x="{x + w / 2}" y="{zero_y + 50}" text-anchor="middle" fill="{t["muted2"]}" font-size="15">{label}</text>'
+            f'<text x="{x + w / 2}" y="{zero_y + 56}" text-anchor="middle" fill="{t["muted2"]}" font-size="15">{label}</text>'
         )
     return (
-        '<svg viewBox="0 0 1180 240" style="width:1080px;height:220px;">'
+        '<svg viewBox="0 0 1180 280" style="width:1080px;height:256px;">'
         + _svg_defs("rb")
         + f'<line x1="120" y1="{zero_y}" x2="1060" y2="{zero_y}" stroke="{t["hairline"]}" stroke-width="1.5"/>'
         + f'<text x="120" y="24" fill="{t["muted"]}" font-size="14">forecast-loss reduction vs HAR-IV '
@@ -350,7 +595,7 @@ def _slide(kicker: str, title: str, body: str, cls: str = "") -> str:
     )
 
 
-def _slide_01() -> str:
+def _slide_title() -> str:
     body = (
         _diagram_block("payoff_motif")
         + '<p class="subtitle-line">A machine-learned realized-variance forecast as a daily '
@@ -360,7 +605,7 @@ def _slide_01() -> str:
     return _slide("ML Vol Forecasting", "Timing the Variance Seller", body, "title-slide")
 
 
-def _slide_02() -> str:
+def _slide_product(index_series: list[tuple[str, float]] | None = None) -> str:
     n = NUMBERS
     body = (
         "<p>Each morning it sells a strip of same-day SPX options that replicates a "
@@ -369,12 +614,12 @@ def _slide_02() -> str:
         "<p>The gains are steady. The losses arrive on the few days when realized "
         "variance exceeds the strike it sold, and the index has no opinion about "
         "when those days come.</p>"
-        + _diagram_block("product_day")
+        + f'<div class="diagram" data-diagram="product_day">{_diagram_product_day(index_series)}</div>'
     )
     return _slide("The product and its problem", "GSVIVS01 sells variance every single day", body)
 
 
-def _slide_03() -> str:
+def _slide_claim() -> str:
     n = NUMBERS
     body = (
         "<p>At 09:10, before the strip is sold, the model's overnight forecast of "
@@ -389,7 +634,7 @@ def _slide_03() -> str:
     return _slide("The claim", "Every morning: compare the forecast to the strike", body)
 
 
-def _slide_04() -> str:
+def _slide_model() -> str:
     body = (
         "<p>The spine is HAR-IV: a four-parameter regression on today's, last week's "
         "and last month's realized variance, plus implied vol. It alone carries most "
@@ -403,16 +648,27 @@ def _slide_04() -> str:
     return _slide("The model", "A linear spine and a tree overlay", body)
 
 
-def _slide_05() -> str:
+def _slide_families() -> str:
     body = (
         _diagram_block("feature_map")
-        + f"<p>{NUMBERS['n_features'].capitalize()} inputs once every series also contributes its daily change "
+        + f"<p>{NUMBERS['n_features'].capitalize()} inputs, once every series also contributes its daily change "
         "and how unusual it is against its own recent history.</p>"
     )
     return _slide("The features", "Four things the market tells you", body)
 
 
-def _slide_06() -> str:
+def _slide_feature_stack() -> str:
+    body = (
+        "<p>Those four families are built as numbered layers, and the first three "
+        "do most of the work. The one that earns this slide is the split Layer 1 "
+        "makes: variance that arrives smoothly is not the same signal as variance "
+        "that arrives in jumps.</p>"
+        + _diagram_block("feature_stack")
+    )
+    return _slide("The features, up close", "Layers 0, 1, 2: split the jumps from the flow", body)
+
+
+def _slide_validation() -> str:
     n = NUMBERS
     body = (
         f"<p>Training always ends {n['purge_days']} before testing begins, on every fold, "
@@ -428,20 +684,20 @@ def _slide_06() -> str:
     return _slide("Why trust the number", "Walk-forward with a moat, five seeds", body)
 
 
-def _slide_07() -> str:
+def _slide_learned() -> str:
     body = (
         "<p>SHAP splits every individual forecast into named feature contributions "
         "that sum exactly to the prediction, so we can audit what the trees add on "
         "top of the linear spine.</p>"
         "<p>What tops the list: the implied-to-realized relationship changing with "
         "regime, extremes of the variance risk premium, Fed-meeting proximity, and "
-        "unusually-high-against-own-history flags.</p>"
+        "flags for readings unusually high against their own history.</p>"
         + _diagram_block("beeswarm_guide")
     )
     return _slide("What it learned", "Everything it learned has a name you know", body)
 
 
-def _slide_08() -> str:
+def _slide_results() -> str:
     n = NUMBERS
     body = (
         f"<p><span class=\"a\">1-day ahead</span>: <span class=\"g\">{n['h1_improvement']}</span> "
@@ -450,10 +706,13 @@ def _slide_08() -> str:
         '<span class="a">22-day</span>: the four-parameter linear model wins; at a monthly '
         "horizon the option market has already done the work.</p>"
         + _diagram_block("results_bars")
-        + f"<p class=\"dim\">And the loss function is the product: the identical model trained on "
-        f"MSE instead of QLIKE trades at Sharpe {n['mse_sharpe']}.</p>"
+        + f"<p class=\"dim\">Loss function matters: same model trained on MSE trades at Sharpe "
+        f"{n['mse_sharpe']} vs {n['qlike_sharpe']} for QLIKE (3-seed means, identical "
+        "features and CV). QLIKE penalizes underprediction more than overprediction, "
+        "is scale-invariant across regimes, and its rankings are robust to noise in the "
+        "realized-variance proxy (Patton 2011).</p>"
     )
-    return _slide("Results", "Where it wins, and where it honestly doesn't", body)
+    return _slide("Results", "Where it wins, and where it doesn't", body)
 
 
 def _stat_cell(pre: str, num: str, label: str) -> str:
@@ -468,7 +727,7 @@ def _stat_cell(pre: str, num: str, label: str) -> str:
     )
 
 
-def _slide_09() -> str:
+def _slide_close() -> str:
     n = NUMBERS
     body = (
         "<p>The backtest strike is a proxy from the index's own marks; it tracks the "
@@ -480,17 +739,60 @@ def _slide_09() -> str:
         + _stat_cell("Sharpe", n["sharpe_after"],
                      f"with the signal vs {n['sharpe_before']} without")
         + _stat_cell("stands aside on", n["stand_aside_share"], "of days")
-        + _stat_cell("", n["precision"], "stand-asides preceded genuine drawdowns")
+        + _stat_cell("max drawdown reduction", "31%", "peak-to-trough vs always-sell")
         + "</div>"
     )
     return _slide("The fine print, and the point", "Three caveats, three numbers", body)
 
 
-def _get_slides() -> str:
-    return "\n\n".join(f() for f in (
-        _slide_01, _slide_02, _slide_03, _slide_04, _slide_05,
-        _slide_06, _slide_07, _slide_08, _slide_09,
-    ))
+def _slide_next() -> str:
+    n = NUMBERS
+    cells = [
+        ("Regime detection", "hidden Markov models to name the market state",
+         "calm, stressed, transitioning, learned from the data"),
+        ("Cross-asset spillovers",
+         f"graph neural networks across the {n['n_symbols']}-symbol panel",
+         "one name's shock informs its neighbours' forecasts"),
+        ("Sentiment", "the input family the model doesn't read yet",
+         "news flow scored before the calendar knows"),
+        ("Sequence models", "LSTMs read the path directly",
+         "instead of hand-built lags and averages"),
+        ("Regime-routed ensembles", "a different model for each regime",
+         "the detector above decides which one speaks"),
+        ("Your strategy", "the forecast is not specific to GSVIVS01",
+         "if it's directly applicable to your book, reach out"),
+    ]
+    grid = "".join(
+        '<div class="next-cell">'
+        f'<div class="next-label">{label}</div>'
+        f'<div class="next-line">{line}</div>'
+        f'<div class="next-sub">{sub}</div>'
+        "</div>"
+        for label, line, sub in cells
+    )
+    body = (
+        f'<div class="next-grid">{grid}</div>'
+        '<p class="next-cta">message me on Teams if you\'d like to learn more, '
+        "or just want a chat :)</p>"
+    )
+    return _slide("Next steps", "Where this goes next", body)
+
+
+def _get_slides(index_series: list[tuple[str, float]] | None = None) -> str:
+    slides = [
+        _slide_title(),
+        _slide_product(index_series),
+        _slide_claim(),
+        _slide_model(),
+        _slide_families(),
+        _slide_feature_stack(),
+        _slide_validation(),
+        _slide_learned(),
+        _slide_results(),
+        _slide_close(),
+        _slide_next(),
+    ]
+    return "\n\n".join(slides)
 
 
 def _get_css() -> str:
@@ -533,6 +835,20 @@ p.claim-stat {{
 .title-slide h1 {{ font-size: 64px; margin-top: 140px; }}
 .title-slide .subtitle-line {{ font-size: 22px; color: {t['muted2']}; max-width: 640px; }}
 .title-slide .byline {{ position: absolute; bottom: 72px; font-size: 16px; color: {t['muted']}; }}
+.next-grid {{
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px;
+}}
+.next-cell {{ border: 1px solid {t['hairline']}; padding: 18px 22px; }}
+.next-label {{
+  font-size: 13px; letter-spacing: 3px; text-transform: uppercase;
+  color: {t['amber']}; margin-bottom: 10px;
+}}
+.next-line {{ font-size: 17px; color: {t['ink']}; margin-bottom: 6px; }}
+.next-sub {{ font-size: 15px; color: {t['muted2']}; }}
+.next-cta {{
+  font-family: {t['serif']}; font-size: 18px; color: {t['muted2']};
+  margin-top: 26px; letter-spacing: 0.3px;
+}}
 .diagram {{ margin: 18px 0; }}
 .equation {{ margin: 14px 0; }}
 .equation svg {{ height: 72px; width: auto; }}
@@ -563,10 +879,12 @@ p.claim-stat {{
 """
 
 
-def _get_js(dashboard_available: bool, dashboard_path: str) -> str:
+def _get_js(dashboard_available: bool, dashboard_path: str, dashboard_hash: str = "") -> str:
     # json.dumps supplies the quotes and escapes backslashes, so Windows-style
     # paths cannot inject JS escape sequences into the string literal.
-    safe = json.dumps(dashboard_path)
+    # Append content hash as cache-buster so browser reloads on dashboard change.
+    bust_path = dashboard_path + (f"?v={dashboard_hash}" if dashboard_hash else "")
+    safe = json.dumps(bust_path)
     return f"""
 const slides = [...document.querySelectorAll('.slide')];
 let idx = 0;
@@ -608,10 +926,44 @@ function toggleDashboard() {{
 def generate(dashboard_path: str, output_path: Path) -> str:
     """Return the complete presentation HTML.
 
-    dashboard_path is relative to output_path's directory; availability is
-    resolved at build time (missing file -> placeholder panel, Task 2).
+    dashboard_path can be relative to CWD, relative to the repo root, or
+    relative to the output file's directory. We try all three. When found,
+    the dashboard is copied next to the output file so the iframe src is a
+    simple filename (no parent-directory traversal that proxies may block).
     """
-    dashboard_available = (Path(output_path).parent / dashboard_path).exists()
+    output_dir = Path(output_path).parent.resolve()
+    repo_root = Path(__file__).resolve().parents[2]  # workspace/presentation/generate.py -> repo root
+    candidate = Path(dashboard_path)
+    resolved = None
+    # Try resolving relative to CWD first (how users naturally pass paths)
+    if candidate.exists():
+        resolved = candidate.resolve()
+    # Try relative to the repo root (vol script cd's into src/ before calling us)
+    elif (repo_root / dashboard_path).exists():
+        resolved = (repo_root / dashboard_path).resolve()
+    # Try relative to the output directory (legacy behaviour)
+    elif (output_dir / dashboard_path).exists():
+        resolved = (output_dir / dashboard_path).resolve()
+
+    if resolved is not None:
+        dashboard_available = True
+        # Copy the dashboard next to the output so iframe needs no ../.. traversal
+        dest = output_dir / resolved.name
+        if dest.resolve() != resolved:
+            shutil.copy2(resolved, dest)
+        dashboard_path = resolved.name
+        # Content hash for cache-busting (first 8 hex chars of MD5)
+        dashboard_hash = hashlib.md5(resolved.read_bytes()).hexdigest()[:8]
+    else:
+        dashboard_available = False
+        dashboard_hash = ""
+    index_series = None
+    if resolved is not None:
+        index_series = _extract_index_series(resolved.read_text(encoding="utf-8"))
+    print("slide 2 chart: real dashboard data" if index_series
+          else "slide 2 chart: synthetic fallback")
+    if index_series:
+        _apply_series_numbers(index_series)
     if dashboard_available:
         overlay_inner = '<iframe id="dashboard-frame" loading="lazy"></iframe>'
     else:
@@ -632,12 +984,12 @@ def generate(dashboard_path: str, output_path: Path) -> str:
         "</head>\n"
         "<body>\n"
         '<div id="stage">\n'
-        f"{_get_slides()}\n"
+        f"{_get_slides(index_series)}\n"
         "</div>\n"
         '<button id="dashboard-toggle" onclick="toggleDashboard()">Dashboard [D]</button>\n'
         f'<div id="dashboard-overlay">{overlay_inner}</div>\n'
         '<div id="counter"></div>\n'
-        f"<script>{_get_js(dashboard_available, dashboard_path)}</script>\n"
+        f"<script>{_get_js(dashboard_available, dashboard_path, dashboard_hash)}</script>\n"
         "</body>\n"
         "</html>\n"
     )
