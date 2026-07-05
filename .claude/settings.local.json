@@ -1,56 +1,5 @@
 {
   "permissions": {
     "defaultMode": "bypassPermissions"
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -q \"git commit\"; then echo \"[hook] Commit detected -- invoke /progress-log to update the daily log.\"; fi'"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -q \"vol-project-ref/chapters/.*\\.tex\"; then CHFILE=$(echo \"$TOOL_INPUT\" | grep -oP \"ch\\d+-[\\w-]+\\.tex\" | head -1); MDFILE=$(echo \"$CHFILE\" | sed \"s/\\.tex$/.md/\"); echo \"[hook] vol-project-ref chapter source modified ($CHFILE). Update the corresponding markdown file: guides/vol-project-ref/markdown/$MDFILE\"; fi'"
-          },
-          {
-            "type": "command",
-            "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -q \"vol-learning-guide/chapters/.*\\.tex\"; then TEXFILE=$(echo \"$TOOL_INPUT\" | grep -oP \"\\d+-[\\w-]+\\.tex\" | head -1); MDFILE=\"ch$(echo \"$TEXFILE\" | sed \"s/\\.tex$/.md/\")\"; echo \"[hook] vol-learning-guide chapter source modified ($TEXFILE). Update the corresponding markdown file: guides/vol-learning-guide/markdown/$MDFILE\"; fi'"
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -q \"vol-project-ref/chapters/.*\\.tex\"; then CHFILE=$(echo \"$TOOL_INPUT\" | grep -oP \"ch\\d+-[\\w-]+\\.tex\" | head -1); MDFILE=$(echo \"$CHFILE\" | sed \"s/\\.tex$/.md/\"); echo \"[hook] vol-project-ref chapter source modified ($CHFILE). Update the corresponding markdown file: guides/vol-project-ref/markdown/$MDFILE\"; fi'"
-          },
-          {
-            "type": "command",
-            "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -q \"vol-learning-guide/chapters/.*\\.tex\"; then TEXFILE=$(echo \"$TOOL_INPUT\" | grep -oP \"\\d+-[\\w-]+\\.tex\" | head -1); MDFILE=\"ch$(echo \"$TEXFILE\" | sed \"s/\\.tex$/.md/\")\"; echo \"[hook] vol-learning-guide chapter source modified ($TEXFILE). Update the corresponding markdown file: guides/vol-learning-guide/markdown/$MDFILE\"; fi'"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/RyanPC/Documents/Projects/ML-GS/.claude/hooks/guide-autosync.js\"",
-            "timeout": 30,
-            "statusMessage": "Checking if guide docs need syncing..."
-          }
-        ]
-      }
-    ]
   }
 }
