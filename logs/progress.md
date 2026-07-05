@@ -125,5 +125,9 @@
 - Renamed the one existing offender on docs-only: deliverables/desk-pitch-2026-07/generate.py -> generate.py.txt
 - Gitignored ml-vol-estimator/ on both branches -- the sync-docs `git add -A` step would otherwise sweep the 909-file local GS repo copy into docs-only on the next sync
 - Updated /sync-docs Step 4 (explicit .py rename + `git add` scoped to guides/deliverables/notes) and the CLAUDE.md docs-only section
+- Overhauled the Claude Code hook system (3 commits, planned via docs/superpowers/plans/2026-07-05-hook-improvements.md). Discovered the three PostToolUse bash one-liners had never fired: they grepped a `$TOOL_INPUT` env var Claude Code doesn't set (hook input is stdin JSON), and plain PostToolUse stdout is invisible to the model anyway. Replaced with `.claude/hooks/posttool-nudge.js` emitting `hookSpecificOutput.additionalContext` (chapter-mirror nudges for both guides incl. the ch12/ch12b slug collision, plus the git-commit progress-log nudge) -- verified live in-session
+- Extended the guide-autosync Stop hook to cover vol-project-ref alongside vol-learning-guide: JSON marker map (legacy bare-hex migrates), silent seeding of newly covered guides so fresh clones don't trigger a spurious full regen+push, root via CLAUDE_PROJECT_DIR instead of a hardcoded path, 17 node:test unit+integration tests
+- Moved hook wiring into tracked `.claude/settings.json`; `settings.local.json` now holds only the machine-local permission mode; added `.claude/hooks/README.md`
+- Noted: uncommitted prose-editing changes across all three guides' chapters are sitting in the working tree (not mine, left uncommitted); once committed, the Stop hook will correctly demand a mirror regen + sync-docs for both covered guides
 
 ---
