@@ -116,3 +116,14 @@
 **Next:** Decide univariate-RV vs realized-covariance focus; port JLDC/HARd-to-Beat as the HAR baseline harness on the GS machine
 
 ---
+
+## 2026-07-05
+
+**Focus:** Repo tooling -- no-.py guard for the docs-only branch
+
+- Added a git pre-commit hook enforcing that docs-only never contains `.py` files (restricted machines flag them): auto-renames staged `.py` to `.py.txt`, plus an index-level fail-safe that aborts the commit. Source of truth `.githooks/pre-commit` on main, installed at `.git/hooks/pre-commit` (can't use core.hooksPath -- tracked files vanish from the working tree on docs-only)
+- Renamed the one existing offender on docs-only: deliverables/desk-pitch-2026-07/generate.py -> generate.py.txt
+- Gitignored ml-vol-estimator/ on both branches -- the sync-docs `git add -A` step would otherwise sweep the 909-file local GS repo copy into docs-only on the next sync
+- Updated /sync-docs Step 4 (explicit .py rename + `git add` scoped to guides/deliverables/notes) and the CLAUDE.md docs-only section
+
+---
