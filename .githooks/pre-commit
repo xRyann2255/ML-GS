@@ -1,0 +1,31 @@
+#!/bin/sh
+# docs-only branch guard: the branch is downloaded on restricted machines that
+# flag code files, so no .py file may ever be committed to it. Any staged *.py
+# is auto-renamed to *.py.txt and re-staged before the commit proceeds.
+#
+# Source of truth: .githooks/pre-commit on main.
+# Must be installed to .git/hooks/pre-commit (tracked files from main disappear
+# from the working tree on docs-only, so core.hooksPath cannot be used):
+#   cp .githooks/pre-commit .git/hooks/pre-commit
+
+[ "$(git rev-parse --abbrev-ref HEAD)" = "docs-only" ] || exit 0
+
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.py')
+
+if [ -n "$files" ]; then
+  echo "$files" | while IFS= read -r f; do
+    [ -f "$f" ] && mv -f "$f" "$f.txt"
+    git rm --cached --quiet -- "$f"
+    git add -- "$f.txt"
+    echo "[pre-commit] renamed $f -> $f.txt (no .py files allowed on docs-only)"
+  done
+fi
+
+# Fail-safe: the committed tree must contain no .py at all (ls-files reads the
+# index, so staged deletions of .py correctly pass).
+if git ls-files -- '*.py' | grep -q .; then
+  echo "[pre-commit] ERROR: index still contains .py files on docs-only; commit aborted:" >&2
+  git ls-files -- '*.py' >&2
+  exit 1
+fi
+exit 0

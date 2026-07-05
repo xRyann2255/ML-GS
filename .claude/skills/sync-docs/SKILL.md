@@ -59,8 +59,10 @@ cd $ROOT && git add guides/vol-learning-guide/main.pdf guides/quant-trading/main
 First stash any uncommitted work so the branch switch doesn't destroy it, then sync and return to main:
 
 ```bash
-cd $ROOT && git stash && git checkout docs-only && git checkout main -- guides/vol-learning-guide/main.pdf guides/vol-learning-guide/markdown/ guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/ && git add -A && git diff --cached --quiet && echo "No changes to sync" || (git commit -m "chore: sync compiled PDFs, markdown, and notes from main" && git push) && git checkout main && git stash pop
+cd $ROOT && git stash && git checkout docs-only && git checkout main -- guides/vol-learning-guide/main.pdf guides/vol-learning-guide/markdown/ guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/ && find guides deliverables notes -name '*.py' -exec sh -c 'mv -f "$1" "$1.txt"' _ {} \; && git add -A -- guides deliverables notes && git diff --cached --quiet && echo "No changes to sync" || (git commit -m "chore: sync compiled PDFs, markdown, and notes from main" && git push) && git checkout main && git stash pop
 ```
+
+The `find ... mv` step renames any `.py` pulled over from main to `.py.txt` — docs-only must never contain Python files (restricted machines flag them). A pre-commit hook (`.githooks/pre-commit` on main, installed at `.git/hooks/pre-commit`) enforces this as a backstop on every docs-only commit.
 
 If the stash pop reports conflicts, resolve them — the stashed changes are the user's working copy and take priority.
 
@@ -87,3 +89,4 @@ Page counts for each compiled PDF + which guides were skipped + confirmation of 
 - Use `| tail -5` on compile commands to avoid flooding context.
 - Use timeout 300000ms for compile commands (quant-trading is 570+ pages).
 - NEVER use `git checkout -f` — it destroys uncommitted changes. Use `git stash` / `git stash pop` to preserve working tree state across branch switches.
+- NEVER commit a `.py` file to docs-only — rename to `.py.txt`. The pre-commit hook does this automatically; keep it installed (`cp .githooks/pre-commit .git/hooks/pre-commit`).

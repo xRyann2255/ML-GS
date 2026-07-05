@@ -120,10 +120,17 @@ The `docs-only` branch contains only compiled PDFs, deliverables, and markdown n
    ```bash
    git checkout docs-only
    git checkout main -- guides/vol-learning-guide/main.pdf guides/vol-learning-guide/markdown/ guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/
+   find guides deliverables notes -name '*.py' -exec sh -c 'mv -f "$1" "$1.txt"' _ {} \;
+   git add -A -- guides deliverables notes
    git commit -m "chore: sync compiled PDFs, markdown, and notes from main"
    git push
    git checkout main
    ```
+
+**No `.py` files on `docs-only` — ever.** Restricted machines flag Python files, so any `.py` headed for the branch must be renamed to `.py.txt` (the `find` step above). A git pre-commit hook enforces this on every docs-only commit by auto-renaming staged `.py` files. Source of truth is `.githooks/pre-commit` on main; it must be installed locally (tracked files vanish from the working tree on docs-only, so `core.hooksPath` can't be used):
+```bash
+cp .githooks/pre-commit .git/hooks/pre-commit   # re-run after a fresh clone
+```
 
 **What stays on `docs-only`:**
 - `guides/vol-learning-guide/main.pdf`, `guides/quant-trading/main.pdf`, `guides/vol-project-ref/main.pdf`
