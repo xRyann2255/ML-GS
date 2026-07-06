@@ -61,7 +61,7 @@ You need proxies for each:
 
 > **Project Connection: Why This Matters**
 >
-> This is the equation you will compute every day in a VRP trading strategy. Your ML model replaces the naive backward-looking RV with a more accurate $\hat{\operatorname{RV}}^{\mathbb{P}}_{t+h}$, producing a cleaner VRP signal. A HAR or XGBoost forecast that improves QLIKE by 5--10% does not just make your RV number better in isolation; it sharpens the VRP estimate that drives every downstream trading decision.
+> This is the equation you will compute every day in a VRP trading strategy. Your ML model replaces the naive backward-looking RV with a more accurate $\hat{\operatorname{RV}}^{\mathbb{P}}_{t+h}$, producing a cleaner VRP signal. A HAR or XGBoost forecast that improves QLIKE by 5--10% sharpens the VRP estimate that drives every downstream trading decision.
 
 > **Warning: Ex-Ante vs. Ex-Post VRP**
 >
@@ -123,16 +123,15 @@ This "volatility of volatility" in the real economy generates a variance risk pr
 > 2. **Non-diversifiable risk**: volatility spikes coincide with market crashes, making volatility risk systematic (not diversifiable away).
 > 3. **Uncertainty about uncertainty**: in equilibrium models like Drechsler and Yaron (2011), time-varying economic uncertainty generates a positive VRP.
 >
-> The premium is not a market inefficiency. It is rational compensation for bearing a risk that hurts most when it materializes.
+> The premium is not a market inefficiency but rational compensation for bearing a risk that hurts most when it materializes.
 
 ## VRP Predicts Returns
 
-The VRP is not just an insurance premium that options sellers passively collect.
-It actively predicts future equity returns.
+Options sellers collect the VRP as an insurance premium, but the premium also carries information: it predicts future equity returns.
 This is the central empirical finding of Bollerslev, Tauchen, and Zhou (2009).
 
 The logic: when VRP is high, the market is demanding steep compensation for bearing volatility risk.
-This signals elevated risk aversion or heightened uncertainty.
+This signals unusually high risk aversion or uncertainty.
 Assets priced under high risk aversion offer higher expected returns as compensation.
 When VRP is low, the market is complacent, and expected returns are lower.
 
@@ -152,17 +151,17 @@ When VRP is low, the market is complacent, and expected returns are lower.
 > VRP predicts returns in a statistical, population-average sense.
 > Even the best specification ($R^2 \approx 15\%$) leaves 85% of quarterly return variation unexplained.
 > A high VRP does *not* guarantee positive returns in any single quarter.
-> Furthermore, VRP is highest during crises, precisely when portfolio constraints and drawdown pain are most severe.
+> VRP is highest during crises, precisely when portfolio constraints and drawdown pain are most severe.
 > Trading on VRP requires the ability and willingness to take risk when it feels worst.
 
 ## VRP Predicts Future Volatility
 
-VRP is not only a return predictor; it also contains information about future realized volatility.
+VRP also contains information about future realized volatility.
 The mechanism is mean reversion.
 
 When VRP is large (implied far above realized), two things tend to happen:
 
-1. Realized volatility rises toward implied. The options market is pricing in higher future vol for a reason: upcoming risk events, deteriorating conditions, or elevated uncertainty. Realized vol tends to catch up.
+1. Realized volatility rises toward implied. The options market is pricing in higher future vol for a reason: upcoming risk events, deteriorating conditions, or high uncertainty. Realized vol tends to catch up.
 2. Implied volatility falls toward realized. As the risk event passes or uncertainty resolves, the fear premium deflates.
 
 The net effect is convergence: the gap closes from both sides, but with realized vol doing more of the adjustment.

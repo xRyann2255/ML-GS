@@ -365,7 +365,7 @@ $$
 When the conditional mean is approximately constant (a reasonable assumption for daily equity returns), the unconditional variance is simply the time average of the conditional variances.
 The gap between the two is what makes volatility modeling interesting.
 
-*Figure: The unconditional volatility (dashed red) is a single long-run average, held flat at about 17% annualized; it tells you nothing about which regime you're in today. The conditional volatility (solid blue) varies over time: it sits near 10-14% during calm stretches, climbs to a crisis spike of about 41% annualized around day 100, then mean-reverts back toward the long-run level before smaller oscillations later in the sample. Your project's goal is to forecast the blue line one step ahead, not just know the red line.*
+*Figure: The unconditional volatility (dashed red) is a single long-run average, held flat at about 17% annualized; it tells you nothing about which regime you're in today. The conditional volatility (solid blue) varies over time: it sits near 10-14% during calm stretches, climbs to a crisis spike of about 41% annualized around day 100, then mean-reverts back toward the long-run level before smaller oscillations later in the sample. Your project's goal is to forecast the blue line one step ahead; knowing the red line alone is not enough.*
 
 > **Key Idea: The Central Goal of This Guide**
 >

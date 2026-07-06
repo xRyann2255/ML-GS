@@ -44,7 +44,7 @@ $$
 
 where $\alpha$ is the probability the counterparty is informed and $\sigma_v$ is the volatility of the information signal. When volatility is high, information asymmetry increases (there is more to know), so spreads widen mechanically. This creates a feedback loop: high vol leads to wider spreads, which creates more noise in transaction prices, which creates more biased RV estimates.
 
-This means microstructure noise is not merely a nuisance to filter; it carries information about market quality and **informed-trading intensity** that can itself predict future volatility ([Chapter 10](ch10-feature-engineering.md)).
+Beyond being a nuisance to filter, microstructure noise therefore carries information about market quality and **informed-trading intensity** that can itself predict future volatility ([Chapter 10](ch10-feature-engineering.md)).
 
 A related insight from Roll (1984) (Roll, R. (1984). A simple implicit measure of the effective bid-ask spread in an efficient market. *The Journal of Finance*, 39(4), 1127-1139): the first-order autocovariance of price changes satisfies $\operatorname{Cov}(\Delta p_t, \Delta p_{t+1}) = -s^2/4$. This connects the noise-robust estimators developed later in this chapter (which exploit autocovariance structure) to a liquidity interpretation.
 
@@ -124,7 +124,7 @@ The volatility signature plot shows that standard RV is badly biased at high fre
 > Compute RV at two different frequencies: a "fast" scale (e.g., every 1 minute) and a "slow" scale (e.g., every 30 minutes).
 > The fast-scale RV picks up both signal and noise: $\operatorname{RV}^{(\text{fast})} \approx \operatorname{IV}_t + 2n_{\text{fast}}\omega^2$.
 > The slow-scale RV also picks up signal and noise, but with far fewer observations: $\operatorname{RV}^{(\text{slow})} \approx \operatorname{IV}_t + 2n_{\text{slow}}\omega^2$.
-> However, the key insight is that the *noise per observation* is the same at both scales.
+> However, the *noise per observation* is the same at both scales.
 > By taking a specific weighted difference of the two, you can cancel the noise term and isolate the signal.
 
 ### Construction
@@ -200,7 +200,7 @@ In practice, MSRV is straightforward to implement (it is a weighted sum of subsa
 
 ## The Realized Kernel
 
-The realized kernel, developed by Barndorff-Nielsen, Hansen, Lunde, and Shephard (2008), is the most widely used noise-robust estimator in the volatility literature. It achieves the optimal $n^{-1/4}$ convergence rate (same as MSRV) with a clean, intuitive construction.
+The realized kernel, developed by Barndorff-Nielsen, Hansen, Lunde, and Shephard (2008), is the most widely used noise-robust estimator in the volatility literature. It achieves the optimal $n^{-1/4}$ convergence rate (same as MSRV) with an intuitive construction.
 
 > **Intuition: Noise as Spurious Autocorrelation**
 > Under the i.i.d. noise model, the *observed* returns $r^*_{t,i}$ have negative first-order autocorrelation: if the noise pushes the price up this tick, the next return is more likely to be negative (reverting the noise).
@@ -306,7 +306,7 @@ The four estimators above (TSRV, MSRV, realized kernel, pre-averaging) are the m
 
 **Subsampled/Averaged RV.** Before TSRV was developed, practitioners used averaged RV (computing multiple RVs on offset grids and averaging them) to reduce noise. This is the slow-scale component of TSRV without the bias correction. It reduces noise variance but does not eliminate the bias. It remains a useful quick fix when the noise level is low.
 
-**Fourier Estimator.** Malliavin and Mancino (2002, 2009) proposed estimating integrated variance via the Fourier coefficients of the price process. The idea: the variance is related to the squared magnitude of low-frequency Fourier coefficients, while noise concentrates at high frequencies. By truncating high-frequency components, you filter out the noise. The Fourier estimator is less widely used in practice but has elegant theoretical properties and does not require equally spaced observations.
+**Fourier Estimator.** Malliavin and Mancino (2002, 2009) proposed estimating integrated variance via the Fourier coefficients of the price process. The idea: the variance is related to the squared magnitude of low-frequency Fourier coefficients, while noise concentrates at high frequencies. By truncating high-frequency components, you filter out the noise. The Fourier estimator is less widely used in practice, but it has attractive theoretical properties and does not require equally spaced observations.
 
 **Quasi-Maximum Likelihood Estimator (QMLE).** Xiu (2010) proposed treating the noisy price observations as a state-space model: the true price is the latent state, and the observed price adds Gaussian noise. Applying the Kalman filter produces a quasi-maximum likelihood estimate of integrated variance and the noise variance $\omega^2$ jointly. The QMLE achieves the optimal $n^{-1/4}$ rate and provides a natural estimate of $\omega^2$ as a byproduct.
 
@@ -319,7 +319,7 @@ The four estimators above (TSRV, MSRV, realized kernel, pre-averaging) are the m
 
 Which estimator you use depends on your goal.
 
-The figure below shows how the different estimators behave on the volatility signature plot. The key visual takeaway: noise-robust estimators produce a flat line across frequencies, while naive RV diverges.
+The figure below shows how the different estimators behave on the volatility signature plot. Noise-robust estimators produce a flat line across frequencies, while naive RV diverges.
 
 *Figure: Volatility signature plot comparing estimators. The $x$-axis runs over sampling intervals (1s, 5s, 15s, 30s, 1m, 5m, 15m, 30m, 1h, 2h, 1d); the $y$-axis is estimated variance. The true $\operatorname{IV}_t$ is a black dashed line at about 1.10. Naive RV (red) diverges at high frequencies, starting around 4.8 at 1s and falling through the curve to about 0.55 at 1d. TSRV ($n^{-1/6}$, orange triangles) is consistent but has a slower convergence rate, sitting around 1.35 at 1s and producing a slight upward bias at the highest frequencies before tracking toward true IV. The realized kernel ($n^{-1/4}$, blue squares) and pre-averaging ($n^{-1/4}$, green diamonds) stay very close to the true $\operatorname{IV}_t \approx 1.11$ across all high frequencies. At very low frequencies (right side), all estimators lose precision due to too few observations, dropping below 1.0. An annotation brackets the high-frequency region: "Noise-robust estimators stay near true $\operatorname{IV}_t$"; another notes "Naive RV diverges."*
 

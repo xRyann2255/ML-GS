@@ -65,7 +65,7 @@ The entire point of this chapter is to estimate $\operatorname{IV}_t$ from obser
 
 You now know the target: integrated variance $\operatorname{IV}_t$.
 The question is how to estimate it from data you can actually observe.
-The answer, developed by Andersen, Bollerslev, Diebold, and Labys (2001) and Barndorff-Nielsen and Shephard (2002), is remarkably simple: sum up squared intraday returns.
+The answer, developed by Andersen, Bollerslev, Diebold, and Labys (2001) and Barndorff-Nielsen and Shephard (2002), is simple: sum up squared intraday returns.
 
 ### Construction
 
@@ -301,8 +301,7 @@ The plot has three regions:
 Given the tradeoff from the previous section, what sampling frequency should you use in practice?
 The answer, for most applications, is 5 minutes.
 
-This is not a number derived from first principles (the optimal frequency depends on the noise-to-signal ratio, which varies by asset and time period).
-It is an empirical finding, and a remarkably robust one.
+This number is an empirical finding rather than a derivation from first principles (the optimal frequency depends on the noise-to-signal ratio, which varies by asset and time period), and it has proved remarkably robust.
 
 > **Key Result: Liu, Patton, and Sheppard (2015): Does Anything Beat 5-Minute RV?**
 >

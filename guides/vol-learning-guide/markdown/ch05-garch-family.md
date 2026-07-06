@@ -202,7 +202,7 @@ $$
 - $\phi$: an additional ARCH-side parameter
 - $\beta$: persistence parameter, same role as in GARCH
 
-The key point is not the algebra but the implication: FIGARCH matches the slow decay of volatility autocorrelations far better than GARCH.
+The algebra matters less than the implication: FIGARCH matches the slow decay of volatility autocorrelations far better than GARCH.
 
 > **Project Connection: Why This Matters**
 > Long memory in volatility is precisely why HAR works: its weekly and monthly components act as a discrete approximation to the slow-decaying memory that FIGARCH models continuously. If your ML residual model finds that long-lag features improve forecasts, FIGARCH's $d$ parameter gives you a theoretical explanation for why.
@@ -218,7 +218,7 @@ Standard GARCH uses only daily returns to infer volatility. But if you have acce
 > **Intuition: The Measurement Problem**
 > In GARCH, the conditional variance $\sigma^2_t$ is a latent (unobserved) variable. The model infers it from the noisy signal $r^2_t$ (the squared daily return). But $r^2_t$ is an extremely noisy estimator of daily variance: on average, the noise-to-signal ratio exceeds 5. Realized volatility $\operatorname{RV}_t$ is computed from many intraday returns and is orders of magnitude more precise. Realized GARCH exploits this better signal.
 
-The key addition in Realized GARCH is the measurement equation linking $\operatorname{RV}_t$ to the latent conditional variance $h_t$ (see diagram).
+What Realized GARCH adds is a measurement equation linking $\operatorname{RV}_t$ to the latent conditional variance $h_t$ (see diagram).
 
 ```mermaid
 flowchart TD
@@ -322,7 +322,7 @@ $$
 
 ## Comparison: GARCH vs. Realized GARCH vs. HEAVY
 
-The key distinction across the three approaches is the data input: standard GARCH uses only daily returns, while Realized GARCH and HEAVY incorporate intraday information through $\operatorname{RV}_t$ (see table).
+The main distinction across the three approaches is the data input: standard GARCH uses only daily returns, while Realized GARCH and HEAVY incorporate intraday information through $\operatorname{RV}_t$ (see table).
 
 | | **GARCH(1,1)** | **Realized GARCH** | **HEAVY** |
 |---|---|---|---|

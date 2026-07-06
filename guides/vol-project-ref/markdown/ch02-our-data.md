@@ -32,7 +32,7 @@ The table below summarizes the capabilities our data provides relative to what i
 
 > **Key Idea: The data advantage is structural, not just bigger**
 >
-> The tick-level RV, full IV surface, and L2 depth data let us construct features that are mathematically impossible to compute from public data. This is not a matter of having "more data"; public researchers literally cannot replicate the feature set.
+> The tick-level RV, full IV surface, and L2 depth data let us construct features that are mathematically impossible to compute from public data. The gap is one of kind rather than volume: no amount of additional public data would allow the feature set to be replicated.
 
 ## Constraints That Shape Decisions
 
@@ -45,4 +45,4 @@ These constraints determine which features apply to which assets in the feature 
 > **Warning: Do not treat depth or surface features as stock-level predictors**
 >
 > L2 depth and the full IV surface are index-level data. Using them as if they vary across individual equities would introduce look-ahead bias or a constant signal masquerading as stock-specific information.
-> Single-stock ATM IV is the exception -- it is genuinely per-name.
+> Single-stock ATM IV is the exception: it is genuinely per-name.

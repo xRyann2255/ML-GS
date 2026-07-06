@@ -242,7 +242,7 @@ Brenner and Subrahmanyam (1988) provide a simple closed-form approximation for A
 $$\sigma_0 \approx \sqrt{\frac{2\pi}{T}} \cdot \frac{C_{\text{mkt}}}{S}.$$
 
 This approximation exploits the fact that the ATM Black-Scholes call price is approximately $C \approx S\sigma\sqrt{T/(2\pi)}$.
-For options far from the money, use $\sigma_0 = 0.20$ (20%) as a robust starting point.
+For options far from the money, use $\sigma_0 = 0.20$ (20%) as a reliable starting point.
 
 > **Warning: When Newton-Raphson Fails**
 >
@@ -260,7 +260,7 @@ For options far from the money, use $\sigma_0 = 0.20$ (20%) as a robust starting
 > Implement Newton-Raphson with the Brenner-Subrahmanyam initial guess and bisection fallback.
 > The entire IV surface construction pipeline (from raw option prices to smooth SVI-fitted IV) starts with this inversion at each individual $(K, T)$ point.
 
-A critical point: implied volatility is *not* a single number for a given underlying.
+Implied volatility is *not* a single number for a given underlying.
 Every (strike, maturity) pair has its own IV.
 This leads directly to the next section.
 
@@ -380,7 +380,7 @@ Symmetric tail pricing (high butterfly) tends to precede periods of elevated but
 > **Project Connection: Why This Matters**
 >
 > The butterfly spread is one of nine options-implied features in the project's feature pipeline ([Chapter 10](ch10-feature-engineering.md)).
-> It provides information that the risk reversal (skew) cannot: whether the market prices *symmetric* tail risk, not just directional fear.
+> It provides information that the risk reversal (skew) cannot: whether the market prices *symmetric* tail risk rather than directional fear alone.
 > Empirically, the butterfly is most useful as a crisis-detection signal.
 > Spikes in the butterfly predict periods of elevated realized volatility at weekly and monthly horizons, especially when combined nonlinearly with VIX and the term structure slope in tree-based models.
 
@@ -421,7 +421,7 @@ The **Stochastic Volatility Inspired (SVI)** parametrization (Gatheral and Jacqu
 > The five parameters give enough flexibility to fit real market smiles accurately while producing smooth, well-behaved extrapolations into the tails.
 
 **Why SVI?**
-Two properties make SVI theoretically well-motivated, not just a convenient curve fit (Gatheral and Jacquier, 2014):
+Two properties make SVI theoretically well-motivated rather than merely a convenient curve fit (Gatheral and Jacquier, 2014):
 
 1. As $|k| \to \infty$, $w(k)$ becomes linear in $k$, matching **Roger Lee's moment formula** (the theoretical constraint that total variance must grow at most linearly in extreme log-moneyness).
 2. The large-maturity limit of the **Heston** stochastic volatility model's implied variance is exactly SVI. The parametrization is not arbitrary.
@@ -552,7 +552,7 @@ Britten-Jones and Neuberger (2000) proved a striking result: under very general 
 > - $C(K,T)$ = price of a European call with strike $K$ and maturity $T$ (used for $K > F$, i.e., OTM calls).
 > - The $1/K^2$ weighting gives proportionally more weight to lower-strike options.
 >
-> The key insight: by integrating option prices across all strikes, the dependence on any particular volatility model cancels out.
+> Integrating option prices across all strikes cancels out the dependence on any particular volatility model.
 
 > **Intuition: Why It Works Without a Model**
 >
@@ -650,7 +650,7 @@ The theoretical foundation: Britten-Jones and Neuberger (2000) and Carr and Wu (
 The realized P&L from this hedge equals the realized variance minus the cost of the portfolio.
 Therefore, the cost of this portfolio (which is exactly the model-free implied variance integral from the Model-Free Implied Variance section above) equals the fair variance swap strike $K_{\text{var}}$.
 
-This is the deep connection: the VIX formula (the discrete VIX equation above) computes the fair strike of a 30-day variance swap on the S&P 500.
+In other words, the VIX formula (the discrete VIX equation above) computes the fair strike of a 30-day variance swap on the S&P 500.
 $\text{VIX}^2 / 10{,}000$ is the annualized $K_{\text{var}}$ for that maturity.
 
 > **Intuition: Trading Your Vol Forecast Directly**

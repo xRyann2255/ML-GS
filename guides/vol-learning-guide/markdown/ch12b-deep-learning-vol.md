@@ -376,7 +376,7 @@ Here is the evidence, scenario by scenario:
 
 > **Warning: Overfitting Is the Central Risk**
 >
-> Deep learning models have orders of magnitude more parameters than HAR or trees. A 2-layer LSTM with 64 hidden units has $\sim$50,000 parameters. A HAR model has 4. A LightGBM with max_depth=4 and 200 trees has $\sim$3,000 leaf values. On a daily $\operatorname{RV}$ series with 2,500 observations (10 years), the LSTM has 20 parameters per observation. Regularization (dropout, weight decay, early stopping) is not optional; it is survival. Always compare against the HAR baseline on identical data.
+> Deep learning models have orders of magnitude more parameters than HAR or trees. A 2-layer LSTM with 64 hidden units has $\sim$50,000 parameters. A HAR model has 4. A LightGBM with max_depth=4 and 200 trees has $\sim$3,000 leaf values. On a daily $\operatorname{RV}$ series with 2,500 observations (10 years), the LSTM has 20 parameters per observation. Regularization (dropout, weight decay, early stopping) is not optional. Always compare against the HAR baseline on identical data.
 
 ## Summary
 
@@ -400,7 +400,7 @@ Here is the evidence, scenario by scenario:
 
 - **The honest bottom line**: use DL for raw sequential data and cross-asset pooling; use trees for tabular features; use HAR for RV-only lags. Always compare against HAR as a baseline.
 
-- Overfitting is the central risk. A 2-layer LSTM has $\sim$50,000 parameters; HAR has 4. Regularization (dropout, early stopping, weight decay) is mandatory, not optional.
+- Overfitting is the central risk. A 2-layer LSTM has $\sim$50,000 parameters; HAR has 4. Regularization (dropout, early stopping, weight decay) is mandatory.
 
 - LSTMs can fail during extreme stress (Rahimikia and Poon, 2020). Always evaluate performance conditional on volatility regime.
 

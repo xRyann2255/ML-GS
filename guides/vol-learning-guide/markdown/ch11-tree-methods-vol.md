@@ -148,10 +148,10 @@ A **random forest** adds one decisive twist to bagging: at *each* split, the tre
 
 ### Out-of-bag error, and why it lies on time series
 
-Because each tree omits its $\approx 36.8\%$ out-of-bag days (the bootstrap fraction above), a forest comes with a free, built-in validation set: score each day using only the trees that did *not* see it, and the resulting **out-of-bag (OOB) error** approximates leave-one-out cross-validation (test on each day in turn while training on all the others) with no separate holdout needed. That is genuinely useful, for cross-sectional, exchangeable data.
+Because each tree omits its $\approx 36.8\%$ out-of-bag days (the bootstrap fraction above), a forest comes with a free, built-in validation set: score each day using only the trees that did *not* see it, and the resulting **out-of-bag (OOB) error** approximates leave-one-out cross-validation (test on each day in turn while training on all the others) with no separate holdout needed. That is genuinely useful for cross-sectional, exchangeable data.
 
 > **Warning: OOB Error Is Invalid for Volatility Time Series**
-> OOB error assumes the observations are **exchangeable** (i.i.d. -- independent and identically distributed; the order of the rows does not matter). Volatility is not: if day $t{+}1$ is in a tree's bootstrap sample while day $t$ is out-of-bag, scoring day $t$ on that tree lets it "predict the past from the future," because adjacent $\operatorname{RV}$ values are nearly identical (see the Hyperparameters section). OOB error therefore looks far better than true out-of-sample performance. Use it only as a quick development sanity check, never as your selection metric. For honest model selection, use purged $K$-fold cross-validation with an embargo (the purged-CV section of [Chapter 16](ch16-forecast-evaluation.md)), which removes the leakage that breaks OOB.
+> OOB error assumes the observations are **exchangeable** (i.i.d., independent and identically distributed; the order of the rows does not matter). Volatility is not: if day $t{+}1$ is in a tree's bootstrap sample while day $t$ is out-of-bag, scoring day $t$ on that tree lets it "predict the past from the future," because adjacent $\operatorname{RV}$ values are nearly identical (see the Hyperparameters section). OOB error therefore looks far better than true out-of-sample performance. Use it only as a quick development sanity check, never as your selection metric. For honest model selection, use purged $K$-fold cross-validation with an embargo (the purged-CV section of [Chapter 16](ch16-forecast-evaluation.md)), which removes the leakage that breaks OOB.
 
 ## LightGBM and XGBoost
 
@@ -223,7 +223,7 @@ $$
 > QLIKE penalizes you more harshly for under-predicting volatility than for over-predicting it by the same amount. If realized vol is 20% and you forecast 10%, the penalty is much larger than if you forecast 30%. This asymmetry matches real risk management needs: underestimating volatility is more dangerous than overestimating it. MSE, by contrast, penalizes both directions equally.
 
 > **Project Connection: Why This Matters**
-> Audrino and Knaus (2016) show that QLIKE-optimized trees outperform MSE-optimized trees for realized volatility, so this custom loss is not optional; it is a core part of the pipeline.
+> Audrino and Knaus (2016) show that QLIKE-optimized trees outperform MSE-optimized trees for realized volatility, so this custom loss is a core part of the pipeline.
 
 Neither LightGBM nor XGBoost provides $\operatorname{QLIKE}$ natively, but both accept custom objective functions. You supply the gradient and Hessian:
 
@@ -240,7 +240,7 @@ $$
 - $h_t$: the Hessian tells each tree how aggressively to adjust (curvature information).
 
 > **Project Connection: Why This Matters**
-> Implementing these two formulas as a custom objective function in LightGBM or XGBoost is a 10-line code change, but it is the single most impactful modification you can make to the default pipeline.
+> Implementing these two formulas as a custom objective function in LightGBM or XGBoost is a 10-line code change, but it is the most effective modification you can make to the default pipeline.
 
 > **Warning: Enforce Positive Predictions**
 > $\operatorname{QLIKE}$ requires $\hat{y}_t > 0$. Clip predictions to a small positive floor (e.g., $10^{-8}$) inside the custom objective, or the gradient explodes. Also apply the floor when evaluating the metric, not just during training.
@@ -280,11 +280,11 @@ Volatility data has three properties that make default hyperparameters dangerous
 > **Prereq: SHAP, MDA, and MDI from Chapter 10**
 > The feature-importance section of [Chapter 10](ch10-feature-engineering.md) introduced three feature-importance ideas you will reuse here: **SHAP** values, which decompose a single prediction additively into per-feature contributions (the SHAP equation); **MDA** (mean decrease in accuracy), the permutation-based global importance; and **MDI** (mean decrease in impurity), the fast-but-biased split-based importance. It also introduced **ALE** plots (the ALE equation). This section answers the question that section left open: *how* do you compute SHAP for a tree ensemble cheaply, and *which* plot do you reach for when?
 
-You have a tuned LightGBM forecasting next-day log-$\operatorname{RV}$ on the feature matrix from [Chapter 10](ch10-feature-engineering.md) (lagged RV transforms, realized quarticity, VIX, jumps). It beats HAR by 7.7% in $\operatorname{QLIKE}$ (see the Hyperparameters section). Your sponsor's first question is not "what is the $\operatorname{QLIKE}$?" but "*why* did the model forecast a vol spike for next Tuesday?" The SHAP equation promises an exact additive answer per day, but computing it honestly looks hopeless.
+You have a tuned LightGBM forecasting next-day log-$\operatorname{RV}$ on the feature matrix from [Chapter 10](ch10-feature-engineering.md) (lagged RV transforms, realized quarticity, VIX, jumps). It beats HAR by 7.7% in $\operatorname{QLIKE}$ (see the Hyperparameters section). Your sponsor's first question will be "*why* did the model forecast a vol spike for next Tuesday?", not "what is the $\operatorname{QLIKE}$?" The SHAP equation promises an exact additive answer per day, but computing it honestly looks hopeless.
 
 ### The exponential cost that TreeSHAP defeats
 
-The SHAP value of feature $i$ (recall from [Chapter 10](ch10-feature-engineering.md): feature $i$'s fair share of the forecast) averages its *marginal contribution* (how much adding $i$ changes the prediction) over *every* subset of the other features. With $p$ features that is $2^p$ **coalitions** to evaluate, *for every observation* ("coalition" and "subset of features" mean the same thing here). The notation $2^p$ means $2$ multiplied by itself $p$ times, so every extra feature *doubles* the number of subsets. On the [Chapter 10](ch10-feature-engineering.md) matrix with, say, $p = 20$ features, that already gives $2^{20} \approx 10^6$ (about a million) model evaluations per day, times $\sim$1,250 days, far too slow for a generic model. This exponential wall is exactly why Lundberg and Lee (2017) introduced model-specific shortcuts.
+The SHAP value of feature $i$ (recall from [Chapter 10](ch10-feature-engineering.md): feature $i$'s fair share of the forecast) averages its *marginal contribution* (how much adding $i$ changes the prediction) over *every* subset of the other features. With $p$ features that is $2^p$ **coalitions** to evaluate, *for every observation* ("coalition" and "subset of features" mean the same thing here). The notation $2^p$ means $2$ multiplied by itself $p$ times, so every extra feature *doubles* the number of subsets. On the [Chapter 10](ch10-feature-engineering.md) matrix with, say, $p = 20$ features, that already gives $2^{20} \approx 10^6$ (about a million) model evaluations per day, times $\sim$1,250 days, which is far too slow for a generic model. This exponential wall is exactly why Lundberg and Lee (2017) introduced model-specific shortcuts.
 
 **TreeSHAP** (Lundberg et al., 2020) exploits the structure of decision trees to compute the *exact* same Shapley values in polynomial time. In the cost formula below, $O(\cdots)$ is shorthand for how fast the computation time grows as the inputs grow: bigger inside the parentheses means slower.
 
@@ -307,7 +307,7 @@ In plain terms: TreeSHAP's cost grows with trees $\times$ leaves $\times$ depth-
 > The naive method asks "what happens to the prediction under all $2^p$ ways of hiding features?" TreeSHAP notices that a depth-$D$ tree only ever splits on at most $D$ features along any root-to-leaf path, so the only subsets that can possibly change a leaf's reachability number $O(2^D)$, not $O(2^p)$. It pushes probability mass down the tree once and reads off the exact attributions, turning an exponential count over *features* into a polynomial count over *tree depth*. Because of the additivity axiom (a guarantee that the per-tree contributions add up cleanly), the ensemble's SHAP value for a feature is simply the sum of its values across all trees.
 
 > **Project Connection: Why This Matters**
-> Because TreeSHAP is exact, it removes a confound when you compare importance across purged-CV folds for stability, any ranking changes you see are real instability, not Monte-Carlo noise from the explainer.
+> Because TreeSHAP is exact, it removes a confound when you compare importance across purged-CV folds for stability: any ranking changes you see are real instability, not Monte-Carlo noise from the explainer.
 
 > **Warning: TreeSHAP: Interventional vs. Path-Dependent**
 > TreeSHAP ships in two modes. The default **path-dependent** mode is faster but uses the tree's internal node-coverage counts to marginalise missing features, which can assign small nonzero SHAP values to features the model never split on. The **interventional** mode marginalises against a background dataset, which is theoretically cleaner but slower. Both are still TreeSHAP (exact for their respective games) and differ from **KernelSHAP**, a model-agnostic *sampling* approximation usable on any model but noisy and orders of magnitude slower. For $\operatorname{RV}$ work: use path-dependent mode for fast exploration, switch to interventional with an $\operatorname{RV}$-feature background sample for the numbers you put on a slide.
@@ -341,8 +341,8 @@ All three measures answer "which features matter?" but at different granularity,
 In practice you compute all three on your $\operatorname{RV}$ model and reconcile:
 
 - **All three agree** on the top features (typically lagged $\operatorname{RV}$ then $\sqrt{\operatorname{RQ}}$): robust evidence, proceed.
-- **SHAP and MDA agree but MDI disagrees**: trust SHAP/MDA -- this is the MDI cardinality bias (see the warning below); ignore MDI.
-- **SHAP and MDA disagree**: the importance is likely driven by a few extreme days (vol spikes) that SHAP attributes per-observation but MDA averages away, inspect a SHAP dependence plot to locate them.
+- **SHAP and MDA agree but MDI disagrees**: trust SHAP/MDA and ignore MDI; this is the MDI cardinality bias (see the warning below).
+- **SHAP and MDA disagree**: the importance is likely driven by a few extreme days (vol spikes) that SHAP attributes per-observation but MDA averages away; inspect a SHAP dependence plot to locate them.
 
 > **Warning: Do Not Report MDI as a Final Importance Result**
 > MDI systematically over-credits features with many possible split points. A continuous feature such as lagged $\operatorname{RV}$ or VIX has hundreds of candidate thresholds, so the tree has more chances to split on it by luck alone, while a binary jump-day dummy has one. Strobl et al. (2007) show this rigorously: in simulations MDI assigned nonzero importance to continuous *noise* features. Use MDI to glance during development; use SHAP or MDA for anything you write down.
@@ -358,11 +358,11 @@ The interpretation work only pays off if a non-technical audience believes it. T
 The three waterfalls to pick for an $\operatorname{RV}$ forecaster:
 
 1. **A correct vol-spike forecast.** "The model predicted next-day $\operatorname{RV}$ roughly double its average. The drivers were a high lagged daily $\operatorname{RV}$ ($+$), a detected jump the prior session ($+$), and an elevated VIX ($+$). Realized vol spiked as forecast."
-2. **A missed forecast from an unseen event.** "The model predicted a calm day from low lagged $\operatorname{RV}$ and a flat VIX, but an unscheduled macro announcement triggered a spike. SHAP shows the forecast rested entirely on backward-looking RV features, the model cannot see a surprise that is not in its inputs."
+2. **A missed forecast from an unseen event.** "The model predicted a calm day from low lagged $\operatorname{RV}$ and a flat VIX, but an unscheduled macro announcement triggered a spike. SHAP shows the forecast rested entirely on backward-looking RV features; the model cannot see a surprise that is not in its inputs."
 3. **A tree-vs-HAR disagreement.** "HAR forecast a mild rise; the tree forecast a sharp one. SHAP shows the gap came from an interaction between lagged $\operatorname{RV}$ and implied volatility, the HARQ-type effect ([Chapter 6](ch06-har-model.md)) the tree captures but linear HAR cannot, motivating the HAR$+$tree blend in the Ensemble with HAR section."
 
 > **Project Connection: Why This Matters**
-> The waterfall is the single most persuasive chart in a volatility-model review because it mirrors the additive P&L attribution risk committees already use. "Lagged $\operatorname{RV}$ contributed $+$X, the jump term $+$Y, VIX $+$Z" is a sentence a portfolio manager can challenge on economic grounds, which is exactly the scrutiny that separates a real signal from an overfit one.
+> The waterfall is the most persuasive chart in a volatility-model review because it mirrors the additive P&L attribution risk committees already use. "Lagged $\operatorname{RV}$ contributed $+$X, the jump term $+$Y, VIX $+$Z" is a sentence a portfolio manager can challenge on economic grounds, which is exactly the scrutiny that separates a real signal from an overfit one.
 
 ## The Christensen--Siggaard--Veliyev Evidence
 
@@ -553,7 +553,7 @@ Shrinkage and DART are not mutually exclusive. In LightGBM, you can set `boostin
 > **Project Connection: DART for Volatility Forecasting**
 > Over-specialization is particularly relevant for $\operatorname{RV}$ forecasting. The dominant signal in volatility data is the autoregressive persistence captured by HAR's three lagged averages ([Chapter 6](ch06-har-model.md)). In standard boosting, the first few trees learn this persistence, and all subsequent trees become narrowly specialized to small residual patterns that may not generalize. DART forces later trees to occasionally reconstruct the autoregressive signal on their own, building redundancy into the ensemble and reducing dependence on any single tree's overfitting.
 >
-> In LightGBM, enable DART by setting `boosting_type='dart'`. The key hyperparameter is the drop rate: start with `drop_rate`$\,\in [0.05, 0.15]$ and tune via purged CV (the Hyperparameters section). Higher drop rates increase diversity but slow convergence; lower rates approach standard GBDT behavior. Note that DART disables early stopping (because the loss is non-monotone due to random dropping), so you must set `num_iterations` explicitly rather than relying on patience-based stopping.
+> In LightGBM, enable DART by setting `boosting_type='dart'`. The key hyperparameter is the drop rate: start with `drop_rate`$\,\in [0.05, 0.15]$ and tune via purged CV (the Hyperparameters section). Higher drop rates increase diversity but slow convergence; lower rates approach standard GBDT behavior. DART disables early stopping (because the loss is non-monotone due to random dropping), so you must set `num_iterations` explicitly rather than relying on patience-based stopping.
 
 > **Warning: DART Disables Early Stopping**
 > With standard GBDT, you monitor validation loss and stop when it plateaus. DART's random dropout makes the validation loss noisy and non-monotone from round to round, so early stopping triggers prematurely. When using DART, fix the number of boosting rounds via cross-validation rather than relying on early stopping. This increases tuning cost, but the regularization benefit of dropout often compensates.
@@ -584,7 +584,7 @@ Shrinkage and DART are not mutually exclusive. In LightGBM, you can set `boostin
 
 12. Branco, Rubesam, and Zevallos (2024) and Bollerslev et al. (2024) caution that many ML-beats-HAR claims reflect unfair comparisons. When both models are properly tuned, the gap is smaller than headline numbers suggest.
 
-13. DART (Vinayak and Gilad-Bachrach, 2015) applies dropout to boosted trees: randomly dropping previous trees during each boosting round prevents over-specialization, where later trees become overly dependent on early trees that captured the dominant autoregressive signal. Use `drop_rate` $\in [0.05, 0.15]$; note that DART disables early stopping.
+13. DART (Vinayak and Gilad-Bachrach, 2015) applies dropout to boosted trees: randomly dropping previous trees during each boosting round prevents over-specialization, where later trees become overly dependent on early trees that captured the dominant autoregressive signal. Use `drop_rate` $\in [0.05, 0.15]$; DART disables early stopping.
 
 14. The gains from ML come from richer features and longer horizons, not from nonlinear modeling of the same three RV lags. [Chapter 12b](ch12b-deep-learning-vol.md) explores whether deep learning changes this conclusion.
 

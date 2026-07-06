@@ -122,7 +122,7 @@ A sequence of six 5-minute returns includes one jump return ($r_4$).
 The left panel shows each return's contribution to $\operatorname{RV}_t$ (its squared value).
 The right panel shows each return's contribution to $\operatorname{BPV}_t$ (its absolute value times the previous absolute value, scaled by $\pi/2$).
 
-*Two bar charts (contributions in units of $\times 10^{-4}$) showing how a jump affects $\operatorname{RV}$ versus $\operatorname{BPV}$. Left panel ("$\operatorname{RV}$ contributions: $r_i^2$"): six bars for returns $r_1$ through $r_6$. The five normal returns contribute tiny amounts (about 0.006, 0.003, 0.004, 0.002, 0.005), while the jump return $r_4$ (red, labeled "Jump") contributes $3.24 \times 10^{-4}$, completely dominating all other terms. Right panel ("$\operatorname{BPV}$ contributions: $\frac{\pi}{2}|r_i|\,|r_{i-1}|$"): five bars for consecutive return pairs. The three pairs of normal returns contribute about 0.006, 0.005, and 0.004, while the two pairs involving the jump, $(r_3,r_4)$ and $(r_4,r_5)$ (orange, labeled "Jump $\times$ neighbor"), contribute only 0.17 and 0.11 respectively, roughly 50 times smaller than the squared jump. $\operatorname{BPV}$ "sees through" the jump and recovers the continuous variation.*
+*Two bar charts (contributions in units of $\times 10^{-4}$) showing how a jump affects $\operatorname{RV}$ versus $\operatorname{BPV}$. Left panel ("$\operatorname{RV}$ contributions: $r_i^2$"): six bars for returns $r_1$ through $r_6$. The five normal returns contribute tiny amounts (about 0.006, 0.003, 0.004, 0.002, 0.005), while the jump return $r_4$ (red, labeled "Jump") contributes $3.24 \times 10^{-4}$, dominating all other terms. Right panel ("$\operatorname{BPV}$ contributions: $\frac{\pi}{2}|r_i|\,|r_{i-1}|$"): five bars for consecutive return pairs. The three pairs of normal returns contribute about 0.006, 0.005, and 0.004, while the two pairs involving the jump, $(r_3,r_4)$ and $(r_4,r_5)$ (orange, labeled "Jump $\times$ neighbor"), contribute only 0.17 and 0.11 respectively, roughly 50 times smaller than the squared jump. $\operatorname{BPV}$ "sees through" the jump and recovers the continuous variation.*
 
 
 ## The BNS Jump Test
@@ -228,7 +228,7 @@ If the standardized return exceeds a threshold derived from extreme-value theory
 
 > **Project Connection: Why This Matters**
 >
-> Lee-Mykland gives you jump *times and sizes*, not just a daily indicator.
+> Lee-Mykland gives you jump *times and sizes*, whereas the BNS test gives only a daily indicator.
 > This is the basis for signed jump features: you can separately measure "bad jumps" (large negative returns) and "good jumps" (large positive returns) within the day.
 > Signed jump variation feeds directly into the SHAR model and the asymmetric jump features in [Chapter 10](ch10-feature-engineering.md), where negative jumps predict higher future volatility than positive jumps of the same magnitude.
 
@@ -379,7 +379,7 @@ flowchart TD
 
 There is an additional asymmetry.
 Bollerslev, Kretschmer, Pigorsch, and Tauchen (2009) and Patton and Sheppard (2015) found that "bad jumps" (large negative returns) are more informative for future volatility than "good jumps" (large positive returns).
-A 5% daily drop signals elevated volatility going forward; a 5% daily rally does not, to the same degree.
+A 5% daily drop signals higher volatility going forward; a 5% daily rally does not, to the same degree.
 This connects to the signed volatility decompositions (SHAR) covered in [Chapter 6](ch06-har-model.md) and the signed jump features in [Chapter 10](ch10-feature-engineering.md).
 
 > **Warning: Do Not Treat Jump and Continuous Components as Interchangeable**
@@ -406,7 +406,7 @@ This connects to the signed volatility decompositions (SHAR) covered in [Chapter
 
 - The BNS test has **finite-sample size distortions** (it can over-reject). The ratio variant or Huang-Tauchen correction improves performance (Huang and Tauchen, 2005).
 
-- The **Lee-Mykland test** detects individual jumps within the day, providing jump timing and sizes, not just a daily binary indicator (Lee and Mykland, 2008).
+- The **Lee-Mykland test** detects individual jumps within the day, providing jump timing and sizes rather than only a daily binary indicator (Lee and Mykland, 2008).
 
 - The **Aït-Sahalia-Jacod test** uses power-variation ratios at two frequencies and is more robust to microstructure noise than the BNS test (Aït-Sahalia and Jacod, 2009).
 

@@ -105,7 +105,7 @@ where $P(K)$ and $C(K)$ are the current prices of the put and call struck at $K$
 
 > **Intuition: In Plain English**
 >
-> The fair strike is not a model output; it is a shopping bill. Buy every out-of-the-money option, weight each by one over its strike squared, and the total cost is the fair price of future variance. "Model-free" means the option prices themselves, whatever produced them, already encode the price of variance, with no assumption about the shape of volatility (no Black-Scholes, no Heston).
+> The fair strike is a shopping bill, not a model output. Buy every out-of-the-money option, weight each by one over its strike squared, and the total cost is the fair price of future variance. "Model-free" means the option prices themselves, whatever produced them, already encode the price of variance, with no assumption about the shape of volatility (no Black-Scholes, no Heston).
 
 ### Step 3: why $1/K^2$, and why the strike beats at-the-money implied vol
 
@@ -140,7 +140,7 @@ $$\sigma^2 = \frac{2}{T}\sum_i \frac{\Delta K_i}{K_i^2}\,e^{rT}\,Q(K_i) \;-\; \f
 
 > **Project Connection: Why This Matters**
 >
-> This is not just background: the CBOE discrete formula above is the data feed for Act 2. The strategy's data source (`EDRVS_EXPIRY`) publishes the fair variance by listed expiry, and when it is missing we reconstruct $K_{\mathrm{var}}$ from the option grid using exactly this formula. The $K_{\mathrm{var}}$ that enters the signal in the signal section below is the output of the CBOE discrete formula.
+> The CBOE discrete formula above is also the data feed for Act 2. The strategy's data source (`EDRVS_EXPIRY`) publishes the fair variance by listed expiry, and when it is missing we reconstruct $K_{\mathrm{var}}$ from the option grid using exactly this formula. The $K_{\mathrm{var}}$ that enters the signal in the signal section below is the output of the CBOE discrete formula.
 
 Two honest caveats bound the accuracy of the discrete strip, both of which bite harder at the 0DTE horizon. First, the strip prices *continuous* variance; once the underlying can jump, it becomes a biased estimate of the true quadratic variation (the sum of squared moves that realized variance estimates), and the bias is material only when jumps make up a large share of variance, roughly above seventy percent (Du and Kapadia, 2012). The 0DTE horizon is precisely that high-jump-share regime, so we should remember that GSVIVS01's strike is a smooth-path object being sold against a jump-prone realization, a tension we cash out in the drawdown-mechanism section below. Second, the strip is truncated to a finite range of strikes, which turns it into a "corridor" swap and *underprices* variance, more so the wider the underlying can roam: Demeterfi, Derman, Kamal and Zou (1999, Table 4, p. 28) show a strike range of $75\%$ to $125\%$ of spot recovers $(24.9)^2$ against the full $(25.0)^2$ for a three-month swap, but only $(23.0)^2$ for a one-year swap. GSVIVS01's strip is narrow (the example below spans roughly $\pm 2.7\%$ of spot), so this corridor approximation is real and worth one line in any honest accounting.
 
@@ -171,7 +171,7 @@ The dollar-variance-exposure figure plots $|q_i|\,K_i^2$ across the real strikes
 
 *The figure here is a bar chart of dollar variance exposure $|q_i|\,K_i^2$ across the real 26 May 2022 strikes, from 3875 to 4095 in 10-point steps. The interior strikes form a flat plateau at the relative value $1$ (constant variance exposure regardless of where spot goes); the two edge bars (3875 and 4095) are half-height at $\tfrac12$ because their strike spacing is single-sided. A dashed horizontal line at the plateau level marks the constant variance exposure. Compare [Chapter 18](ch18-ivrv-straddle.md)'s single delta-hedged straddle, whose exposure spikes at one strike and decays in the wings. The flat plateau is what makes GSVIVS01 the clean variance instrument the straddle could not be.*
 
-The strip is executed on a fixed daily schedule, summarized in the schedule table below. The fixed signal-generation time is not a detail: it is what hands Act 2 a clean, lookahead-safe boundary for the forecast (the signal section below).
+The strip is executed on a fixed daily schedule, summarized in the schedule table below. The fixed signal-generation time is what hands Act 2 a clean, lookahead-safe boundary for the forecast (the signal section below).
 
 *The GSVIVS01 daily schedule (Eastern Time), from `GSVIVS01.md`. The 13:10 signal-generation time defines the information cutoff for any forecast that drives the strategy.*
 
@@ -228,7 +228,7 @@ The balance $\theta + \tfrac12\sigma^2 S^2\Gamma = 0$ says these are two sides o
 
 ## The Drawdown Mechanism: When Realized Variance Beats the Strike
 
-Act 1 established *that* GSVIVS01 draws down when realized variance exceeds the strike. Act 2 turns that into a prediction problem, and to do so well we need to understand not just the condition but its shape: which days produce the worst losses, and why they are asymmetric. The answer points the forecast at exactly the features that matter.
+Act 1 established *that* GSVIVS01 draws down when realized variance exceeds the strike. Act 2 turns that into a prediction problem, and to do so well we need to understand the condition's shape: which days produce the worst losses, and why they are asymmetric. The answer points the forecast at exactly the features that matter.
 
 Write the drawdown condition in the daily units the forecast uses. A drawdown day is one on which the realized variance over the day, $\operatorname{RV}_t$, exceeds the daily slice of the strike:
 
@@ -238,7 +238,7 @@ where $252$ is the number of trading days in a year (it converts the annualized 
 
 > **Key Idea: One Number Is Known, One Is Forecast**
 >
-> The power of the drawdown condition is that $K_{\mathrm{var}}$ is *observable at trade time*: it is the model-free implied variance the strip sells, computed from the morning's option prices by the CBOE discrete formula. Only $\operatorname{RV}_t$ is unknown. So predicting a drawdown is not a vague "will the strategy lose money" question; it is the sharp, quantitative question "will today's realized variance exceed a number I can already read off the screen?" This is cleaner than the straddle of [Chapter 18](ch18-ivrv-straddle.md), where the implied side was a single noisy option quote; here the benchmark is a firm, market-wide strike.
+> The power of the drawdown condition is that $K_{\mathrm{var}}$ is *observable at trade time*: it is the model-free implied variance the strip sells, computed from the morning's option prices by the CBOE discrete formula. Only $\operatorname{RV}_t$ is unknown. So predicting a drawdown comes down to a sharp, quantitative question: "will today's realized variance exceed a number I can already read off the screen?" This is cleaner than the straddle of [Chapter 18](ch18-ivrv-straddle.md), where the implied side was a single noisy option quote; here the benchmark is a firm, market-wide strike.
 
 ### Why the losses are asymmetric: the down-jump cubic
 
@@ -290,7 +290,7 @@ The strategy reads the gap through three channels: **compression** (the gap drif
 
 > **Application: Why Conditional Timing Is the Whole Game**
 >
-> The recent literature settles a question that justifies this project's existence. Running GSVIVS01 *unconditionally* is not a free lunch: Vilkov (2024) finds the same-day 0DTE variance risk premium is small and hard to monetize after realistic frictions, with profit and loss "dominated by tail risk rather than stable mean carry," and that disciplined *conditional* timing is what delivers net performance. The premium is genuinely there, richer per unit of time than the familiar one-month premium (Almeida, Freire and Hizmeri, 2024), but harvesting it safely requires sizing the short on a signal. The closest published analogue to our overlay, Yang (2024), conditions a short-variance position on a volatility forecast and improves risk-adjusted returns (the measured figures are in the evaluation section below). In other words, the state of the art says: do not run the short flat-out; time it. That is precisely what the signal rule does.
+> The recent literature settles a question that justifies this project's existence. Running GSVIVS01 *unconditionally* is not a free lunch: Vilkov (2024) finds the same-day 0DTE variance risk premium is small and hard to monetize after realistic frictions, with profit and loss "dominated by tail risk rather than stable mean carry," and that disciplined *conditional* timing is what delivers net performance. The premium is genuinely there, richer per unit of time than the familiar one-month premium (Almeida, Freire and Hizmeri, 2024), but harvesting it safely requires sizing the short on a signal. The closest published analogue to our overlay, Yang (2024), conditions a short-variance position on a volatility forecast and improves risk-adjusted returns (the measured figures are in the evaluation section below). The state of the art says: do not run the short flat-out; time it. That is precisely what the signal rule does.
 
 > **Warning: The VRP Gap May Not Be the Only Conditioning Variable**
 >
@@ -356,7 +356,7 @@ so that a $+1$ signal holds the full GSVIVS01 exposure (collect the premium), a 
 
 ## Evaluation: The Project's Metric
 
-The deliverable is not a lower QLIKE; it is a *better-behaved GSVIVS01 index*, and the evaluation must measure that honestly, tie it back to forecast accuracy, and survive the multiple-testing and small-sample traps that make backtests lie.
+The deliverable is a *better-behaved GSVIVS01 index*, not a lower QLIKE, and the evaluation must measure that honestly, tie it back to forecast accuracy, and survive the multiple-testing and small-sample traps that make backtests lie.
 
 The headline metric is the overlaid index path against buy-and-hold. We judge it on three axes:
 
@@ -372,7 +372,7 @@ The headline metric is the overlaid index path against buy-and-hold. We judge it
 >
 > Three traps must be respected or the metric lies. First, **costs**: trading the overlay is not free; entering and exiting the index, and especially the $-1$ short leg, incur the option and hedge costs of the option-costs section of [Chapter 18](ch18-ivrv-straddle.md), charged as a band, not a point estimate. Second, **multiple testing**: deflate the Sharpe for the honest number of signal, threshold, and feature variants tried, not for one. Third, **small samples and tails**: the 0DTE short's profit and loss is "dominated by tail risk rather than stable mean carry" (Vilkov, 2024), GSVIVS01 has few drawdown events on a short history, and the drawdowns cluster in time, so evaluate under **purged or combinatorial cross-validation** ([Chapter 16](ch16-forecast-evaluation.md)) and report wide error bars. Do not let an apparent edge that rests on two or three historical crashes masquerade as skill.
 
-Finally, the thread back to forecasting. The economic foundation is the negative variance risk premium: the mean gain to selling variance is positive on average (Bakshi and Kapadia, 2003), which is why GSVIVS01 is paid at all, and confirmed from the buyer side by the documented losses of 0DTE option buyers (Beckmeyer, Branger and Gayda, 2023). Our forecast's job is to time *when* that premium is rich enough to harvest and when it is a trap, and the deflated Sharpe of the overlay is the judge of whether the forecast does that job better than chance. Whether a lower QLIKE actually produces a better overlay is not a theorem; it is the central experiment.
+Finally, the thread back to forecasting. The economic foundation is the negative variance risk premium: the mean gain to selling variance is positive on average (Bakshi and Kapadia, 2003), which is why GSVIVS01 is paid at all, and confirmed from the buyer side by the documented losses of 0DTE option buyers (Beckmeyer, Branger and Gayda, 2023). Our forecast's job is to time *when* that premium is rich enough to harvest and when it is a trap, and the deflated Sharpe of the overlay is the judge of whether the forecast does that job better than chance. Whether a lower QLIKE actually produces a better overlay is the central experiment, not a theorem.
 
 *The figure here shows the evaluation metric schematically, plotting index level against trading day for two paths. Buy-and-hold GSVIVS01 (grey) drips upward and then surrenders the gains on each of two drawdown days, ending near 100.75; the forecast overlay (green) stays invested through the calm runs but goes flat on the days the model predicts $\operatorname{RV}>K_{\mathrm{var}}$ (both drawdown days are labelled "avoided"), compounding a higher, smoother path that ends near 102.35. The metric is the difference between the two: deflated Sharpe, maximum-drawdown reduction, and Calmar. Shape is illustrative; the magnitude is what the experiments section must establish on real data.*
 

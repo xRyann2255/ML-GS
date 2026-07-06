@@ -6,9 +6,9 @@ This chapter introduces a principled alternative. Instead of asking "what does *
 
 > **Prereq: What You Need Before This Chapter**
 >
-> - **[Chapter 11](ch11-tree-methods-vol.md)** --- Decision tree fundamentals: how splits are chosen, how CART grows a tree, what makes a tree "optimal." The distinction between greedy (top-down) and globally optimal (branch-and-bound) tree construction.
-> - **SHAP basics** --- The idea that SHAP assigns each feature a contribution to each individual prediction, and that global SHAP importance is obtained by averaging $|\phi_i|$ across predictions. You should know what a SHAP summary plot looks like, but you do *not* need to understand the Shapley value derivation in detail.
-> - **Feature importance concepts** --- Permutation importance (shuffle a feature, measure how much loss increases) and split-count importance (how often a feature appears in tree splits). Both are covered in [Chapter 11](ch11-tree-methods-vol.md).
+> - **[Chapter 11](ch11-tree-methods-vol.md)**. Decision tree fundamentals: how splits are chosen, how CART grows a tree, what makes a tree "optimal." The distinction between greedy (top-down) and globally optimal (branch-and-bound) tree construction.
+> - **SHAP basics**. The idea that SHAP assigns each feature a contribution to each individual prediction, and that global SHAP importance is obtained by averaging $|\phi_i|$ across predictions. You should know what a SHAP summary plot looks like, but you do *not* need to understand the Shapley value derivation in detail.
+> - **Feature importance concepts**. Permutation importance (shuffle a feature, measure how much loss increases) and split-count importance (how often a feature appears in tree splits). Both are covered in [Chapter 11](ch11-tree-methods-vol.md).
 
 
 ## The Problem with Single-Model Explanations
@@ -46,7 +46,7 @@ This creates a serious practical problem. In an internship setting, you will pre
 
 ## The Rashomon Set
 
-The idea of many equally-good models was articulated by Leo Breiman, who called it the **Rashomon effect** --- a reference to the Akutagawa story (and Kurosawa film) in which multiple witnesses give contradictory but individually plausible accounts of the same event. The **Rashomon set** formalizes this: it is the collection of all models whose loss is close to the best achievable loss.
+The idea of many equally-good models was articulated by Leo Breiman, who called it the **Rashomon effect**, a reference to the Akutagawa story (and Kurosawa film) in which multiple witnesses give contradictory but individually plausible accounts of the same event. The **Rashomon set** formalizes this: it is the collection of all models whose loss is close to the best achievable loss.
 
 ### Formal Definition
 
@@ -66,9 +66,9 @@ We need three ingredients: a model class $\mathcal{F}$ (e.g., all decision trees
 
 The symbols:
 
-- $\epsilon$ --- the tolerance parameter. Setting $\epsilon = 0.02$ means we accept models within 2% of the best loss. Typical values in the literature range from $0.01$ to $0.10$ (Xin et al., 2022).
-- $f^*$ --- the reference model, usually the empirical risk minimizer within $\mathcal{F}$ (e.g., found by GOSDT for optimal sparse trees).
-- $L(f^*)$ --- the best achievable loss in the class.
+- $\epsilon$: the tolerance parameter. Setting $\epsilon = 0.02$ means we accept models within 2% of the best loss. Typical values in the literature range from $0.01$ to $0.10$ (Xin et al., 2022).
+- $f^*$: the reference model, usually the empirical risk minimizer within $\mathcal{F}$ (e.g., found by GOSDT for optimal sparse trees).
+- $L(f^*)$: the best achievable loss in the class.
 
 For decision trees specifically, Xin et al. (2022) define the objective function as the misclassification loss plus a sparsity penalty:
 
@@ -88,13 +88,13 @@ The Rashomon set threshold then becomes $\theta_\epsilon = (1 + \epsilon) \times
 
 > **Project Connection: Rashomon Sets for Regression**
 >
-> Our volatility project uses squared-error loss (or QLIKE), not misclassification. The Rashomon set concept applies identically: replace $L(f)$ with $\operatorname{QLIKE}$ or MSE and everything carries through. The computational algorithms (TreeFARMS, SPLIT) currently target classification trees, but the conceptual framework --- and the VIC/RID analysis tools --- is loss-function agnostic.
+> Our volatility project uses squared-error loss (or QLIKE), not misclassification. The Rashomon set concept applies identically: replace $L(f)$ with $\operatorname{QLIKE}$ or MSE and everything carries through. The computational algorithms (TreeFARMS, SPLIT) currently target classification trees, but the conceptual framework (and the VIC/RID analysis tools) is loss-function agnostic.
 
 ### How Large Is the Rashomon Set?
 
-The hypothesis space of sparse trees is enormous. For trees of depth at most 4 with only 10 binary features, the number of possible trees exceeds $9.3 \times 10^{20}$ (Xin et al., 2022). The Rashomon set, fortunately, is usually a tiny fraction of this space --- but "tiny fraction" can still be a very large number in absolute terms.
+The hypothesis space of sparse trees is enormous. For trees of depth at most 4 with only 10 binary features, the number of possible trees exceeds $9.3 \times 10^{20}$ (Xin et al., 2022). The Rashomon set, fortunately, is usually a tiny fraction of this space, but "tiny fraction" can still be a very large number in absolute terms.
 
-Xin et al. (2022) report that on the COMPAS dataset with $\lambda = 0.005$ and a 15% Rashomon threshold, the set contains approximately $10^{12}$ trees. On smaller datasets (Monk2, Bar), sets of $10^5$ to $10^8$ trees are typical. The key insight from their experiments is that *natural baselines (BART, Random Forest, CART + sampling) find at best a tiny sliver of the Rashomon set* --- they recover only hundreds to thousands of trees when the true set contains millions or more.
+Xin et al. (2022) report that on the COMPAS dataset with $\lambda = 0.005$ and a 15% Rashomon threshold, the set contains approximately $10^{12}$ trees. On smaller datasets (Monk2, Bar), sets of $10^5$ to $10^8$ trees are typical. The key insight from their experiments is that *natural baselines (BART, Random Forest, CART + sampling) find at best a tiny sliver of the Rashomon set*: they recover only hundreds to thousands of trees when the true set contains millions or more.
 
 
 ## Optimal Sparse Decision Trees
@@ -103,7 +103,7 @@ Before we can enumerate *all* near-optimal trees, we must be able to find *one* 
 
 ### Why Not Just Use CART?
 
-CART (Breiman et al., 1984) and other greedy algorithms build trees top-down, choosing the best split at each node independently. This is fast --- $O(npd)$ for $n$ samples, $p$ features, depth $d$ --- but greedy splits can be suboptimal. Babbar et al. (2025) show that greedy methods exhibit an average gap of 1--2 percentage points from the optimum, and on some datasets (e.g., COMPAS) the gap can reach 10 percentage points.
+CART (Breiman et al., 1984) and other greedy algorithms build trees top-down, choosing the best split at each node independently. This is fast ($O(npd)$ for $n$ samples, $p$ features, depth $d$), but greedy splits can be suboptimal. Babbar et al. (2025) show that greedy methods exhibit an average gap of 1--2 percentage points from the optimum, and on some datasets (e.g., COMPAS) the gap can reach 10 percentage points.
 
 The problem with greedy construction is that a split that looks best at the root may set up poor options downstream. Global optimization avoids this by searching the *entire* space of trees up to a given depth.
 
@@ -122,7 +122,7 @@ The key insight behind branch-and-bound is that the optimal solution for a datas
 
 ### SPLIT: Greedy Where It Doesn't Matter, Optimal Where It Does
 
-A crucial empirical observation by Babbar et al. (2025) is that greedy splits near the *leaves* are almost always optimal, while greedy splits near the *root* often deviate from the optimum. This makes sense: near the leaves, there are only a few possible splits left, so the greedy choice among them is unlikely to be far from the best. Near the root, a bad split propagates errors through the entire tree.
+A key empirical observation by Babbar et al. (2025) is that greedy splits near the *leaves* are almost always optimal, while greedy splits near the *root* often deviate from the optimum. This makes sense: near the leaves, there are only a few possible splits left, so the greedy choice among them is unlikely to be far from the best. Near the root, a bad split propagates errors through the entire tree.
 
 SPLIT (Sparse Lookahead for Interpretable Trees) exploits this observation. It takes a **lookahead depth** parameter $d_l < d$ and performs full branch-and-bound optimization for splits up to depth $d_l$, then switches to greedy splitting for the remaining $d - d_l$ levels.
 
@@ -134,7 +134,7 @@ SPLIT (Sparse Lookahead for Interpretable Trees) exploits this observation. It t
 >   \mathcal{O}\bigl(n(d - d_l)\,k^{d_l + 1} + n\,k^{d - d_l}\bigr).
 > $$
 >
-> The polynomial-time variant, LicketySPLIT, achieves $O(nk^2 d^2)$ --- comfortably polynomial and dramatically faster than the $\mathcal{O}((2k)^d)$ worst case of fully optimal methods.
+> The polynomial-time variant, LicketySPLIT, achieves $O(nk^2 d^2)$, comfortably polynomial and dramatically faster than the $\mathcal{O}((2k)^d)$ worst case of fully optimal methods.
 
 > **Project Connection: Interpretable Trees for Vol Forecasting**
 >
@@ -142,7 +142,7 @@ SPLIT (Sparse Lookahead for Interpretable Trees) exploits this observation. It t
 
 ### STreeD: Piecewise-Linear Regression Trees
 
-The optimal tree methods discussed so far assume each leaf predicts a *constant* --- the mean of the training labels that fall into that leaf. This creates a staircase-shaped prediction function: the forecast jumps from one flat value to another at each split boundary. van den Bos et al. (2024) introduce **STreeD** (STreeD Regression Trees), a dynamic-programming framework that extends optimal regression trees to **piecewise-linear** leaf models. They develop three methods of increasing expressiveness:
+The optimal tree methods discussed so far assume each leaf predicts a *constant*: the mean of the training labels that fall into that leaf. This creates a staircase-shaped prediction function: the forecast jumps from one flat value to another at each split boundary. van den Bos et al. (2024) introduce **STreeD** (STreeD Regression Trees), a dynamic-programming framework that extends optimal regression trees to **piecewise-linear** leaf models. They develop three methods of increasing expressiveness:
 
 1. **SRT-C** (piecewise-constant): An improved DP algorithm for constant-leaf regression trees with a specialized depth-two solver that achieves orders-of-magnitude speedups over previous optimal methods (e.g., 18$\times$ faster than OSRT on average).
 
@@ -181,11 +181,11 @@ where all sums run over the instances in the leaf and $n = |\mathcal{D}|$.
 
 > **Intuition: Why Piecewise-Linear Leaves Matter**
 >
-> A constant-leaf tree predicts $\bar{y}$ in each partition --- it creates a staircase function. A linear-leaf tree fits a slope within each partition --- it captures *local trends*. For volatility, this means a leaf can express "RV increases linearly with VIX within this regime" rather than just "RV is high in this regime." The tree handles the nonlinear regime boundaries (splits), and the linear models handle the smooth within-regime relationships.
+> A constant-leaf tree predicts $\bar{y}$ in each partition, creating a staircase function. A linear-leaf tree fits a slope within each partition, so it captures *local trends*. For volatility, this means a leaf can express "RV increases linearly with VIX within this regime" rather than just "RV is high in this regime." The tree handles the nonlinear regime boundaries (splits), and the linear models handle the smooth within-regime relationships.
 
-**Scalability.** The depth-two algorithm from van den Bos et al. (2024) is the key to STreeD's performance advantage. By precomputing per-instance costs --- the sums $\sum y$, $\sum y^2$, $\sum x_j$, $\sum x_j^2$, and $\sum x_j y$ for every feature $j$ and every data subset defined by pairs of binary splits --- the depth-two solver avoids redundant traversals of the data. Remarkably, fitting a simple linear regression model per leaf (SRT-SL) costs almost nothing extra compared to fitting a constant (SRT-C), because the additional statistics ($\sum x_j$, $\sum x_j^2$, $\sum x_j y$) can be accumulated in the same pass.
+**Scalability.** The depth-two algorithm from van den Bos et al. (2024) is the key to STreeD's performance advantage. By precomputing per-instance costs (the sums $\sum y$, $\sum y^2$, $\sum x_j$, $\sum x_j^2$, and $\sum x_j y$ for every feature $j$ and every data subset defined by pairs of binary splits), the depth-two solver avoids redundant traversals of the data. Remarkably, fitting a simple linear regression model per leaf (SRT-SL) costs almost nothing extra compared to fitting a constant (SRT-C), because the additional statistics ($\sum x_j$, $\sum x_j^2$, $\sum x_j y$) can be accumulated in the same pass.
 
-**Interpretability.** Every SRT-SL prediction decomposes into two transparent components: (1) a root-to-leaf path of binary splits that determines which regime the input falls into, and (2) a one-variable linear formula in the leaf that produces the forecast. This is what the interpretability literature calls a **short linear formula** --- the entire model is human-readable and can be written on a single page.
+**Interpretability.** Every SRT-SL prediction decomposes into two transparent components: (1) a root-to-leaf path of binary splits that determines which regime the input falls into, and (2) a one-variable linear formula in the leaf that produces the forecast. This is what the interpretability literature calls a **short linear formula**: the entire model is human-readable and can be written on a single page.
 
 > **Project Connection: STreeD for Volatility Forecasting**
 >
@@ -194,13 +194,13 @@ where all sums run over the instances in the leaf and $n = |\mathcal{D}|$.
 
 ## Enumerating the Rashomon Set
 
-Finding one optimal tree is step one. The real power comes from finding *all* near-optimal trees --- the complete Rashomon set. This section covers three algorithms of increasing scalability.
+Finding one optimal tree is step one. The real power comes from finding *all* near-optimal trees, the complete Rashomon set. This section covers three algorithms of increasing scalability.
 
 ### TreeFARMS: Exact Enumeration
 
 TreeFARMS (Trees FAst RashoMon Sets) by Xin et al. (2022) was the first algorithm to *completely* enumerate the Rashomon set for sparse decision trees. It builds on the GOSDT branch-and-bound framework and modifies it in two key ways:
 
-1. **Rashomon pruning.** Instead of pruning subproblems whose lower bound exceeds the optimal objective (as in standard GOSDT), TreeFARMS prunes those whose lower bound exceeds the *Rashomon threshold* $\theta_\epsilon$. This retains more of the search space --- exactly the near-optimal region.
+1. **Rashomon pruning.** Instead of pruning subproblems whose lower bound exceeds the optimal objective (as in standard GOSDT), TreeFARMS prunes those whose lower bound exceeds the *Rashomon threshold* $\theta_\epsilon$. This retains more of the search space: exactly the near-optimal region.
 
 2. **Return all models.** Instead of returning only the single best tree, TreeFARMS returns every tree in the Rashomon set, stored in a compact **Model Set** data structure.
 
@@ -208,13 +208,13 @@ The Model Set representation is critical for scalability. A **Model Set Instance
 
 > **Key Idea: TreeFARMS: From Optimization to Feasibility**
 >
-> Standard ML algorithms solve an *optimization* problem: find the single best model. TreeFARMS solves a *feasibility* problem: find all models within $\epsilon$ of the best. This paradigm shift is the core contribution. Perhaps the tiny sacrifice in empirical risk makes the difference between a model that can be used (interpretable, fair, aligned with domain knowledge) and one that cannot.
+> Standard ML algorithms solve an *optimization* problem: find the single best model. TreeFARMS solves a *feasibility* problem: find all models within $\epsilon$ of the best. This reframing is the core contribution. Perhaps the tiny sacrifice in empirical risk makes the difference between a model that can be used (interpretable, fair, aligned with domain knowledge) and one that cannot.
 
 **Limitations.** TreeFARMS provides exact enumeration but its runtime and memory scale exponentially with tree depth and the number of features. On the Bike dataset ($n \approx 17{,}000$, $k = 60$ binary features, depth 5), TreeFARMS requires approximately 700 seconds and over 50 GB of memory (Heile et al., 2025). On larger datasets, it runs out of memory entirely.
 
 ### RESPLIT: Fast Approximation via Greedy Leaves
 
-Babbar et al. (2025) extend SPLIT to Rashomon set computation with the RESPLIT algorithm. The idea is elegant: use SPLIT to find a set of "prefix trees" (partial trees optimized to the lookahead depth), then call TreeFARMS on each prefix to enumerate the near-optimal completions.
+Babbar et al. (2025) extend SPLIT to Rashomon set computation with the RESPLIT algorithm. The idea is simple: use SPLIT to find a set of "prefix trees" (partial trees optimized to the lookahead depth), then call TreeFARMS on each prefix to enumerate the near-optimal completions.
 
 Because SPLIT uses greedy splits near the leaves, RESPLIT does not exhaustively search the full tree space. This makes it an *approximation*: it may miss some trees in the true Rashomon set. However, Babbar et al. (2025) show that the approximation is remarkably accurate. On six benchmark datasets, the Pearson correlation between variable importances computed from the RESPLIT-approximated Rashomon set and the full Rashomon set is nearly 1.0:
 
@@ -257,9 +257,9 @@ Despite being an approximation, LicketyRESPLIT achieves near-perfect precision a
 
 > **Warning: Exact vs. Approximate Enumeration**
 >
-> TreeFARMS gives you the *exact* Rashomon set: every tree in the set, and no tree outside it. RESPLIT and LicketyRESPLIT are approximations --- they may miss a few trees (recall $< 1$) and occasionally include a tree slightly outside the boundary (precision $< 1$). For downstream variable importance analysis, this distinction rarely matters: the approximate sets produce virtually identical importance rankings. But if you need a formal guarantee ("no tree in the Rashomon set uses feature $X_7$"), only exact enumeration suffices.
+> TreeFARMS gives you the *exact* Rashomon set: every tree in the set, and no tree outside it. RESPLIT and LicketyRESPLIT are approximations: they may miss a few trees (recall $< 1$) and occasionally include a tree slightly outside the boundary (precision $< 1$). For downstream variable importance analysis, this distinction rarely matters: the approximate sets produce virtually identical importance rankings. But if you need a formal guarantee ("no tree in the Rashomon set uses feature $X_7$"), only exact enumeration suffices.
 
-The landscape of Rashomon set algorithms is evolving rapidly. The figure below summarizes the three approaches and their trade-offs.
+Rashomon set algorithms are developing rapidly. The figure below summarizes the three approaches and their trade-offs.
 
 ```mermaid
 flowchart LR
@@ -275,7 +275,7 @@ flowchart LR
 
 ## What the Rashomon Set Reveals
 
-Two complementary tools turn the raw set of models into actionable conclusions about feature importance.
+Two complementary tools turn the raw set of models into concrete conclusions about feature importance.
 
 ### Model Class Reliance (MCR)
 
@@ -329,11 +329,11 @@ MCR gives a one-dimensional summary (min and max importance) for each feature in
 >   \operatorname{VIC}(\mathcal{R}) = \bigl\{MR(f) : f \in \mathcal{R}\bigr\}.
 > $$
 
-The VIC lives in $p$-dimensional space, where each axis represents the importance of one feature. To visualize it, Dong and Rudin (2020) project the VIC onto all pairs of features, producing **Variable Importance Diagrams (VIDs)** --- 2D scatter plots that reveal substitution patterns:
+The VIC lives in $p$-dimensional space, where each axis represents the importance of one feature. To visualize it, Dong and Rudin (2020) project the VIC onto all pairs of features, producing **Variable Importance Diagrams (VIDs)**, 2D scatter plots that reveal substitution patterns:
 
 - **Non-overlapping projections** along one axis: the two features have robustly distinct importance levels. One is always more important than the other, regardless of model choice.
 - **Overlapping projections**: the features are substitutes. Some near-optimal models rely on one, some on the other.
-- **Negative slope** in the 2D projection: the features are direct substitutes --- as one's importance increases, the other's decreases. This is the signature of correlated features competing for the same splits.
+- **Negative slope** in the 2D projection: the features are direct substitutes; as one's importance increases, the other's decreases. This is the signature of correlated features competing for the same splits.
 
 > **Key Idea: VIC vs. Bootstrapped SHAP**
 >
@@ -350,7 +350,7 @@ The **Rashomon Importance Distribution (RID)** proposed by Donnelly et al. (2023
 **The five-step RID pipeline** (illustrated in Figure 2 of Donnelly et al., 2023):
 
 1. **Bootstrap.** Draw $B$ bootstrap datasets $\mathcal{D}_1^{(n)}, \ldots, \mathcal{D}_B^{(n)}$ from the original data $\mathcal{D}^{(n)}$ (sampling $n$ observations with replacement).
-2. **Find Rashomon set.** For each bootstrap dataset $\mathcal{D}_b^{(n)}$, compute the Rashomon set $\mathcal{R}_{\mathcal{D}_b}^{\varepsilon}$ --- all models in $\mathcal{F}$ whose loss is within $\varepsilon$ of the best model *on that bootstrap sample*.
+2. **Find Rashomon set.** For each bootstrap dataset $\mathcal{D}_b^{(n)}$, compute the Rashomon set $\mathcal{R}_{\mathcal{D}_b}^{\varepsilon}$: all models in $\mathcal{F}$ whose loss is within $\varepsilon$ of the best model *on that bootstrap sample*.
 3. **Find importances.** For each model $f$ in each Rashomon set, compute the variable importance $\phi_j(f, \mathcal{D}_b^{(n)})$ using any importance metric (permutation importance, SHAP, model reliance, etc.).
 4. **Find CDF.** For each bootstrap $b$, compute the empirical CDF of importances across the Rashomon set for that bootstrap.
 5. **Find PDF.** Average the CDFs across all $B$ bootstraps to obtain the RID, then differentiate to get the marginal density.
@@ -391,9 +391,9 @@ $$
 >
 > Donnelly et al. (2023) define the Rashomon set using an **additive** threshold: $\mathcal{R}^{\varepsilon} = \{f \in \mathcal{F} : \ell(f) \leq \min_{f'}\ell(f') + \varepsilon\}$. This contrasts with the **multiplicative** threshold used by Xin et al. (2022) earlier in this chapter: $L(f) \leq (1 + \epsilon) L(f^*)$. The two formulations are equivalent when rescaled appropriately, but be careful not to mix them: an additive $\varepsilon = 0.05$ and a multiplicative $\epsilon = 0.05$ define different sets.
 
-**Why not just bootstrap?** A natural alternative is naive bootstrap importance: draw $B$ bootstrap samples, fit the best model on each, and collect the importances. This captures data uncertainty but uses only *one* model per resample --- the best one --- ignoring the many near-optimal alternatives. RID considers *all* near-optimal models per resample, capturing model-choice uncertainty that naive bootstrapping misses entirely.
+**Why not just bootstrap?** A natural alternative is naive bootstrap importance: draw $B$ bootstrap samples, fit the best model on each, and collect the importances. This captures data uncertainty but uses only *one* model per resample (the best one), ignoring the many near-optimal alternatives. RID considers *all* near-optimal models per resample, capturing model-choice uncertainty that naive bootstrapping misses entirely.
 
-**Why not just MCR/VIC?** MCR and VIC analyze the Rashomon set of a *single* dataset. They capture model-choice uncertainty but are blind to data uncertainty. Donnelly et al. (2023) demonstrate that MCR ranges are unstable across bootstrap resamples: for one variable on the Monk 3 dataset, the MCR range is $[-0.1, 0.33]$ on one resample and $[0.33, 0.36]$ on another --- contradictory conclusions from the same underlying data.
+**Why not just MCR/VIC?** MCR and VIC analyze the Rashomon set of a *single* dataset. They capture model-choice uncertainty but are blind to data uncertainty. Donnelly et al. (2023) demonstrate that MCR ranges are unstable across bootstrap resamples: for one variable on the Monk 3 dataset, the MCR range is $[-0.1, 0.33]$ on one resample and $[0.33, 0.36]$ on another: contradictory conclusions from the same underlying data.
 
 > **Key Idea: RID = Bootstrap $\times$ Rashomon**
 >
@@ -416,13 +416,13 @@ $$
 
 For example, $B = 471$ bootstraps guarantees that the estimated RID is within $t = 0.075$ of the true value with 90% confidence. This is a practical guarantee: a few hundred bootstraps suffice for reliable results.
 
-**Metric-agnostic.** RID works with any variable importance metric $\phi_j$ --- permutation importance, SHAP, model reliance, conditional model reliance, or any other metric with a bounded range. The framework treats $\phi_j$ as a black box, making it immediately compatible with existing importance tools.
+**Metric-agnostic.** RID works with any variable importance metric $\phi_j$: permutation importance, SHAP, model reliance, conditional model reliance, or any other metric with a bounded range. The framework treats $\phi_j$ as a black box, making it immediately compatible with existing importance tools.
 
 **Empirical stability.** On four synthetic data-generating processes, Donnelly et al. (2023) find that RID achieves a median Jaccard similarity of 0.69 across independently generated datasets, compared to below 0.55 for both MCR and VIC. RID is the only method whose importance intervals consistently overlap across independent datasets drawn from the same distribution.
 
 > **Project Connection: RID for Volatility Feature Selection**
 >
-> For our project, RID would answer questions that neither SHAP nor MCR can: "Across bootstrap resamples of the training data *and* across all near-optimal models within each resample, what is the distribution of VIX's importance?" If the RID CDF for VIX rises steeply near zero, VIX is unimportant in most models across most resamples --- we can drop it. If the CDF rises steeply above 0.2, VIX is robustly important. If the CDF rises gradually from 0 to 0.4, VIX is a substitute: sometimes important, sometimes not, depending on both the data sample and the model chosen. Unlike MCR, this conclusion is *stable* --- it will not flip if we add one more month of data.
+> For our project, RID would answer questions that neither SHAP nor MCR can: "Across bootstrap resamples of the training data *and* across all near-optimal models within each resample, what is the distribution of VIX's importance?" If the RID CDF for VIX rises steeply near zero, VIX is unimportant in most models across most resamples, and we can drop it. If the CDF rises steeply above 0.2, VIX is robustly important. If the CDF rises gradually from 0 to 0.4, VIX is a substitute: sometimes important, sometimes not, depending on both the data sample and the model chosen. Unlike MCR, this conclusion is *stable*: it will not flip if we add one more month of data.
 
 
 ## Rashomon Analysis for Volatility Forecasting
@@ -443,9 +443,9 @@ A Rashomon-based approach to regime-stable feature selection:
 
 The Rashomon set also reveals **prediction multiplicity**: the range of forecasts that different near-optimal models produce for the same input. For a given feature vector $\mathbf{x}_t$ (today's features), we can compute $\{f(\mathbf{x}_t) : f \in \mathcal{R}\}$ and report the min, max, and spread.
 
-If all near-optimal models agree that tomorrow's volatility will be high, that is a strong signal. If some predict high and others predict low, the forecast is sensitive to model choice --- and we should report wider confidence intervals or flag the day as uncertain.
+If all near-optimal models agree that tomorrow's volatility will be high, that is a strong signal. If some predict high and others predict low, the forecast is sensitive to model choice, and we should report wider confidence intervals or flag the day as uncertain.
 
-This is conceptually similar to the disagreement among models in an ensemble, but with a crucial difference: ensemble members are not guaranteed to be near-optimal, while Rashomon set members are.
+This is conceptually similar to the disagreement among models in an ensemble, but with one important difference: ensemble members are not guaranteed to be near-optimal, while Rashomon set members are.
 
 ### Defensible Presentations
 
@@ -453,8 +453,8 @@ In a Goldman Sachs internship, you will present model results to people who will
 
 Rashomon analysis gives you defensible answers:
 
-- "I examined all 14,000 decision trees within 2% of optimal accuracy. Lagged RV is the top feature in every single one of them. VIX and ATM IV are interchangeable --- the data supports either, so I chose VIX for simplicity."
-- "The feature importance is not anecdotal. It is *provably stable*: no near-optimal model exists that does not rely on lagged RV."
+- "I examined all 14,000 decision trees within 2% of optimal accuracy. Lagged RV is the top feature in every single one of them. VIX and ATM IV are interchangeable; the data supports either, so I chose VIX for simplicity."
+- "The feature importance is *provably stable*: no near-optimal model exists that does not rely on lagged RV."
 - "The prediction range across all near-optimal models for tomorrow is $[0.00012, 0.00018]$. The spread tells you how much of the forecast uncertainty comes from model choice rather than data noise."
 
 
@@ -471,4 +471,4 @@ This chapter introduced a fundamentally different approach to model interpretabi
 | Model-choice uncertainty | Not quantified | Prediction multiplicity |
 | Computational cost | Fast (one model) | Hours (enumeration needed) |
 
-**Looking ahead.** [Chapter 12b (Deep Learning for Volatility)](ch12b-deep-learning-vol.md) will introduce deep learning methods for volatility, which are powerful but even harder to interpret than tree ensembles. The Rashomon perspective suggests a hybrid strategy: use deep models for raw predictive power, but use interpretable trees (and their Rashomon sets) to understand *which features matter and why*. This is not an either/or choice --- it is a complementary toolkit.
+**Looking ahead.** [Chapter 12b (Deep Learning for Volatility)](ch12b-deep-learning-vol.md) will introduce deep learning methods for volatility, which are powerful but even harder to interpret than tree ensembles. The Rashomon perspective suggests a hybrid strategy: use deep models for raw predictive power, but use interpretable trees (and their Rashomon sets) to understand *which features matter and why*. The two approaches complement each other.
