@@ -93,7 +93,7 @@ Right: LightGBM with four feature layers and stricter cross-validation.
 
 > **Key Idea: One YAML, One Experiment**
 >
-> The entire experiment -- universe, horizons, features, model, CV strategy -- is defined by a single config file.
+> The entire experiment (universe, horizons, features, model, CV strategy) is defined by a single config file.
 > No code changes needed to run a different experiment.
 
 > **Warning: Registries Require Import**
