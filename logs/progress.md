@@ -144,6 +144,8 @@
 - Mirrored the 199 rendered tex hunks into the markdown copies (22 agents, 20 files changed, 0 reconversions, 0 em dashes in mirrors)
 - 3 commits to main (tex, markdown, PDFs) + push; docs-only synced + pushed (restores vol-learning main.pdf and markdown/ that an earlier branch cleanup had dropped)
 
+- Follow-up: user caught that the vol-learning-guide PDF was committed one pdflatex pass short of pagination convergence (TOC off by one page from mid-ch1). Verified via pdftotext diff (all 650 changed lines were page numbers/running heads; quant-trading and vol-project-ref text-identical on recompile), recompiled to the .toc/.aux fixpoint, recommitted, resynced docs-only
+
 **Next:** Presentation diagrams (2026-07-03 spec) or next research topic from open-questions
 
 ---
