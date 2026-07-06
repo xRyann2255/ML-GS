@@ -4,9 +4,9 @@
 
 \Cref{ch:black_scholes} gave Black--Scholes; \cref{ch:vol_surface} showed
 the market violates its flat-vol assumption, producing a surface. This
-chapter covers three progressively richer models of that surface---
+chapter covers three progressively richer models of that surface:
 \emph{local volatility} (Dupire), \emph{stochastic volatility} (Heston),
-and their combination \emph{local-stochastic volatility} (LSV)---then
+and their combination \emph{local-stochastic volatility} (LSV). It then
 derives the variance swap. The variance-swap replication formula,
 promised in \cref{ch:vol_surface}, is the centrepiece: it ties together
 the vol surface, the $1/\Kstrike^2$ option-strip hedge, and the desk
@@ -43,7 +43,7 @@ lets volatility depend on the underlying's level and on time:
   \label{eq:local_vol_sde}
 \end{equation}
 where $\volat_{\text{loc}}(\Spx, t)$ is the \textbf{local volatility
-function}---a deterministic surface that can in principle be chosen
+function}, a deterministic surface that can in principle be chosen
 so the model reproduces every observed European-option price
 simultaneously. Because $\volat_{\text{loc}}$ is a known function of
 $(\Spx, t)$, the model is Markovian and the Kolmogorov forward
@@ -76,7 +76,7 @@ diffusion coefficient that reproduces those prices is
 \textbf{Reading the formula.}
 \begin{itemize}
   \item The \emph{numerator} measures how the call price changes with
-    maturity (plus a drift correction)---the rate at which value
+    maturity (plus a drift correction); the rate at which value
     accrues with $\Tmat$ encodes the local variance needed at $(K,T)$.
   \item The \emph{denominator} is $\tfrac12 K^2$ times the butterfly
     spread. By Breeden--Litzenberger, $\partial^2\Call/\partial
@@ -135,7 +135,7 @@ Tomorrow's surface will differ, and the model has no mechanism for
 the change: it predicts skew flattens with maturity far faster than
 markets actually exhibit. Traders say local vol gets statics right
 but dynamics wrong. Delta-hedging exotics with local-vol Greeks
-leaves you systematically mis-hedged when the smile shifts---hence
+leaves you systematically mis-hedged when the smile shifts; hence
 Heston and LSV.
 \end{pitfallbox}
 
@@ -144,7 +144,7 @@ Local vol is a \emph{photograph} of today's surface: pixel-perfect
 but frozen. Heston is a \emph{physical model}: may miss wrinkles
 but has built-in dynamics (mean-reversion, vol-of-vol, spot--vol
 correlation) that produce plausible future surfaces. LSV combines
-both---photo today, physics tomorrow.
+both: photo today, physics tomorrow.
 \end{intuitionbox}
 
 
@@ -213,7 +213,7 @@ volatility), and the five parameters are:
 
 \begin{intuitionbox}[title={Why negative $\rho$ creates skew}]
 \label{intuition:heston_rho}
-Market drops coincide with vol spikes---the \emph{leverage effect}.
+Market drops coincide with vol spikes: the \emph{leverage effect}.
 Heston bakes this in: $\rho<0$ correlates negative spot returns with
 positive variance shocks, producing a fat left tail (i.e.\ higher
 implied vol at low strikes). More negative $\rho$, steeper skew;
@@ -251,11 +251,11 @@ where
 \end{equation}
 $\varphi_1,\varphi_2$ are closed-form (complex exponentials of the
 parameters), and the 1D integrals in \eqref{eq:heston_pi} need only a
-few dozen quadrature points for six-digit accuracy---fast enough for
+few dozen quadrature points for six-digit accuracy, fast enough for
 real-time calibration.
 
 \begin{keyfactbox}[Heston pricing is semi-closed-form]
-The characteristic-function approach needs one 1D integral---orders
+The characteristic-function approach needs one 1D integral, orders
 of magnitude faster than Monte Carlo, enabling sub-second calibration
 to the full surface. The same structure extends to other affine
 stochastic-vol models (Bates, double Heston).
@@ -273,7 +273,7 @@ Varying each parameter from a baseline $v_0=\bar v=0.04$
   Parameter change & Effect on implied-vol smile \\
   \midrule
   $\rho$: $-0.7 \to -0.3$ &
-    Skew decreases.  The smile becomes more symmetric---less steep
+    Skew decreases.  The smile becomes more symmetric: less steep
     on the left, slightly higher on the right.  The left-tail fattening
     diminishes because spot and vol are less anti-correlated. \\[6pt]
   $\xi$: $0.5 \to 1.0$ &
@@ -344,7 +344,7 @@ Varying each parameter from a baseline $v_0=\bar v=0.04$
 \end{tikzpicture}
 \end{minipage}
 \caption{Heston smile sensitivities from baseline $v_0=\bar{v}=0.04$ ($\volat=20\%$),
-$\kappa=2$. \textbf{Left:} negative $\rho$ tilts the smile into an equity skew---OTM puts
+$\kappa=2$. \textbf{Left:} negative $\rho$ tilts the smile into an equity skew: OTM puts
 expensive, OTM calls cheap. \textbf{Right:} higher $\xi$ lifts both wings symmetrically,
 producing curvature without skew.}
 \label{fig:heston_smile}
@@ -377,7 +377,7 @@ model implied vol (from \cref{eq:heston_call}, then inverting BS).
 The objective is non-convex, so global optimisers (differential
 evolution, simulated annealing) beat gradient methods. For $N=50$
 quotes, total cost is $\sim 12{,}500$ characteristic-function
-evaluations---sub-second on modern hardware.
+evaluations, sub-second on modern hardware.
 
 \begin{pitfallbox}[Feller condition and calibration]
 An optimiser may propose parameters violating $2\kappa\bar v\geq\xi^2$,
@@ -406,7 +406,7 @@ structure) but cannot exactly match every kink. Failure modes:
 \noindent
 Desks use piecewise-constant parameters across maturity buckets, add
 jumps (the Bates model: spot + Poisson jumps), or combine Heston with
-local vol---the next section.
+local vol, the subject of the next section.
 
 \subsection{Comparison: Black--Scholes vs local vol vs Heston}
 \label{subsec:model_comparison}
@@ -473,10 +473,10 @@ iterative calibration (particle MC or Fokker--Planck PDE).
 \noindent
 \textbf{Mixing-fraction intuition.} Parametrise by $\alpha\in[0,1]$:
 \begin{itemize}
-  \item $\alpha=0$: pure local vol---perfect fit, wrong dynamics.
-  \item $\alpha=1$: pure Heston---right dynamics, imperfect fit.
-  \item $\alpha\in(0,1)$: LSV---$L$ bends Heston to fit exactly while
-    retaining fraction $\alpha$ of the stochastic dynamics.
+  \item $\alpha=0$: pure local vol (perfect fit, wrong dynamics).
+  \item $\alpha=1$: pure Heston (right dynamics, imperfect fit).
+  \item $\alpha\in(0,1)$: LSV, where $L$ bends Heston to fit exactly
+    while retaining fraction $\alpha$ of the stochastic dynamics.
 \end{itemize}
 $\alpha$ is set to match observed surface dynamics (e.g.\ skew shift
 per 1\% spot move); equity desks typically use $\alpha\approx0.5$--$0.8$.
@@ -490,15 +490,15 @@ per 1\% spot move); equity desks typically use $\alpha\approx0.5$--$0.8$.
 This section delivers the derivation promised in
 \cref{ch:vol_surface}: the fair variance-swap strike equals a
 $1/\Kstrike^2$-weighted integral of OTM option prices. The argument
-is model-independent---any continuous diffusion, not just BS or
-Heston---and is one of the most elegant results in quant finance.
+is model-independent (it holds for any continuous diffusion, not just
+BS or Heston) and is one of the most elegant results in quant finance.
 
 \emph{Why the product exists.} An option gives vol exposure, but only
 bundled with directional exposure that must be neutralised by daily
 delta-hedging; the realised P\&L depends on the hedging path
 (\cref{ch:greeks_hedging}). A variance swap pays realised variance
 directly, so a trader who wants a pure view on volatility can buy one
-and skip the hedging workflow entirely---the dealer handles replication.
+and skip the hedging workflow entirely; the dealer handles replication.
 
 \subsection{Setup and payoff}
 \label{subsec:varswap_setup}
@@ -732,7 +732,7 @@ The $1/\Kstrike^2$ weight favours low strikes: at $K=3{,}600$ the
 weight is $\approx 7.7\times 10^{-8}$ vs $\approx 4.9\times 10^{-8}$
 at $K=4{,}500$ (57\% larger). Equity skew further makes OTM puts more
 expensive per $\Kstrike$ than OTM calls. So a variance swap on a
-skewed underlying is overwhelmingly a left-tail bet---hence
+skewed underlying is overwhelmingly a left-tail bet; hence
 variance-swap levels track put skew closely and blow up in crashes.
 \end{intuitionbox}
 
@@ -777,7 +777,7 @@ $\volat = 20\%$ to provide a self-consistent baseline.
 \paragraph{Step 1: weights.}
 $\Delta\Kstrike/\Kstrike_i^2 = 100/\Kstrike_i^2$. At $K=3{,}600$:
 $100/3{,}600^2 = 7.716\times 10^{-6}$, 56\% larger than at $K=4{,}500$
-($4.938\times 10^{-6}$)---the $1/K^2$ overweight on low strikes.
+($4.938\times 10^{-6}$), reflecting the $1/K^2$ overweight on low strikes.
 
 \paragraph{Step 2: contributions.}
 Multiply weight by price. E.g.\ the $K=3{,}900$ put:
@@ -830,7 +830,7 @@ recovers $20.00\%$. Desks extrapolate the wings to reduce this bias.
 
 \begin{keyfactbox}[Variance swap replication]
 $\Kstrike_{\text{var}}$ is determined entirely by today's OTM option
-prices---no model assumed, any continuous diffusion works. The only
+prices: no model is assumed, and any continuous diffusion works. The only
 assumption is no jumps; jumps open a ``jump gap'' between the strip
 price and true expected variance.
 \end{keyfactbox}
@@ -853,7 +853,7 @@ term corrects the $(F,K_0)$ gap. VIX is quoted in annualised vol
 points: $\text{VIX}=100\sqrt{\text{VIX}^2}$.
 
 ``VIX at 20'' means the $1/K^2$-weighted 30-day OTM strip prices to
-$\Kstrike_{\text{var}}=0.04$---equivalently, 20\% annualised realised
+$\Kstrike_{\text{var}}=0.04$, equivalently 20\% annualised realised
 vol. The world's most-watched vol gauge is nothing but the variance
 strike from the formula just derived.
 
@@ -1005,7 +1005,7 @@ $\Tmat=0.25$:
   \text{PV(div)} &= 2 \times e^{-0.05 \times 2/12} = 2 \times 0.9917 = 1.98, \\
   F_0^{\text{div}} &= (100 - 1.98) \times e^{0.05 \times 0.25} = 98.02 \times 1.01258 = 99.25.
 \end{align*}
-Without the dividend the forward is $101.26$---the dividend knocks
+Without the dividend the forward is $101.26$; the dividend knocks
 2.01 off. A 100-strike call that was slightly OTM becomes more deeply
 OTM; price and Greeks shift accordingly.
 
@@ -1013,7 +1013,7 @@ OTM; price and Greeks shift accordingly.
 Junior Strats obsess over the vol model (LV vs Heston vs LSV) and
 treat dividends as an afterthought. PV of dividends can be 3--5\% of
 spot for high-yield names; a wrong schedule shifts every price.
-Autocallables are especially sensitive---a missed dividend on a
+Autocallables are especially sensitive: a missed dividend on a
 barrier date can flip knock-in pricing. Always verify dividends
 before calibrating.
 \end{pitfallbox}
@@ -1096,13 +1096,13 @@ inner-loop speedup halves risk-report runtime.
 \begin{prosperitybox}
 Prosperity's VOLCANIC\_ROCK\_VOUCHERS were vanilla European calls on a
 simulated underlying; a simple BS pricer with an implied-vol estimate
-sufficed---local vol/Heston/LSV/exotics would be overkill. But the
+sufficed (local vol/Heston/LSV/exotics would be overkill). But the
 variance-swap replication links to the gamma-scalping strategy in
 \cref{ch:vol_surface}: knowing fair variance from the strip tells you
 whether implied vol is cheap or rich, hence long or short gamma. The
 Hedgehogs did exactly that: estimate fair vol, compare to bot-quote
-implied vol, trade the gap with delta-hedged options---a discretised
-variance-swap replication.
+implied vol, trade the gap with delta-hedged options, in effect a
+discretised variance-swap replication.
 \end{prosperitybox}
 
 \begin{gsbox}
@@ -1120,8 +1120,8 @@ Equity-derivatives Strat stack at GS:
 \end{enumerate}
 A junior Strat's first project is often ``build a variance-swap pricer
 reading the calibrated surface and outputting fair strikes across the
-term structure''---forcing the whole stack: calibration, numerical
-integration, variance economics.
+term structure'', a task that forces the whole stack: calibration,
+numerical integration, variance economics.
 \end{gsbox}
 
 \begin{historybox}
@@ -1130,7 +1130,7 @@ Three papers define the modern toolkit:
   \item \textbf{Dupire (1994) and Derman--Kani (1994).} At Paribas and
     GS respectively, they showed a deterministic
     $\volat_{\text{loc}}(\Spx,t)$ can reproduce any arbitrage-free
-    surface---the first beyond-BS model adopted on desks.
+    surface, the first beyond-BS model adopted on desks.
   \item \textbf{Heston (1993).} First stochastic-vol model with a
     semi-closed-form characteristic function, making calibration
     practical. 15{,}000+ citations.
@@ -1170,7 +1170,7 @@ Three papers define the modern toolkit:
 
   \item \textbf{Heston is semi-closed-form.}
     European prices via a 1D Fourier integral of a known
-    characteristic function---fast enough for real-time calibration.
+    characteristic function, fast enough for real-time calibration.
 
   \item \textbf{LSV = local $\times$ stochastic.}
     Industry standard.  A leverage function $L(S,t)$ calibrates

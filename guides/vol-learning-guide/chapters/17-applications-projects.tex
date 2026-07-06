@@ -23,7 +23,7 @@ The idea: size your position inversely proportional to forecast vol, so that por
 \label{subsec:ewma-baseline}
 % ──────────────────────────────────────────────────
 
-The workhorse volatility estimate used by the vast majority of systematic funds for position sizing is not GARCH, not HAR, but plain \textbf{exponentially weighted moving average (EWMA)} smoothing:
+The workhorse volatility estimate used by the vast majority of systematic funds for position sizing is plain \textbf{exponentially weighted moving average (EWMA)} smoothing, not GARCH or HAR:
 \begin{equation}
 \label{eq:ewma}
 \hat\sigma^2_t = (1-\delta)\,r_{t-1}^2 + \delta\,\hat\sigma^2_{t-1},
@@ -172,11 +172,11 @@ The gross return of the vol-targeted strategy, from Section~\ref{subsec:vol-targ
 \end{equation}
 where:
 \begin{itemize}[nosep]
-  \item $w_t = \sigma_{\text{target}}/\hat\sigma_t$ --- the vol-targeted weight held through day $t$ (set at the close of day $t-1$ from information up to $t-1$, so no look-ahead).
-  \item $|w_t - w_{t-1}|$ --- the absolute change in the weight, i.e.\ the fraction of notional you must trade to move from yesterday's position to today's.
-  \item $c$ --- the \textbf{half-spread cost} per unit of traded notional, expressed in the same units as $r_t$. A full round-trip (out and back) costs $2c$.
+  \item $w_t = \sigma_{\text{target}}/\hat\sigma_t$: the vol-targeted weight held through day $t$ (set at the close of day $t-1$ from information up to $t-1$, so no look-ahead).
+  \item $|w_t - w_{t-1}|$: the absolute change in the weight, i.e.\ the fraction of notional you must trade to move from yesterday's position to today's.
+  \item $c$: the \textbf{half-spread cost} per unit of traded notional, expressed in the same units as $r_t$. A full round-trip (out and back) costs $2c$.
 \end{itemize}
-If the forecast is unchanged, $w_t = w_{t-1}$ and you pay nothing. If a vol spike pushes the weight down over several days --- as the ML model did in Section~\ref{subsec:vol-target-example}, from $0.82$ on day~13 to $0.36$ on day~16 --- the cost is charged on each day's move, not on the cumulative drop. The largest single-day cut in that table is on day~14 ($|0.54 - 0.82| = 0.28$ of notional, costing $0.28\,c$); the day-16 move itself is only $|0.36 - 0.45| = 0.09$.
+If the forecast is unchanged, $w_t = w_{t-1}$ and you pay nothing. If a vol spike pushes the weight down over several days (as the ML model did in Section~\ref{subsec:vol-target-example}, from $0.82$ on day~13 to $0.36$ on day~16), the cost is charged on each day's move, not on the cumulative drop. The largest single-day cut in that table is on day~14 ($|0.54 - 0.82| = 0.28$ of notional, costing $0.28\,c$); the day-16 move itself is only $|0.36 - 0.45| = 0.09$.
 
 \begin{workedexample}[Gross vs.\ Net Over Eight Days of Vol-Targeting]
 We recast the day-by-day P\&L onto the vol-targeting weights from the transition table in Section~\ref{subsec:vol-target-example}. Take the ML model's weights $w_t^{\text{ML}}$ from that table, assume $w_{12} = 0.82$ entering the window, and an SPX-futures half-spread $c = 1$~bp. \textbf{All P\&L columns below are in percent}, so to keep the arithmetic in one unit we write that $1$~bp cost as $0.01\%$ per unit of weight traded. The underlying daily returns $r_t$ are the SPX moves over the sell-off.
@@ -202,7 +202,7 @@ $t$ & $w_t^{\text{ML}}$ & $r_t$ (\%) & $|\Delta w_t|$ & Gross (\%) & Net (\%) \\
 \end{center}
 
 \medskip
-\noindent\textbf{Reading the table.} The protection came not from one day but from a step-by-step cut: starting at $0.82$, the forecast shrank the weight to $0.54$, then $0.45$, then $0.36$, so that by day~16 --- the day of the $-2.1\%$ drop --- only $0.36$ of the book was exposed. The gross loss that day was therefore $0.36 \times 2.1\% = 0.76\%$ instead of a near-full $2.1\%$. Over the eight days, total traded notional is $\sum|\Delta w_t| = 0.57$, so total cost at $c = 1$~bp is $0.57 \times 0.01\% = 0.006\%$. Costs consumed only $0.006/0.394 \approx 1.5\%$ of the (negative) gross P\&L. Even an aggressive regime-detecting forecast, run on a $1$~bp instrument, barely registers costs over a short window. The cost problem is invisible day-by-day; it accumulates over a full year of small daily re-weights --- which the next subsection makes precise.
+\noindent\textbf{Reading the table.} The protection came not from one day but from a step-by-step cut: starting at $0.82$, the forecast shrank the weight to $0.54$, then $0.45$, then $0.36$, so that by day~16, the day of the $-2.1\%$ drop, only $0.36$ of the book was exposed. The gross loss that day was therefore $0.36 \times 2.1\% = 0.76\%$ instead of a near-full $2.1\%$. Over the eight days, total traded notional is $\sum|\Delta w_t| = 0.57$, so total cost at $c = 1$~bp is $0.57 \times 0.01\% = 0.006\%$. Costs consumed only $0.006/0.394 \approx 1.5\%$ of the (negative) gross P\&L. Even an aggressive regime-detecting forecast, run on a $1$~bp instrument, barely registers costs over a short window. The cost problem is invisible day-by-day; it accumulates over a full year of small daily re-weights, which the next subsection makes precise.
 \end{workedexample}
 
 % ──────────────────────────────────────────────────
@@ -219,9 +219,9 @@ The single number that summarizes how expensive a forecast is to run is its \tex
 \end{equation}
 where:
 \begin{itemize}[nosep]
-  \item $|w_t - w_{t-1}|$ --- one day's traded notional, as a fraction of the book.
-  \item $T$ --- the number of days in the backtest.
-  \item the factor $252$ --- the number of trading days per year, converting a daily average into an annual trading volume.
+  \item $|w_t - w_{t-1}|$: one day's traded notional, as a fraction of the book.
+  \item $T$: the number of days in the backtest.
+  \item the factor $252$: the number of trading days per year, converting a daily average into an annual trading volume.
 \end{itemize}
 A strategy with $\bar\tau = 0.05$ resizes $5\%$ of its position on an average day; over $252$ trading days that adds up to $252 \times 0.05 = 12.6$ times the size of the whole book traded in a year.
 
@@ -232,18 +232,18 @@ Turnover matters because it converts, almost mechanically, into a deduction from
 \end{equation}
 where:
 \begin{itemize}[nosep]
-  \item $\SR^{\text{gross}}$ --- the annualized Sharpe of the gross vol-targeted return stream $w_t r_t$.
-  \item $\bar\tau$ --- average daily turnover from Equation~\eqref{eq:turnover-vt}.
-  \item $c$ --- the half-spread cost per unit notional.
-  \item $\sigma_{\text{ret}}$ --- the annualized volatility of the gross returns (for a vol-targeted book this is approximately $\sigma_{\text{target}}$ by construction).
+  \item $\SR^{\text{gross}}$: the annualized Sharpe of the gross vol-targeted return stream $w_t r_t$.
+  \item $\bar\tau$: average daily turnover from Equation~\eqref{eq:turnover-vt}.
+  \item $c$: the half-spread cost per unit notional.
+  \item $\sigma_{\text{ret}}$: the annualized volatility of the gross returns (for a vol-targeted book this is approximately $\sigma_{\text{target}}$ by construction).
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-Where does the exact shape come from? Sharpe is average return $\div$ volatility. Costs lower the average return by (annual turnover $\times$ cost per trade) $= 252\,\bar\tau\,c$ each year, but barely touch the volatility. So the Sharpe falls by exactly that cost amount divided by the same $\sigma_{\text{ret}}$ you were already dividing by --- which is the second term. The $\sqrt{252}$ in the Sharpe definition is absorbed because both the numerator (now a per-year cost) and $\sigma_{\text{ret}}$ are on an annual footing.
+Where does the exact shape come from? Sharpe is average return $\div$ volatility. Costs lower the average return by (annual turnover $\times$ cost per trade) $= 252\,\bar\tau\,c$ each year, but barely touch the volatility. So the Sharpe falls by exactly that cost amount divided by the same $\sigma_{\text{ret}}$ you were already dividing by, which is the second term. The $\sqrt{252}$ in the Sharpe definition is absorbed because both the numerator (now a per-year cost) and $\sigma_{\text{ret}}$ are on an annual footing.
 \end{intuition}
 
 \begin{workedexample}[How Turnover Eats the ML Sharpe Edge]
-From Section~\ref{subsec:vol-target-example}, the gross figures are $\SR^{\text{gross}}_{\text{HAR}} = 0.82$ and $\SR^{\text{gross}}_{\text{ML}} = 0.88$, both at $\sigma_{\text{ret}} \approx 10\%$ (the target). Suppose the smoother HAR weights have turnover $\bar\tau_{\text{HAR}} = 0.04$ while the reactive ML weights have $\bar\tau_{\text{ML}} = 0.09$. Take an SPX-futures half-spread $c = 2$~bp $= 0.0002$. \emph{Note:} this example works entirely in decimals (returns and costs as fractions, so $\sigma_{\text{ret}} = 0.10$ and $c = 0.0002$), in contrast to the percent-based table above --- keep the two conventions separate.
+From Section~\ref{subsec:vol-target-example}, the gross figures are $\SR^{\text{gross}}_{\text{HAR}} = 0.82$ and $\SR^{\text{gross}}_{\text{ML}} = 0.88$, both at $\sigma_{\text{ret}} \approx 10\%$ (the target). Suppose the smoother HAR weights have turnover $\bar\tau_{\text{HAR}} = 0.04$ while the reactive ML weights have $\bar\tau_{\text{ML}} = 0.09$. Take an SPX-futures half-spread $c = 2$~bp $= 0.0002$. \emph{Note:} this example works entirely in decimals (returns and costs as fractions, so $\sigma_{\text{ret}} = 0.10$ and $c = 0.0002$), in contrast to the percent-based table above; keep the two conventions separate.
 
 \medskip
 \noindent\textbf{HAR drag:}
@@ -271,7 +271,7 @@ c^\ast \;=\; \frac{\SR^{\text{gross}} \cdot \sigma_{\text{ret}}}{252 \cdot \bar\
 where every symbol is as defined for Equation~\eqref{eq:sharpe-drag}.
 
 \begin{intuition}[In Plain English]
-The breakeven cost answers ``how expensive could trading get before this forecast is worthless?'' A forecast that needs cheap execution to make money has a low $c^\ast$; a robust forecast keeps a positive Sharpe even when spreads widen. Two forecasts with identical gross Sharpe can have very different $c^\ast$: the smoother one (lower $\bar\tau$) survives to a higher cost. So $c^\ast$ rewards exactly the property --- forecast smoothness --- that raw QLIKE and gross Sharpe are blind to.
+The breakeven cost answers ``how expensive could trading get before this forecast is worthless?'' A forecast that needs cheap execution to make money has a low $c^\ast$; a robust forecast keeps a positive Sharpe even when spreads widen. Two forecasts with identical gross Sharpe can have very different $c^\ast$: the smoother one (lower $\bar\tau$) survives to a higher cost. So $c^\ast$ rewards forecast smoothness, exactly the property that raw QLIKE and gross Sharpe are blind to.
 \end{intuition}
 
 Report $\SR^{\text{net}}(c)$ for all three forecasts on the same axes rather than a single number; the schematic in Figure~\ref{fig:sharpe-cost-curve} shows what the plot looks like.
@@ -332,10 +332,10 @@ c^\ast_{\text{HAR}} = \frac{0.82 \times 0.10}{252 \times 0.04} = \frac{0.082}{10
 \label{subsec:spx-costs}
 % ──────────────────────────────────────────────────
 
-The cost grid above is a stress test; for the instrument your project actually trades it is worth knowing the realistic number. The strategy in Section~\ref{sec:vol-targeting} sizes exposure to the S\&P~500, implemented through \textbf{E-mini} or \textbf{Micro E-mini S\&P~500 futures} --- among the most liquid exchange-traded instruments in the world. For a single E-mini contract the bid--ask spread is typically one \textbf{tick} ($0.25$ index points), and each E-mini contract is worth $50 \times$ the index level (the contract multiplier). Walk the chain at an index level of $\approx 5000$: the contract is worth $50 \times 5000 = \$250{,}000$, and one tick is worth $50 \times 0.25 = \$12.50$, so the full spread is $12.5 / 250{,}000 \approx 0.5$~bp --- a \textbf{half-spread of well under $1$~bp} (half the round-trip spread defined above) in normal conditions. Adding exchange and clearing fees, a realistic all-in round-trip cost for vol-targeting rebalances is on the order of \textbf{$1$--$2$~bp}, widening in stressed markets.
+The cost grid above is a stress test; for the instrument your project actually trades it is worth knowing the realistic number. The strategy in Section~\ref{sec:vol-targeting} sizes exposure to the S\&P~500, implemented through \textbf{E-mini} or \textbf{Micro E-mini S\&P~500 futures}, among the most liquid exchange-traded instruments in the world. For a single E-mini contract the bid--ask spread is typically one \textbf{tick} ($0.25$ index points), and each E-mini contract is worth $50 \times$ the index level (the contract multiplier). Walk the chain at an index level of $\approx 5000$: the contract is worth $50 \times 5000 = \$250{,}000$, and one tick is worth $50 \times 0.25 = \$12.50$, so the full spread is $12.5 / 250{,}000 \approx 0.5$~bp, a \textbf{half-spread of well under $1$~bp} (half the round-trip spread defined above) in normal conditions. Adding exchange and clearing fees, a realistic all-in round-trip cost for vol-targeting rebalances is on the order of \textbf{$1$--$2$~bp}, widening in stressed markets.
 
 \begin{warning}[Use One Instrument's Real Cost, Then Stress It]
-Do not paste a generic cross-asset cost table into a vol-targeting report. The strategy trades one thing --- SPX futures --- so anchor on its real half-spread ($\lesssim 1$~bp) and then sweep upward through the $\{1,2,5,10,20\}$~bp grid to show robustness, not to suggest you trade twenty-basis-point instruments. The grid is there to expose how a high-turnover ML forecast would fare \emph{if} costs rose, e.g.\ in a liquidity crunch when spreads on even E-minis widen.
+Do not paste a generic cross-asset cost table into a vol-targeting report. The strategy trades one thing, SPX futures, so anchor on its real half-spread ($\lesssim 1$~bp) and then sweep upward through the $\{1,2,5,10,20\}$~bp grid to show robustness, not to suggest you trade twenty-basis-point instruments. The grid is there to expose how a high-turnover ML forecast would fare \emph{if} costs rose, e.g.\ in a liquidity crunch when spreads on even E-minis widen.
 \end{warning}
 
 % ──────────────────────────────────────────────────
@@ -359,7 +359,7 @@ Sortino ratio & $(\mu_{\text{ret}} / \sigma_{\text{downside}}) \times \sqrt{252}
 \addlinespace
 Hit rate & $\#\{\text{PnL}_t > 0\} / T$ & Fraction of profitable days; aim $> 50\%$ \\
 \addlinespace
-Max drawdown & $\max_{s \le t}(\text{cumPnL}_s - \text{cumPnL}_t)$ & How far the running total fell from its highest previous point --- the deepest hole the strategy dug; the survival metric \\
+Max drawdown & $\max_{s \le t}(\text{cumPnL}_s - \text{cumPnL}_t)$ & How far the running total fell from its highest previous point, i.e.\ the deepest hole the strategy dug; the survival metric \\
 \addlinespace
 Calmar ratio & Annualized return $/$ max drawdown & Return per unit of worst-case pain \\
 \addlinespace
@@ -371,7 +371,7 @@ Breakeven cost & $c^\ast$ where $\SR^{\text{net}}(c^\ast) = 0$ & Tradeability th
 \end{table}
 
 \begin{keyidea}[Lead with Net Sharpe and Breakeven, Support with the Rest]
-Never report a single net Sharpe. Plot $\SR^{\text{net}}(c)$ across the $\{0, 1, 2, 5, 10, 20\}$~bp grid for the ML forecast, the HAR forecast, and the EWMA baseline (Section~\ref{subsec:ewma-baseline}) on \emph{identical} axes (Figure~\ref{fig:sharpe-cost-curve}). In your deliverable, lead with net Sharpe at the realistic SPX cost ($\approx 1$~bp) and the breakeven cost $c^\ast$ where each line hits zero --- the single number a systematic desk cares about most. What matters is whether the ML curve sits \emph{above} HAR across the whole plausible cost range, not just at $c = 0$. Support with max drawdown, Calmar, and turnover. If the desk asks one question it will be about $c^\ast$; if they ask two, the second is about max drawdown.
+Never report a single net Sharpe. Plot $\SR^{\text{net}}(c)$ across the $\{0, 1, 2, 5, 10, 20\}$~bp grid for the ML forecast, the HAR forecast, and the EWMA baseline (Section~\ref{subsec:ewma-baseline}) on \emph{identical} axes (Figure~\ref{fig:sharpe-cost-curve}). In your deliverable, lead with net Sharpe at the realistic SPX cost ($\approx 1$~bp) and the breakeven cost $c^\ast$ where each line hits zero, the single number a systematic desk cares about most. What matters is whether the ML curve sits \emph{above} HAR across the whole plausible cost range, not just at $c = 0$. Support with max drawdown, Calmar, and turnover. If the desk asks one question it will be about $c^\ast$; if they ask two, the second is about max drawdown.
 \end{keyidea}
 
 % ──────────────────────────────────────────────────
@@ -382,12 +382,12 @@ Never report a single net Sharpe. Plot $\SR^{\text{net}}(c)$ across the $\{0, 1,
 A strong net Sharpe can still hide a fragile strategy. The vol-targeting Sharpe gain comes from cutting exposure before drawdowns, so a natural worry is that \emph{all} of the edge is concentrated in one or two crisis episodes. Aggregate metrics will not reveal this; a P\&L-source decomposition will.
 
 \begin{keyidea}[The Fragility Rule of Thumb]
-If more than $70\%$ of the strategy's cumulative net P\&L comes from days that make up less than $30\%$ of the sample, the strategy is \textbf{fragile}: it is a regime bet (a \textbf{regime} being a market environment such as a calm stretch or a crisis period), not a robust earner. These figures are a heuristic, not a law --- the idea is simply that if most of your profit comes from a small handful of unusual days, you are really betting on those days recurring. If net P\&L accrues roughly in proportion to time spent in each state, the strategy is \textbf{broad-based} --- which is what you want for a deliverable that claims a forecast adds steady economic value.
+If more than $70\%$ of the strategy's cumulative net P\&L comes from days that make up less than $30\%$ of the sample, the strategy is \textbf{fragile}: it is a regime bet (a \textbf{regime} being a market environment such as a calm stretch or a crisis period), not a robust earner. These figures are a heuristic, not a law. The idea is simply that if most of your profit comes from a small handful of unusual days, you are really betting on those days recurring. If net P\&L accrues roughly in proportion to time spent in each state, the strategy is \textbf{broad-based}, which is what you want for a deliverable that claims a forecast adds steady economic value.
 \end{keyidea}
 
 A cheap and informative version of this check, available before any regime model, is a \textbf{VIX-tercile decomposition}. Split the backtest days into low, medium, and high VIX terciles, and sum net P\&L within each:
 \begin{itemize}[nosep]
-  \item If the vol-targeting edge over EWMA is concentrated entirely in the high-VIX tercile, the ML forecast is really a \emph{crisis detector} --- valuable, but you should say so, because a desk that does not want concentrated crisis exposure will read that Sharpe differently.
+  \item If the vol-targeting edge over EWMA is concentrated entirely in the high-VIX tercile, the ML forecast is really a \emph{crisis detector}; that is valuable, but you should say so, because a desk that does not want concentrated crisis exposure will read that Sharpe differently.
   \item If the edge is spread across terciles, the better forecast is improving position sizing in ordinary conditions too, and the Sharpe gain is more durable.
 \end{itemize}
 Report the tercile split alongside the headline table. It costs one extra row and pre-empts the desk's sharpest question about where the money comes from.
@@ -444,10 +444,10 @@ Beyond GEX, distance to nearest barrier level and net open interest by strike ar
 % ═══════════════════════════════════════════════════
 
 \begin{prereq}[Background]
-This section assumes you have results to present: a QLIKE comparison and Diebold--Mariano test from Chapter~\ref{ch:evaluation} (Sections~\ref{sec:eval-qlike}, \ref{sec:eval-dm}), the vol-targeting economic-value test from Sections~\ref{sec:vol-targeting} and~\ref{sec:net-econ-value}, and the overfitting controls from Chapter~\ref{ch:evaluation} (Sections~\ref{sec:eval-dsr}, \ref{sec:eval-purgedcv}, \ref{sec:eval-lookahead-taxonomy}). The skill here is not generating results --- it is communicating them so a volatility desk trusts the work in twenty minutes.
+This section assumes you have results to present: a QLIKE comparison and Diebold--Mariano test from Chapter~\ref{ch:evaluation} (Sections~\ref{sec:eval-qlike}, \ref{sec:eval-dm}), the vol-targeting economic-value test from Sections~\ref{sec:vol-targeting} and~\ref{sec:net-econ-value}, and the overfitting controls from Chapter~\ref{ch:evaluation} (Sections~\ref{sec:eval-dsr}, \ref{sec:eval-purgedcv}, \ref{sec:eval-lookahead-taxonomy}). The skill this section teaches is communicating those results so that a volatility desk trusts the work in twenty minutes.
 \end{prereq}
 
-You have built a forecast that beats HAR on QLIKE and adds net Sharpe in a vol-targeting test. The remaining risk is entirely in the telling. A desk audience decides in the first minute whether to engage with your hypothesis or to start hunting for the \textbf{overfitting} that they assume is hiding behind any ML result. (Overfitting means a model looks good on the data it was built from but fails on new data --- and the more feature combinations you try, the more likely one looks good by pure chance, which is why a desk hearing ``47 features'' immediately distrusts the result.) This section is about controlling that first minute and the nineteen that follow.
+You have built a forecast that beats HAR on QLIKE and adds net Sharpe in a vol-targeting test. The remaining risk is entirely in the telling. A desk audience decides in the first minute whether to engage with your hypothesis or to start hunting for the \textbf{overfitting} that they assume is hiding behind any ML result. (Overfitting means a model looks good on the data it was built from but fails on new data. The more feature combinations you try, the more likely one looks good by pure chance, which is why a desk hearing ``47 features'' immediately distrusts the result.) This section is about controlling that first minute and the nineteen that follow.
 
 % ──────────────────────────────────────────────────
 \subsection{Frame It as a Hypothesis Test, Not a Fishing Expedition}
@@ -461,14 +461,14 @@ The question that decides your reception is: \emph{did you start from an economi
   \item \textbf{Bad (fishing expedition):} ``We fed $47$ features into a LightGBM model and it forecasts RV better than HAR.''
 \end{itemize}
 
-The first framing invites engagement: there is a well-grounded mechanism --- the leverage effect, or the variance risk premium (Chapter~\ref{ch:vrp}) --- and modern tools were used to test it. The audience evaluates the hypothesis, then checks whether the test is clean. The second framing invites the question ``how many features did you try?'' and a reach for the Deflated Sharpe Ratio (Section~\ref{sec:eval-dsr}; a Sharpe adjusted downward for how many things you tried, so that staying positive means the edge survives that penalty).
+The first framing invites engagement: there is a well-grounded mechanism, the leverage effect or the variance risk premium (Chapter~\ref{ch:vrp}), and modern tools were used to test it. The audience evaluates the hypothesis, then checks whether the test is clean. The second framing invites the question ``how many features did you try?'' and a reach for the Deflated Sharpe Ratio (Section~\ref{sec:eval-dsr}; a Sharpe adjusted downward for how many things you tried, so that staying positive means the edge survives that penalty).
 
 \begin{keyidea}[The ML Is the Test, Not the Story]
 Lead with the volatility mechanism, not the model: the economic theory provides the \emph{why}, the ML (Chapter~\ref{ch:trees}) provides the \emph{how much better than HAR}, and the forecast is judged against the HAR baseline, not by its raw $R^2$.
 \end{keyidea}
 
 \begin{warning}[Never Open with Model Architecture]
-If the first thing the desk hears is ``a $500$-tree LightGBM ensemble with Bayesian hyperparameter search,'' you have lost them. They will spend the rest of the talk looking for overfitting instead of listening to results. Model complexity is a \emph{liability} until you have shown that the HAR baseline (Chapter~\ref{ch:har}) cannot do the job --- which is exactly why HAR appears on every chart. Save the architecture for the methodology slide.
+If the first thing the desk hears is ``a $500$-tree LightGBM ensemble with Bayesian hyperparameter search,'' you have lost them. They will spend the rest of the talk looking for overfitting instead of listening to results. Model complexity is a \emph{liability} until you have shown that the HAR baseline (Chapter~\ref{ch:har}) cannot do the job, which is exactly why HAR appears on every chart. Save the architecture for the methodology slide.
 \end{warning}
 
 % ──────────────────────────────────────────────────
@@ -479,7 +479,7 @@ If the first thing the desk hears is ``a $500$-tree LightGBM ensemble with Bayes
 The discipline that keeps a desk presentation tight is \textbf{one slide per claim}. Each slide communicates exactly one takeaway, and the structure is fixed:
 \begin{itemize}[leftmargin=1.5em]
   \item \textbf{Title = the claim.} Not ``Results'' but ``A semivariance feature beats HAR on QLIKE by $4\%$ ($\text{DM } t = 2.9$).'' The title is the takeaway.
-  \item \textbf{Body = one chart.} One chart proves the claim. No multi-chart slides --- they split attention and invite the audience to study the wrong panel while you talk about the right one.
+  \item \textbf{Body = one chart.} One chart proves the claim. No multi-chart slides: they split attention and invite the audience to study the wrong panel while you talk about the right one.
   \item \textbf{Footer = the metric.} A single line with the key numbers: ``$\QLIKE_{\text{ML}} = 0.241$ vs.\ $\QLIKE_{\text{HAR}} = 0.251$; DM $t = 2.9$; net $\SR = 0.84$; $n = 1{,}250$.''
 \end{itemize}
 
@@ -491,7 +491,7 @@ The same discipline governs chart \textbf{captions} in the written report: a cap
 The second caption states the claim, the magnitude, the significance test, and which line is which. A reader who sees only the figure and its caption should be able to reconstruct your point.
 
 \begin{keyidea}[If They Only Read the Titles]
-Write slide titles so that reading them in sequence tells the whole story. Test it: list your titles and hand them to a colleague. If they can reconstruct the argument from titles alone --- hypothesis, QLIKE result, DM significance, net economic value, what failed --- the deck is well structured. If they cannot, rewrite the titles until they can.
+Write slide titles so that reading them in sequence tells the whole story. Test it: list your titles and hand them to a colleague. If they can reconstruct the argument from titles alone (hypothesis, QLIKE result, DM significance, net economic value, what failed), the deck is well structured. If they cannot, rewrite the titles until they can.
 \end{keyidea}
 
 % ──────────────────────────────────────────────────
@@ -499,18 +499,18 @@ Write slide titles so that reading them in sequence tells the whole story. Test 
 \label{subsec:negatives}
 % ──────────────────────────────────────────────────
 
-A presentation that reports only wins triggers the audience's overfitting alarm. One that says ``we tested four feature families against HAR; two beat it, two did not'' signals intellectual honesty --- and honesty is what buys belief in the wins.
+A presentation that reports only wins triggers the audience's overfitting alarm. One that says ``we tested four feature families against HAR; two beat it, two did not'' signals intellectual honesty, and honesty is what buys belief in the wins.
 
 Report which feature families \emph{failed} to beat the HAR baseline, and why. Useful negatives for a volatility project look like:
 \begin{itemize}[leftmargin=1.5em]
   \item ``Cross-asset RV spillover features added no QLIKE improvement over HAR after purged cross-validation (Section~\ref{sec:eval-purgedcv}; cross-validation that removes train/test windows that overlap in time, so nothing leaks); the Diebold--Mariano test could not reject equal accuracy ($t = 0.4$).''
-  \item ``A jump-component split (HAR-J) helped in-sample but the gain did not survive walk-forward evaluation (training only on the past and testing on the next block, rolling forward) --- consistent with the difficulty of forecasting the jump part of RV.''
+  \item ``A jump-component split (HAR-J) helped in-sample but the gain did not survive walk-forward evaluation (training only on the past and testing on the next block, rolling forward), consistent with the difficulty of forecasting the jump part of RV.''
   \item ``LightGBM did not beat ridge-HAR (a HAR regression with ridge regularization, i.e.\ a penalty that shrinks the coefficients) on the same features. The RV-to-RV mapping appears close to linear in our sample (Chapter~\ref{ch:trees}, Section~\ref{sec:trees:honest}), so we report the linear model.''
 \end{itemize}
 Each of these tells the desk what the \emph{data} look like, not just what the model found. Put them on one slide titled honestly, e.g.\ ``Feature families that did not beat HAR,'' as a compact table of family, QLIKE-vs-HAR, DM $t$-statistic, and the reason.
 
 \begin{intuition}[Negatives Build Trust Because They Are Costly]
-Reporting failures costs scarce presentation time and exposes the limits of your work. The audience knows this. The fact that you are \emph{willing} to pay that cost signals that the positive results are real. A presenter who shows only successes is optimizing for impression, not information --- and an experienced desk head can tell the difference instantly.
+Reporting failures costs scarce presentation time and exposes the limits of your work. The audience knows this. The fact that you are \emph{willing} to pay that cost signals that the positive results are real. A presenter who shows only successes is optimizing for impression, not information, and an experienced desk head can tell the difference instantly.
 \end{intuition}
 
 % ──────────────────────────────────────────────────
@@ -518,10 +518,10 @@ Reporting failures costs scarce presentation time and exposes the limits of your
 \label{subsec:report-structure}
 % ──────────────────────────────────────────────────
 
-The written deliverable is a desk-ready report, not slides. Page budgets enforce discipline --- they stop you from burying the result in methodology. A workable structure:
+The written deliverable is a desk-ready report, not slides. Page budgets enforce discipline; they stop you from burying the result in methodology. A workable structure:
 \begin{enumerate}[leftmargin=1.5em, nosep]
   \item \textbf{Executive summary} ($1$ page). Hypothesis, headline QLIKE/DM result, net economic value. A busy desk head reads only this page.
-  \item \textbf{Hypothesis and motivation} ($1$--$2$ pages). The volatility mechanism --- leverage effect (Chapter~\ref{ch:har}), variance risk premium (Chapter~\ref{ch:vrp}) --- that motivates the feature.
+  \item \textbf{Hypothesis and motivation} ($1$--$2$ pages). The volatility mechanism that motivates the feature: the leverage effect (Chapter~\ref{ch:har}) or the variance risk premium (Chapter~\ref{ch:vrp}).
   \item \textbf{Data and features} ($2$--$3$ pages). RV construction, HAR components, the candidate feature families, sample period, and the reserved holdout (data locked away and never looked at during model-building).
   \item \textbf{Methodology} ($2$--$3$ pages). QLIKE loss (Section~\ref{sec:eval-qlike}), purged cross-validation (Section~\ref{sec:eval-purgedcv}), look-ahead controls (Section~\ref{sec:eval-lookahead-taxonomy}), model specifications.
   \item \textbf{Results, with the HAR baseline} ($3$--$5$ pages). One subsection per feature family. Each: QLIKE table vs.\ HAR, Diebold--Mariano test, and the vol-targeting net-Sharpe table from Section~\ref{sec:net-econ-value}, always plotted against HAR.
@@ -533,7 +533,7 @@ The written deliverable is a desk-ready report, not slides. Page budgets enforce
 Every chart in the report supports exactly one claim, stated in its caption (Section~\ref{subsec:one-slide}).
 
 \begin{warning}[Do Not Iterate After Unblinding the Holdout]
-Chapter~\ref{ch:evaluation} made this point under the look-ahead taxonomy (Section~\ref{sec:eval-lookahead-taxonomy}); it bears repeating here. The out-of-sample test on the reserved holdout is a \emph{one-shot} exercise. You run it once, report the result, and do not return to re-tune. ``In-sample QLIKE improvement $5\%$, out-of-sample $3\%$'' is a legitimate, honest result. ``We re-optimized on the holdout until the out-of-sample number improved'' is not a result --- it is the bias the whole evaluation framework exists to prevent.
+Chapter~\ref{ch:evaluation} made this point under the look-ahead taxonomy (Section~\ref{sec:eval-lookahead-taxonomy}); it bears repeating here. The out-of-sample test on the reserved holdout is a \emph{one-shot} exercise. You run it once, report the result, and do not return to re-tune. ``In-sample QLIKE improvement $5\%$, out-of-sample $3\%$'' is a legitimate, honest result. ``We re-optimized on the holdout until the out-of-sample number improved'' is the bias the whole evaluation framework exists to prevent, not a result.
 \end{warning}
 
 % ──────────────────────────────────────────────────
@@ -551,12 +551,12 @@ The following questions come up in almost every desk presentation of a volatilit
 \emph{Answer:} ``Out-of-sample QLIKE improves by $4\%$, and the Diebold--Mariano test (Section~\ref{sec:eval-dm}) rejects equal accuracy at $t = 2.9$. The improvement holds in walk-forward, not just one split.''\\
 \noindent\emph{Backup slide:} QLIKE-vs-HAR table with DM $t$-statistics per feature family.
 
-\paragraph{``What happens in a crisis --- does it underpredict?''}
+\paragraph{``What happens in a crisis? Does it underpredict?''}
 \emph{Answer:} ``Like all models trained on mostly-calm data, it underpredicts the largest jumps; we show this in the VIX-tercile decomposition (Section~\ref{sec:net-econ-value}). The vol-targeting book floors leverage during high-uncertainty regimes (Section~\ref{subsec:tsmom-connection}) to bound the damage.''\\
 \noindent\emph{Backup slide:} VIX-tercile net-P\&L table plus the crisis-underprediction note.
 
-\paragraph{``Why not just use HAR --- is the nonlinearity real?''}
-\emph{Answer:} ``We tested ridge-HAR on identical features; where the tree wins, SHAP (a tool that quantifies how much each feature pushed a given prediction) attributes the win to a threshold effect --- the model behaving differently above versus below a vol level --- which a straight-line (linear) model, by definition, cannot represent (Chapter~\ref{ch:trees}). Where ridge ties the tree, we report the linear model as production.''\\
+\paragraph{``Why not just use HAR? Is the nonlinearity real?''}
+\emph{Answer:} ``We tested ridge-HAR on identical features; where the tree wins, SHAP (a tool that quantifies how much each feature pushed a given prediction) attributes the win to a threshold effect (the model behaving differently above versus below a vol level), which a straight-line (linear) model, by definition, cannot represent (Chapter~\ref{ch:trees}). Where ridge ties the tree, we report the linear model as production.''\\
 \noindent\emph{Backup slide:} HAR vs.\ ridge-HAR vs.\ LightGBM QLIKE bar chart (Section~\ref{sec:trees:honest}).
 
 \paragraph{``Are the features stable across regimes?''}
@@ -567,7 +567,7 @@ The following questions come up in almost every desk presentation of a volatilit
 \emph{Answer:} ``Every feature is built point-in-time and every label uses the next period's RV; the look-ahead taxonomy in Section~\ref{sec:eval-lookahead-taxonomy} lists each control. Purged cross-validation (Section~\ref{sec:eval-purgedcv}) removes overlap between train and test windows.''\\
 \noindent\emph{Backup slide:} timeline diagram of feature/label alignment and the purge/embargo windows.
 
-\paragraph{``Is this overfit --- how many things did you try?''}
+\paragraph{``Is this overfit? How many things did you try?''}
 \emph{Answer:} ``We logged $N$ experiments; the Deflated Sharpe Ratio (Section~\ref{sec:eval-dsr}) stays positive after correcting for that count. Walk-forward out-of-sample QLIKE is consistent with the cross-validation estimate.''\\
 \noindent\emph{Backup slide:} DSR computation with the trial count and the walk-forward QLIKE series.
 

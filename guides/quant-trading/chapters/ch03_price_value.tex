@@ -45,7 +45,7 @@ From \cref{ch:participants}:
 No prior finance knowledge assumed beyond these.
 \end{backgroundbox}
 
-\section{Bid, ask, spread, mid --- formally}
+\section{Bid, ask, spread, mid: formal definitions}
 \label{sec:bidaskmid_formal}
 
 \Cref{ch:lob} introduced $\bidp$, $\askp$, $\spreads$, and $\midp$ as
@@ -79,7 +79,7 @@ If $A_t$ is empty, $\askp$ is undefined.
 The \emph{bid--ask spread} $\spreads$ is the gap between the best ask
 and the best bid, $\spreads \defeq \askp - \bidp$. On an uncrossed
 book $\spreads \geq 0$; we have $\spreads = 0$ only in the degenerate
-instant when the book is \emph{locked} mid-match --- that is, the
+instant when the book is \emph{locked} mid-match, that is, when the
 best bid and best ask are momentarily equal because the matching
 engine has not yet cleared the crossing orders.
 \end{definition}
@@ -96,8 +96,8 @@ bid and the best ask:
 The mid is the most common ``summary'' of where a market is trading,
 and $\midp$ appears in almost every subsequent chapter. It is not
 ``the price'' in any rigorous sense; it is a convenient average that
-pretends the two sides of the book are symmetric. When they are not
---- almost always --- there are better choices.
+pretends the two sides of the book are symmetric. When they are not,
+which is almost always, there are better choices.
 
 \begin{pitfallbox}[``The mid is the price'' is wrong]
 The mid is easy to compute, plot, and defend in a meeting. It also
@@ -105,7 +105,7 @@ implicitly asserts that the best bid and best ask carry \emph{equal}
 information about where the next trade happens. This is almost never
 true. If the bid is backed by $131$ lots and the ask by only $48$,
 the ask clears first under a modest market buy, and the post-trade
-mid sits strictly above the pre-trade mid --- meaning the expected
+mid sits strictly above the pre-trade mid, meaning the expected
 next traded price was above the mid all along. The microprice
 (\cref{sec:beyond_mid}) is the correction. Use the mid as an
 \emph{input} to strategies, not as a belief about fair value.
@@ -148,15 +148,15 @@ disagree, and the disagreement is informative.
 
 Bouchaud, Bonart, Donier, and Gould \citeBouchaud{} give the formal
 treatment and show the microprice is a markedly better short-horizon
-predictor of the next mid movement than the mid --- it anticipates
-the mid rather than lagging it. The underlying reason is order-flow
+predictor of the next mid movement than the mid itself: it
+anticipates the mid rather than lagging it. The underlying reason is order-flow
 imbalance, developed in \cref{ch:order_flow}.
 
 \begin{intuitionbox}
 The side with less size breaks first: a smaller buffer against the
 next market order means a higher probability that side gets wiped
-and its top quote moves. If you believe that --- and the data in
-\cref{ch:order_flow} say you should --- then the near-future price
+and its top quote moves. If you believe that (and the data in
+\cref{ch:order_flow} say you should), then the near-future price
 sits closer to the \emph{other} side. The microprice is the cheapest
 implementation of that belief: one weighted average, no model, no
 parameter to fit. Whenever a market-making chapter refers to ``fair
@@ -179,7 +179,7 @@ $(p_1, q_1), \ldots, (p_n, q_n)$ have printed on a product, the
 VWAP is not a fair-value estimate; it is a \emph{benchmark}. The
 standard use case is execution measurement. Suppose a pension fund
 buys a million shares over a trading day. The fund does not care
-about the current mid --- it cares whether its average acquisition
+about the current mid; it cares whether its average acquisition
 price beat or missed the day's VWAP. Beating VWAP by a basis point
 on a million-share parent order is a valuable sell-side
 relationship; missing by five basis points is an excuse to find a
@@ -194,8 +194,8 @@ benchmark.
 Two practical notes. First, VWAP depends on the window: ``day
 VWAP'' is the common version, but ``trailing one-hour VWAP'' and
 ``VWAP since open'' appear routinely on execution dashboards.
-Second, VWAP is backward-looking --- it exists only after the trades
-print --- so it cannot be a forward-looking fair value. Do not
+Second, VWAP is backward-looking (it exists only after the trades
+print), so it cannot be a forward-looking fair value. Do not
 confuse the two.
 
 \subsection{Last-trade price}
@@ -209,7 +209,7 @@ time $t$. If no trades have yet occurred in the current session,
 $p^{\mathrm{last}}_t$ is undefined.
 \end{definition}
 
-The last-trade price is the folk-meaning of ``the price'' --- what
+The last-trade price is the folk-meaning of ``the price'': what
 retail websites display as ``current'' and what the closing-auction
 print becomes for end-of-day accounting. Its use case is narrow but
 important: \textbf{marking a position to market}. At session end
@@ -224,8 +224,8 @@ closing-auction print, is preferred.
 Its weakness: a single number from a noisy stream. One small trade
 at an odd price moves it; one unwatched cancelled trade leaves it
 stale for an hour. It is also the cheapest price to manipulate near
-the close --- the regulatory phrase \emph{``marking the close''}
-refers to exactly this --- which is why closing auctions exist as a
+the close (the regulatory phrase \emph{``marking the close''}
+refers to exactly this), which is why closing auctions exist as a
 separate mechanism.
 
 \section{Wall Mid: a Prosperity-specific fair value}
@@ -239,8 +239,8 @@ bot quotes are transient orders from competing human-written
 algorithms, including one-lot ``stub'' orders posted for signalling
 or to momentarily narrow the top. Using raw top-of-book as a
 fair-value proxy therefore reacts to every skirmish there. The
-Frankfurt Hedgehogs noticed that the \emph{outer} visible levels ---
-the lowest bid and highest ask in each snapshot --- were
+Frankfurt Hedgehogs noticed that the \emph{outer} visible levels
+(the lowest bid and highest ask in each snapshot) were
 consistently posted by the same designated market-maker bots,
 quoting rounded versions of the true underlying price (typically
 $\pm 2$ ticks). They named those outer levels the \emph{bid wall}
@@ -271,7 +271,7 @@ two outer levels gave a far more stable estimate than any
 top-of-book quantity.
 
 \begin{prosperitybox}
-\textbf{Wall Mid --- the Frankfurt Hedgehogs' signature construction.}
+\textbf{Wall Mid: the Frankfurt Hedgehogs' signature construction.}
 Below is the exact helper used by the 2nd-place Frankfurt Hedgehogs
 algorithm in Prosperity~3 to compute the Wall Mid from a
 \texttt{TradingState}. \texttt{mkt\_buy\_orders} and
@@ -310,8 +310,8 @@ Prosperity-specific insight most worth stealing for a 2026 entry.
 \label{sec:running_example}
 
 Take the same four-level toy LOB carried through \cref{ch:lob},
-reproduced with sizes made explicit --- for this chapter every size
-matters.
+reproduced with sizes made explicit, since for this chapter every
+size matters.
 
 \begin{center}
 \begin{tabular}{cc|cc}
@@ -415,7 +415,7 @@ $\wallmid$              & Wall Mid                          & $102.925$  \\
 \end{center}
 
 Six numbers, all nominally near ``one hundred and three,'' spread
-across a range of $103.20 - 102.54 = 0.66$ --- almost exactly the
+across a range of $103.20 - 102.54 = 0.66$, almost exactly the
 quoted spread. This dispersion is the point. Each number answers a
 different question, and confusing them is the cheapest way a new
 quant loses money.
@@ -443,8 +443,8 @@ Never use a single one of the six numbers for all four purposes.
 Every price measure in this chapter is a \emph{statistic}: a
 deterministic function of the LOB or the recent trade tape. None
 estimates a latent quantity. The word quants use for that latent
-quantity is \textbf{fair value}; it is worth saying clearly what it
-means, since the term is thrown around casually on trading desks.
+quantity is \textbf{fair value}; since the term is thrown around
+casually on trading desks, we state clearly what it means.
 
 \begin{definition}[Fair value, informally]
 \index{fundamental value|textbf}
@@ -462,8 +462,8 @@ model, which defines the \emph{efficient price} as a latent random
 walk of unobservable innovations and extracts it from trade-price
 autocovariance alone. \Cref{ch:black_scholes} covers Black--Scholes,
 where the fair value of a European option is the unique
-no-arbitrage price implied by the underlying's dynamics --- rigorous
-once inputs are fixed, but inheriting all the fragility of those
+no-arbitrage price implied by the underlying's dynamics, rigorous
+once inputs are fixed but inheriting all the fragility of those
 inputs. In both cases fair value is the output of a model, and the
 model is only as good as its inputs and assumptions.
 

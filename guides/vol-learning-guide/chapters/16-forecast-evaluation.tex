@@ -11,7 +11,7 @@ We cover the right loss function ($\QLIKE$), the right comparison test (Diebold-
 \label{sec:eval-why}
 % ══════════════════════════════════════════════════════════════
 
-Before diving into specific tools, consider two scenarios that illustrate why evaluation methodology \emph{is} the credibility of your results.
+Before turning to specific tools, consider two scenarios that illustrate why evaluation methodology \emph{is} the credibility of your results.
 
 \textbf{Scenario 1.}
 You build a LightGBM volatility forecast that achieves 5\% lower $\QLIKE$ than the HAR benchmark (Chapter~\ref{ch:har}).
@@ -23,8 +23,7 @@ You try 30 different feature sets, pick the best one, and report a backtest Shar
 A colleague asks: ``What's the probability that at least one of 30 random strategies would have produced a Sharpe that high?''
 Without the Deflated Sharpe Ratio, you cannot answer.
 
-The evaluation framework is not a final step you tack on after research.
-It is the infrastructure you build \emph{first}, so that every experiment you run produces honest, comparable numbers from day one.
+The evaluation framework is infrastructure you build \emph{first}, not a final step you tack on after research, so that every experiment you run produces honest, comparable numbers from day one.
 
 \begin{keyidea}[Seven Tools, Seven Questions]
 This chapter introduces seven evaluation tools.
@@ -121,7 +120,7 @@ where:
 \begin{intuition}[In Plain English]
 QLIKE has two parts pulling in opposite directions.
 The $\ln h_t$ term punishes you for forecasting too high (wasting capital on unnecessary hedges), while the $\sigma^2_t / h_t$ term punishes you for forecasting too low (holding unrecognized risk).
-Critically, the under-prediction penalty ($\sigma^2_t / h_t$) explodes as $h_t \to 0$, so QLIKE is far harsher on dangerous under-estimates than on conservative over-estimates.
+The under-prediction penalty ($\sigma^2_t / h_t$) explodes as $h_t \to 0$, so QLIKE is far harsher on dangerous under-estimates than on conservative over-estimates.
 This asymmetry matches real-world priorities: underestimating volatility gets you fired; overestimating it merely costs some opportunity.
 This does not mean the optimal forecast is biased upward.
 It means that among two equally wrong forecasts, the one that errs low is more costly.
@@ -211,7 +210,7 @@ When MSE and QLIKE disagree, check whether the MSE ranking is driven by a handfu
 \begin{projectconnection}[Why This Matters]
 QLIKE is THE primary evaluation metric for your project.
 When you report that your ML model beats HAR, the headline number is the percentage reduction in QLIKE.
-The asymmetry is critical: QLIKE penalizes you more for underestimating vol than overestimating it (through the $\sigma^2_t / h_t$ ratio), which aligns with risk management priorities where underestimating vol means holding too much risk.
+The asymmetry matters: QLIKE penalizes you more for underestimating vol than overestimating it (through the $\sigma^2_t / h_t$ ratio), which aligns with risk management priorities where underestimating vol means holding too much risk.
 Target a 30--80 bps $\QLIKE$ improvement over HAR to claim a meaningful result.
 Report the percentage reduction to two decimal places in your results table, and always pair it with a DM test $p$-value (Section~\ref{sec:eval-dm}).
 \end{projectconnection}
@@ -799,27 +798,27 @@ Always use purged CV, expanding-window, or walk-forward evaluation for time seri
 % ══════════════════════════════════════════════════════════════
 
 The purging and embargo machinery above protects you when you forecast \emph{one} series at a time (e.g., SPX realized variance).
-But the moment you \textbf{pool} several instruments into a single panel --- stacking, say, SPX, Nasdaq-100, the Russell 2000, and a basket of single names into one training matrix to give your ML model more rows --- a second, sneakier form of leakage appears.
+But the moment you \textbf{pool} several instruments into a single panel (stacking, say, SPX, Nasdaq-100, the Russell 2000, and a basket of single names into one training matrix to give your ML model more rows), a second, sneakier form of leakage appears.
 
 The concrete question: \emph{if I shuffle my pooled panel and split it row-by-row, what exactly leaks?}
 
 \begin{prereq}[Pooled Panel of Realized Variances]
 A \textbf{pooled panel} stacks observations indexed by both an instrument $i$ and a date $t$.
 Each row is a $(\text{date } t, \text{instrument } i)$ pair: the features are that instrument's HAR components on day $t$ (daily, weekly, monthly lagged $\RV$, jumps, implied volatility $\IVol$), and the label is its forward realized variance $\RV_{i,t+1}$.
-These are just the model's input columns from earlier chapters --- you do not need their details here, only that each row is one asset on one day.
+These are just the model's input columns from earlier chapters; you do not need their details here, only that each row is one asset on one day.
 Pooling is attractive because a single ML model trained on $N_{\text{assets}} \times T$ rows sees far more data than $T$ rows from one asset, and it can borrow strength across instruments that share volatility dynamics.
 \end{prereq}
 
 \textbf{Same-date observations are cross-sectionally correlated.}
 On any given day, equity-index realized variances move together: a macro shock (a Fed surprise, a CPI print, the COVID crash of March 2020) lifts $\RV$ for \emph{every} index on the \emph{same} date.
-This is the cross-sectional analogue of volatility clustering --- not ``today's $\RV$ predicts tomorrow's'' but ``SPX's $\RV$ today is correlated with Nasdaq's $\RV$ today.''
+This is the cross-sectional analogue of volatility clustering: not ``today's $\RV$ predicts tomorrow's'' but ``SPX's $\RV$ today is correlated with Nasdaq's $\RV$ today.''
 The day-to-day surprises in each asset's $\RV_{i,t}$ share a single market-wide shock $f_t$ (a common factor; think: the size of that day's macro surprise) that pushes every asset's $\RV$ in the same direction.
 
-Now suppose you split this pooled panel with random $K$-fold, putting individual \emph{rows} into folds. The SPX row for 16 March 2020 lands in the training fold; the Nasdaq row for the \emph{same} 16 March 2020 lands in the test fold. Because both rows are driven by the same crisis-day common factor $f_t$, the model has effectively seen the test day's volatility shock through a different instrument's window. Your forecast of Nasdaq $\RV$ on that date is no longer a genuine out-of-sample prediction --- the answer leaked in sideways, across the cross-section, on the same calendar date.
+Now suppose you split this pooled panel with random $K$-fold, putting individual \emph{rows} into folds. The SPX row for 16 March 2020 lands in the training fold; the Nasdaq row for the \emph{same} 16 March 2020 lands in the test fold. Because both rows are driven by the same crisis-day common factor $f_t$, the model has effectively seen the test day's volatility shock through a different instrument's window. Your forecast of Nasdaq $\RV$ on that date is no longer a genuine out-of-sample prediction: the answer leaked in sideways, across the cross-section, on the same calendar date.
 
 \begin{intuition}[In Plain English]
-Purging and embargo (Section~\ref{sec:eval-purgedcv}) plug the leak \emph{through time} --- yesterday bleeding into today.
-Cross-sectional leakage is a leak \emph{through the cross-section} --- one asset's value on a date bleeding into another asset's value on the \emph{same} date.
+Purging and embargo (Section~\ref{sec:eval-purgedcv}) plug the leak \emph{through time}: yesterday bleeding into today.
+Cross-sectional leakage is a leak \emph{through the cross-section}: one asset's value on a date bleeding into another asset's value on the \emph{same} date.
 A random row split looks innocent (no single asset appears in both train and test for the same date), but because all assets share the day's shock, splitting by row still hands the model the answer.
 The fix is blunt and absolute: an entire \emph{date} is either a training date or a test date, never both.
 \end{intuition}
@@ -827,7 +826,7 @@ The fix is blunt and absolute: an entire \emph{date} is either a training date o
 \begin{keyidea}[Grouped Purged CV by Date]
 When pooling instruments, do not cross-validate on rows.
 Cross-validate on \textbf{dates}: assign each calendar date wholesale to train or to test, so all instruments observed on a given date go to the same side of the split.
-Then apply purging and embargo \emph{on the date axis} exactly as in Section~\ref{sec:eval-purgedcv} --- purge the dates whose forward-$\RV$ label windows overlap the test block, and embargo the dates immediately after it.
+Then apply purging and embargo \emph{on the date axis} exactly as in Section~\ref{sec:eval-purgedcv}: purge the dates whose forward-$\RV$ label windows overlap the test block, and embargo the dates immediately after it.
 In \texttt{scikit-learn} this is the role of \texttt{GroupKFold} / \texttt{StratifiedGroupKFold} with the date as the group key, layered on top of a time-ordered (not shuffled) split, with purge and embargo added manually.
 This is the panel-econometrics discipline of \citet{LopezdePrado2018}: entire dates go into train or test, never split across folds.
 \end{keyidea}
@@ -842,10 +841,10 @@ Using \texttt{TimeSeriesSplit} on a pooled panel without grouping by date stops 
 \end{warning}
 
 \begin{projectconnection}[Why This Matters]
-If you pool SPX, Nasdaq-100, and a handful of liquid single names to fatten your training set --- a tempting move when one index gives you only ${\sim}1{,}250$ usable daily rows over five years --- a row-wise CV split will report a $\QLIKE$ improvement over HAR that simply does not exist out of sample.
+If you pool SPX, Nasdaq-100, and a handful of liquid single names to fatten your training set (a tempting move when one index gives you only ${\sim}1{,}250$ usable daily rows over five years), a row-wise CV split will report a $\QLIKE$ improvement over HAR that simply does not exist out of sample.
 The leaked common factor $f_t$ makes the model look like it forecasts crisis days well when it has merely memorised them through a sibling instrument.
 Group your purged folds by date, and your cross-validated $\QLIKE$ will finally track the held-out $\QLIKE$ you report in Section~\ref{sec:eval-dm}.
-The cross-sectional pooling design itself --- which instruments to stack, and how to weight them --- is developed in Chapter~\ref{ch:applications}; this subsection is the validation guardrail that design must respect (see \Cref{sec:ch16:xsection-leakage}).
+The cross-sectional pooling design itself (which instruments to stack, and how to weight them) is developed in Chapter~\ref{ch:applications}; this subsection is the validation guardrail that design must respect (see \Cref{sec:ch16:xsection-leakage}).
 \end{projectconnection}
 
 
@@ -855,7 +854,7 @@ The cross-sectional pooling design itself --- which instruments to stack, and ho
 % ══════════════════════════════════════════════════════════════
 
 Purged CV gives you, for each candidate hyperparameter (the ridge penalty $\lambda$, the LightGBM tree depth, the number of HAR lags), a cross-validated $\QLIKE$ estimate.
-The obvious rule --- pick the value with the lowest CV $\QLIKE$ --- slightly over-fits.
+The obvious rule, picking the value with the lowest CV $\QLIKE$, slightly over-fits.
 
 The CV $\QLIKE$ at each $\lambda$ is itself an \emph{estimate}, averaged over a handful of purged folds, and it carries a standard error.
 The value that happens to minimise the average may be only a noise-width below several nearby, simpler (more regularised) candidates.
@@ -876,13 +875,14 @@ where:
   \item $\mathrm{SE}(\lambda_{\min})$ is the across-fold standard error of the CV $\QLIKE$ at the minimiser,
   \item $\lambda_{\text{1SE}}$ is the largest (simplest) $\lambda$ whose CV loss is statistically indistinguishable from the best.
 \end{itemize}
-In words: the notation $\{\lambda : \ldots\}$ reads ``the set of all $\lambda$ such that \ldots'', and $\max$ picks the largest element of that set. So Equation~\eqref{eq:one-se} says: look at every $\lambda$ whose average CV loss is no more than one standard error above the very best; among those, keep the largest $\lambda$ --- the simplest, most-shrunk model.
-The \textbf{standard error} here is how much the average CV loss would wobble if you reran the folds --- your measurement noise on that average (the standard deviation of the per-fold losses divided by $\sqrt{\text{number of folds}}$).
+In words: the notation $\{\lambda : \ldots\}$ reads ``the set of all $\lambda$ such that \ldots'', and $\max$ picks the largest element of that set. So Equation~\eqref{eq:one-se} says: look at every $\lambda$ whose average CV loss is no more than one standard error above the very best; among those, keep the largest $\lambda$: the simplest, most-shrunk model.
+The \textbf{standard error} here is how much the average CV loss would wobble if you reran the folds: your measurement noise on that average (the standard deviation of the per-fold losses divided by $\sqrt{\text{number of folds}}$).
 This ``yields a simpler (more regularised) model that performs nearly as well'' \citep[the one-standard-error rule predates this source, originating with Breiman et al.\ (CART, 1984) and Hastie, Tibshirani \& Friedman, ESL;][applies it in the purged-CV setting]{LopezdePrado2018}.
 \end{keyidea}
 
 \begin{projectconnection}[Why This Matters]
-When you tune the ridge-HAR penalty $\lambda$ or the LightGBM depth by purged CV, picking $\lambda_{\min}$ on five-fold data routinely lands you on a setting that is barely better in CV but more reactive --- and that extra reactivity is the first thing to evaporate out of sample, showing up as $b > 1$ (over-reaction) in your Mincer--Zarnowitz regression (Section~\ref{sec:eval-mz}).
+When you tune the ridge-HAR penalty $\lambda$ or the LightGBM depth by purged CV, picking $\lambda_{\min}$ on five-fold data routinely lands you on a setting that is barely better in CV but more reactive.
+That extra reactivity is the first thing to evaporate out of sample, showing up as $b > 1$ (over-reaction) in your Mincer--Zarnowitz regression (Section~\ref{sec:eval-mz}).
 The one-standard-error rule pushes you toward a smoother HAR-like forecast that holds up on the holdout.
 It also shrinks your trial count: by collapsing a band of indistinguishable settings to a single principled choice, you make fewer real decisions, which directly lowers $N$ in the Deflated Sharpe Ratio (Section~\ref{sec:eval-dsr}) and the Probability of Backtest Overfitting (\Cref{sec:ch16:pbo}).
 \end{projectconnection}
@@ -894,7 +894,7 @@ It also shrinks your trial count: by collapsing a band of indistinguishable sett
 % ══════════════════════════════════════════════════════════════
 
 Purged $K$-fold CV (Section~\ref{sec:eval-purgedcv}) hands you one number per fold.
-With $K = 5$ folds you get five cross-validated $\QLIKE$ estimates, and walk-forward evaluation gives you a single out-of-sample path --- a thin basis for a claim as strong as ``my LightGBM forecast robustly beats HAR.''
+With $K = 5$ folds you get five cross-validated $\QLIKE$ estimates, and walk-forward evaluation gives you a single out-of-sample path, a thin basis for a claim as strong as ``my LightGBM forecast robustly beats HAR.''
 The natural question: \emph{how would my model have performed across many different out-of-sample histories drawn from the same five years of data, not just one?}
 
 \begin{prereq}[Combinatorics: $N$ Choose $k$]
@@ -939,10 +939,10 @@ where:
 Equation~\eqref{eq:ch16-cpcv-splits} asks ``how many models do I fit?'' and Equation~\eqref{eq:ch16-cpcv-paths} asks ``how many complete alternative histories can I reconstruct from their out-of-sample pieces?''
 Here is why the path count is $(k/N)\binom{N}{k}$, derived from scratch.
 Each split tests a fraction $k/N$ of the data (it holds out $k$ of the $N$ groups).
-To cover the whole history exactly once you therefore need $N/k$ splits stitched edge-to-edge --- that is one path.
-You fit $\binom{N}{k}$ splits in total, so the total test coverage is $\binom{N}{k}$ splits $\times\ k/N$ of the data each $=\ \frac{k}{N}\binom{N}{k}$ complete passes over the data --- and one complete pass \emph{is} one path.
+To cover the whole history exactly once you therefore need $N/k$ splits stitched edge-to-edge; that is one path.
+You fit $\binom{N}{k}$ splits in total, so the total test coverage is $\binom{N}{k}$ splits $\times\ k/N$ of the data each $=\ \frac{k}{N}\binom{N}{k}$ complete passes over the data, and one complete pass \emph{is} one path.
 Because every group is held out in the same number of splits, those passes line up cleanly: the per-group test results tile into $\varphi(N,k)$ full-length paths with nothing left over.
-The payoff: instead of one out-of-sample $\QLIKE$ number, you get a whole \emph{distribution} of out-of-sample $\QLIKE$ numbers, all extracted from the same five years of data --- a far stronger basis for judging whether an edge is real or an artifact of the one path you happened to walk.
+The payoff: instead of one out-of-sample $\QLIKE$ number, you get a whole \emph{distribution} of out-of-sample $\QLIKE$ numbers, all extracted from the same five years of data: a far stronger basis for judging whether an edge is real or an artifact of the one path you happened to walk.
 \end{intuition}
 
 \begin{workedexample}[CPCV with $N = 6$, $k = 2$]
@@ -970,7 +970,7 @@ $\{5,6\}$ & & & & & \\
 \end{tabular}
 \end{center}
 
-Each group is tested whenever it is paired with one of the other 5 groups, i.e.\ $\binom{5}{1} = 5$ times --- so each of the six groups appears as a test group in exactly 5 of the 15 splits, and coverage is uniform.
+Each group is tested whenever it is paired with one of the other 5 groups, i.e.\ $\binom{5}{1} = 5$ times, so each of the six groups appears as a test group in exactly 5 of the 15 splits, and coverage is uniform.
 Those 15 out-of-sample segments reassemble into \textbf{5 non-overlapping backtest paths}, each scoring the model across all 1,250 days.
 You now report a distribution of 5 full-sample $\QLIKE$ values for ``LightGBM minus HAR,'' instead of the single path a walk-forward would have given you.
 If all 5 paths show LightGBM beating HAR, the edge is robust; if 2 of the 5 reverse, you have learned something a single walk-forward would have hidden.
@@ -1037,7 +1037,7 @@ If all 5 paths show LightGBM beating HAR, the edge is robust; if 2 of the 5 reve
 \end{tikzpicture}
 \caption{CPCV with $N=6$, $k=2$ reassembles the $\binom{6}{2}=15$ test-group pairs into $\varphi(6,2)=5$ non-overlapping backtest paths.
 Each row is one backtest path; every group G1--G6 is tested exactly once per path, so each path scores the model on the full 1{,}250-day history.
-Within a path the six test cells split into three pairs --- marked with superscripts $a$, $b$, $c$ --- and each pair is one train--test split (the two groups in the pair are tested while the other four train).
+Within a path the six test cells split into three pairs (marked with superscripts $a$, $b$, $c$), and each pair is one train--test split (the two groups in the pair are tested while the other four train).
 The per-row label lists those three test pairs.
 Five paths give a distribution of full-sample $\QLIKE$ values instead of the single estimate a walk-forward provides.}
 \label{fig:ch16-cpcv-paths}
@@ -1061,7 +1061,7 @@ Pair this with the Diebold--Mariano test (Section~\ref{sec:eval-dm}) on the pool
 % ══════════════════════════════════════════════════════════════
 
 CPCV gives you a distribution of out-of-sample performance.
-The next question is sharper and more uncomfortable: \emph{when I pick the configuration that looks best in-sample --- the feature set, the lag count, the hyperparameters --- how often does that very choice turn out to be below-average out-of-sample?}
+The next question is sharper and more uncomfortable: \emph{when I pick the configuration that looks best in-sample (the feature set, the lag count, the hyperparameters), how often does that very choice turn out to be below-average out-of-sample?}
 If the answer is ``most of the time,'' your selection procedure is manufacturing overfit, not discovering signal.
 The \textbf{Probability of Backtest Overfitting} (PBO) measures exactly this, and it does so without assuming any model for returns \citep{Bailey2014PBO}.
 
@@ -1077,7 +1077,7 @@ A negative logit ($\text{logit}(\omega) < 0$) therefore means the chosen model l
 
 PBO is computed by \textbf{Combinatorially Symmetric Cross-Validation} (CSCV).
 The input is a $T \times N$ matrix of per-period performance, where $T$ is the number of time periods and $N$ is the number of configurations you tested.
-For volatility forecasting, the natural per-period entry is the (negative) $\QLIKE$ of each configuration's forecast on each block of days --- so that ``higher is better'' and the best-in-sample configuration is the one with the lowest in-sample $\QLIKE$.
+For volatility forecasting, the natural per-period entry is the (negative) $\QLIKE$ of each configuration's forecast on each block of days, so that ``higher is better'' and the best-in-sample configuration is the one with the lowest in-sample $\QLIKE$.
 
 \begin{definition}[CSCV and PBO]
 \textbf{Step 1.} Partition the $T$ time periods into $S$ non-overlapping, contiguous blocks of roughly equal size ($S$ even).
@@ -1087,7 +1087,7 @@ For volatility forecasting, the natural per-period entry is the (negative) $\QLI
   \item the chosen $S/2$ blocks form the IS set, the rest form the OOS set;
   \item compute each configuration's IS and OOS performance (here, $-\QLIKE$);
   \item let $n^*_c$ be the configuration with the best IS performance (lowest IS $\QLIKE$);
-  \item compute its OOS \textbf{relative rank} $\omega_c \in (0,1)$ --- the fraction of the $N$ configurations it beats out-of-sample ($\omega_c = 1$ is best, $0$ is worst).
+  \item compute its OOS \textbf{relative rank} $\omega_c \in (0,1)$: the fraction of the $N$ configurations it beats out-of-sample ($\omega_c = 1$ is best, $0$ is worst).
 \end{enumerate}
 
 \textbf{Step 3.} Take the logit of that rank:
@@ -1106,7 +1106,7 @@ where:
   \item $S$ is the number of contiguous time blocks (typically 8--16; must be even),
   \item $\binom{S}{S/2}$ is the number of IS/OOS partitions (for $S=10$, $\binom{10}{5}=252$),
   \item $n^*_c$ is the configuration that minimises in-sample $\QLIKE$ in partition $c$,
-  \item $\omega_c$ is the OOS relative rank of $n^*_c$ (fraction of configurations it beats out-of-sample); $\omega_c$ --- and hence $\lambda_c$ --- is the OOS rank \emph{of} $n^*_c$, the single in-sample winner whose out-of-sample fate is the only one we track in partition $c$,
+  \item $\omega_c$ is the OOS relative rank of $n^*_c$ (fraction of configurations it beats out-of-sample); $\omega_c$, and hence $\lambda_c$, is the OOS rank \emph{of} $n^*_c$, the single in-sample winner whose out-of-sample fate is the only one we track in partition $c$,
   \item $\lambda_c < 0 \iff \omega_c < 0.5$, i.e.\ the IS winner ranked below the OOS median.
 \end{itemize}
 \end{definition}
@@ -1114,7 +1114,7 @@ where:
 \begin{intuition}[In Plain English]
 PBO answers one blunt question: ``If I keep the model that looks best on the data I tuned on, how often does it actually rank below the median on fresh data?''
 A PBO of $0.60$ means that 60\% of the time, the configuration you would have selected by backtesting goes on to underperform half the alternatives out-of-sample.
-That is not signal selection --- it is noise selection.
+That is noise selection, not signal selection.
 Low PBO means your in-sample winners tend to stay winners; high PBO means your tuning procedure is fooling you.
 \end{intuition}
 
@@ -1142,7 +1142,7 @@ Take IS $=$ blocks $\{1,2\}$, OOS $=$ blocks $\{3,4\}$.
 \begin{enumerate}[nosep]
   \item \textbf{IS sums:} $\text{C}_1 = -2.70$, $\text{C}_2 = -2.80$, $\text{C}_3 = -2.75$. The IS winner $n^*_c$ is $\text{C}_1$ (least negative $=$ best).
   \item \textbf{OOS sums:} $\text{C}_1 = -2.75$, $\text{C}_2 = -2.80$, $\text{C}_3 = -1.80$. Out-of-sample, $\text{C}_1$ beats only $\text{C}_2$, i.e.\ 1 of the other 2 configs.
-  \item \textbf{Relative rank:} $\omega_c = 1/2 = 0.50$ (it beat 1 of the 2 non-self configurations). Logit $\lambda_c = \ln(0.5/0.5) = 0$ --- right at the median.
+  \item \textbf{Relative rank:} $\omega_c = 1/2 = 0.50$ (it beat 1 of the 2 non-self configurations). Logit $\lambda_c = \ln(0.5/0.5) = 0$, right at the median.
 \end{enumerate}
 
 \textbf{Repeat for all 6 partitions} (each pairs an IS half with its complementary OOS half), record $\lambda_c$ for each, then
@@ -1151,16 +1151,16 @@ Take IS $=$ blocks $\{1,2\}$, OOS $=$ blocks $\{3,4\}$.
 \text{PBO} = \frac{\#\{c : \lambda_c < 0\}}{6}.
 \]
 
-If, say, the IS winner lands in the bottom half OOS in 4 of the 6 partitions, $\text{PBO} = 4/6 \approx 0.67$ --- a red flag.
+If, say, the IS winner lands in the bottom half OOS in 4 of the 6 partitions, $\text{PBO} = 4/6 \approx 0.67$, a red flag.
 With only 3 configs and $S=4$ this is a toy; in practice $S = 10$ gives 252 partitions and $N$ runs into the dozens, but the mechanics are exactly these three steps repeated.
 \end{workedexample}
 
 \begin{keyidea}[PBO Thresholds]
 Use PBO as a go/no-go diagnostic on your \emph{selection process}, not on any single model:
 \begin{itemize}[nosep]
-  \item $\text{PBO} < 0.30$: encouraging --- in-sample winners usually survive out-of-sample.
-  \item $0.30 \le \text{PBO} \le 0.50$: caution --- treat your selected configuration sceptically and widen the holdout.
-  \item $\text{PBO} > 0.50$: red flag --- the in-sample winner is more likely to underperform than outperform; your selection is overfit.
+  \item $\text{PBO} < 0.30$: encouraging; in-sample winners usually survive out-of-sample.
+  \item $0.30 \le \text{PBO} \le 0.50$: caution; treat your selected configuration sceptically and widen the holdout.
+  \item $\text{PBO} > 0.50$: red flag; the in-sample winner is more likely to underperform than outperform, and your selection is overfit.
   \item $\text{PBO} > 0.70$: your strategy selection is almost certainly overfit. Do not proceed; cut the number of configurations or get more data \citep{Bailey2014PBO}.
 \end{itemize}
 With $S = 10$ blocks the 252 IS/OOS partitions are enough to estimate PBO reliably.
@@ -1168,7 +1168,7 @@ With $S = 10$ blocks the 252 IS/OOS partitions are enough to estimate PBO reliab
 
 \begin{projectconnection}[Why This Matters]
 PBO is the right diagnostic for the central decision of this project: HAR versus an ML alternative, and \emph{which} features and hyperparameters to give that ML model.
-Build the $T \times N$ matrix where the $N$ columns are your candidate configurations --- HAR, HAR-J, HARQ, ridge-HAR at several $\lambda$, LightGBM at several depths, each fed different feature subsets (jumps, signed $\RV$, $\IVol$/$\VRP$) --- and each entry is that configuration's $-\QLIKE$ on a block of days.
+Build the $T \times N$ matrix where the $N$ columns are your candidate configurations (HAR, HAR-J, HARQ, ridge-HAR at several $\lambda$, LightGBM at several depths, each fed different feature subsets of jumps, signed $\RV$, and $\IVol$/$\VRP$) and each entry is that configuration's $-\QLIKE$ on a block of days.
 If PBO comes back above $0.50$, the apparent superiority of your favourite ML configuration is an artifact of having tried many; the honest move is to shrink the candidate set (often back toward plain HAR) or extend the sample.
 A PBO below $0.30$ is exactly the evidence you want next to your headline $\QLIKE$ reduction: it says the configuration you picked is not just the luckiest of many.
 \end{projectconnection}
@@ -1280,7 +1280,7 @@ Your options:
 \end{enumerate}
 \end{workedexample}
 
-\begin{keyidea}[What Counts as a New Trial --- and Why the Budget Is Tiny]
+\begin{keyidea}[What Counts as a New Trial, and Why the Budget Is Tiny]
 Every configuration that \emph{influenced your final choice} increments $N$, even the ones you discarded. Concretely, a new trial is created by each of:
 \begin{enumerate}[nosep]
   \item a different \textbf{feature set} (adding jumps, signed $\RV^{+}/\RV^{-}$, realized quarticity, $\IVol$/$\VRP$, or cross-asset features);
@@ -1294,8 +1294,9 @@ Every configuration that \emph{influenced your final choice} increments $N$, eve
 These multiply: $5$ feature sets $\times$ $4$ targets $\times$ $3$ model families is $N = 60$ trials, not $3$.
 Now weigh that against your data budget. Five years of daily observations is only about $1{,}250$ rows (the $T$ used in the DSR and Haircut examples above), and the held-out portion is a fraction of that.
 The False Strategy Theorem (Section~\ref{sec:eval-dsr}) captures the squeeze: your ability to detect a real edge improves only as fast as $\sqrt{T}$ (more days $=$ sharper evidence, since the noise in an average return shrinks like $1/\sqrt{T}$), but the bar luck sets rises as $\sqrt{2\ln N}$ (more trials $=$ a higher fluke to beat).
-With $T$ frozen at $\approx 1{,}250$ days, every extra trial raises the bar you must clear without giving you any more evidence to clear it --- so the honest trial budget is small, and the one-standard-error rule (\Cref{sec:eval-one-se}) and a tight CPCV/PBO loop (\Cref{sec:ch16:cpcv,sec:ch16:pbo}) exist precisely to keep $N$ down.
-If you do not log every experiment, you cannot compute an honest DSR --- which is why the experiment tracker is infrastructure you build \emph{before} you start modeling.
+With $T$ frozen at $\approx 1{,}250$ days, every extra trial raises the bar you must clear without giving you any more evidence to clear it.
+The honest trial budget is therefore small, and the one-standard-error rule (\Cref{sec:eval-one-se}) and a tight CPCV/PBO loop (\Cref{sec:ch16:cpcv,sec:ch16:pbo}) exist precisely to keep $N$ down.
+If you do not log every experiment, you cannot compute an honest DSR, which is why the experiment tracker is infrastructure you build \emph{before} you start modeling.
 \end{keyidea}
 
 % ══════════════════════════════════════════════════════════════
@@ -1311,13 +1312,13 @@ Instead of a probability it returns an adjusted Sharpe and a percentage haircut,
 A \textbf{$p$-value} is the probability of observing a statistic at least as extreme as the one obtained, assuming the null (no effect) is true.
 When you run many tests, the chance that \emph{at least one} returns a small $p$-value by luck grows fast.
 A \textbf{multiple-testing correction} inflates each $p$-value to compensate.
-Two families matter here: \textbf{family-wise error rate (FWER)} corrections control the probability of \emph{even one} false positive, while \textbf{false discovery rate (FDR)} corrections control the \emph{expected fraction} of false positives among rejections --- a looser, more powerful target.
+Two families matter here: \textbf{family-wise error rate (FWER)} corrections control the probability of \emph{even one} false positive, while \textbf{false discovery rate (FDR)} corrections control the \emph{expected fraction} of false positives among rejections, a looser, more powerful target.
 \end{prereq}
 
 \subsubsection{From Sharpe to a $t$-Statistic}
 
 The bridge between a Sharpe ratio and a hypothesis test is one line.
-Testing whether a Sharpe ratio differs from zero is the same as testing whether the mean excess return differs from zero --- a $t$-test.
+Testing whether a Sharpe ratio differs from zero is the same as testing whether the mean excess return differs from zero: a $t$-test.
 
 \begin{equation}
 \label{eq:eval-sr-to-t}
@@ -1332,13 +1333,13 @@ where:
 
 \begin{intuition}[In Plain English]
 Equation~\eqref{eq:eval-sr-to-t} says a Sharpe ratio is just a $t$-statistic in disguise: scale the per-period Sharpe by $\sqrt{T}$ and you have the very quantity a $t$-test produces.
-That means every tool statisticians built for ``did I find a real effect among many tests?'' --- Bonferroni, Holm, BHY --- applies directly to backtested Sharpe ratios.
+That means every tool statisticians built for ``did I find a real effect among many tests?'' (Bonferroni, Holm, BHY) applies directly to backtested Sharpe ratios.
 The longer your sample $T$, the larger the $t$ for the same Sharpe, so the same edge becomes easier to defend with more data.
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
 If your vol-targeting overlay (Chapter~\ref{ch:applications}) earns an annualised Sharpe of $1.5$ on five years of daily data, first de-annualise it: Sharpe ratios are quoted annualised, and Sharpe scales with the square root of the number of periods, so to get the per-day Sharpe that Equation~\eqref{eq:eval-sr-to-t} needs you divide by $\sqrt{252}$ (there are ${\sim}252$ trading days a year). That gives $\SR_{\text{daily}} = 1.5/\sqrt{252} \approx 0.0945$, and Equation~\eqref{eq:eval-sr-to-t} gives $t = 0.0945\sqrt{1{,}250} \approx 3.34$.
-That is the single-test $t$ \emph{before} any multiple-testing penalty --- the starting point for every correction below.
+That is the single-test $t$ \emph{before} any multiple-testing penalty, the starting point for every correction below.
 Keep $T$ honest: it is your number of return observations, not your number of forecasts.
 \end{projectconnection}
 
@@ -1361,7 +1362,7 @@ Sort the $p$-values ascending, $p_{(1)} \le \cdots \le p_{(M)}$. The adjusted va
 \label{eq:eval-holm}
 p_{(i)}^{\text{Holm}} = \min\!\left(\max_{j \le i}\bigl[(M - j + 1)\,p_{(j)}\bigr],\; 1\right).
 \end{equation}
-Holm multiplies the smallest $p$-value by $M$ (matching Bonferroni), the next by $M-1$, and so on down. It also controls FWER but is uniformly more powerful --- it never rejects fewer hypotheses than Bonferroni.
+Holm multiplies the smallest $p$-value by $M$ (matching Bonferroni), the next by $M-1$, and so on down. It also controls FWER but is uniformly more powerful: it never rejects fewer hypotheses than Bonferroni.
 
 In words: multiply the smallest $p$-value by $M$, the next-smallest by $M-1$, and so on; then sweep left-to-right taking a running maximum ($\max_{j\le i}$ means ``the largest value seen so far'') so the adjusted values never decrease, and cap each at $1$. The running maximum is just bookkeeping that keeps the adjusted sequence sorted.
 \end{definition}
@@ -1374,13 +1375,13 @@ p_{(i)}^{\text{BHY}} = \min\!\left(\frac{M \cdot c(M)}{i}\,p_{(i)},\; 1\right),
 \qquad c(M) = \sum_{j=1}^{M}\frac{1}{j}
 \end{equation}
 where $c(M)$ is the $M$-th harmonic number (for $M=20$, $c(20)\approx 3.60$).
-BHY walks the $p$-values from largest to smallest --- the opposite order to Holm --- because FDR control compares each $p$-value against a threshold that loosens as the rank increases.
+BHY walks the $p$-values from largest to smallest (the opposite order to Holm) because FDR control compares each $p$-value against a threshold that loosens as the rank increases.
 BHY controls the false discovery rate rather than the stricter FWER, making it the least conservative of the three.
 \end{definition}
 
 \begin{intuition}[In Plain English]
 The three corrections trade strictness for power.
-Bonferroni is the bouncer who treats every test as a fresh chance to be fooled and so penalises all of them by the full count $M$ --- safe but harsh.
+Bonferroni is the bouncer who treats every test as a fresh chance to be fooled and so penalises all of them by the full count $M$: safe but harsh.
 Holm is the same bouncer with a memory: once a test clears the strictest bar, the next one faces a slightly easier bar ($M-1$, then $M-2$, \ldots), so it rejects at least as much as Bonferroni and often more.
 BHY changes the goal entirely: rather than ``allow essentially no false positives,'' it accepts a controlled \emph{fraction} of false discoveries, which is the right stance when you expect several genuine winners among many candidates.
 \end{intuition}
@@ -1396,30 +1397,30 @@ The haircut is the percentage by which the correction shrinks your Sharpe.
 where:
 \begin{itemize}[nosep]
   \item $\SR_{\text{reported}}$ is the raw (annualised) Sharpe of the strategy,
-  \item $\SR_{\text{adjusted}}$ is the Sharpe implied by the \emph{corrected} $p$-value --- convert the adjusted $p$ back to a $t$ via $\Phi^{-1}(1 - p^{\text{adj}}/2)$, then invert Equation~\eqref{eq:eval-sr-to-t}. Here $\Phi^{-1}$ is the inverse of the normal CDF --- given a probability it returns the matching $z$-score (\texttt{scipy.stats.norm.ppf}) --- and the $1 - p/2$ reflects a two-sided test, splitting the probability between both tails,
+  \item $\SR_{\text{adjusted}}$ is the Sharpe implied by the \emph{corrected} $p$-value: convert the adjusted $p$ back to a $t$ via $\Phi^{-1}(1 - p^{\text{adj}}/2)$, then invert Equation~\eqref{eq:eval-sr-to-t}. Here $\Phi^{-1}$ is the inverse of the normal CDF (given a probability it returns the matching $z$-score, \texttt{scipy.stats.norm.ppf}), and the $1 - p/2$ reflects a two-sided test, splitting the probability between both tails,
   \item if the adjusted $p$-value is no longer significant at level $\alpha$, the adjusted Sharpe is effectively zero and the haircut is $100\%$.
 \end{itemize}
 
 \begin{intuition}[In Plain English]
 The haircut translates a $p$-value penalty back into the unit a portfolio manager cares about.
-``Your Sharpe is $1.5$, but after admitting you tried 20 strategies, the defensible Sharpe is $1.07$ --- a $28.5\%$ haircut'' is a sentence a desk head understands instantly, where a probability might wash over them.
+``Your Sharpe is $1.5$, but after admitting you tried 20 strategies, the defensible Sharpe is $1.07$, a $28.5\%$ haircut'' is a sentence a desk head understands instantly, where a probability might wash over them.
 A $100\%$ haircut is the bluntest possible verdict: once corrected, the edge is statistically indistinguishable from zero.
 \end{intuition}
 
 \begin{workedexample}[Haircut Sharpe with 20 Tests]
 You report an annualised $\SR = 1.50$ from $T = 1{,}250$ daily observations, having tested $M = 20$ configurations of a volatility-timing overlay.
 
-\textbf{Step 1 --- Sharpe to $t$.} Daily $\SR = 1.50/\sqrt{252} = 0.0945$, so $t = 0.0945\sqrt{1{,}250} = 3.34$ (Equation~\eqref{eq:eval-sr-to-t}).
+\textbf{Step 1: Sharpe to $t$.} Daily $\SR = 1.50/\sqrt{252} = 0.0945$, so $t = 0.0945\sqrt{1{,}250} = 3.34$ (Equation~\eqref{eq:eval-sr-to-t}).
 
-\textit{How to get the numbers below:} $\Phi$ and $\Phi^{-1}$ are normal-distribution lookups --- use \texttt{scipy.stats.norm.cdf} / \texttt{.ppf}, or a $z$-table. We run two-sided tests, so the $p$-value uses a factor of $2$ and the inverse uses $1 - p/2$.
+\textit{How to get the numbers below:} $\Phi$ and $\Phi^{-1}$ are normal-distribution lookups; use \texttt{scipy.stats.norm.cdf} / \texttt{.ppf}, or a $z$-table. We run two-sided tests, so the $p$-value uses a factor of $2$ and the inverse uses $1 - p/2$.
 
-\textbf{Step 2 --- single-test $p$.} Two-sided: $p = 2\bigl(1 - \Phi(3.34)\bigr) \approx 0.00084$.
+\textbf{Step 2: single-test $p$.} Two-sided: $p = 2\bigl(1 - \Phi(3.34)\bigr) \approx 0.00084$.
 
-\textbf{Step 3 --- Bonferroni.} $p^{\text{Bonf}} = 20 \times 0.00084 = 0.0168$, still significant at $\alpha = 0.05$. Back out the $t$: $\Phi^{-1}(1 - 0.0168/2) = 2.39$, giving adjusted annualised $\SR = (2.39/\sqrt{1{,}250})\sqrt{252} = 1.07$. Haircut $(1.50 - 1.07)/1.50 = 28.5\%$.
+\textbf{Step 3: Bonferroni.} $p^{\text{Bonf}} = 20 \times 0.00084 = 0.0168$, still significant at $\alpha = 0.05$. Back out the $t$: $\Phi^{-1}(1 - 0.0168/2) = 2.39$, giving adjusted annualised $\SR = (2.39/\sqrt{1{,}250})\sqrt{252} = 1.07$. Haircut $(1.50 - 1.07)/1.50 = 28.5\%$.
 
-\textbf{Step 4 --- Holm.} For the top-ranked of 20 strategies the Holm penalty equals Bonferroni's ($20 \times 0.00084 = 0.0168$), so the best strategy is haircut by the same $28.5\%$.
+\textbf{Step 4: Holm.} For the top-ranked of 20 strategies the Holm penalty equals Bonferroni's ($20 \times 0.00084 = 0.0168$), so the best strategy is haircut by the same $28.5\%$.
 
-\textbf{Step 5 --- BHY.} With $c(20) = 3.60$: $p^{\text{BHY}} = (20 \times 3.60 / 1)\times 0.00084 = 0.0605$, now marginally \emph{insignificant} at $\alpha = 0.05$. Adjusted $t = \Phi^{-1}(1 - 0.0605/2) = 1.88$, giving adjusted $\SR = 0.84$. Haircut $(1.50 - 0.84)/1.50 = 43.7\%$.
+\textbf{Step 5: BHY.} With $c(20) = 3.60$: $p^{\text{BHY}} = (20 \times 3.60 / 1)\times 0.00084 = 0.0605$, now marginally \emph{insignificant} at $\alpha = 0.05$. Adjusted $t = \Phi^{-1}(1 - 0.0605/2) = 1.88$, giving adjusted $\SR = 0.84$. Haircut $(1.50 - 0.84)/1.50 = 43.7\%$.
 
 \medskip
 \begin{center}
@@ -1439,11 +1440,11 @@ BHY & 0.0605 & 0.84 & 43.7\% \\
 \textbf{What this tells you.}
 A Sharpe of $1.50$ after 20 tests survives the two FWER corrections (Bonferroni and Holm keep it significant at 5\%) but is rendered borderline by the FDR-controlling BHY.
 The ``shave it in half'' rule of thumb practitioners sometimes apply is roughly right for BHY here but too harsh for Bonferroni.
-The lesson is not which correction is ``correct'' --- it is that a single raw Sharpe means nothing until you state $M$ and pick a correction.
+The lesson is not which correction is ``correct''; it is that a single raw Sharpe means nothing until you state $M$ and pick a correction.
 \end{workedexample}
 
 \begin{keyresult}[Harvey, Liu, and Zhu (2016): The $t > 3.0$ Hurdle]
-Cataloguing hundreds of factors from the literature, \citet{HarveyLiuZhu2016} show that the appropriate $t$-statistic hurdle for a newly proposed factor, after multiple-testing correction, is $t > 3.0$ --- not the conventional $1.96$.
+Cataloguing hundreds of factors from the literature, \citet{HarveyLiuZhu2016} show that the appropriate $t$-statistic hurdle for a newly proposed factor, after multiple-testing correction, is $t > 3.0$, not the conventional $1.96$.
 Under that bar only a handful of the catalogued return predictors survive.
 For your project the analogue is direct: a vol-timing Sharpe of $1.0$ on five years of daily data gives $t = (1.0/\sqrt{252})\sqrt{1{,}250} \approx 2.23$, comfortably below $3.0$.
 Most ``edges'' you find by searching feature sets will not clear the hurdle, which is the honest default expectation.
@@ -1499,9 +1500,9 @@ This section catalogs the mistakes these tools are designed to prevent, so you c
 
 \begin{warning}[Survivorship Bias in the Instrument Universe]
 A seventh pitfall, distinct from the six above because it corrupts the data \emph{before} any model sees it: \textbf{survivorship bias}.
-If your universe contains only instruments that \emph{still trade today} --- indices and tickers that survived the sample --- you have silently dropped every name that was delisted, merged, or blew up.
-Those vanished instruments are disproportionately the ones that experienced the most extreme volatility, defaults, and crashes, so a survivorship-filtered panel systematically \emph{understates} tail volatility and makes any forecaster look better-calibrated on crisis days than it would have been in real time --- exactly where forecasting matters most.
-When pooling assets (\Cref{sec:ch16:xsection-leakage}), assemble the universe from a \emph{point-in-time} constituent list (the instruments tradeable \emph{as of} each historical date) --- e.g.\ include Lehman Brothers or Wachovia as they existed pre-2008, not just the banks still listed today, since the failures are exactly the high-volatility names you must not erase --- not from today's survivors. If a fully point-in-time universe is not available, note the limitation explicitly and do not overstate how well your forecaster would have handled the names that did not survive \citep{LopezdePrado2018}.
+If your universe contains only instruments that \emph{still trade today} (indices and tickers that survived the sample), you have silently dropped every name that was delisted, merged, or blew up.
+Those vanished instruments are disproportionately the ones that experienced the most extreme volatility, defaults, and crashes, so a survivorship-filtered panel systematically \emph{understates} tail volatility and makes any forecaster look better-calibrated on crisis days than it would have been in real time, exactly where forecasting matters most.
+When pooling assets (\Cref{sec:ch16:xsection-leakage}), assemble the universe from a \emph{point-in-time} constituent list (the instruments tradeable \emph{as of} each historical date), not from today's survivors: include Lehman Brothers or Wachovia as they existed pre-2008, not just the banks still listed today, since the failures are exactly the high-volatility names you must not erase. If a fully point-in-time universe is not available, note the limitation explicitly and do not overstate how well your forecaster would have handled the names that did not survive \citep{LopezdePrado2018}.
 \end{warning}
 
 

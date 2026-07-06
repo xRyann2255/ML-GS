@@ -400,7 +400,7 @@ The method converges quadratically -- each iteration roughly doubles the number 
 \sigma_0 \approx \sqrt{\frac{2\pi}{T}} \cdot \frac{C_{\text{mkt}}}{S}.
 \end{equation}
 This approximation exploits the fact that the ATM Black-Scholes call price is approximately $C \approx S\sigma\sqrt{T/(2\pi)}$.
-For options far from the money, use $\sigma_0 = 0.20$ (20\%) as a robust starting point.
+For options far from the money, use $\sigma_0 = 0.20$ (20\%) as a reliable starting point.
 
 \begin{warning}[When Newton-Raphson Fails]
 Vega approaches zero for deep in-the-money and deep out-of-the-money options (where the option price is insensitive to volatility changes).
@@ -418,7 +418,7 @@ Implement Newton-Raphson with the Brenner-Subrahmanyam initial guess and bisecti
 The entire IV surface construction pipeline -- from raw option prices to smooth SVI-fitted IV -- starts with this inversion at each individual $(K, T)$ point.
 \end{projectconnection}
 
-A critical point: implied volatility is \emph{not} a single number for a given underlying.
+Implied volatility is \emph{not} a single number for a given underlying.
 Every (strike, maturity) pair has its own IV.
 This leads directly to the next section.
 
@@ -646,7 +646,7 @@ Symmetric tail pricing (high butterfly) tends to precede periods of elevated but
 
 \begin{projectconnection}[Why This Matters]
 The butterfly spread is one of nine options-implied features in the project's feature pipeline (Chapter~\ref{ch:features}).
-It provides information that the risk reversal (skew) cannot: whether the market prices \emph{symmetric} tail risk, not just directional fear.
+It provides information that the risk reversal (skew) cannot: whether the market prices \emph{symmetric} tail risk rather than directional fear alone.
 Empirically, the butterfly is most useful as a crisis-detection signal.
 Spikes in the butterfly predict periods of elevated realized volatility at weekly and monthly horizons, especially when combined nonlinearly with VIX and the term structure slope in tree-based models.
 \end{projectconnection}
@@ -736,7 +736,7 @@ The five parameters give enough flexibility to fit real market smiles accurately
 \end{intuition}
 
 \textbf{Why SVI?}
-Two properties make SVI theoretically well-motivated, not just a convenient curve fit \citep{GatheralJacquier2014}:
+Two properties make SVI theoretically well-motivated rather than merely a convenient curve fit \citep{GatheralJacquier2014}:
 \begin{enumerate}[nosep]
   \item As $|k| \to \infty$, $w(k)$ becomes linear in $k$, matching \textbf{Roger Lee's moment formula} -- the theoretical constraint that total variance must grow at most linearly in extreme log-moneyness.
   \item The large-maturity limit of the \textbf{Heston} stochastic volatility model's implied variance is exactly SVI. The parametrization is not arbitrary.
@@ -813,17 +813,17 @@ Figure~\ref{fig:pca-factors} illustrates the three factor loadings.
   legend style={font=\small},
   axis lines=left,
 ]
-% PC1 — Level (roughly flat, positive)
+% PC1: Level (roughly flat, positive)
 \addplot[ultra thick, defblue, smooth] coordinates {
   (0.85, 0.55) (0.90, 0.58) (0.95, 0.60) (1.00, 0.60) (1.05, 0.58) (1.10, 0.55) (1.15, 0.52)
 };
 \addlegendentry{PC1: Level ($\sim$70\%)}
-% PC2 — Slope (negative for low K, positive for high K)
+% PC2: Slope (negative for low K, positive for high K)
 \addplot[ultra thick, warnred, smooth, dashed] coordinates {
   (0.85, -0.50) (0.90, -0.35) (0.95, -0.15) (1.00, 0.05) (1.05, 0.25) (1.10, 0.40) (1.15, 0.50)
 };
 \addlegendentry{PC2: Slope ($\sim$15\%)}
-% PC3 — Curvature (positive at extremes, negative at center)
+% PC3: Curvature (positive at extremes, negative at center)
 \addplot[ultra thick, intgreen, smooth, densely dotted] coordinates {
   (0.85, 0.45) (0.90, 0.20) (0.95, -0.10) (1.00, -0.25) (1.05, -0.10) (1.10, 0.20) (1.15, 0.45)
 };
@@ -978,7 +978,7 @@ where:
   \item $C(K,T)$ = price of a European call with strike $K$ and maturity $T$ (used for $K > F$, i.e., OTM calls).
   \item The $1/K^2$ weighting gives proportionally more weight to lower-strike options.
 \end{itemize}
-The key insight: by integrating option prices across all strikes, the dependence on any particular volatility model cancels out.
+Integrating option prices across all strikes cancels out the dependence on any particular volatility model.
 \end{keyresult}
 
 \begin{intuition}[Why It Works Without a Model]
@@ -1086,7 +1086,7 @@ The theoretical foundation: \citet{BrittenJones2000} and \citet{Carr2009} showed
 The realized P\&L from this hedge equals the realized variance minus the cost of the portfolio.
 Therefore, the cost of this portfolio -- which is exactly the model-free implied variance integral from Section~\ref{sec:model-free} -- equals the fair variance swap strike $K_{\text{var}}$.
 
-This is the deep connection: the VIX formula (Equation~\ref{eq:vix}) computes the fair strike of a 30-day variance swap on the S\&P~500.
+In other words, the VIX formula (Equation~\ref{eq:vix}) computes the fair strike of a 30-day variance swap on the S\&P~500.
 $\text{VIX}^2 / 10{,}000$ is the annualized $K_{\text{var}}$ for that maturity.
 
 \begin{workedexample}{Discretizing the Variance Swap Strike}

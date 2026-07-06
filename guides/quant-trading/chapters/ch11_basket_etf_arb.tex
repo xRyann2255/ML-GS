@@ -5,7 +5,7 @@
 An exchange-traded fund (ETF) on the S\&P~$500$ holds $500$
 underlying stocks in declared proportions. Summing those prices at
 the declared weights gives the \emph{synthetic} value of one ETF
-share --- what the wrapper should cost if it equalled its contents.
+share: what the wrapper should cost if it equalled its contents.
 The ETF's market price can drift from synthetic value, but not far:
 \emph{authorised participants} (a class of large dealer) can
 mechanically convert constituents into ETF shares (and back)
@@ -22,8 +22,8 @@ mechanism. PICNIC\_BASKET prices mean-revert toward synthetic value
 only because the simulator's data-generating process is built that
 way, not because anyone can force convergence. The Prosperity
 basket trade is a \emph{pure cointegration play with a known hedge
-ratio} --- the cleanest application of
-\cref{ch:pairs_cointegration} --- but not, strictly, an arbitrage.
+ratio} (the cleanest application of
+\cref{ch:pairs_cointegration}), but not, strictly, an arbitrage.
 
 The chapter has two halves. The first develops the theory: creation
 / redemption, the synthetic-value formula, static-vs-dynamic hedge
@@ -71,7 +71,7 @@ From outside the book:
 \section{ETFs and the creation/redemption mechanism}
 \label{sec:ch11_creation_redemption}
 
-An ETF alone is not an arbitrage instrument --- it is a
+An ETF alone is not an arbitrage instrument; it is a
 passively-managed fund whose shares trade on an exchange. The
 arbitrage angle comes from a parallel mechanism in the prospectus
 that lets a specific class of dealer convert wrapper to contents
@@ -172,7 +172,7 @@ them at the higher synthetic value.
 \caption{ETF creation mechanism. When the ETF trades at a \emph{premium} to
 NAV, the authorised participant buys the constituent basket on the stock market,
 delivers it to the fund, and receives freshly minted ETF shares to sell on
-the exchange --- locking in the premium as riskless profit.
+the exchange, locking in the premium as riskless profit.
 Redemption is the reverse: the AP buys ETF shares cheaply, redeems them for
 the basket, and sells the constituents.
 This in-kind arbitrage keeps the ETF price anchored to its net asset value.}
@@ -210,13 +210,13 @@ otherwise be a soft mean-reversion trade. The OU residual of
 distribution: the spread could wander out arbitrarily long before
 reverting, stopped only by statistics and a stop-out. The
 cointegration spread of \cref{ch:pairs_cointegration} has the same
-problem --- the LTCM box there is the canonical example.
+problem; the LTCM box there is the canonical example.
 
 The ETF basis on a liquid AP-served ETF is different. Once it
 exceeds the fee-plus-cost floor, APs converge within minutes
 (often seconds); the gap closes as mechanical engineering, not
 statistical drift. ETF basis trading is among the safest
-stat-arb variants --- and, as the case study shows, one of the
+stat-arb variants and, as the case study shows, one of the
 lowest-margin, because the floor is well-known and well-policed.
 \end{intuitionbox}
 
@@ -253,8 +253,8 @@ exactly $\text{Basis}_t$.
 The basket's cointegration vector is \emph{declared by
 construction}: the issuer publishes the weights, so there is no
 Engle--Granger or Johansen fit. The ADF test on the residual stays
-informative --- it signals whether wrapper and contents have
-decoupled --- but the slope is given.
+informative (it signals whether wrapper and contents have
+decoupled), but the slope is given.
 \end{remark}
 
 Under cointegration (enforced by creation / redemption on a real
@@ -275,9 +275,9 @@ and apply the threshold rule:
 With thresholds $z_{\text{entry}} > z_{\text{exit}} \geq 0$, apply
 the \cref{ch:mean_reversion_ou} rule:
 \begin{itemize}
-  \item $z_t > +z_{\text{entry}}$: \emph{short the basis} --- short
+  \item $z_t > +z_{\text{entry}}$: \emph{short the basis}, i.e.\ short
   $1$ basket, long $w_i$ of each constituent. Basket is rich.
-  \item $z_t < -z_{\text{entry}}$: \emph{long the basis} --- long
+  \item $z_t < -z_{\text{entry}}$: \emph{long the basis}, i.e.\ long
   $1$ basket, short $w_i$ of each constituent. Basket is cheap.
   \item $|z_t| < z_{\text{exit}}$: close; the basis has reverted.
 \end{itemize}
@@ -332,7 +332,7 @@ unchanged), PnL is $(\text{Basis}_3 - \text{Basis}_4) \cdot 1 = 3$
 seashells per basket short, hedge leg breaking even.
 
 Two takeaways. First, the \emph{hedge ratio is the literal share
-count} --- no fitting. Second, $\hat\mu = 1 \neq 0$; the $z$-score
+count}: no fitting. Second, $\hat\mu = 1 \neq 0$; the $z$-score
 is taken against it, not against zero (the running-mean correction
 of \cref{sec:ch11_hh_premium_drift}). Shorting whenever
 $\text{Basis}_t > 0$ would have shorted at $t = 1$ at zero, sat
@@ -482,7 +482,7 @@ The Hedgehogs also considered an \emph{inter-basket} spread
 which removes the constituents by combining the two baskets.
 Since $1.5 \times (4, 2, 0) = (6, 3, 0)$, the difference
 $(6, 3, 1) - 1.5 \times (4, 2, 0) = (0, 0, 1)$ leaves one
-\texttt{DJEMBE} unhedged --- hence the $-P^{\text{dj}}_t$. The
+\texttt{DJEMBE} unhedged, hence the $-P^{\text{dj}}_t$. The
 writeup is explicit (\S\,Round 2): ``\emph{we quickly identified
 that comparing baskets directly to their constituent sums was the
 stronger and more reliable path}.'' Production trades only
@@ -540,9 +540,9 @@ branch being the ``\texttt{elif ETF\_CLOSE\_AT\_ZERO}'' block on
 lines $493$--$501$. Base thresholds are
 \texttt{BASKET\_THRESHOLDS = [80, 50]} (line $59$): enter
 basket~$1$ at $\pm 80$ from the running mean, basket~$2$ at
-$\pm 50$ --- \emph{absolute-seashell} thresholds, not $z$-scores.
+$\pm 50$. These are \emph{absolute-seashell} thresholds, not $z$-scores.
 The Hedgehogs chose raw thresholds because basis volatility did
-not appear to vary meaningfully --- ``\emph{using a $z$-score
+not appear to vary meaningfully: ``\emph{using a $z$-score
 normalizes the spread by recent volatility, but unless volatility
 is known to vary meaningfully over time \ldots\ this introduces
 unnecessary complexity and risk of overfitting}'' (writeup,
@@ -551,7 +551,7 @@ unnecessary complexity and risk of overfitting}'' (writeup,
 \paragraph{Why $80$ and $50$, not $200$ and $100$?} A small grid
 search (Figure~$5$, the ``Optimal Parameter Search Grid'' heat map)
 led the Hedgehogs to \emph{not pick the best back-test
-parameter} but the centre of a flat plateau on the PnL surface ---
+parameter} but the centre of a flat plateau on the PnL surface,
 the canonical defence against small-sample overfitting. The
 chrispyroberts P3 writeup\footnote{See
 \texttt{research/writeups/chrispyroberts\_P3/ROUND 2/basket\_gridsearch\_results.csv};
@@ -561,8 +561,8 @@ peak.} reaches a similar conclusion.
 \subsection{Dynamic threshold adjustment using Olivia}
 \label{sec:ch11_hh_olivia}
 
-The strategy's most distinctive feature --- the one that
-materially separated its PnL from a vanilla threshold rule --- is
+The strategy's most distinctive feature, the one that
+materially separated its PnL from a vanilla threshold rule, is
 the use of an external trading-bot signal to bias the thresholds.
 The bot is \emph{Olivia}, already detected on \texttt{SQUID\_INK}
 in Round~$1$ as an ``informed-buyer / informed-seller'' whose
@@ -588,7 +588,7 @@ modified entry rule is
 \end{equation}
 The single offset $d_t \cdot A$ shifts \emph{both} thresholds the
 same way. Olivia long ($d_t = +1$) slides the band up: more
-positive deviation for a short, less negative for a long --- the
+positive deviation for a short, less negative for a long, so the
 strategy biases toward long-basket. Olivia short ($d_t = -1$)
 biases toward short-basket. $d_t = 0$ reduces to
 \cref{sec:ch11_hh_threshold}.
@@ -632,7 +632,7 @@ Attribution in \cref{sec:ch11_hh_pnl}.
 
 $S^{B1}_t$'s running mean was non-zero: a persistent positive
 premium drifting slowly across a round. A zero-centred rule is
-biased --- the basis spends more time positive, the strategy runs
+biased: the basis spends more time positive, the strategy runs
 net short on average, long-entry never fires. Fix: estimate
 $\hat\mu^{Bk}_t$ online and subtract before thresholding.
 
@@ -658,8 +658,8 @@ with it on.
 \label{pitfall:basket_premium}
 The most expensive beginner failure: compute spread as
 $B - \sum_i w_i C_i$, centre the threshold at zero, trade. If the
-basket carries a persistent premium --- Prosperity's
-PICNIC\_BASKET$1$ did, by tens of seashells --- the spread is
+basket carries a persistent premium (Prosperity's
+PICNIC\_BASKET$1$ did, by tens of seashells), the spread is
 almost always positive and only the ``short basket'' branch
 fires. The trader becomes systematically short, correct in
 expectation \emph{only if} the premium is about to revert to zero,
@@ -672,7 +672,7 @@ thresholds make the step explicit.
 
 Deeper lesson: a basket basis with non-zero mean can still be
 cointegrated. The residual's mean encodes fees, microstructure
-costs, and adverse-selection premia --- non-zero in general.
+costs, and adverse-selection premia, and is non-zero in general.
 Centre on the running mean, not structural zero.
 \end{pitfallbox}
 
@@ -683,8 +683,8 @@ The headline PnL is from the writeup's Round~$2$ conclusion:
 ``\emph{about $40{,}000$--$60{,}000$ SeaShells per round on
 baskets, plus another $20{,}000$ SeaShells per round directly
 from trading Croissants individually}.'' We treat it as ground
-truth --- the only number published, not re-attributable without
-rerunning the simulator.
+truth: it is the only number published, and it cannot be
+re-attributed without rerunning the simulator.
 
 Qualitative observations:
 
@@ -729,9 +729,9 @@ The Hedgehogs chose $\alpha = \tfrac{1}{2}$. Then:
   \item \textbf{Expected return} is linear:
   $\E[\alpha X + (1 - \alpha) Y] = \alpha \E[X] + (1-\alpha) \E[Y]$.
   Both books trade the same signal with positive expected PnL, so
-  the half-hedged book splits the difference. Crucially
+  the half-hedged book splits the difference. In particular,
   $\E[Y] > 0$: hedging removes constituent-direction exposure;
-  the basis --- the alpha --- is preserved.
+  the basis, the alpha, is preserved.
   \item \textbf{Variance} is not linear:
   \begin{equation}
     \Var[\alpha X + (1-\alpha) Y]
@@ -757,8 +757,8 @@ position limits, reducing throughput. Half-hedge is the compromise.
 
 \paragraph{Why not dynamic?} Variance-minimising $\alpha$ solves a
 quadratic in live $\Var[X]$, $\Var[Y]$, $\Cov[X, Y]$; the
-round-sample is too small to fit. A static $\alpha$ is robust ---
-same discipline as the threshold choice.
+round-sample is too small to fit. A static $\alpha$ is robust,
+following the same discipline as the threshold choice.
 
 \section{Avellaneda--Lee PCA stat-arb}
 \label{sec:ch11_avellaneda_lee}
@@ -766,8 +766,8 @@ same discipline as the threshold choice.
 The Hedgehogs' strategy is a special case. Two assets: residual is
 the spread (\cref{ch:pairs_cointegration}). $n+1$ assets with a
 wrapper: residual is the basis (\cref{def:basket_basis}). The
-natural extension --- the one that took academic stat-arb from
-pair trades to a thousand-name portfolio --- is a large
+natural extension, the one that took academic stat-arb from
+pair trades to a thousand-name portfolio, is a large
 constituent universe with no single wrapper, where the residual
 is computed by first removing a few common factors from data.
 
@@ -796,7 +796,7 @@ is computed by first removing a few common factors from data.
 The framework generalises both: pairs trading (residual from many
 constituents rather than one partner) and the basket basis trade
 (the wrapper is extracted statistically, not declared). We do not
-derive the PCA estimator here --- see the paper and \citeChan{}
+derive the PCA estimator here; see the paper and \citeChan{}
 (Chapter $5$, on ETF-vs-constituent strategies);
 \cref{ch:ml_trading} returns to the broader ML view of factor
 residuals. The point: the whole chapter so far is the special
@@ -815,7 +815,7 @@ machinery the literature later formalised.
 collecting $1995$--$2008$ results and showing the strategy was
 profitable until the August $2007$ ``quant quake,'' when stat-arb
 funds simultaneously deleveraged and residuals decoupled from
-pre-2007 OU behaviour for several days --- the canonical reminder
+pre-2007 OU behaviour for several days, the canonical reminder
 that ``statistically stationary'' is an empirical property, not a
 guarantee.
 \end{historybox}
@@ -850,7 +850,7 @@ Otherwise the engine runs the flow: SPY alone generates hundreds
 of round-trips per day across the AP community; PnL is a fraction
 of a basis point on each multiplied by very large notional. ETF
 arb is among the most systematically run and reliably profitable
-desks at a large bank --- edge has compressed as APs have
+desks at a large bank. Edge has compressed as APs have
 proliferated, but the fee floor remains and inventory turnover is
 enormous.
 \end{gsbox}
@@ -888,7 +888,7 @@ def picnic_basket_spread(basket_price, croissant_price, jam_price, djembe_price,
 
 Three production notes. First, \texttt{running\_mean} and
 \texttt{running\_std} are stateful and must be updated each tick
-via \eqref{eq:running_mean} or an EMA --- forgetting is the
+via \eqref{eq:running_mean} or an EMA; forgetting is the
 \cref{pitfall:basket_premium} failure. Second, production uses
 absolute-seashell thresholds, not $z$-scores ($T^{B1} = 80$,
 $T^{B2} = 50$, $A = 90$ on lines $59$ and $65$);
@@ -910,7 +910,7 @@ buy $\tfrac{1}{2}w_i$ of each constituent at ask).
   combination, nothing more.
   \item \textbf{Creation/redemption is the floor.} On a liquid
   AP-served ETF the basis is bounded by round-trip fee plus
-  constituent liquidity costs --- single-digit bps on SPY. One
+  constituent liquidity costs (single-digit bps on SPY). One
   of the safest stat-arb variants because the floor is hard.
   \item \textbf{No AP $\Rightarrow$ no floor.} A basket without
   creation/redemption (proprietary indices, all Prosperity
@@ -925,7 +925,7 @@ buy $\tfrac{1}{2}w_i$ of each constituent at ask).
   (loose coupling, drifting effective ratio).
   \item \textbf{Trading rule.} Short basis at
   $z_t > +z_{\text{entry}}$, long at $z_t < -z_{\text{entry}}$,
-  close at $|z_t| < z_{\text{exit}}$ --- same OU $z$-score
+  close at $|z_t| < z_{\text{exit}}$: the same OU $z$-score
   machinery as \cref{ch:mean_reversion_ou}.
   \item \textbf{Frankfurt PICNIC compositions.}
   \texttt{PICNIC\_BASKET1} $= 6$\,\texttt{CROISSANTS} $+

@@ -15,7 +15,7 @@ This chapter introduces the seven categories of participant you will
 meet repeatedly: why they trade, how their orders appear in the limit
 order book, and how to recognise them in market data. The centrepiece
 is the distinction between \textbf{informed} and \textbf{uninformed}
-traders --- the foundation of every microstructure model in
+traders: the foundation of every microstructure model in
 \cref{ch:spreads_roll,ch:kyle_gm}, and the reason a market maker can
 earn money posting quotes, or lose it quickly if they misjudge who is
 hitting them.
@@ -45,7 +45,7 @@ market participants by why they trade, not what they trade. Motivation
 predicts behaviour: a participant trading on information acts
 differently from one rebalancing a pension fund, even sending identical
 orders to the same exchange. The seven categories below are not
-mutually exclusive --- one firm can run desks in several roles --- but
+mutually exclusive (one firm can run desks in several roles), but
 they map cleanly onto the strategies in
 \cref{ch:market_making,ch:arbitrage_zoo}.
 
@@ -109,7 +109,7 @@ directionally exposed.
 
 In the LOB, arbitrageurs are almost exclusively \textbf{takers}: the
 opportunity closes in milliseconds, too fast to rest a limit order.
-Their flow is \emph{correlated across venues} --- simultaneous hits on
+Their flow is \emph{correlated across venues}: simultaneous hits on
 EUR/USD at two venues are likely one arbitrageur firing two legs.
 \Cref{ch:arbitrage_zoo} catalogues the arbitrage types (triangular,
 cash-and-carry, put--call parity, ETF creation--redemption, and more);
@@ -139,7 +139,7 @@ The prototypical informed trader in academic models is an
 coming, an analyst who has done original research, a trader who has
 seen a regulatory filing minutes before it goes public. Harris's
 broader sense of ``informed'' covers any participant whose expected
-value for the product exceeds the market's information set --- not
+value for the product exceeds the market's information set: not
 only illegal insider trading but also superior models, proprietary
 data feeds, or faster news parsing.
 
@@ -178,7 +178,7 @@ rebalancing a multi-billion-dollar portfolio is not literally
 move. What matters is that the noise trader's decision is
 \emph{uncorrelated with the product's true value}: on average they
 buy as often before a down-move as before an up-move. To the market
-maker, the noise trader is the perfect counterparty --- every fill is
+maker, the noise trader is the perfect counterparty: every fill is
 a fair bet and the spread collected is profit.
 
 Real markets always contain a mix of informed and noise flow, and
@@ -258,15 +258,15 @@ move price by percent. Instead they slice the parent order over hours
 or days using execution algorithms such as VWAP, TWAP, and
 participation-of-volume targets. \Cref{ch:almgren_chriss} derives the
 optimal schedule under a linear impact model. For now: institutional
-trading is \emph{size-constrained and execution-sensitive} --- P\&L
-is dominated by the price received on each slice, not by the raw
+trading is \emph{size-constrained and execution-sensitive}, meaning
+P\&L is dominated by the price received on each slice, not by the raw
 direction of the trade.
 
 To the market maker, institutional flow is \emph{partially informed}:
 the rebalance decision is uncorrelated with short-horizon moves
 (looks like noise), but the signed persistence of a parent sliced
 over hours reveals its direction (looks like information). This is
-why institutional orders leak impact even when executed carefully ---
+why institutional orders leak impact even when executed carefully:
 persistent one-sided flow is itself informative.
 
 \paragraph{Identification heuristic.} Persistent one-sided flow over
@@ -307,7 +307,7 @@ Wholesale market makers pay for retail flow because it is, on average,
 heavily noise-dominated. A retail trader is more likely selling to
 pay a bill than because they have private information about earnings.
 Paying for retail flow therefore buys the best counterparty in the
-market --- the noise trader of \cref{subsec:noise}. Retail flow is
+market, the noise trader of \cref{subsec:noise}. Retail flow is
 not uniformly uninformed: retail-level insider trading, meme-stock
 coordination, and reactions to public news all inject short bursts of
 information into the channel.
@@ -426,7 +426,7 @@ well: sells come preferentially from informed traders who know $V =
 giving P\&L $= -1.5$ per unit.
 
 The market maker cannot stay at the mid. Allowing a genuine spread
---- ask strictly above $105$, bid strictly below --- shrinks losses,
+(ask strictly above $105$, bid strictly below) shrinks losses,
 and at a wide enough spread turns them positive. ``How wide must the
 spread be to offset adverse selection?'' is the Glosten--Milgrom
 problem, derived in full in \cref{ch:kyle_gm}. The toy calculation
@@ -482,7 +482,7 @@ costly, and someone must compensate the posters or they will stop
 posting.
 
 The taker, in the same trade, crossed the book. They paid the spread
---- the gap between fill price and mid --- and received the one thing
+(the gap between fill price and mid) and received the one thing
 the market maker cannot promise: \textbf{immediacy}. The taker traded
 right now, at the quoted price, without risk of the opportunity
 disappearing. This is valuable to any participant with a
@@ -501,8 +501,8 @@ Without the rebate, no posted liquidity; without the fee, no
 exchange.
 \end{keyfactbox}
 
-A market charging neither side would still function in principle ---
-participants would trade for the spread alone --- but the exchange
+A market charging neither side would still function in principle
+(participants would trade for the spread alone), but the exchange
 would have no revenue, and without a rebate the incentive to post
 rather than wait-and-take disappears. Rebates are typically a few
 tenths of a basis point, but at the scale of rebate-harvesting market
@@ -564,8 +564,8 @@ client is. A macro hedge fund gets quoted wider; a corporate treasurer
 rolling a hedge gets quoted tighter.
 
 The microstructure models of \cref{ch:spreads_roll,ch:kyle_gm} were
-developed for order-driven markets, but the core intuition ---
-adverse-selection pressure on the liquidity provider --- carries over.
+developed for order-driven markets, but the core intuition,
+adverse-selection pressure on the liquidity provider, carries over.
 A dealer faces the same problem as a market maker with a different
 interface: they see the client's identity (helps: classify the flow)
 but commit to a price before the client commits to trade (hurts: the
@@ -575,7 +575,7 @@ life of a Strat on the quote-driven side.
 \begin{gsbox}
 On a Goldman rates desk, a pension fund calls asking a price on a
 \$500m 10-year interest rate swap. There is no central book for swaps
-in that size. You --- the Strat --- receive the RFQ; your system
+in that size. You, the Strat, receive the RFQ; your system
 computes a fair mid from the current swap curve; you add a spread
 reflecting your inventory (already long duration? charge more), your
 view of the client's informedness (routine corporate hedge or macro
@@ -592,8 +592,8 @@ central book by day and an RFQ facility for block trades. Some crypto
 products trade on central books and via OTC dealers. Some order-driven
 exchanges host dealer-style market makers (``lead market makers'' in
 ETFs, designated market makers on NYSE, specialists in older designs).
-What does not change is the economic pressure: the liquidity provider
---- central-book market maker or sell-side dealer --- is paid to
+What does not change is the economic pressure: the liquidity provider,
+whether central-book market maker or sell-side dealer, is paid to
 absorb risk from flow they cannot fully classify. The game is the
 adverse-selection game of \cref{ch:kyle_gm}.
 
@@ -601,9 +601,9 @@ adverse-selection game of \cref{ch:kyle_gm}.
 \label{sec:olivia}
 
 The informed/uninformed distinction can feel abstract. Prosperity~3
-provided a vivid real example showing the informed-trader category is
-a recognisable pattern in actual order flow --- and exploiting it
-paid.
+provided a vivid real example showing that the informed-trader
+category is a recognisable pattern in actual order flow, and that
+exploiting it paid.
 
 \begin{prosperitybox}
 In the 2025 IMC Prosperity~3 competition, participants traded against
@@ -629,7 +629,7 @@ could latch onto. The optimal strategy on Squid Ink became ``mimic the
 informed trader'': buy when Olivia buys, sell when Olivia sells. This
 single signal generated roughly $8{,}000$ SeaShells on Squid Ink in
 Round~1. In Round~2 they used Olivia's inferred Croissants position
-(a picnic-basket constituent) to tilt basket-spread thresholds ---
+(a picnic-basket constituent) to tilt basket-spread thresholds,
 the cross-product extension of \cref{ch:basket_etf_arb}.
 
 When Round~5 revealed trader IDs, the Hedgehogs already had a working
@@ -644,19 +644,18 @@ market-making on Squid Ink was unwittingly the market maker of
 Teams that identified and copied Olivia were on the informed side, and
 P\&L flowed accordingly. Lesson for Prosperity~4 (and for any real
 exchange with mixed counterparties): the informed/uninformed
-distinction is not abstraction. It is the difference between making
-and losing money, visible in the order flow if you know where to
-look.
+distinction is the difference between making and losing money,
+visible in the order flow if you know where to look.
 \end{prosperitybox}
 
 \section{Key facts to memorise}
 \label{sec:ch2_key_facts}
 
 \begin{itemize}
-  \item The seven participant categories --- \textbf{market makers},
+  \item The seven participant categories (\textbf{market makers},
   \textbf{arbitrageurs}, \textbf{informed traders}, \textbf{noise
   (liquidity) traders}, \textbf{HFTs}, \textbf{institutional asset
-  managers}, \textbf{retail traders} --- are distinguished by
+  managers}, \textbf{retail traders}) are distinguished by
   motivation, not by the orders they send.
 
   \item The most consequential split is \textbf{informed vs
@@ -695,7 +694,6 @@ look.
   is the best counterparty.
 
   \item The \textbf{Olivia story} is empirical ground truth for the
-  informed-trader category --- detectable from order flow alone, and
-  top-ten teams copied her for direct P\&L. The informed/uninformed
-  distinction is a pattern in real data, not an abstraction.
+  informed-trader category: detectable from order flow alone, and
+  top-ten teams copied her for direct P\&L.
 \end{itemize}

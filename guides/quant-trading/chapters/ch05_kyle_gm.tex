@@ -227,7 +227,7 @@ The implied spread and mid at the start of the game are
 \subsubsection{Step 5: interpret.}
 The mid is $105.0$, equal to the prior expected value. The spread
 of $3.0$ is positive despite zero costs, zero inventory, and zero
-holding period --- attributable entirely to adverse selection.
+holding period, attributable entirely to adverse selection.
 
 Check break-even: the ask equals $\E[V \mid \text{buy}]$, so the
 expected P\&L on the next buy is $\askp_0 - \E[V \mid \text{buy}] =
@@ -327,7 +327,7 @@ revealed value, giving
 \]
 the maximum. The market maker quotes only at fair value: any
 tighter loses, any wider goes unfilled. Dark pools populated
-entirely by informed hedge funds exhibit this pathology --- spreads
+entirely by informed hedge funds exhibit this pathology: spreads
 there are large or the venue goes unused.
 
 \paragraph{Limit 3: symmetric prior $\theta_t = 1/2$.} At a
@@ -433,7 +433,7 @@ $10$ & B     & $0.9930$ & $109.870$ & $109.962$ & $0.092$ \\
 \end{center}
 
 By $t = 10$, $\theta = 0.993$ and the spread has collapsed from
-$3$ to below $0.1$ --- a $30\times$ compression.
+$3$ to below $0.1$, a $30\times$ compression.
 
 Three observations. First, both mid and spread change after every
 trade: the mid tracks $\theta_t$ ($\theta_t V_H + (1-\theta_t)V_L$)
@@ -484,7 +484,7 @@ tradable until the profit disappears.
 Third, the trajectory $(0.5, 0.65, 0.7752, 0.8650, 0.7752, 0.65)$
 ends where it was four steps earlier. In the binary GM model a
 BS-pair (in either order) returns the posterior to its starting
-value --- a useful sanity check on hand-computed trajectories.
+value, a useful sanity check on hand-computed trajectories.
 (This is special to the binary case; multi-state models have more
 elaborate path dependence.)
 
@@ -495,7 +495,7 @@ informed. The spread $\alpha (V_H - V_L)$ (at $\theta = 1/2$) is
 exactly the width so uninformed traders, paying $\alpha(V_H -
 V_L)/2$ each way, collectively cover the loss. The spread is the
 \textbf{expected loss to the informed, amortised across the entire
-population} --- a tax, not a profit.
+population}: a tax, not a profit.
 
 Poker analogy (\cref{ch:participants}): one card-counter at a
 table of nine tourists, nobody can tell them apart. The house
@@ -512,10 +512,10 @@ nobody gets rich, the house stays in business.
 Glosten (Columbia) and Milgrom (Stanford) published ``Bid, Ask and
 Transaction Prices in a Specialist Market with Heterogeneously
 Informed Traders'' in the \emph{JFE} in 1985 \citeGM{}. Against a
-decade of debate over positive spreads --- the received answer was
-order-processing and inventory costs --- GM (and Kyle, in the same
-year's \emph{Econometrica}) showed adverse selection alone produces
-a spread. The technical innovation was bringing Bayes' theorem to
+decade of debate over positive spreads, in which the received
+answer was order-processing and inventory costs, GM (and Kyle, in
+the same year's \emph{Econometrica}) showed adverse selection alone
+produces a spread. The technical innovation was bringing Bayes' theorem to
 quote-setting. Milgrom later won the 2020 Nobel for his auction
 work.
 \end{historybox}
@@ -568,7 +568,7 @@ Only their aggregate $\noiseu$ is observable, not the individual
 trades. The noise traders are indispensable: without them every
 order would equal $\beta V$, the market maker could invert to
 recover $V$ exactly, and the insider's edge would collapse to zero
-before any profit was realised --- so the insider would not trade
+before any profit was realised, so the insider would not trade
 and the market would unravel.
 
 Third, a \textbf{risk-neutral, competitive market maker} observes
@@ -961,7 +961,7 @@ Generalised, both predict a \textbf{square-root law}: $\Delta p
 \propto \sqrt{Q}$ for a large trade of size $Q$. Kyle's
 single-round result is linear ($\Delta p = \lamk Q$), but
 multi-period multi-agent versions collapse to the empirical
-square-root shape --- \cref{ch:market_impact} covers this.
+square-root shape; \cref{ch:market_impact} covers this.
 
 \begin{pitfallbox}[Kyle's $\lamk$ is not the GM spread]
 A common first-reading error is to identify $\lamk$ with the
@@ -980,7 +980,7 @@ size $Q$:
   \text{spread} \;\sim\; 2 \lamk \cdot Q,
 \]
 a mnemonic, not a theorem. Do not write ``$\lamk$ is the
-spread'' --- it is a category error comparing a sensitivity to a
+spread''; it is a category error comparing a sensitivity to a
 price.
 \end{pitfallbox}
 
@@ -1029,14 +1029,14 @@ parent-order fills and monitors residuals for regime changes.
 client asks ``sell $5$M XYZ, what's my price?'' The pricing tool
 runs a Kyle-flavoured impact model, estimates the expected shift
 over the unwind horizon, and adds it as a markup/markdown to the
-mid --- exactly the $\lamk \cdot Q$ arithmetic. Informed clients
+mid, exactly the $\lamk \cdot Q$ arithmetic. Informed clients
 (hedge funds with history) get $\lamk$ adjusted upward;
 rebalancing pension funds get it adjusted downward.
 
 \textbf{Delta-hedging equity-derivative positions.} Scheduling an
 $N$-share delta hedge balances speed against self-impact. With
 $N = 200{,}000$ and $\lamk \approx 0.0002$, the naive one-shot
-hedge moves the price by $\approx 40$ bp --- enough to turn a
+hedge moves the price by $\approx 40$ bp, enough to turn a
 structured-product trade from a winner into a loser. This is
 why \cref{ch:almgren_chriss} is a central Strats chapter.
 

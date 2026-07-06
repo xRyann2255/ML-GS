@@ -2,12 +2,12 @@
 \label{ch:prosperity_setup}
 \chaptermark{Prosperity: competition and tooling}
 
-You are about to compete in IMC Prosperity.  Everything so far---limit
+You are about to compete in IMC Prosperity.  Everything covered so far
+applies directly: limit
 order books (\cref{ch:lob}), market making (\cref{ch:market_making}),
 statistical arbitrage (\cref{ch:basket_etf_arb}), options pricing
 (\cref{ch:black_scholes,ch:greeks_hedging,ch:vol_surface}), and the
-``which strategy when'' framework (\cref{ch:which_strategy_when})---applies
-directly.  This chapter is the operational briefing: competition
+``which strategy when'' framework (\cref{ch:which_strategy_when}).  This chapter is the operational briefing: competition
 structure, Python API, tooling, and the product archetypes that recur
 every year.
 
@@ -36,12 +36,12 @@ objective: \emph{maximise PnL} measured in the in-game currency
 
 The competition spans $\approx$16 days in five rounds.  Each round
 introduces 1--3 new products; earlier-round products persist.  Alongside
-each algorithmic round is a \textbf{manual challenge}---a human-decision
+each algorithmic round is a \textbf{manual challenge}, a human-decision
 task (optimisation under uncertainty, game theory) scored independently.
 Combined PnL across all rounds sets the leaderboard.
 
 Scale: P3 (2025) attracted over 12{,}000 teams; P4 is expected to be
-similar.  Ranking is pure PnL---no style points.
+similar.  Ranking is pure PnL; there are no style points.
 
 \begin{keyfactbox}[Prosperity at a glance]
 \begin{itemize}
@@ -51,7 +51,7 @@ similar.  Ranking is pure PnL---no style points.
   \item \textbf{Language:} Python (submitted as a single
   \texttt{.py} file).
   \item \textbf{Execution:} your algorithm trades independently
-  against bots---there is \emph{no} direct interaction between
+  against bots; there is \emph{no} direct interaction between
   different teams' algorithms.
   \item \textbf{Scoring:} total PnL (realised + unrealised) across all
   rounds.  Algo and manual PnL are summed for the overall leaderboard.
@@ -59,8 +59,8 @@ similar.  Ranking is pure PnL---no style points.
 \end{itemize}
 \end{keyfactbox}
 
-Prosperity compresses the core challenges of systematic trading---fair
-value, inventory, spread capture, stat arb, options---into a
+Prosperity compresses the core challenges of systematic trading (fair
+value, inventory, spread capture, stat arb, options) into a
 fast-feedback environment where iteration takes hours, not months.
 Every strategy archetype in Parts~III--V has appeared in at least one
 round.
@@ -131,7 +131,7 @@ Each round has two independent components:
   and trade CSVs for each new product let you study dynamics before
   coding.
 
-  \item \textbf{Manual challenge.}  A human-decision task---optimisation
+  \item \textbf{Manual challenge.}  A human-decision task: optimisation
   under uncertainty, game theory, news trading.  Manual PnL is
   \emph{added} to algo PnL.  Prior tasks have ranged from triangular FX
   arbitrage to Nash-equilibrium container
@@ -139,7 +139,7 @@ Each round has two independent components:
 \end{enumerate}
 
 The manual round is inactive during the tutorial period.  Skipping the
-manual round leaves free money on the table---even a mediocre submission
+manual round leaves free money on the table; even a mediocre submission
 beats zero.
 
 \subsection{PnL and scoring}
@@ -148,7 +148,7 @@ Round PnL = realised (closed trades) + unrealised (mark-to-market on
 open positions) at simulation end.  Concretely, realised PnL sums
 $-\sum p_i q_i$ over your fills (signed: $q_i>0$ for buys costs cash,
 $q_i<0$ for sells earns cash), and unrealised PnL marks any leftover
-position $q$ at the final mid-price $m$ as $q \cdot m$---so a long
+position $q$ at the final mid-price $m$ as $q \cdot m$, so a long
 position counts at what it could be sold for, a short at what it would
 cost to cover.  Currency: XIRECs (P4) or SeaShells (P3).  The overall
 leaderboard ranks by \emph{total} PnL across rounds (algo + manual),
@@ -162,7 +162,7 @@ letting it bleed.
 \subsection{Position limits}
 
 Each product has a position limit $L$: your signed position $q$ must
-satisfy $-L \le q \le L$.  Enforcement is aggressive---if the aggregate
+satisfy $-L \le q \le L$.  Enforcement is aggressive: if the aggregate
 of your buy (sell) quantities plus $q$ would exceed $+L$ ($-L$),
 \emph{every} order for that product in that iteration is rejected, not
 just the excess.
@@ -172,7 +172,7 @@ Resin, Kelp) to 400 (Volcanic Rock, the options underlying).  Limits
 are disclosed in the product spec at round start.
 
 \begin{pitfallbox}[Position limit enforcement is all-or-nothing]
-You cannot partially exceed---\emph{all} orders for the product are
+There is no partial rejection: \emph{all} orders for the product are
 voided if the aggregate could push past the limit.  Compute remaining
 capacity up front:
 \[
@@ -317,7 +317,7 @@ class Trader:
   \item \texttt{conversions}: integer conversion request (cross-exchange
   products only; else~0).
   \item \texttt{traderData}: string delivered back as
-  \texttt{state.traderData} next call---your only persistence mechanism
+  \texttt{state.traderData} next call, your only persistence mechanism
   (see pitfall below).
 \end{itemize}
 
@@ -437,7 +437,7 @@ at iteration end.
 
 Each \texttt{own\_trades}/\texttt{market\_trades} element is a
 \texttt{Trade} with \texttt{symbol, price, quantity, buyer, seller,
-timestamp}.  Counterparty names are hidden---\texttt{buyer}/\texttt{seller}
+timestamp}.  Counterparty names are hidden: \texttt{buyer}/\texttt{seller}
 are empty strings unless \emph{your} algorithm is one of the parties (in
 which case \texttt{"SUBMISSION"}).  In P3 Round~5, trader IDs were
 briefly revealed, enabling direct bot identification.
@@ -446,7 +446,7 @@ briefly revealed, enabling direct bot identification.
 
 Matching uses price--time priority (\cref{ch:lob}):
 \begin{enumerate}
-  \item Zero latency---you never lose a race to a bot.
+  \item Zero latency: you never lose a race to a bot.
   \item Buys match cheapest sells first; sells match most expensive buys
   first.
   \item Fills at the \emph{resting} price, so you may get a better price
@@ -469,7 +469,7 @@ foreign bid/ask, transport fees, and import/export tariffs.  Execute by
 returning a non-zero integer as the \texttt{conversions} element.
 
 A per-tick conversion limit (e.g.\ 10 units for P3 Macarons) caps
-throughput.  You must hold sufficient inventory---the exchange will not
+throughput.  You must hold sufficient inventory; the exchange will not
 create positions from nothing.
 
 \subsection{Worked example: two iterations of trading}
@@ -495,8 +495,8 @@ is $L - q = 10 - 3 = 7$ lots.  Send:
 Order("PRODUCT1", 12, 7)   # buy up to 7 at price 12
 \end{lstlisting}
 
-The exchange matches: 4 lots at~11 (you pay 11, not 12---fills at
-resting price), then 3 of 8 lots at~12.  You bought 7 lots at average
+The exchange matches: 4 lots at~11 (you pay 11, not 12, since fills
+occur at the resting price), then 3 of 8 lots at~12.  You bought 7 lots at average
 $(4 \times 11 + 3 \times 12)/7 \approx 11.43$.
 
 \textbf{Iteration 2.}  The next \texttt{TradingState} shows:
@@ -640,8 +640,8 @@ For each new product the platform provides several days of CSVs:
 \end{itemize}
 
 The backtester ships with data for all rounds.  Use these CSVs for
-exploratory analysis---plot prices, compute spreads, check mean
-reversion, spot bot patterns---\emph{before} writing strategy code.
+exploratory analysis (plot prices, compute spreads, check mean
+reversion, spot bot patterns) \emph{before} writing strategy code.
 
 \subsection{AWS Lambda constraints}
 
@@ -682,7 +682,7 @@ class Trader:
         traderData = json.dumps({"prices": history})
         return result, conversions, traderData
 \end{lstlisting}
-\texttt{traderData} is truncated to 50{,}000 characters---keep state
+\texttt{traderData} is truncated to 50{,}000 characters, so keep state
 compact.
 \end{pitfallbox}
 
@@ -690,9 +690,9 @@ compact.
 
 Python~3.12, with:
 \begin{itemize}
-  \item \texttt{numpy}, \texttt{pandas} --- numerics and data.
-  \item \texttt{statistics}, \texttt{math} --- stdlib numerics.
-  \item \texttt{jsonpickle} --- serialisation for \texttt{traderData}.
+  \item \texttt{numpy}, \texttt{pandas}: numerics and data.
+  \item \texttt{statistics}, \texttt{math}: stdlib numerics.
+  \item \texttt{jsonpickle}: serialisation for \texttt{traderData}.
   \item All Python~3.12 stdlib (\texttt{collections}, \texttt{itertools},
   \texttt{functools}, \dots).
 \end{itemize}
@@ -724,7 +724,7 @@ sequence~\citep{frankfurthedgehogs2025}:
   \item Next iteration begins with a fresh \texttt{TradingState}.
 \end{enumerate}
 
-Two implications.  First, you see the full book before acting---no
+Two implications.  First, you see the full book before acting, with no
 information disadvantage relative to bots.  Second, resting quotes are
 exposed to takers \emph{after} you submit, so passive MM accumulates
 fills between iterations.
@@ -741,8 +741,8 @@ Bots are not noise.  In P3, top teams identified distinct personalities:
   closely~\citep{frankfurthedgehogs2025}.
 
   \item \textbf{Taker bots} crossing the spread.  Some are uninformed;
-  others informed---e.g.\ ``Olivia'' in P3 bought the daily low and sold
-  the daily high of Squid Ink.
+  others informed (e.g.\ ``Olivia'' in P3 bought the daily low and sold
+  the daily high of Squid Ink).
 
   \item \textbf{Hidden taker bots} not visible in the book that fill
   resting orders priced attractively vs.\ a hidden fair value.  P3's
@@ -802,7 +802,7 @@ class Trader:
 \end{enumerate}
 
 This 15-line bot will not win, but it establishes the full
-pipeline---write, backtest, visualise, iterate---that top teams run
+pipeline (write, backtest, visualise, iterate) that top teams run
 hundreds of times per round.  The Frankfurt Hedgehogs reported
 Rainforest Resin alone contributed $\approx$39{,}000 SeaShells per round
 from a simple variant.
@@ -826,7 +826,7 @@ Round~1 opens, have:
   basket arbitrage (synthetic price vs.\ residual), (d) options
   (Black--Scholes, IV extraction, delta hedge), (e) cross-exchange
   arbitrage (local vs.\ foreign after fees).  These need to
-  \emph{exist}, not be tuned---so you can plug parameters in within the
+  \emph{exist}, not be tuned, so you can plug parameters in within the
   first hour.
 
   \item \textbf{Analysis notebooks.}  Load CSVs, plot prices, compute
@@ -844,8 +844,8 @@ Round~1 opens, have:
   Highest-ROI prep activity.
 
   \item \textbf{Read the entire wiki.}  Position limits, matching,
-  libraries, the Round~2 \texttt{bid()} method---easy to miss if you
-  only skim the API page.
+  libraries, the Round~2 \texttt{bid()} method; these are easy to miss
+  if you only skim the API page.
 \end{enumerate}
 
 \begin{historybox}
@@ -853,8 +853,8 @@ IMC Prosperity began in 2022 as ``Prosperity~1,'' originally targeting
 IMC's intern pipeline.  Its success prompted a global opening; by P3
 (2025) it was among the largest student trading competitions, with
 $>$12{,}000 teams from 100+ countries.  The design mirrors IMC's own
-philosophy---market making, inventory management, robust
-backtesting---so placing well is a credible signal to trading firms;
+philosophy (market making, inventory management, robust
+backtesting), so placing well is a credible signal to trading firms;
 several top teams have received direct interview invitations from IMC
 and competitors.
 \end{historybox}
@@ -876,7 +876,7 @@ framework at a firm like Goldman Sachs:
   positions, fills since last tick, order-book depth.
   \item The returned order list maps to a \textbf{smart order router}
   (SOR) or direct exchange gateway.
-  \item A real desk runs microseconds, not 900\,ms---but the mental
+  \item A real desk runs microseconds, not 900\,ms, but the mental
   model is identical: receive state, compute fair, decide, submit.
   \item \texttt{traderData} has no production equivalent (real systems
   have databases and shared memory), but explicit state serialisation
@@ -915,10 +915,10 @@ framework at a firm like Goldman Sachs:
   signal-driven, basket, options, cross-exchange).  Identify first, then
   apply matching strategy.
 
-  \item Zero latency---speed does not matter; \emph{fair-value} and
+  \item Zero latency: speed does not matter; \emph{fair-value} and
   \emph{inventory} determine PnL.
 
-  \item Manual round is scored independently---free PnL, do not skip.
+  \item Manual round is scored independently: free PnL, do not skip.
 
   \item Pre-competition: backtester, datamodel clone, strategy
   skeletons per archetype.

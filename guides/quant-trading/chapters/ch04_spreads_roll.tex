@@ -3,7 +3,7 @@
 \chaptermark{Spreads and the Roll model}
 
 A typical US large-cap stock has a bid--ask spread as tight as
-one cent on a share worth two hundred dollars --- five basis points.
+one cent on a share worth two hundred dollars, or five basis points.
 Why not zero? Why not ten cents? No regulator, exchange, or single
 market maker sets the width. The spread is \textbf{endogenous}: the
 equilibrium output of competition between market makers posting
@@ -17,7 +17,7 @@ This chapter has two jobs. First, it names the three forces:
 \cref{ch:spreads_roll,ch:kyle_gm,ch:market_impact,ch:market_making}.
 Second, it derives the \textbf{Roll (1984) spread estimator}
 \citeRoll{} from first principles: given only a tape of trade
-prices --- no quotes, no volumes --- the spread leaves a recoverable
+prices (no quotes, no volumes), the spread leaves a recoverable
 fingerprint in the lag-1 autocovariance of price changes. Four
 lines of algebra and one square root suffice.
 
@@ -76,8 +76,8 @@ floor}: the reason spreads on even the most contested products do
 not collapse to zero.
 
 Two counterintuitive points. First, order-processing costs are
-\emph{small} on the most liquid products --- US large-cap stocks,
-major currency pairs, top futures --- because volume is enormous
+\emph{small} on the most liquid products (US large-cap stocks,
+major currency pairs, top futures) because volume is enormous
 and fixed costs amortise over billions of trades. Second, despite
 this, they often \emph{dominate} the spread on exactly those
 products. Inventory and adverse selection are both much smaller on
@@ -92,7 +92,7 @@ is the \emph{smallest} of its three components.
 
 A market maker who fills a buy now holds a long position, whether
 they wanted one or not. That position is exposed to price risk
-until unwound --- seconds on a liquid product, minutes on a slower
+until unwound: seconds on a liquid product, minutes on a slower
 one, hours on an illiquid one. During that interval the position
 can move against them: a downtick in the efficient price on a long
 inventory is a real dollar loss. A rational market maker demands
@@ -141,7 +141,7 @@ and wider informed fraction means wider spread.
 Adverse selection is hardest to measure directly and easiest to
 get wrong in backtests. A strategy that looks profitable on
 historical mid-to-mid data may pay a live adverse-selection
-premium that historical mids never showed --- historical mids are
+premium that historical mids never showed. Historical mids are
 where the market quoted, not where the strategy would have been
 filled. \Cref{ch:backtesting} returns to this failure mode.
 
@@ -181,7 +181,7 @@ tape.
 Roll's puzzle, set in the early 1980s: intraday tick data was
 expensive and often impossible to obtain retrospectively.
 Researchers studying historical transaction costs had access only
-to the \emph{tape} of printed trades --- a time-ordered sequence
+to the \emph{tape} of printed trades: a time-ordered sequence
 of trade prices, with no quotes, quantities, or trade-direction
 labels. Can you estimate the effective bid--ask spread using only
 the trade-price time series?
@@ -191,8 +191,8 @@ bounce}: because trades alternate between hitting the bid and
 hitting the ask, trade prices zig-zag around the efficient price
 even when no new information arrives, and that zig-zag leaves a
 distinctive negative correlation between consecutive price
-changes. Under two assumptions --- a latent random-walk
-efficient price and iid trade directions --- the trade-price
+changes. Under two assumptions (a latent random-walk
+efficient price and iid trade directions), the trade-price
 series has a negative lag-1 autocovariance whose magnitude depends
 only on the spread. Invert the relationship and you have a spread
 estimator. The argument is four lines long.
@@ -201,7 +201,7 @@ estimator. The argument is four lines long.
 \label{subsec:roll_setup}
 
 We model two quantities. The first is an unobservable
-\textbf{efficient price} $m_t$ --- the hypothetical price at which
+\textbf{efficient price} $m_t$, the hypothetical price at which
 the product would trade in a frictionless market where all
 currently available information has already been incorporated.
 We assume it follows a random walk:
@@ -214,8 +214,8 @@ $\Var(u_t) = \sigma_u^2$. Shocks represent new information moving
 the fundamental price; mean-zero means no drift on average, \iid{}
 means $m_{t-1}$ tells you nothing about $u_t$.
 
-The second quantity is the \textbf{observable trade price} $p_t$
---- what actually prints on the tape. Each trade happens either at
+The second quantity is the \textbf{observable trade price} $p_t$,
+the price that actually prints on the tape. Each trade happens either at
 the bid (if it was a customer sell hitting a resting buy quote) or
 at the ask (if it was a customer buy hitting a resting sell
 quote). Introduce a \textbf{trade-direction indicator} $q_t$
@@ -247,7 +247,7 @@ version of a convenient fiction:
   = 1/2$. In particular $\E[q_t] = 0$ and $\E[q_t^2] = 1$, so
   $\Var(q_t) = 1$.
   \item $\{u_t\}$ and $\{q_t\}$ are independent of each other and
-  of their own pasts --- i.e.\ the efficient-price shocks carry no
+  of their own pasts: the efficient-price shocks carry no
   information about the direction of the current or future
   trades, and trade directions carry no information about the
   efficient-price shocks.
@@ -293,8 +293,8 @@ $p_t$ & $99.95$ & $100.05$ & $99.95$ & $99.95$ & $100.05$ & $99.95$ & $99.95$ & 
 }
 \end{center}
 
-A tape of thirteen trade prices, all either $99.95$ or $100.05$
---- looks like noise around a round number. The differences
+A tape of thirteen trade prices, all either $99.95$ or $100.05$,
+looks like noise around a round number. The differences
 $\Delta p_t = p_t - p_{t-1}$ are
 \begin{center}
 \resizebox{\linewidth}{!}{%
@@ -321,8 +321,8 @@ Now look at pairs of consecutive price changes. No $(+0.10,
 +0.10)$ or $(-0.10, -0.10)$ pairs appear; products $\Delta p_t
 \cdot \Delta p_{t-1}$ are either $0$ (one side zero) or $-0.01$
 (opposite signs). \emph{None is positive.} The sample lag-1
-autocovariance will be strictly negative --- Roll's point, because
-a pure random walk would predict zero.
+autocovariance will be strictly negative, which is Roll's point: a
+pure random walk would predict zero.
 
 We will compute the exact number in \cref{subsec:roll_toy_payoff}
 and recover the spread. But first, the general derivation.
@@ -435,7 +435,7 @@ Substituting back into \cref{eq:roll_covsurvived}:
 \end{equation}
 
 \paragraph{Step 5: invert to get the estimator.} The population
-lag-1 autocovariance of $\Delta p_t$ is exactly $-\spreads^2/4$ ---
+lag-1 autocovariance of $\Delta p_t$ is exactly $-\spreads^2/4$,
 a negative number whose magnitude is one quarter of the squared
 spread. Solving for $\spreads$:
 \begin{equation}
@@ -476,10 +476,10 @@ Three remarks about this result before we feed it numbers.
 \begin{remark}[The efficient-price variance cancels]
 \Cref{eq:roll_variance,eq:roll_cov} together say: variance of
 price changes has two contributions (information and bounce) but
-the lag-1 autocovariance has one --- the bounce alone. \iid{}
+the lag-1 autocovariance has one: the bounce alone. \iid{}
 information innovations contribute zero lag-1 autocorrelation;
-only the bounce survives at lag one, and it depends only on the
-spread. Hence the Roll estimator's robustness to efficient-price
+only the bounce survives at lag one, and that surviving term
+depends only on the spread. Hence the Roll estimator's robustness to efficient-price
 volatility: $\sigma_u^2$ dominates $\Var(\Delta p_t)$ but does not
 leak into the autocovariance.
 \end{remark}
@@ -553,8 +553,8 @@ Apply \cref{eq:roll_estimator}:
   \;=\; 2 \cdot 0.05
   \;=\; 0.10.
 \]
-Recovered spread is exactly $0.10$, matching the input at
-\cref{subsec:roll_toy}. Job done, tape alone.
+The recovered spread is exactly $0.10$, matching the input at
+\cref{subsec:roll_toy}, from the tape alone.
 
 \begin{intuitionbox}
 \textbf{The spread as a statistical signature of trading.}
@@ -616,14 +616,14 @@ the sample.
 Roll fails worst on illiquid products with few prints. A stock
 trading three times an hour on a day with real-information drift
 has $\Delta p_t$ observations dominated by $u_t$ shocks, not the
-bounce --- so $\sigma_u^2 \gg \spreads^2/2$ in
+bounce, so $\sigma_u^2 \gg \spreads^2/2$ in
 \cref{eq:roll_variance}. Population lag-1 autocovariance is still
 $-\spreads^2/4$, but the sample version from a handful of
 drift-dominated changes can easily come out positive by sampling
 noise, leaving the estimator undefined (\texttt{NaN}).
 
-Worse, an analyst who flips the sign by hand --- ``surely it must
-be negative, take the absolute value'' --- computes a statistic
+Worse, an analyst who flips the sign by hand (``surely it must
+be negative, take the absolute value'') computes a statistic
 with no theoretical backing. Roll is a \emph{model}, and on
 illiquid data the model is misspecified. When sample autocov comes
 out positive, discard, don't patch. For illiquid products use the
@@ -631,8 +631,8 @@ Corwin--Schultz high-low estimator, or direct quote data if
 available.
 \end{pitfallbox}
 
-These caveats make Roll a \emph{starting point}, not the end.
-Model-light, quick, requires only trade prices. Modern practice
+These caveats make Roll a \emph{starting point}, not the end. The
+estimator is model-light, quick, and needs only trade prices. Modern practice
 uses it as a sanity check and default when nothing better is
 available, cross-validated against Hasbrouck or direct quotes when
 those exist.
@@ -689,8 +689,8 @@ spread and balanced flow. Roll is the right tool.
 
 \medskip
 \textbf{Roll on a drifting \texttt{KELP} tape (fails).} Now suppose
-\texttt{KELP} is trending upward during the sample window --- its
-efficient price drifting by $+0.5$ seashells per trade --- and
+\texttt{KELP} is trending upward during the sample window, its
+efficient price drifting by $+0.5$ seashells per trade, and
 nine consecutive taker orders arrive on the ask (so
 $q_t = +1$ throughout). With a true spread of $\spreads = 1$, the
 trade prices are
@@ -745,7 +745,7 @@ estimation from end-of-day OHLC on products without licensed
 intraday tick data. A PM asking ``what was the effective spread on
 the Mexican peso non-deliverable forward in February 2019?''
 typically gets a Roll-based estimate unless the desk paid for the
-tick archive --- and for exotic products, usually they haven't.
+tick archive, and for exotic products, usually they haven't.
 
 On HFT desks with abundant tick data, Roll is superseded by the
 Hasbrouck VAR decomposition, which separates permanent

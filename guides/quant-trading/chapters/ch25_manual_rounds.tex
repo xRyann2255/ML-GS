@@ -28,8 +28,8 @@ Prosperity~1--3, each treated with the mathematics it deserves:
 \begin{backgroundbox}[Prerequisites]
 \begin{itemize}
   \item \Cref{ch:arbitrage_zoo}, \S\ref{sec:ch13_triangular}:
-  triangular FX arbitrage --- computing round-trip products,
-  trading when the product exceeds one.
+  triangular FX arbitrage (computing round-trip products,
+  trading when the product exceeds one).
   \item \Cref{ch:kelly_risk}: the Kelly criterion and
   expected-value-based position sizing.
   \item \Cref{ch:kyle_gm}: Glosten--Milgrom Bayesian updating
@@ -132,7 +132,7 @@ yielding approximately $8.9\%$ profit per round trip.
 
 \subsection{Connection to graph theory}
 
-The general problem---maximum-weight walk of length~$\le k$---is
+The general problem (maximum-weight walk of length~$\le k$) is
 solved by Bellman--Ford in log-space: set $w'_{ij} = -\ln M_{ij}$,
 then the rate product equals $\exp(-\sum w'_{ij})$, so maximising
 the product is equivalent to finding a minimum-weight walk (a
@@ -140,20 +140,20 @@ negative-total-weight walk is a profitable round trip).  Real-world
 FX desks run this continuously on live quotes \citeBouchaud.
 
 For the competition, brute force suffices: $n = 4$, $k = 5$ gives
-$4^5 = 1{,}024$ walks---minutes by hand.
+$4^5 = 1{,}024$ walks, minutes by hand.
 
 \subsection{Manual skill: speed under time pressure}
 
 Under time pressure on a $4 \times 4$ matrix:
 \begin{enumerate}
-  \item \textbf{Eliminate dominated currencies}---drop any row
+  \item \textbf{Eliminate dominated currencies}: drop any row
   uniformly worse than another.
   \item \textbf{Check all three-cycles first}: at most
   $\binom{4}{3} \times 2 = 8$ oriented three-cycles.
   \item \textbf{Extend promising three-cycles to five-step paths.}
   If $A \to B \to C \to A$ has $\Delta > 0$, try splitting one
   leg into two intermediate conversions that beat the direct rate.
-  \item \textbf{Verify with full precision}---rounding in
+  \item \textbf{Verify with full precision}: rounding in
   intermediate steps can flip the ranking of close candidates.
 \end{enumerate}
 
@@ -165,7 +165,7 @@ multiplications and catches most errors.
 \begin{pitfallbox}[Don't confuse rates and inverses]
 If $M_{A,B} = 1.45$, selling one~$A$ gives $1.45$~$B$.  The
 reverse direction uses $M_{B,A}$, which is \emph{not} necessarily
-$1/1.45 = 0.6897$---the matrix may bake in bid--ask spreads.
+$1/1.45 = 0.6897$: the matrix may bake in bid--ask spreads.
 Always read the entry for the direction you trade; never invert.
 \end{pitfallbox}
 
@@ -197,7 +197,7 @@ inhabitants).
 
 \begin{keyfactbox}[Winner's curse]
 In common-value auctions, the highest bidder wins precisely
-because they have the most optimistic estimate---or the least
+because they have the most optimistic estimate, or the least
 accurate model of the crowd.
 
 In container auctions, the container that looks most profitable
@@ -229,7 +229,7 @@ That is, the expected payout from any container in the support
 of the equilibrium is the same.
 \end{definition}
 
-The exact Nash needs the payoff function and player count---both
+The exact Nash needs the payoff function and player count, both
 given in Prosperity.  But the crowd does not play Nash: human
 biases (round-number attraction, anchoring on the highest
 multiplier, social-media coordination) cause systematic deviations.
@@ -287,7 +287,7 @@ SeaShells.  In hindsight, 10 or~37 would have earned $4{,}000$--%
 $10{,}000$ more \citep{frankfurtHedgehogs2025imcP3}.
 
 \begin{pitfallbox}[Anchoring on the obvious best container]
-The highest multiplier is almost never the best pick---it attracts
+The highest multiplier is almost never the best pick: it attracts
 the crowd and crushes per-team payout.  The optimum is a
 contrarian container with low allocation relative to its multiplier,
 the same logic as value investing: the best risk-adjusted return
@@ -396,7 +396,7 @@ population average~$\mu$:
   \label{eq:ch25_reserve_game}
 \end{equation}
 The cubic penalty punishes bids below average severely, creating
-upward coordination pressure---every team wants to bid at or above
+upward coordination pressure: every team wants to bid at or above
 the average, pushing the average up.
 
 \begin{intuitionbox}
@@ -418,7 +418,7 @@ shade above~$285$, which raises~$\mu$ and penalises those who did
 not.  This ratchet pushes bids higher.
 
 The Hedgehogs bid~$303$, anticipating overshoot.  The actual
-average was~$287$---most teams did not model the twist---and they
+average was~$287$ (most teams did not model the twist), and they
 overpaid by about $5.5\%$ versus the ex-post optimum
 \citep{frankfurtHedgehogs2025imcP3}.
 
@@ -448,7 +448,7 @@ Two players $A$, $B$ bargain over a surplus~$S$.  If they agree,
 $A$ gets $x$ and $B$ gets $S - x$; if not, they get disagreement
 payoffs $d_A, d_B$.  Nash (1950) proved a unique division satisfies
 four axioms (Pareto efficiency, symmetry, IIA, invariance to affine
-utility transformations)---the one maximising the \emph{Nash product}:
+utility transformations), namely the one maximising the \emph{Nash product}:
 \begin{equation}
   x^*
   \;=\;
@@ -499,7 +499,7 @@ the net surplus is $50{,}000$.  Applying the formula:
 Player~$B$'s stronger outside option ($d_B > d_A$) captures more
 surplus.  If $A$ can improve to $d_A = 40{,}000$ (e.g.\ a competing
 offer), the net surplus shrinks to $30{,}000$ and $A$'s allocation
-rises to $55{,}000$---a $10{,}000$ gain from a $20{,}000$ improvement
+rises to $55{,}000$, a $10{,}000$ gain from a $20{,}000$ improvement
 in the outside option.
 
 \subsection{Application to Prosperity container/suitcase rounds}
@@ -514,12 +514,12 @@ profit; the second-pick surplus must exceed its cost.
 Take the second pick iff $E_2 > c$: with $E_2 = 40{,}000$ and
 $c = 25{,}000$, net value is $+15{,}000$; with $E_2 = 20{,}000$
 it is $-5{,}000$.  Since $E_2$ is an estimate, a close call near
-$c$ is sensitive to error---decline when risk-averse.
+$c$ is sensitive to error; decline when risk-averse.
 
 \paragraph{Prosperity~3, Round~4 results.}
 The Hedgehogs chose multipliers~37 and~50; their ranking was
-60, 37, 50.  Actual crowd allocations differed substantially---%
-multiplier~37 drew $4.79\%$ versus the predicted $2.09\%$---and
+60, 37, 50.  Actual crowd allocations differed substantially
+(multiplier~37 drew $4.79\%$ versus the predicted $2.09\%$), and
 their combined $\approx 85{,}000$ SeaShells barely exceeded the
 average of $82{,}000$ \citep{frankfurtHedgehogs2025imcP3}:
 
@@ -541,7 +541,7 @@ average of $82{,}000$ \citep{frankfurtHedgehogs2025imcP3}:
 In the suitcase round, bargaining power against the crowd comes
 entirely from predicting what others do.  A poor crowd model
 means your ``outside option'' (naive-pick payout) dominates and
-sophistication adds no edge---the Hedgehogs' Round~4 predictions
+sophistication adds no edge.  The Hedgehogs' Round~4 predictions
 were off, and their profit barely exceeded average.
 \end{intuitionbox}
 
@@ -625,7 +625,7 @@ The posterior standard deviation is:
 \]
 Expect a $-13.7\%$ move with $15.6\%$ uncertainty.  The signal
 pulled your view from $0\%$ toward $-35\%$ but only partway,
-because the signal is noisy---a short with moderate conviction.
+because the signal is noisy: a short with moderate conviction.
 
 \subsection{Position sizing}
 
@@ -653,7 +653,7 @@ directional moves and sized positions conservatively.  In the
 table below, \textbf{Profit} is what they earned given their
 actual bets, while \textbf{Optimal} is what a perfect oracle
 knowing the actual move would have earned at the position
-limit---the gap measures forecasting error, not sizing mistakes:
+limit; the gap measures forecasting error, not sizing mistakes:
 
 \medskip
 \begin{center}
@@ -688,7 +688,7 @@ of the theoretical optimum.
 The Hedgehogs anchored on Prosperity~1 and~2 analogies (e.g.\
 assuming \texttt{Haystacks} behaved like a prior-year product).
 This is prior anchoring: when the prior is strong and the signal
-ambiguous, the update barely moves---but if the prior is wrong,
+ambiguous, the update barely moves, but if the prior is wrong,
 so is the posterior.  Defence: treat cross-year analogies as weak
 priors (large $\sigma_0$) and let the signal dominate.
 \end{pitfallbox}
@@ -702,8 +702,8 @@ priors (large $\sigma_0$) and let the signal dominate.
 Several threads run through all five manual-round archetypes.
 
 \paragraph{EV is necessary but not sufficient.}
-Every round reduces to an EV calculation, but its inputs---crowd
-behaviour, signal precision, distributions---are uncertain.  The
+Every round reduces to an EV calculation, but its inputs (crowd
+behaviour, signal precision, distributions) are uncertain.  The
 skill is mental sensitivity analysis: how wrong can my inputs be
 before the bet is $-$EV?
 
@@ -731,7 +731,7 @@ salient multiplier~37 for a middle-of-the-road pick.  Round~3
 a small loss.  Round~4 (suitcases): spread risk across two picks.
 Round~5 (news): deliberately undersized positions.
 
-Total manual PnL $\approx 252{,}000$ SeaShells across five rounds---%
+Total manual PnL $\approx 252{,}000$ SeaShells across five rounds,
 well below the theoretical optimum, but with low variance and no
 catastrophic round.  The lesson: \emph{when manual PnL is small
 relative to algorithmic, play for safe EV, not maximum EV}.
@@ -750,9 +750,9 @@ has seconds to: (i)~estimate fair value from the screen
 (reserve-price problem), and (iv)~update the market view given
 \emph{that client} calling \emph{now} (Bayesian news update).
 
-A placement student who can explain the connection---``the
+A placement student who can explain the connection (``the
 reserve-price round is client quoting with the cubic penalty
-playing the role of adverse selection''---shows exactly the
+playing the role of adverse selection'') shows exactly the
 structured thinking a desk head values.
 \end{gsbox}
 

@@ -8,7 +8,7 @@ theory in the specific institution where you will work.  A Strat at
 Goldman Sachs sits at the intersection of quantitative research,
 trading, and engineering: you derive a pricing model from first
 principles \emph{and} ship production code that runs it in real time
-across every desk.  Understanding that --- hour by hour --- is
+across every desk.  Understanding that role, hour by hour, is
 essential preparation for the off-cycle interview and your first
 weeks on the floor.
 
@@ -37,7 +37,7 @@ Walk onto the floor of a bulge-bracket bank (Goldman Sachs, Morgan
 Stanley, J.P.~Morgan) and you see a single open-plan room the size
 of a football pitch: rows of desks, six or more monitors each, loud
 under fluorescent light.  The room is organised not by seniority but
-by \emph{product} --- clusters for equities, rates, credit, FX,
+by \emph{product}: clusters for equities, rates, credit, FX,
 commodities.  Within each cluster, five roles sit close enough to
 shout at each other.  Proximity is the primary communication
 channel: when a trader needs a price in ten seconds, email will not
@@ -50,17 +50,17 @@ around a related set of tradeable instruments.  The major desk
 families at Goldman Sachs:
 
 \begin{itemize}
-  \item \textbf{Rates} --- government bonds, interest-rate swaps,
+  \item \textbf{Rates}: government bonds, interest-rate swaps,
     swaptions, caps, floors, inflation-linked products.
-  \item \textbf{Equities} --- single stocks, equity indices, equity
+  \item \textbf{Equities}: single stocks, equity indices, equity
     derivatives (calls, puts, exotics, variance swaps), ETFs, program
     trading.
-  \item \textbf{Credit} --- corporate bonds, credit default swaps
+  \item \textbf{Credit}: corporate bonds, credit default swaps
     (CDS), CDS indices, collateralised debt obligations (CDOs),
     leveraged loans.
-  \item \textbf{Foreign exchange (FX)} --- spot, forwards, FX swaps,
+  \item \textbf{Foreign exchange (FX)}: spot, forwards, FX swaps,
     FX options (vanillas and barriers), cross-currency basis swaps.
-  \item \textbf{Commodities} --- oil, natural gas, metals,
+  \item \textbf{Commodities}: oil, natural gas, metals,
     agriculture, power, emissions.  Each sub-commodity often has its
     own desk.
 \end{itemize}
@@ -75,8 +75,8 @@ your traders.
 \paragraph{Traders.}
 The trader owns the risk book: which positions to take, which
 client axes to fill, when to hedge.  (An \emph{axis} is a standing
-interest --- ``the desk is a buyer of 5Y protection'' --- that Sales
-circulates to clients.)  Traders are measured on P\&L ---
+interest, such as ``the desk is a buyer of 5Y protection,'' that Sales
+circulates to clients.)  Traders are measured on P\&L,
 the single number determining bonus, reputation, and survival.  A
 desk head manages a book with gross notional in the billions and a
 daily P\&L swinging by several million.  Traders speak in terse
@@ -85,8 +85,8 @@ client for every other role.
 
 Two archetypes.  \textbf{Flow traders} (``market makers'' on the
 sell side) quote prices, manage inventory, and earn the bid-ask
-spread.  \textbf{Proprietary traders} --- rare since the Volcker Rule
-(2010) --- take directional bets with the firm's capital.  Most
+spread.  \textbf{Proprietary traders}, rare since the Volcker Rule
+(2010), take directional bets with the firm's capital.  Most
 modern bank trading is flow, so the Strat's job is to help price,
 hedge, and risk-manage \emph{client-driven} positions.
 
@@ -122,7 +122,7 @@ Engineering builds the platforms everything runs on: networking,
 databases, messaging, trade capture, regulatory reporting, the
 firm-wide risk aggregation engine.  Engineers own reliability,
 throughput, and internal developer experience, not model logic.
-The off-cycle placement sits in Engineering --- ``at the critical
+The off-cycle placement sits in Engineering, ``at the critical
 center of our business,'' since every trade, risk number, and
 client report flows through infrastructure Engineering maintains.
 
@@ -143,10 +143,10 @@ Eng.     & Infrastructure   & Reliability, throughput & Platforms, tooling \\
 \subsection{How the roles interact}
 
 A client trade illustrates the roles.  A pension fund calls Sales:
-``We want to hedge our equity exposure for six months --- price us
+``We want to hedge our equity exposure for six months: price us
 a collar on the S\&P~500 with a 95\% put and a 105\% call.''  Sales
 passes it to the Trader, who asks the Strat: ``Run the collar
-through the engine --- fair value and vega?''  The Strat evaluates
+through the engine, fair value and vega?''  The Strat evaluates
 in SecDB, which calls the vol-surface calibration code the Strat
 wrote last quarter, computes price and Greeks, and returns the
 result.  The Trader adds a margin for execution risk and target
@@ -162,9 +162,9 @@ UIs) and is not expected to derive a pricing formula.  A Strat
 implements a \emph{specific} pricing or risk model, owns its
 mathematical correctness, and sits physically on the trading desk
 rather than in a separate technology building.  The Engineering job
-description emphasises ``risk management, big data, mobile'' --- all
+description emphasises ``risk management, big data, mobile,'' all
 infrastructure.  The Strat job description (a separate hiring track)
-emphasises ``pricing models, Greeks, calibration'' --- the model
+emphasises ``pricing models, Greeks, calibration,'' the model
 layer.  Know which track you are interviewing for.
 \end{pitfallbox}
 
@@ -180,9 +180,9 @@ Strat must be able to:
   \item \textbf{Derive}: read a QR paper, reproduce the derivation,
     identify which approximations matter, decide whether the model is
     fit for purpose on a given desk.
-  \item \textbf{Implement}: write production code --- the firm's
+  \item \textbf{Implement}: write production code, in the firm's
     proprietary language (Slang at Goldman Sachs;
-    \cref{sec:strats_secdb}) or C++/Python --- that runs in real
+    \cref{sec:strats_secdb}) or C++/Python, that runs in real
     time, handles edge cases, and degrades gracefully under stress.
   \item \textbf{Communicate}: explain to the trader, in thirty
     seconds, why the model gives a particular price, what changed
@@ -204,18 +204,18 @@ at the morning risk report: ``My vega is \$500K per vol point on
 this swaption position, but yesterday it was \$300K.  Nothing
 changed overnight.  What happened?''
 
-An engineer cannot answer: it requires understanding the model ---
-did the surface recalibrate to a different shape, changing vega?  A
+An engineer cannot answer: it requires understanding the model.
+Did the surface recalibrate to a different shape, changing vega?  A
 QR researcher might answer in principle but cannot trace the bug
 through production code to the line where calibration parameters
-are read.  The Strat can: check whether the surface moved (yes --- a
+are read.  The Strat can: check whether the surface moved (yes, a
 new quote shifted SABR $\rho$), verify the calibration code ingested
 the quote correctly (yes), and explain the vega change is real, not
 a bug, and the position is now more sensitive to vol moves than
 yesterday.
 
-End-to-end debugging --- market data through model mathematics
-through code to the screen --- is the Strat's defining skill, and
+End-to-end debugging (market data through model mathematics
+through code to the screen) is the Strat's defining skill, and
 the hardest to develop, requiring simultaneous fluency in three
 domains taught separately at university: mathematics, computer
 science, and finance.
@@ -230,9 +230,9 @@ Every morning the vol surface (\cref{ch:vol_surface}) is
 recalibrated to the previous close and overnight moves.  The Strat
 owns the calibration code: SABR to the swaption grid (rates),
 local-vol or Heston to the equity options chain, hazard-rate curve
-to CDS spreads (credit).  When the fit breaks --- a new strike
+to CDS spreads (credit).  When the fit breaks (a new strike
 outside the interpolation range, an optimiser that fails to
-converge --- the Strat is paged first.
+converge), the Strat is paged first.
 
 Calibration is not one-off.  The surface drifts as new trades print.
 A good routine runs incrementally (updating only parameters affected
@@ -259,8 +259,8 @@ approximation, the trader's hedge is wrong.  Ensuring consistency
 \cref{sec:strats_secdb}) is a core Strat responsibility.
 
 \paragraph{3.\ Trade pricing.}
-When Sales brings a structured-product request --- say, an
-autocallable on the EuroStoxx~50 --- the trader asks the Strat for
+When Sales brings a structured-product request (say, an
+autocallable on the EuroStoxx~50), the trader asks the Strat for
 fair value.  The Strat runs the payoff through the pricing engine,
 checks Greeks, returns a price.  If no existing model handles the
 payoff, the Strat builds one under time pressure (the client wants
@@ -295,9 +295,9 @@ automatic hedge triggered).
 Each morning the trader asks: ``Why is my P\&L what it is?''  The
 Strat decomposes overnight P\&L into contributions from delta, gamma,
 vega, theta, and unexplained residual.  This decomposition
-(\cref{ch:greeks_hedging}) is not just accounting --- a large
-residual signals model mis-specification, and the Strat must
-diagnose it.
+(\cref{ch:greeks_hedging}) is a diagnostic as well as an accounting
+exercise: a large residual signals model mis-specification, and the
+Strat must diagnose it.
 
 The standard decomposition is a Taylor expansion of the portfolio
 value $V$:
@@ -319,7 +319,7 @@ triggers an investigation.
 \begin{intuitionbox}
 The Strat translates between two languages: mathematics (QR) and
 risk/money (trader).  Fluent in both, the Strat is the only person
-on the floor who can debug a pricing discrepancy end to end --- from
+on the floor who can debug a pricing discrepancy end to end, from
 the SDE to the C++ inner loop to the number on the trader's screen.
 \end{intuitionbox}
 
@@ -343,7 +343,7 @@ A composite sketch of a typical day for a junior Strat on an equity
 derivatives desk.  Specifics vary by desk, seniority, and firm, but
 the rhythm is representative.
 
-\subsection{7:00 AM --- Arrive, check overnight}
+\subsection{7:00 AM: Arrive, check overnight}
 
 Asia closed hours ago; Europe is about to open.  The Strat checks
 the overnight batch: did end-of-day risk complete?  Any calibration
@@ -355,11 +355,11 @@ problematic strike, widens optimiser bounds, reruns, verifies
 sensible Greeks, and pushes the fix before the trader arrives at
 7:15.
 
-\subsection{7:30 AM --- Morning meeting}
+\subsection{7:30 AM: Morning meeting}
 
 The desk head runs a five-minute stand-up.  The trader: ``Long
 gamma on the index, short gamma on single names.  Correlation book
-made money overnight --- realised correlation dropped.  Asia was
+made money overnight: realised correlation dropped.  Asia was
 quiet.''  The Strat reports the calibration fix, flags that gamma on
 the at-the-money straddle is unusually high (the earnings gap
 compressed the surface near the money), and recommends rehedging.
@@ -374,7 +374,7 @@ risk profile, sell about 500 ATM-straddle contracts.''  Translating
 model output into actionable trading language in real time takes
 months to develop.
 
-\subsection{8:00 AM --- P\&L explain}
+\subsection{8:00 AM: P\&L explain}
 
 The Strat runs the P\&L decomposition using
 \cref{eq:strats_pnl_explain}.  Yesterday's P\&L was \$+1.2M.  The
@@ -396,16 +396,16 @@ Unexplained residual                      & $+\$30\text{K}$ \\
 \end{tabular}
 \end{center}
 
-The residual is 2.5\% --- well within the 5\% threshold.  The Strat
+The residual is 2.5\%, well within the 5\% threshold.  The Strat
 attributes it to bid-ask crossing on illiquid positions and rounding
 in finite-difference Greek bumps.  The trader signs off.  Had the
 residual been \$150K (12.5\%), the Strat would need to investigate:
 mis-specified model?  Stale market-data feed?  Mis-booked position?
 
-\subsection{10:00 AM --- Price the barrier option}
+\subsection{10:00 AM: Price the barrier option}
 
 Sales has formalised the request: a six-month down-and-out put on
-an equity index, barrier at 85\% of spot, \$50M notional --- a
+an equity index, barrier at 85\% of spot, \$50M notional.  This is a
 path-dependent exotic that knocks out worthless if the index
 touches the barrier in six months.  The Strat prices via the
 local-vol engine (100,000 Monte Carlo paths, Euler discretisation,
@@ -416,7 +416,7 @@ knock-out probability (18\%), and ``barrier delta'' (sensitivity to
 the barrier level).  The trader adds a 50~bp margin and Sales
 quotes.
 
-\subsection{12:00 PM --- Code review}
+\subsection{12:00 PM: Code review}
 
 A fellow Strat has submitted a PR refactoring dividend-handling
 in the equity pricing engine.  The change affects how discrete
@@ -429,10 +429,10 @@ on the benchmark book?).  Model-code review is more demanding than
 infrastructure review: a subtle math error mis-hedges the desk and
 costs real money.
 
-\subsection{2:00 PM --- Fix a production bug}
+\subsection{2:00 PM: Fix a production bug}
 
 A neighbouring-desk trader reports negative vega on a long
-swaption --- clearly wrong.  The bug: a sign error in the SABR vega
+swaption, which is clearly wrong.  The bug: a sign error in the SABR vega
 bump, introduced two weeks ago when a QR patch switched from
 absolute to relative bumps.  The absolute bump $\sigma \to \sigma +
 \epsilon$ became $\sigma \to \sigma(1 + \epsilon)$, but read-back
@@ -451,10 +451,10 @@ the consequences.  Code review, regression testing, and careful
 deployment are the primary defence against P\&L-destroying errors.
 \end{pitfallbox}
 
-\subsection{5:00 PM --- End of day}
+\subsection{5:00 PM: End of day}
 
 Europe closes.  The Strat triggers the end-of-day batch: full recalibration, full
-risk, regulatory report (about 45 minutes --- tens of thousands of
+risk, regulatory report (about 45 minutes: tens of thousands of
 trades, each requiring a pricing evaluation).  While it runs, the
 Strat reviews a QR paper on a stochastic local-vol model that
 might improve barrier-option pricing; the key result (a PDE for
@@ -462,12 +462,12 @@ the local-vol component conditional on the stochastic-vol state)
 is tractable and implementable with a moderate refactor.
 Prototype notes go in the backlog.
 
-\subsection{6:00 PM --- Batch monitoring and wrap-up}
+\subsection{6:00 PM: Batch monitoring and wrap-up}
 
 The batch completes.  The Strat checks output (all calibrations
 converged, all risk numbers within bounds, no limit breaches),
 queues the regulatory report, commits the day's changes, updates
-the tracker, and leaves --- 6:00--6:30~PM on most days.  On bad days
+the tracker, and leaves at 6:00--6:30~PM on most days.  On bad days
 (batch-time model failure, regulatory deadline, product launch) it
 runs much later.
 
@@ -497,18 +497,18 @@ year one learning the desk's products, models, and codebase.
 Primary output: bug fixes, small features, the daily
 calibration/risk cycle (\cref{sec:strats_day_in_life}).  The
 Engineering off-cycle posting specifies ``real responsibilities
-alongside fellow interns and our people'' --- you write production
+alongside fellow interns and our people'': you write production
 code from week one, not observe.
 
 Year one is steep: Slang, SecDB, the desk's product mathematics,
 and the floor's unwritten conventions.  The fastest way to earn
-trust is to fix a bug that has annoyed the trader for months ---
+trust is to fix a bug that has annoyed the trader for months:
 proof you can read the codebase, understand the model, and ship a
 correct fix under pressure.
 
 \paragraph{Associate (3--5 years).}
-You own a specific model or product --- the person the trader calls
-when it misbehaves.  You lead small projects: replacing a
+You own a specific model or product and are the person the trader
+calls when it misbehaves.  You lead small projects: replacing a
 calibration, building a pricing model for a new product, migrating
 legacy code.  The firm expects you to identify model deficiencies
 proactively, not just react to trader complaints.
@@ -546,17 +546,17 @@ MD        & 10+ years   & Runs a Strats group, sets strategy \\
 \subsection{Exit paths}
 
 The sell side is a powerful launchpad.  After three to five years
-a Strat's skillset --- production coding, model derivation, market
-intuition, operational discipline --- is highly valued outside the
+a Strat's skillset (production coding, model derivation, market
+intuition, operational discipline) is highly valued outside the
 bank.
 
 \begin{itemize}
   \item \textbf{Hedge funds.} The most common exit.  Multi-strategy
     funds (Citadel, Millennium, Point72) hire experienced Strats to
-    run systematic desks or build pricing infrastructure.  Direct
-    skill transfer --- pricing, Greeks, calibration, production
-    coding --- and pay at a top fund can be 2--5$\times$ the bank
-    at the same seniority.
+    run systematic desks or build pricing infrastructure.  The
+    skills transfer directly (pricing, Greeks, calibration,
+    production coding), and pay at a top fund can be 2--5$\times$
+    the bank at the same seniority.
   \item \textbf{Proprietary trading firms.} Jane Street, Two Sigma,
     Jump hire Strats for quantitative depth and production
     discipline; low-latency experience is especially valued.
@@ -565,7 +565,7 @@ bank.
     transfer.  Pay is competitive (below hedge-fund levels) and
     work-life balance is better.
   \item \textbf{Quantitative research.} A smaller number move to
-    pure QR --- same bank or a fund --- leaving production to
+    pure QR, at the same bank or a fund, leaving production to
     others.  Suits Strats who prefer derivation to debugging.
   \item \textbf{Fintech and startups.}  A growing path: Strats bring
     credibility and domain expertise to trading platforms, risk
@@ -588,8 +588,8 @@ to Strats candidates:
     new regulations, products, models.  The interviewer wants
     evidence you have operated in ambiguous, shifting environments.
   \item \textbf{Collaboration.}  ``Creative collaborators'' is the
-    exact phrase.  The Strat role is collaborative by construction
-    --- you work with traders, QR, sales, and engineering daily.
+    exact phrase.  The Strat role is collaborative by construction:
+    you work with traders, QR, sales, and engineering daily.
     The interviewer looks for signals that you can communicate
     technical ideas to non-technical stakeholders and vice versa.
 \end{enumerate}
@@ -598,7 +598,7 @@ to Strats candidates:
 The single most important thing Goldman Sachs wants in a junior hire
 is \emph{evidence of building things that work}: a side project, an
 open-source contribution, a competition result, a research
-implementation --- anything that shows you can go from idea to
+implementation, anything that shows you can go from idea to
 working code under constraints.  IMC Prosperity is exactly this: it
 shows you can design, implement, and iterate on a trading algorithm
 under time pressure with real (simulated) consequences.
@@ -621,8 +621,8 @@ system.  Built in the early 1990s and continuously developed since,
 SecDB is not a relational database: it is a \emph{graph-based
 compute engine} representing every trade, instrument, market-data
 input, and pricing model as a node in a directed acyclic graph
-(DAG).  When a market-data input changes --- a spot, a vol quote, a
-yield-curve point --- SecDB propagates the change, recomputing
+(DAG).  When a market-data input changes (a spot, a vol quote, a
+yield-curve point), SecDB propagates the change, recomputing
 every dependent price and risk number automatically.
 
 \begin{keyfactbox}[SecDB in one sentence]
@@ -636,7 +636,7 @@ hundreds of thousands of live trades across every asset class.
 Every desk (rates, equities, credit, FX, commodities) uses the same
 instance, so a single SABR-calibration change affects every desk
 using SABR.  The benefit is consistency (one model, one price, one
-risk number per trade); the cost is global bug propagation --- hence
+risk number per trade); the cost is global bug propagation, hence
 the discipline of code review and testing.
 
 The DAG structure shapes how a Strat thinks about pricing.  Leaves
@@ -669,7 +669,7 @@ market-data and infrastructure layers.
 \textbf{Slang} (\textbf{S}ecDB \textbf{Lang}uage) is Goldman Sachs's
 proprietary functional language for writing pricing and risk models
 inside SecDB: statically typed, garbage-collected, functional, with
-built-in automatic differentiation (AD) --- the same technique
+built-in automatic differentiation (AD), the same technique
 behind modern ML frameworks, applied here to compute Greeks.
 
 \begin{intuitionbox}
@@ -691,15 +691,15 @@ language instead of using C++ or Python:
   \item \textbf{Lazy evaluation.}  Slang evaluates expressions only
     when results are needed.  In SecDB's DAG a market-data change
     triggers recomputation only of nodes actually depending on the
-    input, not the whole graph --- what makes near-real-time risk at
-    scale feasible.
+    input, not the whole graph, which is what makes near-real-time
+    risk at scale feasible.
   \item \textbf{Serialisability.}  Every Slang object serialises to
     disk and back, letting SecDB checkpoint and restore the pricing
-    graph --- critical for end-of-day batches, disaster recovery,
-    and regulatory audits.
+    graph, which is critical for end-of-day batches, disaster
+    recovery, and regulatory audits.
   \item \textbf{Type safety.}  The static type system catches common
-    errors --- passing a volatility where a price was expected,
-    confusing a date with a number --- at compile time.
+    errors (passing a volatility where a price was expected,
+    confusing a date with a number) at compile time.
 \end{enumerate}
 
 The Slang VM runs on every desk's compute infrastructure.  A price
@@ -709,8 +709,8 @@ single-trade pricing (latency-critical, for live quoting) and batch
 risk (throughput-critical, for end-of-day and regulatory reports).
 
 A junior Strat's first months are spent learning Slang and the
-SecDB graph model.  The curve is steep --- Slang is not taught at
-any university and has no public documentation --- but the payoff
+SecDB graph model.  The curve is steep (Slang is not taught at
+any university and has no public documentation), but the payoff
 is that a fluent Strat can implement, test, and deploy a new
 pricing model in days rather than the weeks or months a conventional
 C++ codebase would take.
@@ -745,8 +745,8 @@ Barclays       & BARX    & Java / C++          & Service-oriented \\
 \end{tabular}
 \end{center}
 
-The skills you build on \emph{any} of these systems --- reactive
-computation, AD, model calibration, risk aggregation --- transfer
+The skills you build on \emph{any} of these systems (reactive
+computation, AD, model calibration, risk aggregation) transfer
 directly.  The specific language is secondary; the design patterns
 are universal.
 
@@ -767,8 +767,9 @@ of provably correct financial code (comprehensive tests, formal
 review, staged deployment) is highly valued by hedge funds and
 prop shops.  Second, how a large-scale reactive system works:
 propagating changes through a graph, handling stale data,
-balancing latency against throughput --- problems in every
-real-time data system, from ad platforms to autonomous vehicles.
+balancing latency against throughput.  These problems arise in
+every real-time data system, from ad platforms to autonomous
+vehicles.
 
 \Cref{ch:secdb_slang} covers SecDB's architecture and Slang's
 language features in depth.
@@ -778,8 +779,8 @@ language features in depth.
 %% ================================================================
 
 \begin{prosperitybox}
-Prosperity's \texttt{Trader} class --- \texttt{run()} called once
-per iteration --- is a miniature Strat event loop.  Each call
+Prosperity's \texttt{Trader} class, with \texttt{run()} called once
+per iteration, is a miniature Strat event loop.  Each call
 receives the market state (\texttt{TradingState}) and returns
 orders, conversions, and serialised state, just as a Strat's
 pricing code must return price and Greeks within a single SecDB
@@ -798,7 +799,7 @@ Goldman Sachs quantitative interviews have four components:
 \begin{enumerate}
   \item \textbf{Probability and brainteasers.}  Classics: ``Expected
     coin flips to get two heads in a row?''  ``100 balls, 50 red and
-    50 blue, drawn without replacement --- probability the last is
+    50 blue, drawn without replacement: probability the last is
     red?''  Tests reasoning under uncertainty and structured
     communication.
   \item \textbf{Black--Scholes and Greeks.}  Derive Black--Scholes
@@ -823,15 +824,15 @@ Street \citeDerman{}.  Derman, a theoretical physicist who joined
 Goldman Sachs in 1985, helped build the firm's first-generation
 options-pricing models and shaped the culture that became the
 modern Strats group.  His description of the intellectual
-excitement --- and operational chaos --- of building pricing models
+excitement and operational chaos of building pricing models
 in the late 1980s remains the best introduction to what the Strat
 role \emph{feels like} from inside.  Two themes.  First, models are
 always wrong; the question is whether they are useful enough, and
 the Strat's judgment on ``useful enough'' is what the trader pays
-for.  Second, the half-life of a pricing model is short --- markets
+for.  Second, the half-life of a pricing model is short: markets
 evolve, products change, and the Strat who stops learning stops
-being useful.  Derman's arc --- physicist to junior quant to MD to
-academic --- is a template in \cref{sec:strats_career}.
+being useful.  Derman's arc (physicist to junior quant to MD to
+academic) is a template in \cref{sec:strats_career}.
 \end{historybox}
 
 %% ================================================================
@@ -844,7 +845,7 @@ academic --- is a template in \cref{sec:strats_career}.
     function.  Traders, sales, QR, Strats, and engineering sit
     together per product area.
   \item A \textbf{Strat} writes production code \emph{and} derives
-    the models it implements --- the dual competency separating the
+    the models it implements, the dual competency separating the
     role from software engineering (code without models) and QR
     (models without production code).
   \item Daily loop: morning calibration and P\&L explain, mid-day
@@ -862,6 +863,6 @@ academic --- is a template in \cref{sec:strats_career}.
     Black--Scholes and Greeks, coding, market intuition.
   \item Prosperity's \texttt{Trader.run()} is a miniature Strat
     event loop: receive state, compute, return orders, serialise.
-    Clean, stateful, deterministic code under time pressure --- the
+    Clean, stateful, deterministic code under time pressure is the
     same discipline in both settings.
 \end{itemize}

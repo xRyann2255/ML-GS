@@ -6,8 +6,8 @@ Credit derivatives let you trade default risk without holding the
 bond.  The most important instrument is the \emph{credit default
 swap} (CDS).  This chapter derives CDS pricing from first principles,
 shows how a term structure of CDS quotes is \emph{stripped} into a
-curve of hazard rates --- the exact mirror of the zero-curve bootstrap
-in \cref{ch:fixed_income_foundations} --- introduces the CDX and
+curve of hazard rates (the exact mirror of the zero-curve bootstrap
+in \cref{ch:fixed_income_foundations}), introduces the CDX and
 iTraxx index families, and ends with the 2008 Gaussian-copula
 failure: the model that priced every senior CDO tranche on Wall
 Street and was catastrophically wrong when it mattered.
@@ -19,7 +19,7 @@ Street and was catastrophically wrong when it mattered.
   \item \Cref{ch:kelly_risk}: expected loss
     $= \Prob(\text{loss}) \times \E[\text{loss}\mid\text{default}]$,
     and recovery reducing LGD.
-  \item \Cref{ch:fixed_income_foundations}: zero-curve bootstrap ---
+  \item \Cref{ch:fixed_income_foundations}: zero-curve bootstrap;
     CDS stripping is the credit analogue.
 \end{itemize}
 \end{backgroundbox}
@@ -91,7 +91,7 @@ Junior subordinated      & 10--20\% \\
 The standard CDS convention is $R = 40\%$ for senior unsecured;
 sovereign CDS typically assumes $R = 25\%$.
 
-\paragraph{Worked example --- expected loss.}
+\paragraph{Worked example: expected loss.}
 Suppose a 5-year cumulative default probability is
 $\mathrm{PD}(5) = 20\%$ and the recovery rate is $R = 40\%$.  The
 expected loss on \$1 of face value over 5 years is
@@ -123,7 +123,7 @@ next section corrects both.
 A rating-agency 5-year PD for a BBB-rated firm is roughly 2\%; the
 risk-neutral PD implied by the same firm's 5-year CDS is typically
 \textbf{4--5 times higher}.  The ratio is the \emph{credit risk
-premium} --- compensation for bearing jump-to-default risk.  Pricing
+premium}, compensation for bearing jump-to-default risk.  Pricing
 a CDS with physical PD mis-marks the contract by hundreds of bp.
 \end{pitfallbox}
 
@@ -138,7 +138,7 @@ insurance against default of a \emph{reference entity} (e.g.\ Ford
 Motor Co.).  In plain English: the protection buyer pays a periodic
 premium (the \emph{CDS spread}) and, if the reference entity
 defaults on its bonds before maturity, receives par in exchange for
-the defaulted bond --- exactly like a fire-insurance policy that
+the defaulted bond, exactly like a fire-insurance policy that
 pays out only if the house burns down.
 The CDS market turned corporate credit into a tradable
 asset class in the late 1990s; notional outstanding peaked at \$60
@@ -183,7 +183,7 @@ occurrence, then holds a public auction to set $R$.
 A CDS is default insurance: a premium for a lump-sum $(1-R)$ payout
 if the reference entity is ``totalled''.  The fair premium equals
 the expected discounted cost of the payout.  Unlike insurance, you
-need not own the reference bond --- CDS separated credit exposure
+need not own the reference bond.  CDS separated credit exposure
 from bond ownership, which made credit a tradable asset class.
 \end{intuitionbox}
 
@@ -204,7 +204,7 @@ from bond ownership, which made credit a tradable asset class.
     \draw[->, thick, blue] (\x, 0.15) -- (\x, 1.6)
       node[above, font=\tiny, blue]{$s\,\delta_i$};
 
-  % Default arrow: conditional — occurs between t2 and t3 (at x=5)
+  % Default arrow: conditional, occurs between t2 and t3 (at x=5)
   \draw[->, thick, red, dashed] (5, -0.15) -- (5, -2.2)
     node[below, font=\footnotesize, red, align=center]{$(1{-}R)\,N$};
   \node[red, font=\footnotesize\bfseries] at (5.4, -0.45) {$\tau$};
@@ -296,7 +296,7 @@ back-of-envelope identity is
 \]
 where $h$ is the risk-neutral hazard rate.  ``A 300 bp CDS at 40\%
 recovery implies a hazard of about 500 bp'' (500 $\approx$ 300/0.60)
---- standard mental arithmetic on a credit desk.
+is standard mental arithmetic on a credit desk.
 \end{intuitionbox}
 
 
@@ -321,7 +321,7 @@ every figure.
   \item Recovery: $R = 40\%$, so $1 - R = 0.60$.
 \end{itemize}
 
-\paragraph{Step 1 --- risky annuity.}
+\paragraph{Step 1: risky annuity.}
 Plugging into \cref{eq:cds_pl},
 \[
   A = \sum_{i=1}^{20} 0.25 \cdot e^{-(0.04 + 0.03)\, t_i}
@@ -331,7 +331,7 @@ Plugging into \cref{eq:cds_pl},
 So \$1/year of quarterly premium until default or $T=5$ has PV
 \$4.1819 per unit notional.
 
-\paragraph{Step 2 --- protection leg.}
+\paragraph{Step 2: protection leg.}
 Using $S(t) = e^{-h t}$, $d[1 - S(t)] = h e^{-h t} dt$, so
 \cref{eq:cds_pp} evaluates in closed form:
 \[
@@ -348,7 +348,7 @@ Substituting:
 \]
 So the protection leg is worth 7.59\% of notional.
 
-\paragraph{Step 3 --- par spread.}
+\paragraph{Step 3: par spread.}
 \[
   s^\star
   = \frac{\mathrm{PP}}{A}
@@ -357,12 +357,12 @@ So the protection leg is worth 7.59\% of notional.
   = 181.6 \text{ bp}.
 \]
 
-\paragraph{Step 4 --- dollar cash flows.}
+\paragraph{Step 4: dollar cash flows.}
 On $N = \$10$M the two legs match at par: $\mathrm{PP} \cdot N =
 \$759{,}373$ of expected discounted loss, and a quarterly premium
 coupon $s^\star \delta N = \$45{,}395$.
 
-\paragraph{Step 5 --- sanity check.}  The small-rate, small-hazard
+\paragraph{Step 5: sanity check.}  The small-rate, small-hazard
 approximation says
 \[
   s^\star
@@ -428,7 +428,7 @@ The three first-order sensitivities every credit trader quotes:
     defaults right now.  For a protection buyer, JTD $= (1-R) \cdot
     N$ minus the current premium-leg MtM; for a fresh at-market
     trade, JTD $\approx (1-R) \cdot N$.  In the worked example,
-    $0.60 \times \$10\mathrm{M} = \$6\mathrm{M}$ --- the single
+    $0.60 \times \$10\mathrm{M} = \$6\mathrm{M}$, the single
     largest risk in a CDS book.
   \item \textbf{IR01}: P\&L from a 1~bp parallel shift in the
     risk-free curve.  Small on CDS (dominant risk is spread, not
@@ -443,7 +443,7 @@ name books \$50M of loss overnight on that credit event.
 CS01 is day-to-day P\&L risk (spreads move a few bp/day); JTD is
 catastrophic-event risk (rare but binary).  Risk managers look at
 CS01 first, regulators at JTD first.  A well-hedged book has small
-CS01 and small \emph{name-level} JTD --- but portfolio-level JTD
+CS01 and small \emph{name-level} JTD, but portfolio-level JTD
 can still be large if names correlate (the CDO problem of
 \cref{sec:cdo_copula}).
 \end{intuitionbox}
@@ -482,7 +482,7 @@ Oct 2008).
 Post-2009 standard CDS (US ``Big Bang'', EU ``Small Bang'') trade
 with a fixed coupon (100~bp IG, 500~bp HY) plus an \emph{upfront}
 payment bringing NPV to zero.  A quoted number may be a par spread
-\emph{or} an upfront --- always ask.  Conversion uses the risky
+\emph{or} an upfront; always ask.  Conversion uses the risky
 annuity: $U = (s^\star - c) \cdot A$.  Getting this wrong on a
 5Y IG name costs 4--5 bp per bp of spread error.
 \end{pitfallbox}
@@ -496,7 +496,7 @@ annuity: $U = (s^\star - c) \cdot A$.  Getting this wrong on a
 The market quotes CDS at standard tenors (1, 3, 5, 7, 10Y); the
 spread-curve shape implies a time-varying hazard rate.  This section
 defines the hazard rate, derives survival, and bootstraps
-piecewise-constant hazards from observed spreads --- the credit
+piecewise-constant hazards from observed spreads, the credit
 mirror of the zero-curve bootstrap in
 \cref{ch:fixed_income_foundations}.
 
@@ -526,8 +526,8 @@ $1/0.03 \approx 33$ years and 5Y cumulative PD $1 - e^{-0.15} =
 \begin{intuitionbox}
 The hazard rate is to default what the short rate is to the zero
 curve: $D(T) = \exp(-\int_0^T r\, du)$ vs $S(T) = \exp(-\int_0^T h\,
-du)$.  Every technique from \cref{ch:fixed_income_foundations} ---
-bootstrap, splines, forwards --- transfers verbatim.  Credit traders
+du)$.  Every technique from \cref{ch:fixed_income_foundations}
+(bootstrap, splines, forwards) transfers verbatim.  Credit traders
 call $h(t)$ the ``credit short rate''.
 \end{intuitionbox}
 
@@ -567,7 +567,7 @@ interior time $t \in (T_{k-1}, T_k]$ is then
 \[
   g_k(h_k) \defeq s_k^\star \cdot A_k(h_k) - \mathrm{PP}_k(h_k),
 \]
-with initial guess $h_k^{(0)} = s_k^\star/(1-R)$ --- converges in
+with initial guess $h_k^{(0)} = s_k^\star/(1-R)$; it converges in
 3--5 iterations.  Derivatives $dA_k/dh_k$, $d\mathrm{PP}_k/dh_k$
 have closed forms on piecewise-constant intervals; otherwise use
 numerical derivatives.
@@ -576,17 +576,17 @@ numerical derivatives.
 \begin{itemize}
   \item $h_k \ge 0$: a negative hazard usually means a stale or
     fat-finger quote (or an exotic sovereign).
-  \item $S$ monotone: $S(T_1) \ge S(T_2)$ for $T_1 \le T_2$ ---
+  \item $S$ monotone: $S(T_1) \ge S(T_2)$ for $T_1 \le T_2$,
     equivalent to $h_k \ge 0$.
   \item No implausible jumps at tenor boundaries.  A jump from
     200~bp to 50~bp between 3Y and 5Y either prices a known
     corporate event in that window, or signals piecewise-constant
-    is too coarse --- switch to piecewise-linear or tension splines.
+    is too coarse; switch to piecewise-linear or tension splines.
 \end{itemize}
 
 \paragraph{Worked sanity-check.}  1Y/3Y/5Y CDS on a BBB name at
 100/150/200~bp with $R = 40\%$.  The approximation $h \approx
-s/(1-R)$ gives hazards $\approx$ 167, 250, 333~bp --- upward-sloping,
+s/(1-R)$ gives hazards $\approx$ 167, 250, 333~bp: upward-sloping,
 consistent with the credit curve.  The exact bootstrap shifts these
 by a few bp and preserves shape.
 
@@ -601,7 +601,7 @@ are pinned, so one unknown meets one equation.
 
 \begin{pitfallbox}[Spread curve shape does not equal hazard curve shape]
 If the 1Y and 5Y par spreads are both 200~bp, the hazard curve is
-\emph{not} flat --- it's slightly downward-sloping, because a flat
+\emph{not} flat; it's slightly downward-sloping, because a flat
 long-maturity spread embeds the average of lower near-term hazards.
 The spread-to-hazard mapping is nonlinear; only a bootstrap reads
 the hazard curve off a price screen.
@@ -627,20 +627,20 @@ buying protection pro-rata on each name.
 
 The major families, all administered by Markit/S\&P:
 \begin{itemize}
-  \item \textbf{CDX.NA.IG} --- 125 North-American IG names,
+  \item \textbf{CDX.NA.IG}: 125 North-American IG names,
     reconstituted each March/September on ``index roll'' dates.
     The flagship IG benchmark.
-  \item \textbf{CDX.NA.HY} --- 100 North-American HY names.
-  \item \textbf{iTraxx Europe} --- 125 European IG names.
-  \item \textbf{iTraxx Crossover} --- 75 European sub-IG names.
-  \item \textbf{iTraxx Asia/Japan, CDX.EM} --- regional offshoots.
+  \item \textbf{CDX.NA.HY}: 100 North-American HY names.
+  \item \textbf{iTraxx Europe}: 125 European IG names.
+  \item \textbf{iTraxx Crossover}: 75 European sub-IG names.
+  \item \textbf{iTraxx Asia/Japan, CDX.EM}: regional offshoots.
 \end{itemize}
 
 Index CDS trade with fixed coupons (100~bp IG, 500~bp HY) plus an
 upfront bringing NPV to zero, matching single-name convention
 post-2009.
 
-\begin{historybox}[title={Birth of the CDS --- JP Morgan 1994}]
+\begin{historybox}[title={Birth of the CDS: JP Morgan 1994}]
 The first CDS was structured in 1994 by Blythe Masters' JP Morgan
 team to hedge a \$4.8bn credit line to Exxon (Valdez-spill
 liability), paying the EBRD to take the default risk.  Standardised
@@ -670,7 +670,7 @@ test why the skew exists, when it blows out, and how to monetise a
 \end{gsbox}
 
 \paragraph{Tranches on indices.}  An index can be carved into
-\emph{tranches} of different seniority --- the subject of the next
+\emph{tranches} of different seniority: the subject of the next
 section, and of 2008.
 
 
@@ -684,7 +684,7 @@ credit-risky assets (CDS in a \emph{synthetic CDO}, mortgage loans
 in a \emph{cash CDO}) and issues layered claims.  Each claim is a
 \emph{tranche} defined by an attachment/detachment point in
 portfolio-loss space.  Plain English: pool 125 bonds, then sell
-slices in order of who eats losses first --- the \emph{equity}
+slices in order of who eats losses first.  The \emph{equity}
 tranche absorbs the first few percent of defaults and is paid the
 highest yield as compensation for bearing first-loss risk; the
 \emph{senior} tranche pays the lowest yield but is only touched if
@@ -723,7 +723,7 @@ safest and, pre-2008, rated AAA by S\&P and Moody's.
 
 Tranche pricing needs the \emph{joint} default distribution across
 125 names, not marginals alone.  The industry model
-\citep{li2000default} --- Li's 2000 JP Morgan note --- uses a
+\citep{li2000default}, Li's 2000 JP Morgan note, uses a
 \emph{single-factor Gaussian copula}.
 
 \paragraph{Construction.}  For each name $i = 1, \ldots, 125$:
@@ -746,7 +746,7 @@ default distribution; tranche par spreads follow from
 reproduces each tranche's market spread gives an \emph{implied
 correlation}, analogous to implied vol.  A true Gaussian copula
 would price every tranche with a single $\rho$; in reality implied
-$\rho$ varies --- the \emph{correlation skew}, credit analogue of
+$\rho$ varies: the \emph{correlation skew}, credit analogue of
 the vol smile (\cref{ch:vol_surface}).
 
 \begin{keyfactbox}[Li's single-factor Gaussian copula]
@@ -783,9 +783,9 @@ $\rho$.  Unconditional expected loss is $\rho$-invariant; what
 $\rho$ governs is the \emph{distribution} around that mean, hence
 tranche prices.
 
-Higher $\rho$ thickens both tails of the loss distribution ---
-simultaneous defaults and simultaneous survivals become more likely
---- \emph{raising} senior-tranche expected loss (tail hits) and
+Higher $\rho$ thickens both tails of the loss distribution:
+simultaneous defaults and simultaneous survivals become more likely,
+\emph{raising} senior-tranche expected loss (tail hits) and
 \emph{lowering} equity-tranche expected loss (common survivals).
 This is the core comparative static.
 
@@ -845,7 +845,7 @@ $\rho$ from a static snapshot.  In a crisis:
   \item the Gaussian has no tail dependence: extreme co-movements
     are near-zero-probability by construction;
   \item implied correlation across tranches becomes a surface, not
-    a constant --- the credit analogue of the vol smile.
+    a constant (the credit analogue of the vol smile).
 \end{itemize}
 Practitioners now use base-correlation models, $t$-copulas with
 tail dependence, and stressed add-ons.  The Gaussian copula
@@ -865,7 +865,7 @@ Every OTC derivative has \emph{bilateral counterparty risk}: if
 your swap is \$5M in the money and the counterparty defaults, you
 become an unsecured creditor recovering at most \$5M $\times R$.
 In plain English, \emph{CVA} is the market value of that
-counterparty-default risk --- the amount of value you would lose
+counterparty-default risk: the amount of value you would lose
 today if the counterparty defaulted right now, weighted by how
 likely they are to default and how far in the money the trade will
 be when they do.
@@ -891,7 +891,7 @@ firm's counterparty-risk book.
 
 \begin{intuitionbox}
 Sell a \$10M IRS to a BB-rated hedge fund and you are long the
-swap and \emph{short} CDS protection on the fund --- a CDS on the
+swap and \emph{short} CDS protection on the fund, a CDS on the
 expected positive exposure, not on fixed notional.  CVA is the
 price of that implicit CDS, and a bank's CVA desk is the internal
 CDS-hedging desk the firm trades against.
@@ -904,7 +904,7 @@ using our own hazard $h_{\mathrm{self}}$ and the expected
 \emph{negative} exposure $\max(-V(t), 0)$.  Bilateral CVA from our
 perspective is then $\mathrm{CVA} - \mathrm{DVA}$.  DVA is
 controversial because it credits a bank's P\&L when its own credit
-deteriorates --- a ``benefit from our own default risk'' that is
+deteriorates, a ``benefit from our own default risk'' that is
 impossible to hedge without buying protection on yourself.
 
 
@@ -933,13 +933,13 @@ tighten to 120 bp, MtM is $-\$240{,}000$.
 \paragraph{Why annuity-weighted.}  $(s_1 - s_0)A$ follows from
 $\mathrm{PL}(s) = s \cdot A$: the buyer pays $s_0 A N$ per annum
 while the fair price is $s_1 A N$, so the buyer is $AN$ better off
-per unit of widening.  This is the long-bond-rally mechanism --- $A$
-is the credit analogue of duration --- and why CS01 $= A \cdot N
+per unit of widening.  This is the long-bond-rally mechanism ($A$
+is the credit analogue of duration) and why CS01 $= A \cdot N
 \cdot 10^{-4}$.
 
 \begin{intuitionbox}
 A CDS is an annuity-weighted short position on the spread.  Every
-bp of widening is worth $A \cdot N \cdot 10^{-4}$ to the buyer ---
+bp of widening is worth $A \cdot N \cdot 10^{-4}$ to the buyer:
 \$4{,}200/bp on a 5Y \$10M CDS with $A \approx 4.2$.  A credit
 trader's P\&L report is
 ``$\sum_i \text{CS01}_i \cdot \Delta s_i$'' over 250 names.
@@ -985,7 +985,7 @@ conceptually.
     market convention.  LGD $= 1 - R$.
   \item \textbf{CDS par spread}:
     $s^\star = (1-R) \int_0^T D(t)\, d[1-S(t)] \,/\,
-      \sum_i \delta_i D(t_i) S(t_i)$ --- expected discounted loss
+      \sum_i \delta_i D(t_i) S(t_i)$: expected discounted loss
     over risky annuity.
   \item \textbf{Quick approximation}: $s^\star \approx h (1-R)$.
     A 300 bp CDS with $R = 40\%$ implies a hazard rate of about
@@ -1009,7 +1009,7 @@ conceptually.
     pool.
   \item \textbf{2008 failure}: regime-dependent $\rho$ rises in
     crisis, so AAA super-senior tranches priced at low $\rho$ were
-    catastrophically mispriced when defaults clustered --- ``the
+    catastrophically mispriced when defaults clustered: ``the
     formula that killed Wall Street'' \citep{salmon2009formula}.
   \item \textbf{Credit Greeks}: CS01 (1~bp credit sensitivity),
     JTD (jump-to-default), recovery delta.

@@ -86,7 +86,7 @@ written $\Call_t$ (or simply $\Call$ when the time is clear).
 \end{definition}
 
 The mechanics: at time $\Tmat$, if $\Spx_T > \Kstrike$ the holder
-\emph{exercises} --- pays $\Kstrike$, takes delivery of an asset
+\emph{exercises}. She pays $\Kstrike$, takes delivery of an asset
 worth $\Spx_T$, and immediately sells for $\Spx_T$, locking in
 $\Spx_T - \Kstrike$. If $\Spx_T \leq \Kstrike$, exercise would be
 a loss (paying $\Kstrike$ for something she could buy for
@@ -120,7 +120,7 @@ Non-negativity of both payoffs is the source of every other
 property below. Since $(\Spx_T - \Kstrike)^+$ and
 $(\Kstrike - \Spx_T)^+$ are both $\geq 0$, no option price may be
 negative; if it were, buying it would be a free positive payoff
-plus a positive cash receipt at $t$ --- the simplest arbitrage.
+plus a positive cash receipt at $t$, the simplest arbitrage.
 
 \begin{definition}[American option]
 \index{American option|textbf}
@@ -198,7 +198,7 @@ $(\Kstrike - \Spx_t)^+$.
 \end{definition}
 
 Intrinsic value is what the option would pay if expiry were
-\emph{now}. Time value is everything else --- the market's price
+\emph{now}. Time value is everything else: the market's price
 for the chance of going deeper in the money by $\Tmat$, plus the
 carry effect of deferring the strike payment. We prove below
 that time value is non-negative for European calls and peaks at
@@ -277,8 +277,8 @@ above. Expresses ``prices rise, but modestly''.
 \paragraph{Long put spread.} Long put at $\Kstrike_2$, short put
 at $\Kstrike_1 < \Kstrike_2$. Capped at $\Kstrike_2 - \Kstrike_1$
 above, zero below $\Kstrike_1$. Expresses ``prices fall, but
-modestly'' --- the downside analogue of the call spread, and the
-canonical cheap hedge against a bounded drawdown.
+modestly''. It is the downside analogue of the call spread and
+the canonical cheap hedge against a bounded drawdown.
 
 \paragraph{Long straddle and long strangle.} A \emph{straddle}
 is a long call and long put at the same strike $\Kstrike$ and
@@ -286,7 +286,7 @@ maturity, payoff $|\Spx_T - \Kstrike|$. A \emph{strangle} uses
 two strikes (call at $\Kstrike_2 > \Kstrike_1$, put at
 $\Kstrike_1$); cheaper, but pays nothing in
 $[\Kstrike_1, \Kstrike_2]$. Both express ``large move, either
-direction'' --- a pure volatility bet, the topic of
+direction'': a pure volatility bet, the topic of
 \cref{ch:vol_surface}.
 
 \subsection{Tesla worked example}
@@ -554,8 +554,8 @@ $\Kstrike$. By the template, $\Kstrike e^{-\rrf(\Tmat-t)}
 \geq \Put_t$.
 \end{proof}
 
-The upper-bound asymmetry --- call bounded by $\Spx_t$, put by
-$\Kstrike e^{-\rrf(\Tmat-t)}$ --- reflects that the call is
+The upper-bound asymmetry (call bounded by $\Spx_t$, put by
+$\Kstrike e^{-\rrf(\Tmat-t)}$) reflects that the call is
 unbounded above ($\Spx_T$ has no ceiling) while the put is
 bounded above at $\Kstrike$ (the underlying cannot fall below
 zero).
@@ -585,7 +585,7 @@ existence of any pricing model
 depending only on $\Spx_t$, $\Kstrike$, $\rrf$, $\Tmat - t$. The
 discount factor $e^{-\rrf(\Tmat - t)}$ is the \emph{only}
 time-value ingredient: no volatility, drift, or probability
-measure --- none was needed. Volatility is what
+measure was needed. Volatility is what
 \cref{ch:black_scholes} adds: it picks a specific point inside
 the band. Black--Scholes is geometrically a rule for selecting
 that precise location.
@@ -608,7 +608,7 @@ a long stock position, so basket and stock share the same price.
 
 The intuition before the algebra: a long call plus the
 discounted strike in the bank has the same expiry payoff as a
-long put plus one share --- both baskets deliver
+long put plus one share; both baskets deliver
 $\max(\Spx_T, \Kstrike)$ in every state. Two portfolios with
 identical payoffs in every state must cost the same today, or
 buying the cheaper and shorting the dearer is a free lunch.
@@ -749,8 +749,8 @@ content here is that it pins the put price given the call.
 Put--call parity is derivatives' conservation law. Four
 quantities (call, put, spot, discounted strike) related by one
 identity, leaving three degrees of freedom. Any consistent
-options model must respect it --- Black--Scholes, Heston, a
-neural network trained on chain data. Parity does not tell you
+options model must respect it, whether Black--Scholes, Heston,
+or a neural network trained on chain data. Parity does not tell you
 what the call is worth (no more than $E = mc^2$ tells you the
 energy of a specific system); it tells you what the call is
 worth \emph{relative to} the put, halving the problem.
@@ -898,7 +898,7 @@ Dividends create an inflow the call-holder forgoes; a large
 enough dividend overpays for time value, and exercise becomes
 rational. The American-put case trades time value for early
 receipt of $\Kstrike$, which earns interest and can dominate.
-Cash and stock are asymmetric under $\rrf > 0$ --- that is the
+Cash and stock are asymmetric under $\rrf > 0$; that is the
 entire content of early exercise.
 \end{intuitionbox}
 
@@ -959,7 +959,7 @@ The pricing system computes, per (strike, maturity) cell,
 and flags cells where $|\mathrm{LHS} - \mathrm{RHS}|$ exceeds
 the bid--ask width plus estimated borrow cost. A real flag is
 rare and matters: stale quote, unprocessed corporate action,
-or --- rarest --- a capturable arb. Most flags resolve to three
+or, rarest of all, a capturable arb. Most flags resolve to three
 causes: hard-to-borrow names (missing $-y$ borrow term),
 unscheduled corporate actions (spin-offs, specials), or
 low-liquidity maturities where the spread is wider than the

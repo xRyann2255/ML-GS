@@ -24,7 +24,7 @@ From earlier chapters:
     cash flows.
 \end{itemize}
 If the cost-of-carry argument of \cref{ch:arbitrage_zoo} feels
-hazy, re-read that chapter first --- this one builds directly on it.
+hazy, re-read that chapter first; this one builds directly on it.
 \end{backgroundbox}
 
 
@@ -189,8 +189,8 @@ state.  Do not confuse curve shape with directional view.
 investment asset by cash-and-carry replication.  For commodities
 this breaks in two ways.  First, holding the physical barrel is not
 free: you pay \emph{storage costs} (tank rental, insurance, boil-
-off for LNG).  Second, holding the barrel confers a \emph{benefit}
---- if your refinery runs dry you can feed it, whereas a futures
+off for LNG).  Second, holding the barrel confers a \emph{benefit}:
+if your refinery runs dry you can feed it, whereas a futures
 contract cannot be cracked into gasoline.  That benefit is the
 \emph{convenience yield}.
 
@@ -258,8 +258,8 @@ rate $u$ and convenience yield $y$,
   \item Equities and currencies are special cases: set $u=0$ and
     $y$ equal to the dividend or foreign rate.
 \end{itemize}
-The sign of $\rrf + u - y$ is the sign of the curve slope at $T$
---- exactly the continuously-compounded front-to-back roll rate.
+The sign of $\rrf + u - y$ is the sign of the curve slope at $T$,
+exactly the continuously-compounded front-to-back roll rate.
 \end{keyfactbox}
 
 \subsection{Worked example: crude oil forward}
@@ -330,7 +330,7 @@ Inverting cost-of-carry,
   y(T) = \rrf(T) + u(T) - \frac{1}{T} \ln\frac{F(T)}{\Spx}.
 \]
 This \emph{implied convenience yield} is treated as a market-
-observable state variable --- the commodity analogue of extracting
+observable state variable, the commodity analogue of extracting
 dividend yields from equity forward markets.
 
 \subsection{Calendar spreads and the curve as a tradeable instrument}
@@ -346,15 +346,15 @@ position:
 A long spread profits if the curve steepens; short profits if it
 flattens.  Spread volatilities are an order of magnitude below
 outright futures vols because both legs share the systematic level
-risk --- what remains is \emph{curve-shape} risk, driven by
+risk; what remains is \emph{curve-shape} risk, driven by
 inventories and convenience yield.
 
 Exchanges list calendar spreads as explicit products (e.g.\ ICE
 Brent ``BZU'' month-to-month spreads) with their own order books,
 because synthesising them from outright legs carries execution risk.
-Inter-commodity spreads --- WTI vs Brent (``trans-Atlantic''),
-heating oil vs crude (``heat crack''), gasoline-crude (``crack
-3:2:1'') --- dominate physical refinery hedging.  The
+Inter-commodity spreads such as WTI vs Brent (``trans-Atlantic''),
+heating oil vs crude (``heat crack''), and gasoline-crude (``crack
+3:2:1'') dominate physical refinery hedging.  The
 \emph{crack spread} is the refiner's margin: the price of
 refined products (gasoline, heating oil) minus the crude
 input, e.g.\ the 3:2:1 crack $=\tfrac13(2\,\text{RBOB} +
@@ -385,7 +385,7 @@ contracts (e.g.\ 36 monthly CL contracts on NYMEX); (ii) the
 basis; (iii) the \emph{implied convenience yield curve} $y(T)$
 backed out from the above and the Treasury zero curve.  Equities
 need only spot and the dividend curve; here $y(T)$ is where all the
-commodity-specific alpha and risk live --- it moves sharply with
+commodity-specific alpha and risk live.  It moves sharply with
 inventory data, OPEC announcements, and pipeline disruptions.
 Option Strats shock $y$ by $\pm 100$ bp and mark the P\&L; it is a
 first-class risk factor alongside the futures price.
@@ -468,15 +468,16 @@ $\volat$, the time-$t$ futures price for delivery at $T$ is
   \label{eq:schwartz_F}
 \end{equation}
 As $T \to \infty$, $F(t,T) \to \exp(\alpha^* + \volat^2/(4\kappa))$,
-a constant independent of current spot --- the model's long-run
+a constant independent of current spot: the model's long-run
 equilibrium price.
 \end{keyfactbox}
 
 \begin{intuitionbox}
 The long end of the futures curve is anchored at the equilibrium
 level $\alpha^*$, independent of spot.  Only the front moves with
-spot --- the empirical stylised fact: when WTI spot spikes, one-
-month futures spike almost 1:1 while two-year futures barely move.
+spot.  This is the empirical stylised fact: when WTI spot spikes,
+one-month futures spike almost 1:1 while two-year futures barely
+move.
 A random-walk (Black--Scholes) spot model cannot reproduce this,
 which is why Schwartz is preferred for commodities.
 \end{intuitionbox}
@@ -516,7 +517,7 @@ curve (\ref{eq:schwartz_F}) against observed quotes.
 \subsection{Extensions: two-factor and three-factor models}
 
 The one-factor model has a critical flaw: $\alpha^*$ is constant,
-so the long end of the curve never moves --- empirically it does,
+so the long end of the curve never moves; empirically it does,
 slowly.  \citet{gibsonschwartz1990} make the convenience yield
 $y_t$ a second mean-reverting factor, letting the curve twist.
 \citet{schwartzsmith2000} recast this as a short-term mean-
@@ -612,7 +613,7 @@ print(black76(82, 80, 0.5, 0.30, 0.05, "put"))   # 5.7428
 Not all commodity options are on futures.  LME metals options
 reference the 3-month forward; OTC options on physical crude
 reference a cash spot index.  For spot-referenced options the BS
-formula uses $\rrf - y$ in place of the dividend yield --- the
+formula uses $\rrf - y$ in place of the dividend yield; this is the
 Garman--Kohlhagen formula from \cref{ch:fx_derivatives} with $y$ as
 the foreign rate.
 
@@ -670,7 +671,7 @@ To incorporate seasonality, write
 where $s(T)$ is a deterministic periodic function (a sum of
 sinusoids fit to historical log-futures residuals after removing
 curve-level effects).  Implied vol surfaces inherit the periodic
-component --- winter gas options carry higher vol than summer.
+component: winter gas options carry higher vol than summer.
 
 \subsection{A Fourier-style seasonal overlay}
 
@@ -782,7 +783,7 @@ position in winter gas calendar spreads (long March, short April),
 betting winter scarcity would widen them.  When spreads collapsed
 in September 2006 the fund lost $\sim$\$6.5 billion in a week and
 closed.  Their position was $\sim 40\%$ of NYMEX March--April open
-interest --- they were both the market and its victim.  Lesson:
+interest; they were both the market and its victim.  Lesson:
 seasonality trades are seductive but already priced, edges require
 genuine divergence forecasts, and size must stay a fraction of
 open interest.
@@ -803,7 +804,7 @@ rolling sample and skewed quotes toward $\hat\alpha$: buy below,
 sell above.  This is a textbook Schwartz-style trade: mean-revert
 log-spot, collect spread on noise-trader deviations, flatten
 inventory as price reverts.  Recognise a mean-reverting log-spot
-and the Schwartz toolkit applies --- no commodities needed.
+and the Schwartz toolkit applies; no commodities are needed.
 \end{prosperitybox}
 
 \begin{gsbox}[title={Commodities Strats on the trading floor}]
@@ -859,7 +860,7 @@ auto-run overnight; the trader inspects a curve-diff summary at the
     pattern, not the pattern itself.
   \item \textbf{Physical vs financial settlement:} CL/NG/agris
     settle physically; Brent, power, and most vol products settle
-    financially.  Physical settlement matters near expiry --- roll
+    financially.  Physical settlement matters near expiry: roll
     or be ready for delivery.
   \item \textbf{Metallgesellschaft, Amaranth:} a mathematically
     correct hedge can destroy a firm if the curve's shape moves

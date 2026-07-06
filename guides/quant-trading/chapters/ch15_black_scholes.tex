@@ -6,13 +6,13 @@ The no-arbitrage bounds of \cref{ch:options_payoffs} pin a fair
 European-call price to the interval
 $[\max(\Spx_t - \Kstrike e^{-\rrf(\Tmat-t)},\, 0),\,\Spx_t]$. For
 an at-the-money one-year call on a $\$100$ stock at $\rrf = 5\%$
-that interval is $[4.877,\, 100]$ --- ninety-five dollars wide,
+that interval is $[4.877,\, 100]$: ninety-five dollars wide,
 and no portfolio argument narrows it further. A trader needs a
 single number. This chapter shows how Black, Scholes, and Merton
 (1973) closed the gap by constructing a \emph{self-financing
 replicating portfolio} that tracks the option's payoff in every
 state. No-arbitrage then forces the option price to equal the
-replicating cost --- a single number that depends on the
+replicating cost, a single number that depends on the
 underlying's \emph{volatility} but not on its drift.
 
 The pre-1973 literature priced options by guessing an expected
@@ -59,7 +59,7 @@ From outside the book:
 \begin{intuitionbox}
 Black--Scholes is a hedging argument, not a distributional one.
 It does not answer ``what is the expected discounted payoff of
-the option?'' --- that question has no model-free answer. It
+the option?'' That question has no model-free answer. It
 answers ``how much does it cost to replicate the payoff with
 stock and a bond?'' That question has a unique answer once you
 fix the volatility, and the answer does not depend on the drift.
@@ -92,7 +92,7 @@ derivation.
   \item[\textbf{(A2)}] \textbf{Constant risk-free rate $\rrf$,}
   continuously compounded. \emph{Why:} the bond leg grows
   deterministically as $e^{\rrf t}$ with $dB_t = \rrf B_t\,dt$
-  --- no $dW$ contribution.
+  and no $dW$ contribution.
   \item[\textbf{(A3)}] \textbf{Frictionless trading.} Continuous
   rebalancing, no transaction costs, no spread, no borrow
   cost, no funding, no impact. \emph{Why:} self-financing
@@ -242,7 +242,7 @@ no-arbitrage gives
 The option costs whatever it takes to replicate its payoff with
 stock and a bond. No probabilities appear; we never said how
 likely the up-state is. No-arbitrage turns ``does the same'' into
-``costs the same.'' Drift, beliefs, expected returns --- none
+``costs the same.'' Drift, beliefs, expected returns: none
 enter.
 \end{intuitionbox}
 
@@ -267,7 +267,7 @@ $d \defeq \Spx_d/\Spx_0 = 0.9$,
        \;\approx\; 0.6010.
   \label{eq:bin_p}
 \end{align}
-$p$ is not the real up-probability --- it is whatever makes the
+$p$ is not the real up-probability; it is whatever makes the
 risk-free rate equal the discounted expected stock return. Now
 the call's discounted RN expected payoff:
 \begin{align}
@@ -407,7 +407,7 @@ and the GBM dynamics \eqref{eq:gbm}; the output is a PDE for
 $\Call(\Spx, t)$. We follow the MIT 18.S096 lectures
 \citep{mit18S096} and \citeHull{} Ch~13--15.
 
-\subsection{Step 1 --- Set up the hedged portfolio}
+\subsection{Step 1: Set up the hedged portfolio}
 \label{subsec:ch15_pde_step1}
 
 Hold $\Delta_t$ shares and a bank-account position $B_t$ at
@@ -419,12 +419,12 @@ every $t$. The portfolio's value is
 Choose $(\Delta_t, B_t)$ so that $\Pi_t = \Call_t$ for every
 $t \in [0, \Tmat]$; by no-arbitrage, $\Call_0 = \Pi_0$.
 
-\subsection{Step 2 --- Self-financing condition}
+\subsection{Step 2: Self-financing condition}
 \label{subsec:ch15_pde_step2}
 
 The portfolio is \emph{self-financing}: cash from sold shares
 goes into the bank, cash to buy shares comes out; no external
-flows. Instantaneous P\&L then has two sources --- the stock
+flows. Instantaneous P\&L then has two sources, the stock
 capital gain $\Delta_t\, d\Spx_t$ and the bond interest
 $\rrf\, B_t\, dt$:
 \begin{equation}
@@ -432,10 +432,10 @@ $\rrf\, B_t\, dt$:
   \label{eq:self_financing}
 \end{equation}
 Note what is \emph{absent}: no $\Spx_t\,d\Delta_t$, no $dB_t$
-beyond $\rrf B_t\,dt$, no $d\Delta_t\,d\Spx_t$ --- the formal
-statement that rebalancing adds no cash.
+beyond $\rrf B_t\,dt$, no $d\Delta_t\,d\Spx_t$. This is the
+formal statement that rebalancing adds no cash.
 
-\subsection{Step 3 --- Apply It\^o's lemma to the call}
+\subsection{Step 3: Apply It\^o's lemma to the call}
 \label{subsec:ch15_pde_step3}
 
 We do not yet know $\Call(\Spx, t)$, but assume it is $C^{2,1}$
@@ -488,10 +488,10 @@ into \eqref{eq:ito_C}:
   \label{eq:dC_clean}
 \end{equation}
 Equation \eqref{eq:dC_clean} is It\^o applied to the call under
-GBM --- the only stochastic-calculus input we need
+GBM, the only stochastic-calculus input we need
 (\citeHull{} Ch~14).
 
-\subsection{Step 4 --- Match the hedged portfolio to the call}
+\subsection{Step 4: Match the hedged portfolio to the call}
 \label{subsec:ch15_pde_step4}
 
 We need $d\Pi_t = d\Call_t$, comparing \eqref{eq:dC_clean} and
@@ -615,7 +615,7 @@ $\rrf$ has price $V(\Spx, t)$ satisfying
 \]
 where $g$ is the contractual payoff. $\mu$ does not appear. The
 same PDE prices calls, puts, digitals, and any path-independent
-European payoff --- only $g$ changes.
+European payoff; only $g$ changes.
 \end{keyfactbox}
 
 \begin{intuitionbox}
@@ -758,7 +758,7 @@ Fourier's 1822 formula in Black--Scholes coordinates. The call
 boundary $(\Spx - \Kstrike)^+$ rewritten in $y$, with the four
 substitutions undone, becomes an integral of
 $(\Spx_T - \Kstrike)^+$ against the lognormal density of
-$\Spx_T$ under $\Qm$ --- the integral
+$\Spx_T$ under $\Qm$, the integral
 \S\ref{sec:ch15_martingale} sets up directly. Evaluation:
 split at $\Kstrike$, complete the square, recognise two
 Gaussian tails (\citeHull{} Ch~13;
@@ -837,7 +837,7 @@ conditional on exercise.
 The two CDF arguments encode the two relevant probabilities:
 \begin{itemize}
   \item $\CDFN(d_2) = \Qm[\Spx_T \geq \Kstrike]$ is the
-  risk-neutral ITM probability --- the probability you have to
+  risk-neutral ITM probability: the probability you have to
   pay the strike, hence its appearance in the second term.
   \item $\CDFN(d_1)$ is the call's \emph{Delta},
   $\partial\Call/\partial\Spx$, the same $\Delta$ as in
@@ -864,7 +864,7 @@ start of the chapter:
   \qquad \Tmat - t \;=\; 1 \text{ year.}
 \end{equation*}
 
-\paragraph{Step 1 --- Compute $d_1$ and $d_2$.}
+\paragraph{Step 1: Compute $d_1$ and $d_2$.}
 With $\ln(\Spx/\Kstrike) = \ln 1 = 0$ and $\Tmat - t = 1$,
 \begin{align}
   d_1 \;&=\; \frac{0 + (0.05 + \tfrac{1}{2}\cdot 0.20^2)\cdot 1}
@@ -879,13 +879,13 @@ With $\ln(\Spx/\Kstrike) = \ln 1 = 0$ and $\Tmat - t = 1$,
   \label{eq:numex_d2}
 \end{align}
 
-\paragraph{Step 2 --- Standard normal CDF.}
+\paragraph{Step 2: Standard normal CDF.}
 $\CDFN(0.35) \approx 0.6368$, $\CDFN(0.15) \approx 0.5596$.
 
-\paragraph{Step 3 --- Discount factor.}
+\paragraph{Step 3: Discount factor.}
 $e^{-\rrf(\Tmat - t)} = e^{-0.05} \approx 0.95123$.
 
-\paragraph{Step 4 --- Plug into the call formula.}
+\paragraph{Step 4: Plug into the call formula.}
 \begin{align}
   \Call \;&=\; \Spx\,\CDFN(d_1)
             \;-\; \Kstrike\,e^{-\rrf(\Tmat - t)}\,\CDFN(d_2)
@@ -908,7 +908,7 @@ limit. Black--Scholes places a single point inside the
 model-free interval.
 \end{example}
 
-\paragraph{Step 5 --- Parity check.}
+\paragraph{Step 5: Parity check.}
 Put--call parity gives $\Call - \Put = \Spx -
 \Kstrike\,e^{-\rrf(\Tmat - t)} = 100 - 95.123 = 4.877$, so
 $\Put \approx 5.574$. Computing the put from \eqref{eq:bs_put}
@@ -934,7 +934,7 @@ $\Delta_t = \CDFN(d_1(\Spx_t, t))$ and $B_t$ change.
 \Cref{ch:greeks_hedging} computes the rebalance rate (Gamma) and
 the discrete-rebalance P\&L. For now: the replicating portfolio
 at every $(\Spx_t, t)$ is a deterministic function of two
-variables --- no hidden state.
+variables, with no hidden state.
 
 \subsection{Comparative statics: how the price moves with each input}
 \label{subsec:ch15_comparative}
@@ -980,7 +980,7 @@ The qualitative facts every options trader knows:
   \partial t$ is \emph{Theta} (negative as $t \to \Tmat$).
   \item \textbf{Increasing in the rate.} Higher $\rrf$ pulls
   the discounted strike down, raising ATM/ITM prices.
-  Sensitivity is \emph{Rho} --- small short-dated equity, large
+  Sensitivity is \emph{Rho}: small short-dated equity, large
   long-dated rates.
 \end{itemize}
 All four are derived in \cref{ch:greeks_hedging}; see
@@ -1049,10 +1049,10 @@ where $W_t^{\Qm}$ is $\Qm$-Brownian. The drift under $\Qm$ is
 $\rrf$, not $\mu$; the volatility is unchanged (Girsanov rotates
 drift only \citeHull{}). In plain English, $\Qm$ is the unique
 reweighting of outcomes under which every tradable asset earns
-the risk-free rate on average --- the investor behind $\Qm$ is
+the risk-free rate on average. The investor behind $\Qm$ is
 indifferent to risk, so replacing $\mu$ with $\rrf$ is exactly
 what eliminates the risk premium that hedging already neutralised.
-$\Qm$ is the \emph{risk-neutral measure} --- the continuous
+$\Qm$ is the \emph{risk-neutral measure}, the continuous
 analogue of the binomial $p$ from \eqref{eq:bin_p} (\citeHull{}
 Ch~28).
 
@@ -1060,7 +1060,7 @@ Ch~28).
 \label{subsec:ch15_pricing_expectation}
 
 Once $\widetilde\Spx_t$ is a $\Qm$-martingale, every discounted
-self-financing portfolio is too --- in particular
+self-financing portfolio is too, in particular
 $e^{-\rrf t}\Call_t$. The martingale property
 $\E^{\Qm}[e^{-\rrf\Tmat}\Call_T \mid \mathcal F_t] =
 e^{-\rrf t}\Call_t$ gives
@@ -1167,9 +1167,9 @@ spread adds a cost linear in turnover. \Cref{ch:greeks_hedging}
 computes the per-step discrete-hedge P\&L as
 $\tfrac12\Gamma(\Delta\Spx)^2 - \Theta\,\Delta t$; expected zero
 (gamma cancels theta on average), realised noisy and
-concentrated in the gamma term --- the basis of gamma scalping.
+concentrated in the gamma term, the basis of gamma scalping.
 
-\paragraph{(A4) No dividends --- clean fix.}
+\paragraph{(A4) No dividends: clean fix.}
 For known discrete dividends $D_i$ at times $t_i$, replace
 $\Spx_t$ in \eqref{eq:bs_call} with $\Spx_t - PV(D)$ where
 $PV(D) = \sum_i D_i\,e^{-\rrf(t_i - t)}$. For a continuous yield
@@ -1205,7 +1205,7 @@ your view (\cref{ch:vol_surface}).
 
 \begin{prosperitybox}
 In Prosperity 3, Round 3 introduced
-\texttt{VOLCANIC\_ROCK\_VOUCHERS} --- five European calls on
+\texttt{VOLCANIC\_ROCK\_VOUCHERS}: five European calls on
 \texttt{VOLCANIC\_ROCK}, strikes $9500$--$10500$ in steps of
 $250$, underlying near $10000$ \citep{frankfurthedgehogs2025}.
 Each voucher granted the right to buy one rock at strike at
@@ -1238,7 +1238,7 @@ $\approx \$26.8$ for one week of optionality on a 20\%-vol
 underlying. Frankfurt Hedgehogs fitted the IV smile across the
 five strikes, computed each market price's residual from the
 smile, and traded mean reversion of the residual
-\citep{frankfurthedgehogs2025} --- impossible without
+\citep{frankfurthedgehogs2025}, a strategy impossible without
 evaluating \eqref{eq:bs_call} on every tick.
 \end{prosperitybox}
 
@@ -1314,7 +1314,7 @@ formula. Black died in 1995; Scholes and Merton received the
   $\Call - \Put \approx 4.877$.
   \item \textbf{$\mu$ does not appear.} Two analysts with
   different drift views agree on price as long as they agree on
-  $\volat$ --- the central economic content.
+  $\volat$. That is the central economic content.
   \item \textbf{Two routes, same answer}: PDE (replicate, kill
   the $dW$, heat equation) and martingale (change to $\Qm$,
   discounted expectation, lognormal integral). Feynman--Kac

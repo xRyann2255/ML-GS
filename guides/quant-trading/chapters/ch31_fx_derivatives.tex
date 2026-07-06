@@ -5,8 +5,8 @@
 Foreign-exchange (FX) is the largest financial market in the world:
 the BIS 2022 Triennial Survey put average daily turnover at \$7.5
 trillion, an order of magnitude above global equities.  It also
-carries the densest jargon --- ``pips'', ``forward points'',
-``25-delta risk-reversal'', ``TARF'', ``CNH vs CNY'' --- most with
+carries the densest jargon (``pips'', ``forward points'',
+``25-delta risk-reversal'', ``TARF'', ``CNH vs CNY''), most with
 no analogue elsewhere.  This chapter translates the jargon, derives
 \emph{covered interest parity}, states the FX Black--Scholes
 (\emph{Garman--Kohlhagen}), and tours the vanilla-through-exotic
@@ -86,7 +86,7 @@ $1/1.08 \approx 0.9259$ EUR.  Newcomers flip the convention and
 wonder why their hedge is backwards.  The rule:
 \emph{the left-hand currency is the one unit; the right-hand is
 how many you pay.}  ``A call on $\mathrm{EUR}/\mathrm{USD}$'' is a
-call on EUR --- buying EUR, selling USD --- struck in USD per EUR.
+call on EUR (buying EUR, selling USD), struck in USD per EUR.
 \end{pitfallbox}
 
 The slot convention is fixed by market practice, not mathematics.
@@ -97,8 +97,8 @@ and you have written the opposite trade.
 \subsection{Fixings and settlement mechanics}
 \label{subsec:fx_fixings}
 
-Many FX contracts --- NDFs, option barriers, TARF schedules,
-hedged-equity baskets --- reference an \emph{FX fixing}: a
+Many FX contracts (NDFs, option barriers, TARF schedules,
+hedged-equity baskets) reference an \emph{FX fixing}: a
 publicly-observed rate set at a fixed time by polling or matching
 on a specified venue.  The main fixings:
 \begin{itemize}
@@ -141,7 +141,7 @@ $T+1$; intraday fixings use whatever the fixing definition says.
 The $T+2$ convention is historical: pre-electronic settlement
 required physical payment instructions through two central-bank
 RTGS systems in two time zones.  CLS eliminates the operational
-need, but $T+2$ remains the anchor --- zero curves, forward-point
+need, but $T+2$ remains the anchor: zero curves, forward-point
 quotes, and option-expiry calendars all hang off it.  A ``tom/next''
 trade is a one-day forward relative to spot, not a two-day one.
 
@@ -263,7 +263,7 @@ places in Python (\cref{lst:gk_pricer}).
 With $\mathrm{EUR}/\mathrm{USD}$ and USD domestic, higher USD rate
 gives a forward \emph{premium} ($F > S$).  Quoted as
 $\mathrm{USD}/\mathrm{EUR}$ instead, the domestic role swaps:
-$r_d = 4\%, r_f = 5\%$, so $F/S = e^{-0.01}$ --- a forward
+$r_d = 4\%, r_f = 5\%$, so $F/S = e^{-0.01}$, a forward
 \emph{discount}.  Same economics, opposite sign on the points.
 \end{pitfallbox}
 
@@ -287,8 +287,8 @@ inception PV.  Under naive CIP this would be zero; since 2008 it has
 been persistently non-zero, typically 10--50~bp against USD for
 majors and wider in stress.  In plain English: $b$ is the extra
 interest a counterparty demands, on top of their own domestic
-floating rate, to lend you their currency and take USD in exchange
---- compensation for the scarcity of dollar funding when non-US
+floating rate, to lend you their currency and take USD in exchange,
+compensation for the scarcity of dollar funding when non-US
 banks want USD more than US banks want foreign currency.
 
 \begin{keyfactbox}[Post-2008 CIP deviations]
@@ -297,9 +297,9 @@ The observed cross-currency basis $b$ violates pure CIP:
 \emph{borrowing USD synthetically via FX swaps is more expensive
 than borrowing USD directly.}  The drivers are
 \begin{itemize}
-  \item \textbf{Balance-sheet costs} under Basel III --- arbitraging
+  \item \textbf{Balance-sheet costs} under Basel III: arbitraging
     the basis consumes scarce leverage capacity.
-  \item \textbf{USD funding premium} --- non-US banks structurally
+  \item \textbf{USD funding premium}: non-US banks structurally
     short of USD bid for it, especially at quarter- and year-ends.
   \item \textbf{Credit/counterparty risk} in the FX-swap market.
 \end{itemize}
@@ -479,8 +479,8 @@ the quanto trades at a discount.
 \begin{pitfallbox}[Quantos are not the same as FX-hedged notes]
 An \emph{FX-hedged} investment converts the SPX return at the
 terminal FX rate and strips FX exposure via a rolling forward hedge.
-A \emph{quanto} uses a contractually fixed FX rate --- no spot-FX
-sensitivity at expiry.  The P\&L differs, and the quanto carries
+A \emph{quanto} uses a contractually fixed FX rate, so it has no
+spot-FX sensitivity at expiry.  The P\&L differs, and the quanto carries
 correlation risk ($\rho$) that the hedged note does not.
 \end{pitfallbox}
 
@@ -512,8 +512,8 @@ does not, and the portfolio pays the vanilla payoff either way.
 Barriers are popular because they are strictly cheaper than the
 matching vanilla: a hedger who ``knows'' EUR/USD won't rally above
 1.20 in six months buys a 1.10-strike knock-out with barrier 1.20.
-If spot touches 1.20, the hedge disappears exactly when most needed
---- the standard barrier failure mode.
+If spot touches 1.20, the hedge disappears exactly when most needed:
+the standard barrier failure mode.
 
 For the case of an \emph{up-and-out call} with strike $\Kstrike <
 B$ under Garman--Kohlhagen dynamics, the closed form is
@@ -530,12 +530,12 @@ $\mu = (r_d - r_f)/\volat^2 - \tfrac12$.  Ugly but mechanical to
 code.  Key properties:
 \begin{itemize}
   \item UO vanishes when spot hits $B$;
-  \item vega changes sign near $B$ (long far from $B$, short close
-    --- more vol raises the knockout probability);
+  \item vega changes sign near $B$ (long far from $B$, short close:
+    more vol raises the knockout probability);
   \item gamma spikes large and negative near $B$, making delta
     hedging unstable in the final 1--2\% approach.
 \end{itemize}
-The last point --- barrier \emph{pin risk} --- is why traders run
+The last point, barrier \emph{pin risk}, is why traders run
 separate ``stopping-time'' hedges (small digital offsets for the
 gamma spike) rather than smooth delta hedging alone.
 
@@ -549,13 +549,13 @@ three $\Kstrike = 1.09$ calls:
   \item \textbf{Up-and-out, $B = 1.12$}: $\approx 0.11\%$ (MC).  An
     order of magnitude cheaper: the barrier is tight enough that
     most paying paths knock out first.
-  \item \textbf{Up-and-out, $B = 1.15$}: $\approx 0.61\%$ ---
-    under half the vanilla, but retains most of the 1.09--1.15
+  \item \textbf{Up-and-out, $B = 1.15$}: $\approx 0.61\%$, under
+    half the vanilla, but retains most of the 1.09--1.15
     terminal probability.
 \end{itemize}
 (Prices verified via MC at $2\times 10^5$ paths, 100 steps.)
 The discount is largest exactly when the cheap hedge is most
-wanted --- the same perverse trade-off as TARFs.  The barrier's
+wanted, the same perverse trade-off as TARFs.  The barrier's
 expected payoff conditional on the hedge being needed
 (spot $\geq 1.09$ at expiry) is strictly lower than the vanilla's;
 the shortfall is the structure's true cost.
@@ -580,12 +580,12 @@ long-call-short-call-at-$\Kstrike + \epsilon$ spread, rescaled by
 $1/\epsilon$, replicates a digital.  This is why a digital's
 \emph{vega profile} has a sharp spike at the strike: the replicating
 call spread becomes infinitely narrow.  Traders describe digitals as
-``event insurance'' --- they pay a fixed amount contingent on a
+``event insurance'': they pay a fixed amount contingent on a
 spot-at-expiry event.
 \end{intuitionbox}
 
 ``One-touch'' and ``no-touch'' variants pay $Q$ if spot ever / never
-crosses the barrier before expiry --- cheap conditional bets on
+crosses the barrier before expiry; they are cheap conditional bets on
 range-bound or trending regimes.  Closed forms follow from the
 reflection principle \citep[][Ch.\ 19]{hull8ed}.
 
@@ -645,7 +645,7 @@ roughly $12\times$ vanilla cost.
 
 \begin{pitfallbox}[TARFs are leveraged the wrong way]
 TARFs cap client upside (the target) while leveraging downside
-tenor-unlimited --- the wrong profile for a hedger, the right one
+tenor-unlimited: the wrong profile for a hedger, the right one
 for a short-vol speculator.  Treasurers were sold TARFs as ``cheap
 hedges'' in 2014--2015; the August 2015 RMB devaluation locked
 Asian corporates into daily-doubling CNH purchases above market,
@@ -660,9 +660,9 @@ July 2015: 1Y CNH near 6.20 per USD with a mild appreciation
 trend.  Asian treasurers had TARFs selling CNH at 6.15 (0.8\% better
 than spot), with doubled notional if CNH depreciated.  On 11 August
 the PBOC devalued the onshore fix by 1.9\%; CNH fell to 6.40 over
-weeks.  Corporates sold double-notional at 6.15 into spot near 6.40
---- roughly 4\%/month MTM loss on twice notional, compounding.
-Aggregate Asian corporate losses exceeded \$10bn --- the textbook
+weeks.  Corporates sold double-notional at 6.15 into spot near 6.40,
+roughly a 4\%/month MTM loss on twice notional, compounding.
+Aggregate Asian corporate losses exceeded \$10bn, the textbook
 asymmetric-payoff mis-selling case.
 \end{historybox}
 
@@ -755,13 +755,13 @@ With $\volat_{\mathrm{ATMF}} = 8.50\%, \mathrm{RR}_{25} = -0.40\%,
                                 = 8.88\%.
 \end{align}
 Negative 25\,RR means the put is more expensive than the call in
-vol --- the market prices EUR downside (USD strength) as more
+vol: the market prices EUR downside (USD strength) as more
 volatile than EUR upside.  Typical EUR/USD skew; opposite in USD/JPY
 where JPY-strength tails command more vol.
 
 \begin{intuitionbox}
 ATMF = height, RR = tilt, BF = curvature above the straight line
-through the wings --- the minimum three-parameter smile.  Traders
+through the wings: the minimum three-parameter smile.  Traders
 express directional vol views via $\Delta$RR (``buying 1M EUR/USD
 risk-reversal'' = betting EUR-downside vol widens further over
 EUR-upside) and convexity views via $\Delta$BF.
@@ -817,25 +817,25 @@ the sign is flipped.
 
 FX trades in an over-the-counter market split into three tiers.
 
-\textbf{Tier 1} --- interbank: the G10 banks (JPM, Citi, DB, UBS,
+\textbf{Tier 1} (interbank): the G10 banks (JPM, Citi, DB, UBS,
 Goldman, HSBC, BofA, BNP Paribas, and a few others) making two-way
 prices in size to each other and to top clients.  Quotes trade on
 EBS and Refinitiv FX Matching; inside spread on EUR/USD is sub-pip
 for \$5M clips.
 
-\textbf{Tier 2} --- single-/multi-dealer platforms: each bank's
+\textbf{Tier 2} (single-/multi-dealer platforms): each bank's
 e-FX portal (Barx, NeoBank, Autobahn, \ldots) and ECNs (FXall, 360T,
 Hotspot, Currenex).  Asset managers, hedge funds, and corporates
 trade RFQ or streaming, at spreads scaling with size, urgency, and
 toxicity.
 
-\textbf{Tier 3} --- retail: CFD brokers, spreads 5--20$\times$
+\textbf{Tier 3} (retail): CFD brokers, spreads 5--20$\times$
 interbank and often 2\% per trip on exotics.
 
 \textbf{Settlement.}  Most FX cashflows settle through CLS
 (Continuous Linked Settlement), launched 2002, settling 18
 currencies PvP in a daily five-hour window.  CLS eliminated
-``Herstatt risk'' --- your day-side payment going out before the
+``Herstatt risk'': your day-side payment going out before the
 counterparty fails its other-side leg (a live risk before 2002;
 Bankhaus Herstatt's 1974 \$620M failure is the namesake).  ITM
 options settle via spot, so non-CLS pairs carry meaningfully higher
@@ -942,7 +942,7 @@ All price off the same GK engine plus the smile of
 \begin{prosperitybox}[title={Prosperity Round 1 manual: triangular FX}]
 Round 1's manual gives a small cluster of rates between fictional
 currencies and asks for a trade sequence ending with more shells
-than you started with --- triangular FX arb
+than you started with: triangular FX arb
 (\cref{ch:arbitrage_zoo}) in disguise.  A cycle
 $\mathrm{A} \to \mathrm{B} \to \mathrm{C} \to \mathrm{A}$ is
 profitable iff the product of rates exceeds 1 net of fees.  The
@@ -954,7 +954,7 @@ cross-rate graph with transaction costs, latency, and basis.
 \begin{gsbox}[title={The FX options desk}]
 On a sell-side FX options desk, the Strat owns three systems.
 First, a \emph{vol surface builder} ingesting ATMF/RR/BF broker
-quotes across tenors and delta slices --- usually a SABR or VV fit
+quotes across tenors and delta slices, usually a SABR or VV fit
 \citep{castagna2007consistent}.  Second, a \emph{pricer} for
 vanillas (GK) and barriers/digitals/touches (closed-form with
 skew corrections).  Third, a \emph{MC exotics pricer} for TARFs,
@@ -996,7 +996,7 @@ sketch a knock-out pricer.
     Cheaper than vanillas but disappear when the market moves far
     enough.
   \item \textbf{TARFs} cap client upside and leverage client
-    downside --- the structural mis-selling trap that cost Asian
+    downside, the structural mis-selling trap that cost Asian
     corporates \$10bn+ in 2015.
   \item \textbf{FX vol is quoted in delta space}: ATMF vol, plus
     25-delta risk-reversal (skew) and 25-delta butterfly

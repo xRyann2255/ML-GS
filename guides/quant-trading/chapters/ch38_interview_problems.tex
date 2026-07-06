@@ -5,9 +5,9 @@
 Quant interviews test probability, stochastic processes, linear
 algebra, dynamic programming, and the ability to talk through all
 four under pressure.  This chapter walks \textbf{fifteen problems
-end-to-end} using a five-field template --- problem statement,
+end-to-end} using a five-field template (problem statement,
 first attempt, what goes wrong, correct approach, interviewer
-variations --- to expose the handful of patterns that recur across
+variations) to expose the handful of patterns that recur across
 Goldman Sachs and Jane Street questions.  The canonical industry
 reference is \emph{A Practical Guide to Quantitative Finance
 Interviews} by Xinfeng Zhou, the ``Green Book''
@@ -193,8 +193,8 @@ Verify $1/\ell$ by Monte Carlo.
 \begin{keyfactbox}[Cycle lemma for random permutations]
 For a uniform random permutation of $n$ symbols and any
 $\ell > n/2$, the probability the permutation contains a cycle of
-length exactly $\ell$ is $1/\ell$.  Consequently the cycle-following
-strategy in the 100-prisoner problem wins with probability
+length exactly $\ell$ is $1/\ell$.  The cycle-following
+strategy in the 100-prisoner problem therefore wins with probability
 $1 - \sum_{\ell=51}^{100} 1/\ell \approx 0.3118$.
 \end{keyfactbox}
 
@@ -239,7 +239,7 @@ hire the next new best), success $\approx 0.3987$.
 \paragraph{Interviewer variations.}
 (i) Minimise \emph{expected rank} instead: limiting value
 $\approx 3.87$.  (ii) ``Postdoc'' variant: hire the \emph{second}
-best.  (iii) Two hires --- a staple follow-up.
+best.  (iii) Two hires, a staple follow-up.
 
 \begin{historybox}[title={The 1/e law}]
 The secretary problem and its $1/e$ threshold date from the 1950s;
@@ -583,7 +583,7 @@ eigenvalues.
 \paragraph{Interviewer variations.}
 (i) Different feature scales?  Standardise first, or large-unit
 features dominate.  (ii) When does PCA fail?  When variance is a
-poor proxy for signal --- rare important risk factors may have
+poor proxy for signal: rare important risk factors may have
 low variance, noise may have high variance without predictive
 content.  (iii) Factor models: top PCs of a rates curve are
 level, slope, curvature (\cref{ch:rates_derivatives}).
@@ -642,7 +642,7 @@ $O(n^2)$ update path.
 \begin{intuitionbox}
 $I + uu^\top$ stretches by $1 + \|u\|^2$ along $u$ and leaves
 $u^\perp$ unchanged.  See the geometry and the algebra writes
-itself --- the template for every low-rank update problem.
+itself; this is the template for every low-rank update problem.
 \end{intuitionbox}
 
 %% ================================================================
@@ -740,8 +740,8 @@ K(i-1, w) & \text{if } w_i > w, \\
 \max\bigl(K(i-1, w),\; K(i-1, w - w_i) + v_i\bigr) & \text{otherwise}.
 \end{cases}
 \]
-Base case $K(0, w) = 0$.  Answer $K(n, W)$.  Complexity
-$O(nW)$ time and space --- \emph{pseudopolynomial} because $W$ is
+Base case $K(0, w) = 0$.  Answer $K(n, W)$.  Complexity is
+$O(nW)$ time and space, which is \emph{pseudopolynomial} because $W$ is
 encoded in $\log W$ bits; the problem is $NP$-hard when $W$ is
 allowed to grow exponentially in the input size.
 
@@ -828,8 +828,8 @@ $\CDFN(0.35) \approx 0.6368$.  Call price $\approx 10.45$.
 \sqrt T)$.  (ii) ``Vega.''  $\mathrm{Vega} = S \pdfN(d_1)
 \sqrt T$.  (iii) ``Put delta.''  $\Delta_P = \CDFN(d_1) - 1$
 via put--call parity.  (iv) ``Why is delta also the risk-neutral
-probability of expiring in the money?''  It is not exactly ---
-that is $\CDFN(d_2)$.  $\CDFN(d_1)$ is the probability in a
+probability of expiring in the money?''  It is not exactly:
+that probability is $\CDFN(d_2)$.  $\CDFN(d_1)$ is the probability in a
 different measure (the stock numeraire).  Confusing $d_1$ and
 $d_2$ here is a common pitfall.
 
@@ -858,8 +858,8 @@ cost.''  The ratio is roughly right but cost and payoff sit under
 different functions of $\sigma$.
 
 \paragraph{What goes wrong.}
-Under GBM, $\E|S_T - S_0| \approx S_0 \sigma \sqrt{T} \sqrt{2/\pi}$
---- linear in realised volatility --- while the straddle price is
+Under GBM, $\E|S_T - S_0| \approx S_0 \sigma \sqrt{T} \sqrt{2/\pi}$,
+linear in realised volatility, while the straddle price is
 $\approx S_0 \sigma_{\mathrm{imp}} \sqrt{T} \sqrt{2/\pi}$, also
 linear.  The payoff scales as $\sigma_{\mathrm{real}}/
 \sigma_{\mathrm{imp}}$ but P\&L is payoff minus cost.
@@ -896,7 +896,7 @@ Large: the straddle payoff is heavy-tailed; in 2020 March VIX
 spikes the ratio exceeded 10x for weekly straddles.  (iii) ``Why
 would anyone sell a straddle?''  The seller is short gamma and
 collects theta; profits when realised < implied.  (iv) ``Delta
-hedge the straddle --- what is the P\&L?''  The classic ``gamma
+hedge the straddle: what is the P\&L?''  The classic ``gamma
 P\&L'' identity: daily P\&L $\approx \tfrac{1}{2} \Gamma S^2
 [(\Delta S/S)^2 - \sigma_{\mathrm{imp}}^2 \Delta t]$, summed over
 the life of the option.
@@ -904,7 +904,7 @@ the life of the option.
 \begin{intuitionbox}
 Option P\&L is the integral of squared returns minus squared
 implied.  Realised 80\% vs implied 20\% is a 16x difference in
-squared volatility --- enormous for a long straddle.  The
+squared volatility, enormous for a long straddle.  The
 intuition ``vol is mispriced by 4x'' is right; gamma P\&L accrues
 at the difference of \emph{squared} vols.
 \end{intuitionbox}
@@ -943,8 +943,8 @@ algebra errors and focuses the derivation.
 Every DP problem (LCS, knapsack) and random walk problem (coupon
 collector, secretary, ruin) has a recurrence.  Seek closed form
 when possible (coupon $\to n H_n$; ruin $\to a/N$); accept the
-$O(nm)$ table when not (LCS, knapsack).  Knowing which you are
-in --- and asking --- often decides the interview.
+$O(nm)$ table when not (LCS, knapsack).  Knowing which case you
+are in, and asking, often decides the interview.
 
 \begin{keyfactbox}[Four meta-patterns]
 Every Green-Book-style quant problem yields to one of:
@@ -1071,6 +1071,6 @@ without being obnoxious.
     (\sigma_{\mathrm{real}} - \sigma_{\mathrm{imp}})$.  At 80\% vs
     20\%, $S_0 = 100$, $T = 1$: P\&L $\approx 48$.
   \item \textbf{Meta-patterns.}  Change of variables, martingale
-    first, bound before compute, recurrence to closed form --- one
+    first, bound before compute, recurrence to closed form: one
     fires on almost every quant interview problem.
 \end{itemize}

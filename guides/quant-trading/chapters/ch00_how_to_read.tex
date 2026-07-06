@@ -14,12 +14,12 @@ Prosperity~4} is a two-week algorithmic trading competition starting
 2026-04-14 in which teams write Python algorithms to trade simulated
 products against each other and scripted bots. Past editions rewarded
 market making, basket statistical arbitrage, options pricing, locational
-arbitrage, and exploitation of bot behaviour --- all taught here from
+arbitrage, and exploitation of bot behaviour, all taught here from
 first principles. The \textbf{Goldman Sachs Quant Strats off-cycle
 placement} begins around 2026-04-20; the reader will sit on a trading
 desk as a strategist (``Strats''). Since the desk assignment is not yet
-known, Part~VII covers every major asset class --- rates, equities, FX,
-credit, commodities --- at comparable depth, together with production
+known, Part~VII covers every major asset class (rates, equities, FX,
+credit, commodities) at comparable depth, together with production
 risk, numerical methods, and firm-specific infrastructure (SecDB, Slang).
 
 Parts~I--V form the common core; Part~VI is Prosperity-specific and
@@ -46,7 +46,7 @@ states it informally and cites the rigorous version. Basic optimisation
 \texttt{pandas}, and standard data structures; time complexity; basic
 algorithms (sorting, hashing, dynamic programming); and the ability to
 read a moderately-sized Python codebase unaided. Code in this book is
-sparing --- at most one reference skeleton per strategy, typically
+sparing: at most one reference skeleton per strategy, typically
 15--30 lines, pedagogical rather than production-ready. Full runnable
 code lives outside the PDF.
 
@@ -87,7 +87,7 @@ exchanges, participants, and price (Ch~1--3), then the minimum strategy
 vocabulary the competition historically rewards: market making (Ch~8),
 mean reversion (Ch~9), and basket statistical arbitrage (Ch~11). Enough
 options theory to price and delta-hedge the voucher products follows
-(Ch~14--16), then the full Prosperity playbook (Ch~23--26) --- tooling,
+(Ch~14--16), then the full Prosperity playbook (Ch~23--26): tooling,
 algorithmic round strategies, manual rounds, and lessons from top-team
 writeups. Omitted: Parts~V and~VII, most of the arbitrage zoo beyond
 baskets, and the full vol surface (Ch~17). Roughly 130 pages; intended
@@ -106,14 +106,14 @@ For a reader showing up to a sell-side quant strats desk ready to
 contribute. It begins with the minimum market-structure vocabulary
 (Ch~1--3), then the full options stack (Ch~14--17) since every Part~VII
 chapter cross-references it, then every Part~VII chapter in order: the
-role itself (Ch~27), fixed income foundations --- the largest knowledge
-gap for a CS reader (Ch~28), rates derivatives and SABR (Ch~29), equity
+role itself (Ch~27), fixed income foundations, which are the largest
+knowledge gap for a CS reader (Ch~28), rates derivatives and SABR (Ch~29), equity
 derivatives and variance swaps (Ch~30), FX derivatives (Ch~31), credit
 derivatives (Ch~32), commodities (Ch~33), numerical methods (Ch~34),
 production risk and P\&L Explain (Ch~35), SecDB and Slang (Ch~36),
 regulatory context (Ch~37), and interview-grade problems (Ch~38).
 Omitted: Parts~III, V, and VI, which teach buy-side strategy
-construction --- not the Strats job. Roughly 500 pages; intended for a
+construction rather than the Strats job. Roughly 500 pages; intended for a
 reader with three to five weeks until the placement starts.
 
 \subsection*{Path C: Full cover-to-cover}
@@ -169,7 +169,7 @@ At chapter granularity: Part~I (Ch~1--3) introduces exchanges, the
 limit order book, market participants, and the many definitions of
 ``the price''; every later chapter assumes this vocabulary. Part~II
 (Ch~4--7) builds the theory of \emph{why} spreads exist, underpinning
-every Part~III strategy --- Ch~8 (market making) in particular makes no
+every Part~III strategy; Ch~8 (market making) in particular makes no
 sense without the adverse-selection argument of Ch~5. Inside Part~IV,
 Ch~14 (payoffs, no-arbitrage bounds, put--call parity) precedes Ch~15
 (Black--Scholes), which precedes Ch~16 (Greeks and delta hedging) and
@@ -184,14 +184,14 @@ Parts: it covers how trades are actually placed without moving the
 market against oneself, and how positions are sized and monitored so a
 losing day does not become a career-ending one. Part~VI (Prosperity) is
 an applied layer over Parts~I--IV rather than a prerequisite for
-anything --- Part~VI is the most self-contained Part in the book.
+anything; it is the most self-contained Part in the book.
 
 \section{Notation}
 \label{sec:notation}
 
 Every symbol used across multiple chapters is defined once and
 catalogued in Appendix~B, alongside a glossary of trading terms.
-Appendix~B is a reference --- consult it whenever a symbol introduced
+Appendix~B is a reference: consult it whenever a symbol introduced
 many chapters earlier needs refreshing. No chapter redefines a symbol
 that appears in the master table, so a symbol's meaning is fixed the
 first time it is used.
@@ -206,7 +206,7 @@ are omitted from the master table.
 
 Seven coloured callout boxes recur throughout the book, introduced
 here so that a reader meeting one in Chapter~4 already knows what it
-signals. This chapter uses no boxes --- they are reserved for technical
+signals. This chapter uses no boxes; they are reserved for technical
 content.
 
 \begin{itemize}
@@ -214,7 +214,7 @@ content.
 of most chapters, listing the earlier-chapter results assumed. Skim if
 confident, or follow the back-references if not.
 
-\item \textbf{Key fact} (blue). A formal result worth memorising ---
+\item \textbf{Key fact} (blue). A formal result worth memorising:
 the bid--ask spread formula, Kyle's $\lamk$, Avellaneda--Stoikov's
 reservation-price formula. Every major result appears in a key-fact
 box near where it is derived.
@@ -238,7 +238,7 @@ mostly in Parts~IV and~V; Part~VII treats the same material in depth.
 \item \textbf{Common mistake / Pitfall} (red). A wrong intuition that
 sounds right, or a failure mode the reader will otherwise walk into.
 \emph{Slow down and read these carefully.} These boxes are the highest
-value-per-word in the book --- they encode mistakes that cost
+value-per-word in the book; they encode mistakes that cost
 professionals money.
 
 \item \textbf{Historical note} (purple). An aside on the origin of a
@@ -265,7 +265,7 @@ takes its form from.
 \begin{enumerate}
 \item \textbf{Toy example first.} The chapter opens with a concrete
 numerical example worked by hand with small integers, before any
-symbol is defined abstractly --- so the reader experiences the
+symbol is defined abstractly, so that the reader experiences the
 phenomenon before formalising it. Ch~5, for instance, opens with a
 Glosten--Milgrom game on two states $\{V=100, V=110\}$ with known
 probabilities; the reader computes the bid and ask by hand before
@@ -292,7 +292,7 @@ checking every number in the toy example is reproducible from the
 rules. Read stages~2 and~3 once at normal speed, then re-read while
 writing down each line of algebra on paper. Finally, read the intuition
 box and ask whether it would have been obvious from the toy example
-alone --- if yes, the chapter has done its job. If no, re-read
+alone. If yes, the chapter has done its job. If no, re-read
 stages~3 and~4 together and look for what the intuition box points at
 that the derivation glossed over.
 

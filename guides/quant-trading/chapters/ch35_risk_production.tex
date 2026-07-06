@@ -6,7 +6,7 @@ This chapter takes the single-option Greeks of
 \cref{ch:greeks_hedging} into production: \emph{portfolio-scale}
 Greeks across thousands of positions, \emph{P\&L Explain} as the
 Strat's morning ritual, and the \emph{xVA alphabet soup} (CVA, DVA,
-FVA, KVA) accounting for what textbook Black--Scholes ignores ---
+FVA, KVA) accounting for what textbook Black--Scholes ignores:
 counterparty default, own default, funding costs, regulatory
 capital.  The new content is \emph{scale} and \emph{accountability}:
 a 10k-trade desk cannot reprice by hand; a Strat who cannot explain
@@ -26,7 +26,7 @@ From earlier chapters:
     idea that risk is a \emph{distribution} of P\&L outcomes, not a
     point estimate.
   \item \Cref{ch:fixed_income_foundations}: zero curves and bucketed
-    rate risk --- the object we called a \emph{key-rate duration}
+    rate risk: the object we called a \emph{key-rate duration}
     generalises to the KRD vector used here.
   \item \Cref{ch:credit_derivatives}: hazard rates $h(t)$, survival
     $S(t) = e^{-\int_0^t h(u)du}$, and the expected-loss formula
@@ -76,20 +76,20 @@ not a single number per Greek:
     \emph{strike band} around spot.
   \item \textbf{Vega} is bucketed by underlying, \emph{tenor}
     (maturity band: 1M, 3M, 6M, 1Y, 2Y, 5Y\ldots) and often
-    \emph{strike band} (25-delta put, ATM, 25-delta call) --- a
+    \emph{strike band} (25-delta put, ATM, 25-delta call), forming a
     full vega \emph{surface}.
   \item \textbf{Rho} is bucketed by currency and by \emph{tenor} on
     the rates curve (key-rate durations, KRDs).
 \end{itemize}
 Aggregation without bucketing discards hedging information.  A
-``delta-neutral'' book can be long \$50M AAPL and short \$50M MSFT
---- a pairs trade, not a hedged position.
+``delta-neutral'' book can be long \$50M AAPL and short \$50M MSFT:
+a pairs trade, not a hedged position.
 \end{keyfactbox}
 
 \subsection{Key-rate durations (KRDs)}
 
 For rate-sensitive books (swaps, bonds, swaptions), a single
-duration number is useless --- you need to know \emph{which part of
+duration number is useless: you need to know \emph{which part of
 the curve} you are exposed to.  The answer is the \emph{key-rate
 duration} vector from \cref{ch:fixed_income_foundations}.
 
@@ -106,7 +106,7 @@ reprice, divide by $V \cdot 10^{-4}$.  The vector
 $(\mathrm{KRD}_1, \ldots, \mathrm{KRD}_K)$ is the book's exposure
 along the curve.  A 5Y-receive, 10Y-pay swap has near-zero total
 duration but $\mathrm{KRD}_{5\mathrm{Y}} > 0$ and
-$\mathrm{KRD}_{10\mathrm{Y}} < 0$ --- a pure curve-shape bet
+$\mathrm{KRD}_{10\mathrm{Y}} < 0$: a pure curve-shape bet
 (steepener).
 
 KRDs satisfy a sum rule: on a parallel shift, $\sum_k
@@ -135,15 +135,15 @@ whose delta on one underlying depends on another's price.  Examples:
   \item \emph{Index option} decomposed into constituents: a
     50-delta SPX call has delta $\approx 0.50$ against SPX, but
     across the 500 constituents each delta depends on the others
-    via the index weight --- large cross-gammas.
+    via the index weight, producing large cross-gammas.
   \item \emph{Spread option} with payoff $\max(S_1 - S_2 - K, 0)$:
-    $\partial^2 V / (\partial S_1 \partial S_2) < 0$ --- rallying
+    $\partial^2 V / (\partial S_1 \partial S_2) < 0$, so rallying
     $S_2$ reduces delta to $S_1$.
   \item \emph{Basket option} on $w_1 S_1 + w_2 S_2$: cross-gamma
     $\ne 0$ whenever $w_1 w_2 \ne 0$.
 \end{itemize}
 Single-name books can ignore cross-gamma; index market-making books
-cannot --- ignoring it produces P\&L Explain residuals of several
+cannot; ignoring it produces P\&L Explain residuals of several
 percent.
 
 \subsection{Worked example: a 4-position mini-book}
@@ -184,10 +184,10 @@ SPX  $+20$ C 5000 & $+1{,}135$ & $+5{,}673{,}609$ & $+19{,}527$ \\
 \end{center}
 
 The share-delta total is misleading: 97\% of the \$1{,}164 delta is
-SPX at \$5000 --- AAPL/MSFT/GOOG are rounding error in dollar
+SPX at \$5000; AAPL/MSFT/GOOG are rounding error in dollar
 terms.  Dollar delta makes this clear: almost \$5.7M is SPX.
 
-A single vega total is useless --- 30-day AAPL vol and 90-day SPX
+A single vega total is useless: 30-day AAPL vol and 90-day SPX
 vol respond to different moves.  The desk representation is a
 \emph{vega bucket table} (rows = underlying, columns = tenor):
 
@@ -211,14 +211,14 @@ many more buckets.  Trader's question: ``if 30-day single-name
 vols rally 2 points while index vol stays flat, what do I make?''
 Answer: $2 \times (171 + 301.4 - 152.7) = +\$639$, dominated by
 MSFT.  The SPX bucket is an order of magnitude larger than all
-single-name vega combined --- the book's vol risk lives there.
+single-name vega combined: the book's vol risk lives there.
 
 \begin{intuitionbox}
 Aggregating Greeks without bucketing is like aggregating a
-multi-currency P\&L without FX --- the single number hides the
+multi-currency P\&L without FX: the single number hides the
 risk.  A ``delta-neutral'' book can be long one name and short
 another; a ``vega-flat'' book can be long front-month vol and short
-back-month --- an enormous \emph{term-structure} bet.  The bucketed
+back-month, an enormous \emph{term-structure} bet.  The bucketed
 view is the hedgeable view.
 \end{intuitionbox}
 
@@ -232,7 +232,7 @@ Every morning on every derivatives desk, a Strat takes yesterday's
 closing book plus yesterday's and today's market data, and
 \emph{explains} the overnight change in mark-to-market (MTM) value
 using the book's Greeks.  This report is \emph{P\&L Explain}
-(or \emph{P\&L Attribution}) --- the Strat's daily proof-of-work.
+(or \emph{P\&L Attribution}), the Strat's daily proof-of-work.
 If it balances, pricing library and risk system agree, the trader
 starts the day, and Middle Office signs off on official P\&L.  If
 not, the Strat's job is to find out why, fast.
@@ -259,7 +259,7 @@ misalignment, or a late-booked trade.  Above 10\% means \emph{stop
 trading until fixed}.
 \end{keyfactbox}
 
-Terms use \emph{start-of-day} Greeks (not end-of-day) --- the
+Terms use \emph{start-of-day} Greeks (not end-of-day): the
 Explain is a predictor of what P\&L \emph{should have been} given
 the observed market moves.
 
@@ -325,14 +325,14 @@ By close of day 1:
   \quad T_1 = T_0 - 1/365 = 0.247260.
 \]
 
-\paragraph{Step 1 --- reprice.}
+\paragraph{Step 1: reprice.}
 \[
   C_1 \;=\; 4.963545, \qquad
   \Delta V \;=\; C_1 - C_0 \;=\; 0.731386.
 \]
 Actual MTM change: \$0.731386 per share, \$73.14 per contract.
 
-\paragraph{Step 2 --- contributions.}  Moves:
+\paragraph{Step 2: contributions.}  Moves:
 $\Delta S = +1$, $\Delta \sigma = +0.01$, $\Delta t = +1/365$,
 $\Delta r = 0$.  Plug in:
 \begin{align*}
@@ -348,15 +348,15 @@ $\Delta r = 0$.  Plug in:
 \end{align*}
 Sum: $0.539828 + 0.019848 + 0.198476 - 0.024477 + 0 = +0.733675$.
 
-\paragraph{Step 3 --- residual.}
+\paragraph{Step 3: residual.}
 \[
   \varepsilon \;=\; \Delta V - \text{sum}
   \;=\; 0.731386 - 0.733675 \;=\; -0.002289.
 \]
-The residual is $-\$0.00229$ per share ($-0.31\%$ of $\Delta V$)
---- well inside the 1\% tolerance.  Explain balances.
+The residual is $-\$0.00229$ per share ($-0.31\%$ of $\Delta V$),
+well inside the 1\% tolerance.  Explain balances.
 
-\paragraph{Step 4 --- the residual.}  Sum of unmodelled
+\paragraph{Step 4: the residual.}  Sum of unmodelled
 third-order Taylor terms:
 \begin{itemize}
   \item \emph{Speed} $\partial \Gamma / \partial S$: higher-order
@@ -372,7 +372,7 @@ third-order Taylor terms:
 On a market-making book with large vanna and volga (deep OTM
 options), these terms contribute tens of basis points each and the
 5-Greek Explain breaks down.  Fix: add \emph{second-order Greeks}
-(vanna, volga, charm, speed) --- but that raises position cost from
+(vanna, volga, charm, speed), but that raises position cost from
 five numbers to fifteen.  Trade-off: vanilla books stop at five;
 exotic books carry the full second-order expansion.
 
@@ -405,7 +405,7 @@ Greeks matches MTM within 1\%: risk system and pricing library are
 in sync, screen Greeks are trustworthy.  Residual above 1\%: a
 missing vol bucket, stale bump size, late-booked trade, or pricing
 change not propagated to risk.  Healthy books have residuals near
-zero; unhealthy books have residuals drifting systematically ---
+zero; unhealthy books have residuals drifting systematically,
 usually a missing Greek (vega on a new bucket, cross-gamma on a new
 basket).  A persistent 2\% residual eventually becomes a \$50M
 mystery loss.
@@ -484,12 +484,12 @@ The risk-adjusted price is
   \;-\; \mathrm{MVA}.
 \]
 On a long-dated swap with a weak counterparty, xVA can run to 5\%
-of notional --- larger than the bid--ask spread, and the difference
+of notional: larger than the bid--ask spread, and the difference
 between winning the trade and losing money.
 
-\subsection{CVA --- credit valuation adjustment}
+\subsection{CVA: credit valuation adjustment}
 
-CVA is the expected loss from counterparty default --- the
+CVA is the expected loss from counterparty default, the
 derivative analogue of the bond formula $\mathrm{EL} =
 (1-R)\,\mathrm{PD}$ from \cref{ch:credit_derivatives}, with
 \emph{exposure} replaced by the stochastic MTM and integrated over
@@ -497,8 +497,8 @@ the trade's life.
 
 \begin{keyfactbox}[CVA formula]
 Let $V(t)$ be the dealer's MTM at time $t$.  On counterparty
-default at time $\tau \le T$ the dealer's exposure is $V(\tau)^+$
---- you lose only if in the money when they default.  Unilateral
+default at time $\tau \le T$ the dealer's exposure is $V(\tau)^+$:
+you lose only if in the money when they default.  Unilateral
 CVA:
 \[
   \mathrm{CVA}
@@ -556,14 +556,14 @@ Each contribution is $(1-R) \cdot D(t_k) \cdot \mathrm{EPE}(t_k)
 \cdot \Delta S_k$.  CVA is \$5.60 per \$100 of peak EPE, or 5.6\%
 of peak exposure.  On a \$1bn notional swap (with a calibrated EPE
 replacing the simplified hump), CVA runs into single-digit
-millions --- a charge the salesperson must quote on top of the
+millions, a charge the salesperson must quote on top of the
 BS-implied swap rate.
 
-\subsection{DVA --- debit valuation adjustment}
+\subsection{DVA: debit valuation adjustment}
 
 DVA is the mirror of CVA: the benefit the \emph{dealer} gets from
 their own default probability.  If I owe you \$100M and default, I
-pay only $R \cdot 100$M --- so ex ante my expected payout is less
+pay only $R \cdot 100$M, so ex ante my expected payout is less
 than \$100M, the liability is worth less than \$100M to me, and my
 balance sheet gains when the market perceives my credit
 deteriorating.
@@ -579,17 +579,17 @@ exposure:
 
 \begin{pitfallbox}[DVA is accounting-real but not cash-real]
 DVA is the most controversial xVA.  Under IFRS 13 and US GAAP
-(post-2007), banks must recognise DVA in fair-value accounting ---
+(post-2007), banks must recognise DVA in fair-value accounting,
 so when a bank's own CDS widens in a crisis, it books a \emph{gain}
 on its derivative liabilities.  Hence the Q3 2011 headlines where
 Morgan Stanley, Goldman Sachs, and Citi reported multi-billion DVA
-gains as their own spreads blew out --- gains they could never
+gains as their own spreads blew out, gains they could never
 monetise unless they defaulted.  Many banks now strip DVA from
 ``core'' earnings.  Economic logic clean; political optics
 terrible.
 \end{pitfallbox}
 
-\subsection{FVA --- funding valuation adjustment}
+\subsection{FVA: funding valuation adjustment}
 
 When a dealer's uncollateralised derivative becomes an asset
 (positive MTM), the dealer must borrow cash to hedge at their
@@ -598,7 +598,7 @@ is the \emph{funding spread}; FVA is its discounted integral over
 the trade's life.
 
 Symmetrically, if the position becomes a liability, cash received
-can be invested at the unsecured rate --- a funding benefit (FBA).
+can be invested at the unsecured rate, a funding benefit (FBA).
 FVA is often quoted net of FBA.
 
 Approximate formula:
@@ -613,14 +613,14 @@ vs.\ hazard $\times$ LGD).
 
 FVA applies only to \emph{uncollateralised} trades.  Fully
 collateralised trades (CSA-perfect daily cash margining at OIS)
-have zero FVA because the collateral funds the hedge --- which is
+have zero FVA because the collateral funds the hedge, which is
 why mandatory clearing post-Dodd--Frank (\cref{ch:regulatory})
 dramatically reduced FVA on vanilla flow.  (A \emph{CSA}, Credit
 Support Annex, is the ISDA document specifying daily collateral
 exchange; \emph{OIS}, the overnight-index-swap rate, is the
 near-risk-free rate paid on that posted cash.)
 
-\subsection{KVA --- capital valuation adjustment}
+\subsection{KVA: capital valuation adjustment}
 
 Under Basel III, banks hold regulatory capital against derivative
 exposures: CVA-risk capital (capital against CVA itself moving),
@@ -638,10 +638,10 @@ where $\mathrm{Cap}(t)$ is regulatory capital consumed at time $t$
 and ROE is target return on equity.  On a 30-year uncollateralised
 swap with a low-rated counterparty, KVA can be the largest xVA.
 
-\subsection{MVA --- margin valuation adjustment}
+\subsection{MVA: margin valuation adjustment}
 
 MVA is the cost of funding \emph{initial margin} posted to a CCP
-(central counterparty --- the clearing house that interposes itself
+(central counterparty, the clearing house that interposes itself
 between trade counterparties) or bilaterally under uncleared
 margin rules.  IM is typically funded at the dealer's unsecured
 rate but earns only OIS inside the CCP, producing a spread cost.
@@ -672,7 +672,7 @@ Novices compute per-trade CVA/FVA and sum.  Wrong in two ways.
 \textbf{Netting.}  Under an ISDA Master with CSA, counterparty
 exposure is \emph{netted} across all trades.  A \$100M ITM swap
 and a \$90M OTM swap with the same counterparty net to \$10M, not
-\$100M --- per-trade CVA over-estimates tenfold.
+\$100M; per-trade CVA over-estimates tenfold.
 
 \textbf{Collateral.}  Variation margin reduces CVA to the
 margin-period-of-risk tail ($\sim$10 days).  Fully collateralised
@@ -699,8 +699,8 @@ operates under a hierarchy:
     30-day vega capped at \$50k per vol point.''
   \item \textbf{Notional caps.}  Gross and net notional by product
     and counterparty.
-  \item \textbf{Scenario P\&L caps.}  Loss limit under a stress
-    --- e.g.\ ``5\% SPX drop with vols up 20\% must not exceed
+  \item \textbf{Scenario P\&L caps.}  Loss limit under a stress,
+    e.g.\ ``5\% SPX drop with vols up 20\% must not exceed
     \$10M.''
   \item \textbf{VaR and Expected Shortfall.}  Statistical tail
     measures of loss.
@@ -723,7 +723,7 @@ tail event:
   \;=\; \E[L_h \mid L_h \ge \mathrm{VaR}_\alpha(h)].
 \]
 ES is always at least as large as VaR at the same confidence and
-is a \emph{coherent} risk measure (VaR is not --- it can violate
+is a \emph{coherent} risk measure (VaR is not: it can violate
 subadditivity, penalising diversification).
 
 The Basel Fundamental Review of the Trading Book (FRTB) replaced
@@ -732,7 +732,7 @@ VaR with 97.5\% ES as the regulatory market-risk measure from 2023
 
 \subsection{Why a single VaR number is not enough}
 
-VaR/ES is a \emph{portfolio-level aggregate} --- it collapses the
+VaR/ES is a \emph{portfolio-level aggregate}: it collapses the
 risk distribution to one number.  Too coarse for a trader running
 the book in real time: it does not say \emph{which} Greek drives
 risk, or whether a breach is vega or delta.  Desks run VaR
@@ -757,7 +757,7 @@ monitored intraday.
 
 \begin{itemize}
   \item Portfolio Greeks are \emph{bucketed} by underlying, tenor,
-    strike band, and curve pillar --- not aggregated into scalars.
+    strike band, and curve pillar, not aggregated into scalars.
   \item \textbf{Dollar delta} $= n m \delta S$ gives \$ per \% move;
     \textbf{share delta} $= n m \delta$ gives shares-to-hedge.
   \item KRDs decompose rate risk by pillar; parallel shifts recover
@@ -773,7 +773,7 @@ monitored intraday.
     When vanna/volga matter, add second-order Greeks.
   \item \textbf{CVA} $= (1-R) \int_0^T D(t) \mathrm{EPE}(t)\, dPD(t)$,
     with hazard stripped from CDS (\cref{ch:credit_derivatives}).
-  \item \textbf{DVA} is the symmetric own-default adjustment ---
+  \item \textbf{DVA} is the symmetric own-default adjustment,
     controversial because it books a gain when your own credit
     deteriorates.
   \item \textbf{FVA} is funding spread on uncollateralised exposures;
@@ -788,7 +788,7 @@ monitored intraday.
   \item VaR is not coherent (violates subadditivity); ES is.  FRTB
     uses 97.5\% ES.
   \item A desk runs bucketed Greeks, stress scenarios, and VaR/ES
-    in parallel --- each answers a different question.
+    in parallel; each answers a different question.
 \end{itemize}
 
 
@@ -801,7 +801,7 @@ into \emph{executed-trade} (realised) and \emph{mark-to-market
 inventory} (unrealised), attribute each line to a strategy (market
 making, stat arb, options scalping), and reconcile to the
 leaderboard.  If attribution does not match the posted number, the
-local backtester is wrong --- and an unexplained \$100/round gap
+local backtester is wrong, and an unexplained \$100/round gap
 becomes a \$2000-notional bug on submission day.  The same
 instinct that chases a 50\,bp Explain residual on a sell-side desk
 saves a Prosperity team from submitting a broken algo.
@@ -812,14 +812,14 @@ On a Goldman Sachs equity-derivatives or rates-desk Strat seat,
 the 7am--9am workflow has been fixed for two decades.
 \textbf{07:00.}  Overnight batch is done; pull previous-close
 book, previous-close data, today's open data.  \textbf{07:15.}
-Run P\&L Explain --- the morning's most important job; report
+Run P\&L Explain, the morning's most important job; report
 goes to Market Risk, Product Control, and trader by 08:30.
 \textbf{07:30.}  If Explain balances ($< 1\%$ residual), move to
 xVA checks: any counterparty's CDS moved enough to shift CVA?  Any
 new trade reprice the netting set?  \textbf{08:00.}  Investigate
 stale-trade or missing-Greek exceptions from the overnight batch.
 \textbf{08:30.}  Send consolidated Explain and xVA report.
-\textbf{09:00.}  Market open; pivot to trader support --- pricing
+\textbf{09:00.}  Market open; pivot to trader support: pricing
 requests, scenario runs, hedge simulations.  Same cadence on every
 derivatives desk in every major bank.  An Explain that does not
 balance on Friday is why Strats work weekends.
@@ -830,8 +830,8 @@ Pre-2008, CVA was a quarterly back-office adjustment with minimal
 trader involvement.  Lehman's September 2008 default (and
 Bear Stearns' March rescue) made counterparty default a
 first-order risk overnight.  Basel III (2010--2011) introduced
-\emph{CVA-risk capital} --- explicit capital against CVA itself
-moving --- turning CVA into a first-class trading activity.  Banks
+\emph{CVA-risk capital} (explicit capital against CVA itself
+moving), turning CVA into a first-class trading activity.  Banks
 set up dedicated \emph{CVA desks} that hedge counterparty credit
 by trading CDS, pricing CVA into every long-dated trade.
 

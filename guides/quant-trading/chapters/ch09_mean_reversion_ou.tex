@@ -13,7 +13,7 @@ three quantitative answers in order:
   are random walks that happened to visit the same level twice.
   Trading them on a mean-reversion thesis loses money.
   \item If the series \emph{is} mean-reverting, what is the
-  half-life --- how long does the average excursion take to fade?
+  half-life: how long does the average excursion take to fade?
   A half-life of one minute is tradeable on a one-day horizon; a
   half-life of six months is not.
   \item Given the half-life, when do you enter, exit, and how do
@@ -50,7 +50,8 @@ From earlier in the book:
   continuous-time generalisation that separates reversion speed
   from size.
   \item \Cref{ch:kyle_gm}: the Glosten--Milgrom posterior is a
-  \emph{martingale}. Opposite worldview --- contrast deliberately.
+  \emph{martingale}. Opposite worldview; contrast the two
+  deliberately.
   \item \Cref{ch:order_flow}: Hawkes processes modelled clustered
   \emph{arrivals}. OU is the mean-reversion analogue for
   clustered \emph{values} (drifting back to a mean rather than
@@ -203,7 +204,7 @@ of the initial condition}: the influence of $X_0$ shrinks at rate
 $\theta$. $\mu(1 - e^{-\theta t})$ is the \emph{exponential growth
 of the mean toward $\mu$}: the deterministic part heads to $\mu$
 regardless of start. The It\^o integral is the \emph{accumulated
-noise}, exponentially weighted so recent shocks count more --- old
+noise}, exponentially weighted so recent shocks count more; old
 kicks have already reverted away.
 
 \subsection{Mean and variance at finite time}
@@ -250,7 +251,7 @@ to a finite limit:
 The finite limit is why a mean-reverter can be \emph{traded}.
 A random walk has variance growing linearly forever, so ``it
 will come back'' has unbounded downside. OU has \emph{bounded}
-variance --- values stay in a tight neighbourhood of $\mu$ with
+variance: values stay in a tight neighbourhood of $\mu$ with
 a finite typical excursion size.
 
 \subsection{The stationary distribution}
@@ -269,8 +270,8 @@ is
 \end{equation}
 This is the \emph{stationary distribution}: if $X_0$ is drawn
 from it, $X_t$ has the same distribution for every $t \geq 0$.
-The process never settles to a single point --- noise keeps
-kicking it --- but it settles to a stable Gaussian envelope of
+The process never settles to a single point (noise keeps
+kicking it), but it settles to a stable Gaussian envelope of
 typical width $\sigma_\infty = \volat/\sqrt{2\theta}$ around
 $\mu$.
 
@@ -310,9 +311,9 @@ half its initial size:
 \end{equation}
 The half-life is the single most important quantity for a
 trader: in the natural units of the series, how long on average
-you must wait for an excursion to revert. Everything else ---
-entry threshold, exit threshold, trade duration, capital
-allocation --- is downstream.
+you must wait for an excursion to revert. Everything else
+(entry threshold, exit threshold, trade duration, capital
+allocation) is downstream.
 
 \begin{keyfactbox}[OU process summary]
 The Ornstein--Uhlenbeck SDE
@@ -339,7 +340,7 @@ $\theta > 0$ has the following properties.
 \label{subsec:ch9_worked_ou}
 
 Take $\mu = 100$, $\theta = 0.3$, $\volat = 2$, $X_0 = 105$
-(five units above the mean). Time units are arbitrary --- think
+(five units above the mean). Time units are arbitrary; think
 ``hours'' or ``Prosperity ticks''.
 
 \paragraph{Half-life.} From \eqref{eq:ou_halflife},
@@ -393,7 +394,7 @@ $\sqrt{6.667} \approx 2.582$, matching
 \begin{intuitionbox}
 The half-life is the only number that matters. If it is one day
 and your holding window is five days, you live through several
-revert-and-reset cycles --- profitable in expectation. If it is
+revert-and-reset cycles, profitable in expectation. If it is
 six months and your window is five days, no excursion reverts in
 time; the strategy becomes a directional bet. Half-life $\ll$
 horizon is the gate that separates ``trade this'' from ``leave
@@ -403,7 +404,7 @@ it alone''. Everything else is calibration.
 \section{Testing for mean reversion}
 \label{sec:ch9_tests}
 
-Most financial time series are \emph{not} OU --- they are random
+Most financial time series are \emph{not} OU; they are random
 walks. Equities, FX rates, and commodity futures are
 martingale-like at any human-tradeable horizon. Trading a random
 walk on a mean-reversion thesis loses money: there is no
@@ -436,9 +437,9 @@ where $\Delta X_t \defeq X_t - X_{t-1}$ is the first difference,
 $\alpha$ an intercept (drift), and the $p$ lagged differences are
 nuisance terms that soak up serial correlation in $\epsilon_t$.
 The null is $H_0\colon \beta = 0$: under $H_0$ the level
-$X_{t-1}$ has no predictive power for $\Delta X_t$ --- $X_t$ is a
+$X_{t-1}$ has no predictive power for $\Delta X_t$, so $X_t$ is a
 random walk. Under $H_1\colon \beta < 0$, a high $X_{t-1}$ makes
-$\Delta X_t$ more negative on average --- mean reversion in
+$\Delta X_t$ more negative on average: mean reversion in
 difference form.
 
 The ADF test statistic is the $t$-statistic of $\hat\beta$. Under
@@ -520,16 +521,16 @@ The \textbf{Hurst exponent} $H$ is a third diagnostic, defined so
 that the long-run scaling of the range of a process is
 $R_t \propto t^H$. Three regimes:
 \begin{itemize}
-  \item $H = 0.5$ --- pure random walk.
-  \item $H < 0.5$ --- mean-reverting (the range grows slower than
+  \item $H = 0.5$: pure random walk.
+  \item $H < 0.5$: mean-reverting (the range grows slower than
   $\sqrt{t}$, indicating that excursions get pulled back).
-  \item $H > 0.5$ --- trending (the range grows faster than
+  \item $H > 0.5$: trending (the range grows faster than
   $\sqrt{t}$, indicating persistent moves).
 \end{itemize}
 The classical estimator is the rescaled-range ($R/S$) procedure
 of Mandelbrot, reviewed in \citeChan{}; modern practice uses a
 multifractal extension. $H$ returns one number that classifies
-the regime, but it is the noisiest of the three tests --- Chan
+the regime, but it is the noisiest of the three tests; Chan
 recommends using it only as a tiebreaker after ADF and VR.
 
 The three tests are not redundant: ADF asks ``can a linear
@@ -613,8 +614,8 @@ $N = 5000$; true $\phi = e^{-0.3} \approx 0.7408$. OLS returns
 $\hat\phi \approx 0.734$, $\hat\theta \approx 0.310$,
 $\hat\mu \approx 100.04$, $\hat\volat \approx 2.00$, within
 sampling error. On $N = 500$ points the same procedure returns
-$\hat\theta \in [0.2, 0.4]$ depending on seed --- $\theta$ is
-the hardest of the three to pin down, and narrow confidence
+$\hat\theta \in [0.2, 0.4]$ depending on seed. The rate $\theta$
+is the hardest of the three to pin down, and narrow confidence
 intervals on the half-life require a lot of data.
 
 \begin{keyfactbox}[OU fitting via AR(1)]
@@ -701,7 +702,7 @@ $z_{\text{exit}} = 0.5$, $\theta = 0.3$,
   \label{eq:ch9_worked_duration}
 \end{equation}
 Sanity check: about twice the half-life
-$h_{1/2} \approx 2.310$, as expected --- two halvings
+$h_{1/2} \approx 2.310$, as expected for two halvings
 ($z = 2 \to 1 \to 0.5$) rather than one.
 
 Equation~\eqref{eq:zscore_duration} is a
@@ -736,7 +737,7 @@ your deadline. With trading horizon $H$ and half-life $h_{1/2}$,
 you get $H/h_{1/2}$ revert-and-reset cycles in expectation. Ratio
 $\gg 1$: deviations come back inside the window and the strategy
 harvests them. Ratio $\ll 1$: you mark to market for many
-half-lives without reversion --- functionally a directional bet.
+half-lives without reversion, functionally a directional bet.
 The thresholds set how far from the mean you wait before
 entering, but they do not change the half-life. Pick the asset
 first ($h_{1/2} < H$), then the thresholds.
@@ -750,7 +751,7 @@ the company's business; the mean-reversion speed shifts with
 regime; the volatility shifts continuously. A model fit in
 January is substantially wrong by July, and a model fit on the
 entire historical record uses post-trade information to compute
-pre-trade $z$-scores --- look-ahead bias that inflates simulated
+pre-trade $z$-scores, a look-ahead bias that inflates simulated
 profits and disappears live.
 
 The fix is \textbf{walk-forward estimation}. Pick a fitting
@@ -816,7 +817,7 @@ and refuse to trade. Second, \texttt{ddof=2} accounts for the
 two OLS-estimated parameters $(\phi, a)$; without it
 $\hat\volat$ is slightly biased downward on small samples.
 Third, this function is meant to be called inside a walk-forward
-loop --- calling it once on full history is the look-ahead trap
+loop; calling it once on full history is the look-ahead trap
 above.
 
 \begin{prosperitybox}[title={Prosperity example: KELP}]
@@ -835,7 +836,7 @@ for OU fitting on Prosperity data.
 \begin{enumerate}
   \item Pull the KELP wall-mid
   (\cref{ch:price_value}) from the first $1000$ ticks of a round
-  --- the fitting window $W$.
+  (the fitting window $W$).
   \item Run \texttt{fit\_ou} from \cref{sec:ch9_code} with
   $\Delta t = 1$.
   \item Compute $h_{1/2} = (\ln 2)/\hat\theta$ and
@@ -858,8 +859,8 @@ Hedgehogs' final KELP handler
 (\texttt{imc-prosperity-3/FrankfurtHedgehogs\_polished.py},
 \texttt{DynamicTrader.get\_orders()}) does \emph{not} run a
 literal $z$-score OU strategy on KELP. It quotes one tick inside
-the wall bid/ask --- the fixed-offset rule used on
-RAINFOREST\_RESIN in \cref{ch:market_making} --- and lets the
+the wall bid/ask (the fixed-offset rule used on
+RAINFOREST\_RESIN in \cref{ch:market_making}) and lets the
 wall-mid update absorb the slow random walk. They treated KELP
 as ``unpredictable apart from a tiny rounding effect'' and
 concluded the effect was too small to extract reliably
@@ -879,7 +880,7 @@ workflow on name \texttt{XYZ}:
 \begin{enumerate}
   \item \textbf{Stationarity gate.} Run an ADF test on the
   fitting window. If the test fails to reject the random-walk
-  null, the name does not trade today --- the $z$-score
+  null, the name does not trade today: the $z$-score
   signal is meaningless on a non-stationary series.
   \item \textbf{Parameter estimation.} Fit
   $(\hat\theta, \hat\mu, \hat\volat)$ on the fitting window
@@ -922,7 +923,7 @@ money.
 
 \paragraph{The mean is not constant.} OU assumes a \emph{single}
 long-run mean $\mu$. Real series typically have a slow-moving
-level on top of the fast-reverting noise --- for an equity, the
+level on top of the fast-reverting noise: for an equity, the
 company's growing earnings; for an FX rate, the inflation
 differential; for a Prosperity ETF premium, whatever the
 simulator calibrated. Fix: de-trend before fitting (subtract a
@@ -940,8 +941,8 @@ when the half-life lengthens beyond the holding window.
 \paragraph{The series is not stationary in level.} Many
 ``mean-reverting'' series are stationary only after
 transformation: log, first difference, or residual against a
-slow factor. Classic case: two cointegrated stocks --- each
-price is a random walk, but their difference (with the right
+slow factor. Classic case: two cointegrated stocks, where each
+price is a random walk but their difference (with the right
 hedge ratio) is OU. Trading the OU residual is
 \cref{ch:pairs_cointegration}; the technique here applies
 directly once cointegration is established. A related worry is
@@ -1013,7 +1014,7 @@ chapter.
   before the trade time.
   \item OU is a \emph{variance-control} mean-reverter with
   Gaussian increments. It cannot model fat tails, jumps, or
-  regime changes by itself --- always pair with a hard stop-out
+  regime changes by itself; always pair with a hard stop-out
   for protection.
   \item On Prosperity, KELP is mildly mean-reverting via a
   rounding artifact and is best traded with a fixed-offset
@@ -1027,6 +1028,6 @@ chapter.
   $\to$ live $z$-score $\to$ Kelly sizing
   (\cref{ch:kelly_risk}). Standard interview probe:
   ``half-life says $X$, average holding is $Y$, what do you
-  investigate?'' --- three buckets: stale $\hat\mu$, regime
+  investigate?'' Three buckets: stale $\hat\mu$, regime
   change, walk-forward overfitting.
 \end{itemize}

@@ -15,8 +15,8 @@ matter more than the derivation itself.
 
 The second half switches from \emph{sizing} to \emph{scoring}: how
 do you tell a good run from a lucky one, and compare two
-strategies? That is the province of performance metrics --- Sharpe,
-Sortino, Calmar, information ratio --- and of drawdown arithmetic,
+strategies? That is the province of performance metrics (Sharpe,
+Sortino, Calmar, information ratio) and of drawdown arithmetic,
 which contains the single most important identity in this chapter:
 the asymmetric recovery formula. A 20\% loss needs 25\% to break
 even; 50\% needs 100\%; 80\% needs 400\%. The whole reason one
@@ -39,15 +39,15 @@ From earlier in the book:
   \cref{ch:mean_reversion_ou} is \emph{not} used here, but the
   habit of modelling increments as mean plus noise is.
   \item \Cref{ch:momentum}: the volatility-scaled position-sizing
-  rule of time-series momentum --- ``hold $\volat_{\text{target}}
-  / \volat_t$ units of the instrument'' --- is a \emph{heuristic
+  rule of time-series momentum, ``hold $\volat_{\text{target}}
+  / \volat_t$ units of the instrument'', is a \emph{heuristic
   fractional-Kelly rule in disguise}. This chapter explains why.
   \item \Cref{ch:vol_surface}: $\volat$ denotes annualised
   (log-)volatility. Throughout this chapter $\mu$ is expected
   log-return per unit time, $\volat$ is the standard deviation of
   log-returns per unit time, and the risk-free rate is $\rrf$.
-  \item \Cref{ch:almgren_chriss}: mean--variance thinking ---
-  trade off an expected quantity against a variance. Kelly will
+  \item \Cref{ch:almgren_chriss}: mean--variance thinking, that
+  is, trading off an expected quantity against a variance. Kelly will
   turn out to be \emph{mean--variance optimality in a particular
   disguise} (the $\log$ disguise) rather than a competitor to it.
 \end{itemize}
@@ -85,9 +85,9 @@ With $W_0 = 1$ and trial-$i$ per-unit payoff $R_i \in \{+b, -a\}$,
   W_N = W_0 \prod_{i=1}^{N} (1 + f R_i).
 \end{equation}
 Wealth \emph{multiplies} trial-by-trial: a gain on trial 5 grows
-the base on which trials 6, 7, \ldots compound. This is the single
-most important distinction in the chapter and the reason plain
-$\E[W_N]$ is the \emph{wrong} objective.
+the base on which trials 6, 7, \ldots compound. This multiplicative
+structure is the reason plain $\E[W_N]$ is the \emph{wrong}
+objective.
 
 \subsection{Why maximising expected wealth fails}
 \label{sec:kelly_expected_wealth_trap}
@@ -121,7 +121,7 @@ trap.
 
 \subsection{The Kelly objective: expected log-wealth}
 
-Switch the objective from $\E[W_N]$ to $\E[\ln W_N]$ --- equivalently,
+Switch the objective from $\E[W_N]$ to $\E[\ln W_N]$; equivalently,
 adopt the log-utility $U(w) = \ln w$. Since $\ln W_N = \ln W_0 +
 \sum_i \ln(1 + fR_i)$ turns the multiplicative wealth process into
 a sum, its expectation is $N$ times a \emph{per-trial} growth rate:
@@ -282,7 +282,7 @@ The value at the optimum is
 where $\text{Sharpe} = (\mu - \rrf)/\volat$ is the
 \textbf{Sharpe ratio} (excess return per unit volatility; defined
 in \cref{sec:perf_metrics}). Maximum Kelly-optimal growth depends
-on Sharpe alone --- not separately on $\mu$ and $\volat$. Halving
+on Sharpe alone, not separately on $\mu$ and $\volat$. Halving
 Sharpe quarters the maximum growth rate: Sharpe $2$ is four times
 better than Sharpe $1$ in compounding terms, not twice.
 
@@ -304,7 +304,7 @@ $G(f^{*}/2) = \rrf + 0.06$: exactly three-quarters of the excess
 growth at half the leverage. Both numbers are verified in
 \cref{sec:kelly_reference_impl}.
 
-$f^{*} = 2$ is the single most compelling reason no professional
+$f^{*} = 2$ is the most compelling reason no professional
 runs full Kelly. It is growth-maximising under the Gaussian
 assumption and insane to run: $50\%$ drawdowns would recur, each
 time looking like a broken strategy to whoever holds the
@@ -321,7 +321,7 @@ geometric growth rate is
 At this optimum the growth rate is $\rrf + \tfrac12 \text{Sharpe}^2$,
 i.e.\ the maximum achievable excess growth is \emph{half the
 squared Sharpe ratio} of the underlying strategy. Sharpe is the
-thing that compounds; it is not ``just'' a performance metric.
+quantity that compounds.
 \end{keyfactbox}
 
 \subsection{Half of Kelly is half-Kelly, not half the stakes}
@@ -335,7 +335,7 @@ turned down.
 \section{Fractional Kelly and why no one trades full Kelly}
 \label{sec:fractional_kelly}
 
-The FOC says full Kelly maximises long-run growth --- in the
+The FOC says full Kelly maximises long-run growth in the
 limit, over infinite trials, assuming $\mu$ and $\volat$ are known
 exactly. None of these hold in practice, and the short-term
 variance of full Kelly is brutal: $50\%$ drawdowns are routine.
@@ -368,7 +368,7 @@ Kelly retains $3/4$ of the full-Kelly growth rate
 (\cref{sec:kelly_worked_8_20}); its growth standard deviation is
 exactly \emph{half} full Kelly's, variance one quarter
 \citeThorp. Halving $f$ gives up $25\%$ of growth for $75\%$ less
-drawdown probability --- one of the best trades in quant finance.
+drawdown probability, one of the best trades in quant finance.
 
 \subsection{Estimation error}
 \label{sec:kelly_estimation_error}
@@ -434,7 +434,7 @@ Fractional Kelly's appeal is not timidity. The $G(f)$ curve is
 symmetric near its peak but its \emph{consequences} are
 asymmetric: under-betting loses linear growth, over-betting
 compounds you to zero. When $f^{*}$ cannot be measured
-perfectly --- and it cannot --- the rational response is to
+perfectly (and it cannot), the rational response is to
 deliberately under-bet. Half Kelly is the optimal robust response
 to estimation error in $\mu$.
 \end{intuitionbox}
@@ -588,7 +588,7 @@ the worst peak-to-trough decline ever experienced.
 \subsection{The recovery asymmetry}
 
 The key identity: to recover from a drawdown of fraction $X \in
-(0,1)$ --- wealth level $(1-X)P_t$ --- the post-drawdown gain
+(0,1)$, i.e.\ wealth level $(1-X)P_t$, the post-drawdown gain
 required is $X/(1-X)$:
 \begin{equation}
   (1 - X)P_t \cdot (1 + g) = P_t
@@ -644,7 +644,7 @@ capturing large wins. Symmetry fails because of the denominator:
 after losing $X$, the compounding base is $(1-X)$, not $1$.
 Future percentage returns compound off a smaller base; the deeper
 the hole, the disproportionately harder the climb. Half of risk
-management --- stops, sizing, Kelly fractionalisation --- is
+management (stops, sizing, Kelly fractionalisation) is
 about avoiding the scenario where you need $100\%$ to break even.
 \end{intuitionbox}
 
@@ -670,8 +670,8 @@ days (Basel~III capital).
 VaR is popular because it reports one dollar number a
 non-quantitative manager understands. It also lies about the
 tail: two portfolios can share a $99\%$ VaR of \$5m but differ
-wildly beyond it --- one loses exactly \$5m on its worst $1\%$
-of days, the other loses \$5m on most and \$100m on a few. Same
+wildly beyond it. One loses exactly \$5m on its worst $1\%$
+of days; the other loses \$5m on most and \$100m on a few. Same
 VaR, very different behaviour when the tail fires.
 
 \subsection{Expected Shortfall}
@@ -687,7 +687,7 @@ The average loss given the loss exceeds VaR. By construction
 $\geq$ VaR, and it cares about tail shape, not just the $99$th
 percentile. ES is \emph{coherent} (Artzner et al.): ES of a sum
 of portfolios is at most the sum of individual ES's
-(subadditivity). VaR fails subadditivity --- two portfolios can
+(subadditivity). VaR fails subadditivity: two portfolios can
 have combined VaR larger than the sum of their individual VaRs,
 contradicting the intuition that diversification reduces risk.
 ES does not. Post-2008 Basel moved from VaR to ES for
@@ -724,7 +724,7 @@ Simulator calibration for a similar Prosperity~4 strategy:
 Per-round $\mu = 50{,}000/500{,}000 = 10\%$ and $\volat =
 10{,}000/500{,}000 = 2\%$ (no competition borrowing cost, so
 $\rrf = 0$). Per-round Sharpe $= 0.10/0.02 = 5$. Annualising is
-meaningless here --- the ``year'' is a week of rounds --- but
+meaningless here (the ``year'' is a week of rounds), but
 the per-round $5$ drives sizing.
 
 Log-normal Kelly:
@@ -734,7 +734,7 @@ Log-normal Kelly:
 \end{equation}
 $250\times$ leverage is nonsensical. The full-Kelly output is
 telling you the competition's \emph{position limit} binds long
-before Kelly does --- good news, because you should trade to
+before Kelly does. This is good news, because you should trade to
 \emph{the position limit every round}, not to an abstract
 ``Kelly fraction''. The position limit ($60$ baskets of
 PICNIC\_BASKET1) is the binding constraint. Even unconstrained,
@@ -793,7 +793,7 @@ Technical Journal} \citep{kelly1956new}. His setup was
 information-theoretic: how much of your bankroll to bet on a
 sequence of noisy tips. The growth-optimal answer maximises
 $\E[\ln W]$, and the quantity inside turned out to be the mutual
-information between tips and outcome --- a surprising link from
+information between tips and outcome, a surprising link from
 gambling to Shannon's theory.
 
 Claude Shannon handed the paper to Edward~O. Thorp at MIT in
@@ -837,7 +837,7 @@ assert abs(kelly_lognormal(0.08, 0.20) - 2.0) < 1e-12
 
 These four functions implement the chapter's sizing and scoring.
 A production library adds rolling windows, downside deviation,
-drawdown recovery time, IR, and tail-conditioned loss --- each a
+drawdown recovery time, IR, and tail-conditioned loss, each a
 wrapper around these primitives.
 
 \section{Key facts to memorise}

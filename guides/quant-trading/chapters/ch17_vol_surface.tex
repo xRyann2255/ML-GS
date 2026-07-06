@@ -8,7 +8,7 @@ given any observed call quote, there is a unique $\volat$ that,
 fed through the Black--Scholes formula of \cref{ch:black_scholes},
 reproduces the quote exactly. Inverting Black--Scholes to back out
 that number is \emph{implied volatility}. It depends on strike, on
-maturity, and on the moment you ask --- producing a whole
+maturity, and on the moment you ask, producing a whole
 \emph{surface} of implied vols rather than a single number. This
 chapter explains the surface: how it is built, how to read it, why
 it is not the flat plane Black--Scholes assumes, and how traders
@@ -64,7 +64,7 @@ From outside the book:
   \item Root-finding at the level of bisection or Newton--Raphson.
   One-dimensional root finding on a monotone function is all the
   inversion machinery this chapter needs.
-  \item Multivariable functions and their level sets --- enough to
+  \item Multivariable functions and their level sets, enough to
   visualise a surface over a $(\Kstrike, \Tmat)$ plane.
 \end{itemize}
 \end{backgroundbox}
@@ -231,7 +231,7 @@ is the function
 \end{equation*}
 defined on the strike--maturity plane wherever a liquid option
 quote exists. Intermediate points are interpolated (bilinearly for
-simple desks, via a parametric model --- SABR or SVI --- on
+simple desks, via a parametric model such as SABR or SVI on
 production desks). The interpolation matters because most desks
 quote exotics and bespoke OTC options at strikes and expiries
 that do not trade on exchange: reading $\volat_{\text{imp}}$ off
@@ -243,8 +243,8 @@ If Black--Scholes were the truth, the surface would be flat:
 $\volat_{\text{imp}}(\Kstrike, \Tmat) \equiv \volat$. It is not.
 The true return distribution has fatter tails than the lognormal
 BS assumes, so wherever the market assigns more probability than
-BS does --- far-OTM strikes, near-term expiries across a known
-event --- options there are worth more than BS says, and the only
+BS does (far-OTM strikes, near-term expiries across a known
+event), options there are worth more than BS says, and the only
 way to reconcile the richer market price with the BS formula is
 to feed in a higher $\volat$.
 \Citeauthor{bennett2014trading} \citeBennett Ch 4, \citeNatenberg\
@@ -356,7 +356,7 @@ options desk.
 \paragraph{(1) Short-dated strike cross-section: sharp smile.}
 A one- or two-week expiry against moneyness shows a sharp U: ATM
 is a well, both wings rise steeply. A $10$-delta OTM put at one
-week might trade at $45$ vol vs ATM at $20$ --- a $25$-point
+week might trade at $45$ vol vs ATM at $20$, a $25$-point
 premium. Tail risk over the next week is disproportionately
 priced; short-dated crash insurance is expensive.
 
@@ -410,11 +410,11 @@ trade positions in that manifold.
 \label{subsec:ch17_smile_origin}
 
 Before October 1987, listed option quotes across strikes traded
-at roughly the same implied vol --- the smile did not exist. Flat
+at roughly the same implied vol; the smile did not exist. Flat
 vol was a pillar of early BS empirical validation.
 
 \begin{historybox}
-On \textbf{Monday, October 19, 1987} --- Black Monday --- the
+On \textbf{Monday, October 19, 1987} (Black Monday), the
 S\&P $500$ fell $20.5\%$ in one session. Under BS with the
 $15$--$18$ vol equity options were trading at, the implied
 probability of a $-20\%$ daily move was roughly $10^{-59}$. Reality
@@ -451,8 +451,8 @@ entire smile remains pinned to absolute strike levels.
 \index{sticky delta|textbf}
 Under the \emph{sticky-delta} assumption (sometimes called
 \emph{sticky moneyness}), the implied volatility at a fixed
-Black--Scholes delta --- equivalently, at a fixed moneyness $m
-= \ln(\Kstrike/\Spx)$ --- is invariant to the underlying's level.
+Black--Scholes delta (equivalently, at a fixed moneyness $m
+= \ln(\Kstrike/\Spx)$) is invariant to the underlying's level.
 If SPX moves from $4000$ to $4050$, the entire smile
 \emph{translates} with the spot: the $25$-delta put vol stays
 where it was, but the strike that gives $25$ delta has moved.
@@ -600,8 +600,8 @@ $\volat_{\text{realised}}^2(0,\Tmat)$, up to a residual that
 vanishes as the strike grid becomes finer.
 \end{keyfactbox}
 
-The derivation --- the log-payoff $2\ln(F_T/F_0)$ is replicable as
-a $1/\Kstrike^2$-weighted integral over OTM puts and calls --- is
+The derivation (the log-payoff $2\ln(F_T/F_0)$ is replicable as
+a $1/\Kstrike^2$-weighted integral over OTM puts and calls) is
 in \cref{ch:equity_derivatives} and \citeHull\ \S26.16. Three
 structural takeaways:
 
@@ -621,8 +621,8 @@ dominated by OTM put exposure, so their bid/offer tracks put skew
 closely.
 
 \begin{intuitionbox}
-A variance swap is what a delta-hedged option aspires to be
---- a pure vol bet --- but without the gamma-path and
+A variance swap is what a delta-hedged option aspires to be:
+a pure vol bet, without the gamma-path and
 discrete-hedging noise. The replication formula says: stop hedging
 one call; hold a weighted strip of every OTM option, and the
 strip itself prices pure variance. Sell-side desks quote the
@@ -710,7 +710,7 @@ prints at $25\%$ against implied $20\%$:
   \;&\approx\; \$2.11 \text{ per unit of call, per year}.
 \end{align*}
 Against a $\$10.45$ premium, that is $\sim 20\%$ of premium over
-one year --- a leveraged, convex, pure play on whether realised
+one year: a leveraged, convex, pure play on whether realised
 beats $20\%$. Canonical trade of the vol desk.
 
 If the forecast is wrong and $\volat_{\text{r}} = 18\%$, P\&L
@@ -736,8 +736,8 @@ call. Win if realised exceeds implied; lose if not. The strategy
 Gamma scalping trades your vol forecast against the market's
 implied. Owning the option is ``long vol''; shorting it is ``short
 vol''; delta-hedging strips out direction; what remains is the
-pure vol bet. You are not betting on up-or-down --- the hedge
-eliminates that --- but on whether the underlying \emph{moves a
+pure vol bet. You are not betting on up-or-down (the hedge
+eliminates that) but on whether the underlying \emph{moves a
 lot or a little}. Long gamma profits on every kind of move; you
 just need enough, fast enough, to outpace the theta clock.
 \end{intuitionbox}
@@ -770,8 +770,8 @@ costs decide. Rebalance frequency is a free parameter; optimising
 it is standard work.
 
 \begin{pitfallbox}[Gamma scalping is a vega bet in disguise]
-The sloppy pitch --- ``buy the call, delta-hedge, win iff realised
-exceeds implied'' --- is not quite right. If implied \emph{rises}
+The sloppy pitch, ``buy the call, delta-hedge, win iff realised
+exceeds implied'', is not quite right. If implied \emph{rises}
 after entry, the long call rallies via vega and you profit
 mark-to-market even if realised is average; if implied
 \emph{falls}, you lose on vega even if realised is high. The pure
@@ -798,7 +798,7 @@ Round 3 and kept them through Round 4: five strikes
 ($9500, 9750, 10000, 10250, 10500$) on \texttt{VOLCANIC\_ROCK}
 trading around $10000$, European calls, a few days to expiry.
 Inverting each voucher's mid through BS ($\rrf = 0$ in Prosperity)
-gives five implied vols at one maturity --- a genuine smile
+gives five implied vols at one maturity, a genuine smile
 cross-section.
 
 The top teams' workflow, from the Frankfurt Hedgehogs' second-place
@@ -812,7 +812,7 @@ writeup (\cref{ch:top_team_lessons}):
   \item Buy cheap strikes, sell rich, delta-hedge each with
   \texttt{VOLCANIC\_ROCK} at the BS delta.
 \end{enumerate}
-Rebalancing every $10$ ticks --- exactly the discrete-hedging
+Rebalancing every $10$ ticks is exactly the discrete-hedging
 setup above. The ATM $10{,}000$ voucher was the single biggest
 P\&L contributor: its implied oscillated around the smile fit,
 each oscillation a miniature gamma-scalping round. The Hedgehogs
@@ -844,8 +844,8 @@ A GS equity-derivatives vol-trading Strat's morning ritual is to
   book against the calibrated surface, producing fresh P\&L
   attribution and Greeks.
 \end{enumerate}
-The whole equity-derivatives business --- market making, flow,
-exotics, variance swaps, delta-one --- rests on one consistent
+The whole equity-derivatives business (market making, flow,
+exotics, variance swaps, delta-one) rests on one consistent
 calibrated surface. Two desks using different models book
 inconsistent P\&Ls and the internal auditors flag within a week.
 The surface is a shared operational artefact every risk number
@@ -894,7 +894,7 @@ for this chapter and any Prosperity workload.
   $\Call^{\text{mkt}}$ when plugged into the Black--Scholes
   formula. Existence and uniqueness follow from the monotonicity
   of the BS price in $\volat$ (vega $> 0$). Inversion is numerical
-  --- Brent or Newton --- because there is no closed form.
+  (Brent or Newton) because there is no closed form.
   \item \textbf{Quoting convention.} Options are quoted in vol
   units, not dollars. A ``$32$-vol'' put means the BS
   inversion of the market premium gives $\volat_{\text{imp}} =

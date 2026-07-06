@@ -130,7 +130,7 @@ where $\alpha$ is the probability the counterparty is informed and $\sigma_v$ is
 When volatility is high, information asymmetry increases (there is more to know), so spreads widen mechanically.
 This creates a feedback loop: high vol leads to wider spreads, which creates more noise in transaction prices, which creates more biased RV estimates.
 
-This means microstructure noise is not merely a nuisance to filter; it carries information about market quality and \textbf{informed-trading intensity} that can itself predict future volatility (Chapter~\ref{ch:features}).
+Beyond being a nuisance to filter, microstructure noise therefore carries information about market quality and \textbf{informed-trading intensity} that can itself predict future volatility (Chapter~\ref{ch:features}).
 
 A related insight from Roll~(1984)\footnote{Roll, R. (1984). A simple implicit measure of the effective bid-ask spread in an efficient market. \textit{The Journal of Finance}, 39(4), 1127--1139.}: the first-order autocovariance of price changes satisfies $\Cov(\Delta p_t, \Delta p_{t+1}) = -s^2/4$.
 This connects the noise-robust estimators developed later in this chapter (which exploit autocovariance structure) to a liquidity interpretation.
@@ -299,7 +299,7 @@ The Two-Scales Realized Volatility (TSRV) estimator, developed by \citet{ZhangMy
 Compute RV at two different frequencies: a ``fast'' scale (e.g., every 1 minute) and a ``slow'' scale (e.g., every 30 minutes).
 The fast-scale RV picks up both signal and noise: $\RV^{(\text{fast})} \approx \IVol_t + 2n_{\text{fast}}\omega^2$.
 The slow-scale RV also picks up signal and noise, but with far fewer observations: $\RV^{(\text{slow})} \approx \IVol_t + 2n_{\text{slow}}\omega^2$.
-However, the key insight is that the \emph{noise per observation} is the same at both scales.
+However, the \emph{noise per observation} is the same at both scales.
 By taking a specific weighted difference of the two, you can cancel the noise term and isolate the signal.
 \end{intuition}
 
@@ -484,7 +484,7 @@ For most applied work, the realized kernel (next section) is preferred because i
 % ═══════════════════════════════════════════════════
 
 The realized kernel, developed by \citet{BNHLS2008}, is the most widely used noise-robust estimator in the volatility literature.
-It achieves the optimal $n^{-1/4}$ convergence rate (same as MSRV) with a clean, intuitive construction.
+It achieves the optimal $n^{-1/4}$ convergence rate (same as MSRV) with an intuitive construction.
 
 \begin{intuition}[Noise as Spurious Autocorrelation]
 Under the i.i.d.\ noise model, the \emph{observed} returns $r^*_{t,i}$ have negative first-order autocorrelation: if the noise pushes the price up this tick, the next return is more likely to be negative (reverting the noise).
@@ -733,7 +733,7 @@ It remains a useful quick fix when the noise level is low.
 \citet{MalliavinMancino2002, MalliavinMancino2009} proposed estimating integrated variance via the Fourier coefficients of the price process.
 The idea: the variance is related to the squared magnitude of low-frequency Fourier coefficients, while noise concentrates at high frequencies.
 By truncating high-frequency components, you filter out the noise.
-The Fourier estimator is less widely used in practice but has elegant theoretical properties and does not require equally spaced observations.
+The Fourier estimator is less widely used in practice, but it has attractive theoretical properties and does not require equally spaced observations.
 
 \paragraph{Quasi-Maximum Likelihood Estimator (QMLE).}
 \citet{Xiu2010} proposed treating the noisy price observations as a state-space model: the true price is the latent state, and the observed price adds Gaussian noise.
@@ -755,7 +755,7 @@ They differ in implementation details, robustness to dependent noise, and ease o
 Which estimator you use depends on your goal.
 
 Figure~\ref{fig:estimator-sig-comparison} shows how the different estimators behave on the volatility signature plot.
-The key visual takeaway: noise-robust estimators produce a flat line across frequencies, while naive RV diverges.
+Noise-robust estimators produce a flat line across frequencies, while naive RV diverges.
 
 \begin{figure}[htbp]
 \centering

@@ -625,7 +625,7 @@ When columns of the design matrix $\bX$ are nearly linearly dependent, the Gram 
 
 The Lasso of Section~\ref{sec:har-x} answers ``which extra predictors matter?'' by zeroing out the weak ones.
 But zeroing is exactly the wrong move for the \emph{core} HAR terms.
-When $\RV_t$, $\RV^{(w)}_t$, and $\RV^{(m)}_t$ are strongly correlated (pairwise correlations routinely exceed $0.8$ on equity index data), the Lasso keeps one and drops the rest essentially at random---a disaster for a model whose entire premise (Section~\ref{sec:hmh}) is that all three horizons carry signal.
+When $\RV_t$, $\RV^{(w)}_t$, and $\RV^{(m)}_t$ are strongly correlated (pairwise correlations routinely exceed $0.8$ on equity index data), the Lasso keeps one and drops the rest essentially at random, a disaster for a model whose entire premise (Section~\ref{sec:hmh}) is that all three horizons carry signal.
 
 The principled fix is \textbf{ridge regression}, which adds an $L_2$ penalty instead of an $L_1$ penalty.
 Ridge shrinks correlated coefficients \emph{together} rather than forcing a choice between them, so the daily, weekly, and monthly components all survive in damped form.
@@ -649,7 +649,7 @@ So the first term $\lVert\by - \bX\bbeta\rVert_2^2$ is just the total squared fo
   \item $\by \in \R^n$: the vector of realized-variance targets $\RV_{t+1}$ across the $n$ training days
   \item $\bX \in \R^{n \times p}$: the design matrix whose columns are $\RV_t$, $\RV^{(w)}_t$, $\RV^{(m)}_t$, and any exogenous predictors $X_{j,t}$
   \item $\bbeta \in \R^p$: the HAR coefficient vector ($\beta_d, \beta_w, \beta_m, \gamma_1, \ldots$)
-  \item $\lVert \by - \bX\bbeta \rVert_2^2 = \sum_t (\RV_{t+1} - \bx_t^\top\bbeta)^2$: the ordinary HAR sum of squared forecast errors; here $\bx_t$ is the one row of $\bX$ for day $t$ (that day's feature values), and $\bx_t^\top\bbeta$ multiplies each feature by its coefficient and adds them up---i.e.\ it is the model's forecast for day $t$
+  \item $\lVert \by - \bX\bbeta \rVert_2^2 = \sum_t (\RV_{t+1} - \bx_t^\top\bbeta)^2$: the ordinary HAR sum of squared forecast errors; here $\bx_t$ is the one row of $\bX$ for day $t$ (that day's feature values), and $\bx_t^\top\bbeta$ multiplies each feature by its coefficient and adds them up, i.e.\ it is the model's forecast for day $t$
   \item $\lVert \bbeta \rVert_2^2 = \sum_j \beta_j^2$: the squared $L_2$ norm of the coefficients; penalizes large coefficients
   \item $\lambda \geq 0$: the regularization strength. At $\lambda = 0$ this is plain OLS-HAR; as $\lambda \to \infty$ all coefficients shrink toward zero
 \end{itemize}
@@ -674,7 +674,7 @@ Expand the objective in Equation~\eqref{eq:ridge-har-objective} and set the grad
 
 This step is algebra you can take on faith; the next equation is what you actually use.
 In words: the triangle symbol $\nabla$ (``nabla'') means the slope of the error surface, and at the bottom of a valley the slope is flat (zero), so setting $\nabla_{\bbeta}\loss = \mathbf{0}$ locates the best $\bbeta$.
-The superscript $\top$ is the transpose---flipping a grid so its rows become columns---which is the bookkeeping that lets these grids multiply together.
+The superscript $\top$ is the transpose (flipping a grid so its rows become columns), which is the bookkeeping that lets these grids multiply together.
 
 Solving for $\bbeta$ gives the ridge estimator:
 
@@ -683,9 +683,9 @@ Solving for $\bbeta$ gives the ridge estimator:
   \label{eq:ridge-har-closed-form}
 \end{equation}
 \begin{itemize}[nosep]
-  \item $\bX^\top\bX \in \R^{p\times p}$: the Gram matrix; its eigenvalues (each a single number measuring how strongly the data vary along one direction) measure how much the data spread along each direction. For collinear HAR columns, the smallest eigenvalue is near zero, meaning the data barely move that way---exactly the collinear case
+  \item $\bX^\top\bX \in \R^{p\times p}$: the Gram matrix; its eigenvalues (each a single number measuring how strongly the data vary along one direction) measure how much the data spread along each direction. For collinear HAR columns, the smallest eigenvalue is near zero, meaning the data barely move that way; this is exactly the collinear case
   \item $\mathbf{I}$: the identity matrix, the grid-version of the number $1$ (ones down the diagonal, zeros elsewhere), so $\lambda\mathbf{I}$ just means ``add the amount $\lambda$ along the diagonal''; this adds $\lambda$ to every eigenvalue of $\bX^\top\bX$, lifting the smallest one away from zero and guaranteeing the inverse exists
-  \item the superscript $-1$ on $(\bX^\top\bX + \lambda\mathbf{I})$ is the matrix inverse---the grid-version of dividing, which undoes a multiplication
+  \item the superscript $-1$ on $(\bX^\top\bX + \lambda\mathbf{I})$ is the matrix inverse, the grid-version of dividing, which undoes a multiplication
   \item $\bX^\top\by \in \R^p$: the cross-covariance between each lagged $\RV$ feature and tomorrow's $\RV$
   \item Setting $\lambda = 0$ recovers the OLS-HAR estimator $(\bX^\top\bX)^{-1}\bX^\top\by$ behind Equation~\eqref{eq:har}
 \end{itemize}
@@ -721,7 +721,7 @@ Along each SVD direction, ridge replaces the OLS amplification factor $d_j^{-1}$
 \begin{intuition}[In Plain English]
 OLS-HAR puts the most faith in exactly the directions where it has the least evidence: when the three $\RV$ averages nearly coincide, the leftover direction that distinguishes them has almost no variation, so OLS multiplies it by a giant number and reads pure noise as signal.
 Ridge does the opposite: it leaves the strong, well-measured directions alone and quietly turns down the volume on the weak, collinear ones.
-That is the entire point of ridge-HAR: it does not shrink the three coefficients equally; it selectively mutes the unreliable combination of them.
+That is the entire point of ridge-HAR: rather than shrinking the three coefficients equally, it selectively mutes the unreliable combination of them.
 \end{intuition}
 
 \begin{projectconnection}[Why This Matters]
@@ -822,7 +822,7 @@ Stable across resamples? & no (flips sign) & yes \\
 
 \textbf{Takeaway.}
 Ridge does not shrink $\beta_d$ and $\beta_w$ equally.
-It leaves the shared volatility level (what both terms agree on) almost untouched and damps only the noisy direction where the data cannot reliably separate ``yesterday'' from ``this week'' (the Lasso would instead zero one of the two---see Table~\ref{tab:ridge-vs-lasso}).
+It leaves the shared volatility level (what both terms agree on) almost untouched and damps only the noisy direction where the data cannot reliably separate ``yesterday'' from ``this week'' (the Lasso would instead zero one of the two; see Table~\ref{tab:ridge-vs-lasso}).
 \end{workedexample}
 
 \subsection{Ridge vs.\ Lasso on Correlated HAR Features}
@@ -944,14 +944,14 @@ The \textbf{elastic net} \citep{ZouHastie2005} combines both penalties so you ca
 \begin{itemize}[nosep]
   \item $\alpha \in [0,1]$: the mixing parameter. At $\alpha = 1$ elastic net is pure Lasso; at $\alpha = 0$ it is pure ridge
   \item $\lambda \geq 0$: the overall regularization strength, as in Equation~\eqref{eq:ridge-har-objective}
-  \item $\alpha\,\lVert\bbeta\rVert_1$: the $L_1$ component that zeros out weak exogenous predictors. The $L_1$ norm $\lVert\bbeta\rVert_1 = \sum_j|\beta_j|$ adds up the absolute sizes of the coefficients (ignoring sign), whereas the $L_2$ norm $\lVert\bbeta\rVert_2^2$ adds up their squares---the squaring is what makes $L_2$ punish one big coefficient far more
+  \item $\alpha\,\lVert\bbeta\rVert_1$: the $L_1$ component that zeros out weak exogenous predictors. The $L_1$ norm $\lVert\bbeta\rVert_1 = \sum_j|\beta_j|$ adds up the absolute sizes of the coefficients (ignoring sign), whereas the $L_2$ norm $\lVert\bbeta\rVert_2^2$ adds up their squares; the squaring is what makes $L_2$ punish one big coefficient far more
   \item $\tfrac{1-\alpha}{2}\,\lVert\bbeta\rVert_2^2$: the $L_2$ component that shrinks correlated coefficients toward each other; the factor $\tfrac{1}{2}$ is a conventional scaling that keeps the algebra tidy and does not change the behaviour
 \end{itemize}
 
 \begin{keyidea}[The Grouping Effect]
 \citet{ZouHastie2005} prove the \textbf{grouping effect}: if two features are highly correlated, elastic net assigns them nearly equal coefficients, rather than the Lasso's all-or-nothing pick.
 The strength of the grouping is controlled by the $L_2$ weight $(1-\alpha)$: more $L_2$ means tighter grouping.
-For HAR this is exactly right: the daily, weekly, and monthly $\RV$ terms form a natural correlated group that elastic net keeps intact while pruning useless exogenous regressors---the principled middle ground between ridge-HAR (no selection) and Lasso-HAR (group-blind selection).
+For HAR this is exactly right: the daily, weekly, and monthly $\RV$ terms form a natural correlated group that elastic net keeps intact while pruning useless exogenous regressors; this is the principled middle ground between ridge-HAR (no selection) and Lasso-HAR (group-blind selection).
 \end{keyidea}
 
 \subsection{Tuning and Diagnostics}
@@ -960,7 +960,7 @@ Ridge, Lasso, and elastic net all leave you with a tuning parameter $\lambda$ (a
 How you choose them matters most: the wrong validation scheme silently leaks future volatility into the past.
 
 \begin{warning}[Tune $\lambda$ with Purged CV, Not i.i.d.\ K-Fold]
-Standard $K$-fold CV assumes independent observations; realized variance violates this badly---it is highly persistent (Section~\ref{sec:hmh}), and the HAR features $\RV^{(w)}_t,\RV^{(m)}_t$ are overlapping moving averages, so adjacent days share information by construction.
+Standard $K$-fold CV assumes independent observations; realized variance violates this badly: it is highly persistent (Section~\ref{sec:hmh}), and the HAR features $\RV^{(w)}_t,\RV^{(m)}_t$ are overlapping moving averages, so adjacent days share information by construction.
 If day $t$ is in the training fold and day $t+1$ in the validation fold, the model has effectively already seen the answer, and the chosen $\lambda$ will be far too small (too little shrinkage), inflating in-sample fit and collapsing out-of-sample.
 Tune $\lambda$ (and $\alpha$) with \textbf{purged $K$-fold CV with embargo} (Chapter~\ref{ch:evaluation}, Section~\ref{sec:eval-purgedcv}), and size the embargo to cover the 22-day reach of the monthly average.
 Generalized cross-validation (GCV) gives ridge a fast leave-one-out shortcut, but it inherits the i.i.d.\ assumption, so treat it only as a rough first pass and confirm with purged CV before trusting any reported improvement.

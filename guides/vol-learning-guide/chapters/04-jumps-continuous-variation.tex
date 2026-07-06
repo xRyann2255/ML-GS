@@ -306,7 +306,7 @@ The right panel shows each return's contribution to $\BPV_t$ (its absolute value
 \end{axis}
 \end{tikzpicture}
 \caption{How a jump affects $\RV$ vs.\ $\BPV$.
-\textbf{Left:} the jump return $r_4$ contributes $3.24 \times 10^{-4}$ to $\RV$ (via $r_4^2$), completely dominating all other terms.
+\textbf{Left:} the jump return $r_4$ contributes $3.24 \times 10^{-4}$ to $\RV$ (via $r_4^2$), dominating all other terms.
 \textbf{Right:} in $\BPV$, the jump is multiplied by its normal-sized neighbors.
 The two terms involving $r_4$ contribute only $0.17$ and $0.11 \times 10^{-4}$, roughly 50$\times$ smaller than the squared jump.
 $\BPV$ ``sees through'' the jump and recovers the continuous variation.}
@@ -481,7 +481,7 @@ Only returns that exceed this multiple-testing-adjusted threshold are flagged as
 \end{definition}
 
 \begin{projectconnection}[Why This Matters]
-Lee-Mykland gives you jump \emph{times and sizes}, not just a daily indicator.
+Lee-Mykland gives you jump \emph{times and sizes}, whereas the BNS test gives only a daily indicator.
 This is the basis for signed jump features: you can separately measure ``bad jumps'' (large negative returns) and ``good jumps'' (large positive returns) within the day.
 Signed jump variation feeds directly into the SHAR model and the asymmetric jump features in Chapter~\ref{ch:features}, where negative jumps predict higher future volatility than positive jumps of the same magnitude.
 \end{projectconnection}
@@ -733,7 +733,7 @@ In the HAR-J and HAR-CJ models, each component receives its own coefficient, let
 
 There is an additional asymmetry.
 \citet{BKT2015} and \citet{PSS2015} found that ``bad jumps'' (large negative returns) are more informative for future volatility than ``good jumps'' (large positive returns).
-A 5\% daily drop signals elevated volatility going forward; a 5\% daily rally does not, to the same degree.
+A 5\% daily drop signals higher volatility going forward; a 5\% daily rally does not, to the same degree.
 This connects to the signed volatility decompositions (SHAR) covered in Chapter~\ref{ch:har} and the signed jump features in Chapter~\ref{ch:features}.
 
 \begin{warning}[Do Not Treat Jump and Continuous Components as Interchangeable]
@@ -766,7 +766,7 @@ Always decompose before forecasting.
 
   \item The BNS test has \textbf{finite-sample size distortions} (it can over-reject).  The ratio variant or Huang-Tauchen correction improves performance \citep{HuangTauchen2005}.
 
-  \item The \textbf{Lee-Mykland test} detects individual jumps within the day, providing jump timing and sizes, not just a daily binary indicator \citep{LeeMykland2008}.
+  \item The \textbf{Lee-Mykland test} detects individual jumps within the day, providing jump timing and sizes rather than only a daily binary indicator \citep{LeeMykland2008}.
 
   \item The \textbf{A\"it-Sahalia-Jacod test} uses power-variation ratios at two frequencies and is more robust to microstructure noise than the BNS test \citep{AitSahaliaJacod2009}.
 

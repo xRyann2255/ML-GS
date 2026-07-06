@@ -22,9 +22,9 @@ the Ornstein--Uhlenbeck $z$-score machinery of
 \cref{ch:mean_reversion_ou}: the cointegration residual is an OU
 process, and every formula from that chapter transfers unmodified.
 
-\paragraph{Symbol anchors.} $\beta$ --- cointegrating coefficient
-(hedge ratio); $\hat\epsilon_t$ --- cointegration residual (spread);
-$z_t$ --- spread $z$-score; $h_{1/2}$ --- half-life; $\theta$ ---
+\paragraph{Symbol anchors.} $\beta$: cointegrating coefficient
+(hedge ratio); $\hat\epsilon_t$: cointegration residual (spread);
+$z_t$: spread $z$-score; $h_{1/2}$: half-life; $\theta$:
 mean-reversion speed.
 
 \begin{backgroundbox}[Prerequisites]
@@ -36,7 +36,7 @@ From earlier in the book:
   $h_{1/2} = (\ln 2)/\theta$, AR(1) discrete-time mapping,
   augmented Dickey--Fuller (ADF) stationarity test, $z$-score
   entry/exit rule. All of it carries over.
-  \item \Cref{ch:spreads_roll}: the Roll model --- first appearance
+  \item \Cref{ch:spreads_roll}: the Roll model, the first appearance
   of a stationary linear combination (successive trade-price
   differences) inside a non-stationary process (trade prices).
   Cointegration is the multivariate generalisation.
@@ -101,8 +101,8 @@ asks about \emph{steps} (changes from one observation to the next);
 cointegration asks about \emph{levels} (the long-run tendency of a
 linear combination to stay near a constant). A pair can have either
 property without the other. Plain-English version: two stocks can be
-highly correlated --- both rise in a bull market, both fall in a
-crash --- without being cointegrated. Cointegration is the stronger
+highly correlated (both rise in a bull market, both fall in a
+crash) without being cointegrated. Cointegration is the stronger
 claim that their \emph{spread} is stationary: any deviation from the
 long-run level is temporary and mean-reverts. Correlation is about
 co-movement; cointegration is about a tether. Two examples drive the
@@ -222,16 +222,16 @@ two trending stocks in the same sector riding the market upward:
 daily returns highly correlated (same beta), levels diverge
 (idiosyncratic drift). Selling the spread on a correlation screen
 leaves you short the winner and long the loser for as long as the
-trend continues --- months.
+trend continues, which can be months.
 
 \begin{pitfallbox}[Don't pairs-trade on correlation alone]
-Any two well-known equities --- two gold miners, two US banks,
-two oil majors --- can show return correlation above $0.9$ over
+Any two well-known equities (two gold miners, two US banks,
+two oil majors) can show return correlation above $0.9$ over
 a multi-year sample (same factor exposure). Yet the spread can
 drift to infinity if earnings or operating leverage diverge. A
 trader who screens for ``correlation $> 0.9$'', sells the high one
-and buys the low one is \emph{trend-fighting}, not mean-reverting
---- the spread has no level to revert to. The right test: regress,
+and buys the low one is \emph{trend-fighting}, not mean-reverting;
+the spread has no level to revert to. The right test: regress,
 take the residual, ADF-test it; only if ADF rejects is the pair
 tradeable. \citeChan{} (Chapter 2) is the practitioner reference.
 \end{pitfallbox}
@@ -288,7 +288,7 @@ tabulated by Engle--Granger (1987) and updated by MacKinnon
 the right one.
 
 If (C)ADF rejects the random-walk null, a stationary linear
-combination exists --- the pair is cointegrated. Failure to reject
+combination exists and the pair is cointegrated. Failure to reject
 (given ADF's low power) is inconclusive; the prudent action is not
 to trade the pair.
 
@@ -325,7 +325,7 @@ cointegration analysis on early-2000s daily data:
 \begin{itemize}
   \item OLS hedge ratio $\hat\beta \approx 0.75$ (EWA on EWC): one
   unit long EWA hedges with $0.75$ units short EWC.
-  \item CADF $t \approx -3.7$, $p \approx 0.005$ --- cointegrated.
+  \item CADF $t \approx -3.7$, $p \approx 0.005$: cointegrated.
   \item Residual half-life $\approx 7$ trading days.
   \item $\sigma_\infty$ a few percent of spot ETF price.
 \end{itemize}
@@ -345,7 +345,7 @@ single trade is, by \eqref{eq:zscore_duration} of
 i.e.\ a typical EWA/EWC round trip lasts a couple of weeks. With
 a couple of trades per quarter and target reversion of three to
 four residual standard deviations, historical Sharpe is
-$1$--$1.5$ (Chan) --- modest, consistent, and uncorrelated with
+$1$--$1.5$ (Chan): modest, consistent, and uncorrelated with
 market direction. Modern alpha on this exact pair has decayed
 (\cref{sec:ch10_failure_modes}), but the geometry is the canonical
 teaching example.
@@ -358,7 +358,7 @@ axis only, so swapping changes the slope. Regressing EWA on EWC
 might give $\hat\beta_{Y\mid Z} \approx 0.75$, EWC on EWA
 $\hat\beta_{Z\mid Y} \approx 1.10$ ($1/0.75 = 1.33$, so
 $\hat\beta_{Y\mid Z}\cdot\hat\beta_{Z\mid Y} \neq 1$ unless the
-regression is noiseless --- the regression-to-the-mean fallacy).
+regression is noiseless: the regression-to-the-mean fallacy).
 The two regressions produce different residuals and, near the $5\%$
 threshold, different test outcomes.
 
@@ -434,7 +434,7 @@ structure because it bakes in a single left-hand-side regression.
 
 Once a test has produced $\hat\beta$ and residuals
 $\hat\epsilon_t$, the trading rule is the $z$-score OU strategy
-from \cref{ch:mean_reversion_ou} applied to $\hat\epsilon_t$ ---
+from \cref{ch:mean_reversion_ou} applied to $\hat\epsilon_t$;
 every formula transfers unmodified.
 
 \subsection{Recap of the OU machinery on the residual}
@@ -567,8 +567,8 @@ are the same algorithm with different inputs. The $z$-score code
 from \cref{sec:ch9_code} wraps unchanged around a cointegration
 residual; the only addition is an upstream Engle--Granger (or
 Johansen) fit producing $\hat\beta$ and the residual. Every
-downstream formula --- half-life, $\sigma_\infty$, $z$-thresholds,
-expected duration, walk-forward refit --- transfers unmodified.
+downstream formula (half-life, $\sigma_\infty$, $z$-thresholds,
+expected duration, walk-forward refit) transfers unmodified.
 \end{keyfactbox}
 
 \section{A short reference implementation}
@@ -655,7 +655,7 @@ stat-arb shop), Engle--Granger and Johansen run as a daily
 universe. Morning workflow:
 \begin{enumerate}
   \item \textbf{Universe screen.} One sector at a time (US banks,
-  European energy majors, gold miners) --- cross-sector
+  European energy majors, gold miners); cross-sector
   cointegration is rare and usually spurious.
   \item \textbf{Johansen sweep.} Johansen on every pair (sometimes
   triple) in the sector basket, rolling $250$--$500$ day window.
@@ -705,8 +705,8 @@ which goes to costs. The GS cost gate above exists for this.
 \paragraph{Convergence timing is unbounded.} The OU model gives
 the \emph{expected} reversion time, but the variance is large. A
 $3\sigma$ deviation might revert in a day or in six months, and
-the position marks to market every step. With leverage --- most
-real pairs books use it, since P\&L per unit notional is small ---
+the position marks to market every step. With leverage (most
+real pairs books use it, since P\&L per unit notional is small),
 a long convergence triggers a margin call before the model says
 to give up. Discipline: hard stop-out (\cref{ch:mean_reversion_ou}),
 \emph{conservative} Kelly fraction (\cref{ch:kelly_risk}), and
@@ -720,8 +720,8 @@ itself only in live trading.
 \paragraph{Decay of historical alpha.} Canonical pairs (EWA/EWC,
 Coke/Pepsi, Shell/BP) have had their margins compressed to where
 they barely cover costs. Strategies that work in $2005$ papers do
-not work in $2026$ on the same pairs at the same parameters. Not
-a bug in cointegration --- standard edge erosion. Discipline: keep
+not work in $2026$ on the same pairs at the same parameters. This
+is standard edge erosion, not a bug in cointegration. Discipline: keep
 finding new candidates, on underexplored sector slices or in
 markets with structural barriers to high-frequency entry.
 
@@ -730,16 +730,16 @@ markets with structural barriers to high-frequency entry.
 The cautionary tale is \textbf{Long-Term Capital Management
 (LTCM)}, founded 1994 by John Meriwether with Nobel laureates
 Scholes and Merton on the board. LTCM ran a vast
-cointegration-based portfolio --- on-the-run vs off-the-run
+cointegration-based portfolio (on-the-run vs off-the-run
 Treasuries, swap spreads across countries, convertible-bond
-arbitrage --- with peak notional around $\$1.25$ trillion against
+arbitrage) with peak notional around $\$1.25$ trillion against
 about $\$5$ billion of equity. Their analysis was correct: the
 relationships \emph{were} cointegrated and \emph{would} have
 reverted given time.
 
 In August 1998 Russia defaulted, investors fled to safety, and
 every spread LTCM held widened simultaneously. The relationships
-were not broken --- spreads did eventually revert --- but LTCM's
+were not broken (spreads did eventually revert), but LTCM's
 leverage meant marked-to-market losses triggered margin calls
 they could not meet. The fund collapsed in September 1998; a
 consortium of banks injected $\$3.6$ billion to unwind positions

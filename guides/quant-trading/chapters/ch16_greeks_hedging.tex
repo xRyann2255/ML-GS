@@ -12,8 +12,8 @@ derivatives desk is booked, hedged, and risk-managed in terms of
 its Greeks rather than its mark-to-market price \citeNatenberg.
 
 This chapter has two goals. First, derive the closed-form Greeks
-for a Black--Scholes European call --- delta, gamma, vega, theta,
-rho --- pinned to the running example ($\Spx = \Kstrike = 100$,
+for a Black--Scholes European call (delta, gamma, vega, theta,
+rho), pinned to the running example ($\Spx = \Kstrike = 100$,
 $\rrf = 5\%$, $\volat = 20\%$, $\Tmat - t = 1$) from
 \cref{ch:black_scholes}. Second, prove the P\&L identity behind
 \emph{delta-hedging}: a delta-neutral long-option book makes money
@@ -58,7 +58,7 @@ delta of SPX, short $-50{,}000$ gamma, long $+200{,}000$ vega, and
 bleeding $-30{,}000$ theta a day.'' Each number is the partial
 derivative of the book's mark-to-market with respect to one input.
 Together they tell the trader how the book will move as the world
-moves --- and which parameter to hedge first. The Greeks are the
+moves, and which parameter to hedge first. The Greeks are the
 \emph{language} of risk on a derivatives desk.
 \end{intuitionbox}
 
@@ -186,7 +186,7 @@ zero and the position is \emph{delta-neutral}.
   \to +\infty$, $\Delta \to 1$. The call behaves like a forward on
   the stock.
   \item \emph{At-the-money} call ($\Spx \approx \Kstrike$), $d_1$
-  small and positive, so $\Delta \approx 0.5$ --- the trader's rule
+  small and positive, so $\Delta \approx 0.5$, the trader's rule
   of thumb ``ATM call delta is about a half''.
   \item Deep \emph{out-of-the-money} call ($\Spx \ll \Kstrike$):
   $d_1 \to -\infty$, $\Delta \to 0$. The call has almost no chance
@@ -206,7 +206,7 @@ $d_1 = 0.35$ and $d_2 = 0.15$. Therefore
 \end{equation}
 A trader long one call hedges by shorting $0.6368$ shares: $\$63.68$
 of short stock against a $\$10.45$ option. The hedge exceeding the
-premium is normal --- the delta-hedged position is a vol bet, and
+premium is normal: the delta-hedged position is a vol bet, and
 most capital is tied up in the hedge.
 
 \paragraph{Sanity check from the Ch~15 table.}
@@ -352,7 +352,7 @@ are short gamma.
 \end{minipage}
 \caption{Delta (left) and gamma (right) of a European call as functions of spot price.
 Delta rises monotonically from 0 (deep OTM) toward 1 (deep ITM), passing through
-$\tfrac{1}{2}$ at the money. Gamma --- the rate of change of delta --- peaks at the
+$\tfrac{1}{2}$ at the money. Gamma, the rate of change of delta, peaks at the
 money, where delta is most sensitive to spot moves. A long-gamma position profits
 from large moves in either direction (gamma scalping); the cost is theta decay.}
 \label{fig:delta_gamma}
@@ -391,7 +391,7 @@ Therefore
 Gamma is the rate of change of delta per unit of spot. A $\$1$ move
 up (from $100$ to $101$) shifts delta by $\approx 0.01876$, from
 $0.6368$ to $\approx 0.6556$. The trader who was short $0.6368$
-shares must short another $0.0188$ to stay delta-neutral --- a
+shares must short another $0.0188$ to stay delta-neutral, a
 rebalance forced by the market, not chosen. \emph{Gamma is the rate
 at which the hedge bleeds.}
 
@@ -470,7 +470,7 @@ which is unrealistic. Desks instead report vega per $1\%$ move
   \nu / 100 \;\approx\; 0.3752,
 \end{equation*}
 so the call gains about $\$0.38$ per percentage-point increase in
-implied vol --- and a long holder loses $\$0.38$ if vol drops from
+implied vol, and a long holder loses $\$0.38$ if vol drops from
 $20\%$ to $19\%$ even with spot unchanged.
 
 \begin{pitfallbox}[``Vega'' is not a Greek letter]
@@ -478,7 +478,7 @@ $20\%$ to $19\%$ even with spot unchanged.
 common notation, $\mathcal{V}$ a stylised second choice, $\Lambda$
 in some texts. Early option-pricing literature inherited delta,
 gamma, theta from mechanics, but traders coined ``vega'' later for
-the vol sensitivity --- a word that sounds Greek without being
+the vol sensitivity, a word that sounds Greek without being
 Greek. The symbol on a desk's risk report is $\nu$ or
 $\mathcal{V}$, not a real Greek glyph.
 \end{pitfallbox}
@@ -495,8 +495,8 @@ $37.5$'' means per unit. Same object, different units.
 \label{sec:ch16_theta}
 
 Theta measures option-price decay as time passes with other inputs
-fixed. It is the Greek that is negative for a long option position
---- time always moves forward and erodes optionality.
+fixed. It is the Greek that is negative for a long option position:
+time always moves forward and erodes optionality.
 
 \begin{definition}[Theta]
 \index{theta (Greek)|textbf}\index{Greeks!theta|textbf}
@@ -543,7 +543,7 @@ convention.
 \paragraph{Sign of theta.}
 For a non-dividend call, both terms in~\eqref{eq:theta_call} are
 negative, so $\Theta < 0$ unconditionally. Deep-ITM European puts
-on high-rate underlyings can flip $\Theta > 0$ --- a quirk of the
+on high-rate underlyings can flip $\Theta > 0$, a quirk of the
 put formula \citeHull. For this book, treat long options as
 $\Theta < 0$.
 
@@ -588,7 +588,7 @@ desks prefer),
 
 \paragraph{What does theta cost?}
 A long call bleeds $\$0.018$ (calendar) or $\$0.025$ (business)
-per day without any stock move --- about $\$0.53$ over 21 business
+per day without any stock move: about $\$0.53$ over 21 business
 days, $5\%$ of the $\$10.45$ premium. Over 252 business days the
 cumulative decay is $252 \cdot 0.0254 \approx \$6.41$, matching the
 annualised $|\Theta| \approx 6.414$ at \eqref{eq:theta_numex_yr}:
@@ -603,7 +603,7 @@ section makes this precise.
 \label{sec:ch16_pnl_identity}
 
 We now combine the Greeks into the P\&L identity for a
-delta-hedged option position --- the central equation of
+delta-hedged option position, the central equation of
 derivatives trading.
 
 \subsection{Setting up the delta-hedged book}
@@ -619,7 +619,7 @@ underlying as a hedge. Call the resulting portfolio
 The portfolio is \emph{delta-neutral} at construction: $\partial
 \Pi/\partial \Spx = \Delta - \Delta = 0$, so a small change in
 $\Spx_t$ leaves $\Pi_t$ unchanged at linear order. Directional
-risk is hedged --- what is left?
+risk is hedged. What is left?
 
 \subsection{It\^o expansion of the call price}
 \label{subsec:ch16_ito}
@@ -647,7 +647,7 @@ the share leg is $-\Delta\,d\Spx$. Combining,
        \;&=\; \Theta\,dt \;+\; \tfrac12\,\Gamma\,(d\Spx)^2.
   \label{eq:dPi_raw}
 \end{align}
-The directional terms cancel exactly --- that is what delta
+The directional terms cancel exactly; that is what delta
 hedging buys. What survives are theta and gamma.
 
 \begin{keyfactbox}[Delta-hedged P\&L identity]
@@ -695,9 +695,9 @@ traders. Economic content:
 \begin{itemize}
   \item $\volat_{\text{r}} > \volat_{\text{i}}$: gamma gain
   dominates theta bleed, the delta-hedged long-option book makes
-  money --- \emph{long realised vol}.
+  money. The position is \emph{long realised vol}.
   \item $\volat_{\text{r}} < \volat_{\text{i}}$: theta dominates,
-  the position loses --- \emph{short realised vol}.
+  the position loses. It is \emph{short realised vol}.
   \item $\volat_{\text{r}} = \volat_{\text{i}}$: the two cancel by
   the PDE; zero expected P\&L per dt.
 \end{itemize}
@@ -719,7 +719,7 @@ Options are bets on realised vs implied volatility. Delta-hedging
 strips out direction; what is left is the vol-difference term
 weighted by gamma. A vol buyer expects realised $>$ implied; a
 vol seller the reverse. Profit depends only on which side of
-implied the realised print lands on over the life of the hedge ---
+implied the realised print lands on over the life of the hedge;
 the spot path itself is irrelevant once dynamically hedged.
 \end{intuitionbox}
 
@@ -729,7 +729,7 @@ At the running parameters, $\tfrac12 \Gamma \Spx^2 = \tfrac12 \cdot
 year'' of gamma exposure. If realised prints $25\%$ against implied
 $20\%$, then $\volat_{\text{r}}^2 - \volat_{\text{i}}^2 = 0.0225$
 and annualised P\&L is $93.8 \cdot 0.0225 \approx \$2.11$, about
-$20\%$ of the $\$10.45$ premium --- purely from the 5-vol-point
+$20\%$ of the $\$10.45$ premium, purely from the 5-vol-point
 edge.
 
 \subsection{A worked path-by-path simulation}
@@ -744,13 +744,13 @@ the gamma mechanic.
 Day 1: spot $100 \to 101$. The call rises by $\Delta_0 \cdot 1 +
 \tfrac12 \Gamma_0 \cdot 1^2 \approx 0.6368 + 0.0094 = 0.6462$; the
 hedge (short $0.6368$ shares) loses $0.6368$. Portfolio P\&L is
-$+0.0094$ --- the gamma slug $\tfrac12 \Gamma_0 (\Delta\Spx)^2$.
+$+0.0094$, the gamma slug $\tfrac12 \Gamma_0 (\Delta\Spx)^2$.
 Now reset: new delta $\approx 0.6556$, sell another $0.0188$
 shares.
 
 Day 2: spot $101 \to 100$. $(-1)^2 = 1$ gives a slug of
-$\tfrac12 \cdot 0.01876 \cdot 1 = 0.00938$ --- identical to Day
-1's slug. The slug is positive regardless of move sign --- the
+$\tfrac12 \cdot 0.01876 \cdot 1 = 0.00938$, identical to Day
+1's slug. The slug is positive regardless of move sign: the
 long-gamma trader profits from volatility, not direction.
 
 Days 1 and 2 illustrate the mechanic; the full ten-day schedule
@@ -784,17 +784,17 @@ Day & $\Spx_t$ & $\Delta\Spx$ & $\tfrac12 \Gamma (\Delta\Spx)^2$
 Net P\&L is $0.0938 - 0.254 \approx -0.16$: the trade lost about
 $\$0.16$ over ten days because realised vol ($\pm \$1$/day on
 $\Spx = 100$ annualises to roughly $16\%$) fell short of the
-$20\%$ implied priced into theta --- exactly as
+$20\%$ implied priced into theta, exactly as
 \eqref{eq:vol_trading_eq} predicts. Had the same $\Gamma$ and
 $\Theta$ sat against realised $\pm \$1.30$ daily moves instead,
 each gamma slug would be $\tfrac12 \cdot 0.01876 \cdot 1.69
-\approx 0.01585$, cumulating to $0.1585$ --- flipping the trade
+\approx 0.01585$, cumulating to $0.1585$ and flipping the trade
 to net positive.
 
 The lesson: every dollar of realised-vs-implied edge is scraped
 together one $\tfrac12 \Gamma (\Delta\Spx)^2$ slug at a time
-against a relentless theta drip --- mathematically an identity,
-operationally a spreadsheet of small daily P\&Ls.
+against a relentless theta drip. Mathematically it is an identity;
+operationally it is a spreadsheet of small daily P\&Ls.
 
 \section{Aggregation: portfolio Greeks}
 \label{sec:ch16_aggregation}
@@ -820,7 +820,7 @@ cheaper than hedging each leg individually.
 
 \paragraph{Why aggregate Greeks are the unit of risk.}
 A $\$100$M-long / $\$100$M-short tight call spread has enormous
-gross notional but tiny aggregate Greeks --- the legs nearly
+gross notional but tiny aggregate Greeks, because the legs nearly
 cancel. Real risk is the residual after netting, read off the
 book-aggregated line. \citeNatenberg repeats: look at the net, not
 the gross.
@@ -851,7 +851,7 @@ The second derivative with respect to vol,
   \text{volga} \;\defeq\; \frac{\partial^2 \Call}{\partial \volat^2}
                   \;=\; \frac{\partial \nu}{\partial \volat}.
 \end{equation*}
-For a BS call, $\text{volga} = \nu \cdot d_1 d_2 / \volat$ ---
+For a BS call, $\text{volga} = \nu \cdot d_1 d_2 / \volat$:
 convexity of price in vol, the ``vol of vol'' exposure. Long volga
 loves vol spikes; short volga (selling short-dated straddles is
 canonical) hates them. Barrier-option pricing
@@ -863,7 +863,7 @@ The mixed derivative with respect to spot and time,
   \text{charm} \;\defeq\; \frac{\partial^2 \Call}{\partial \Spx\,\partial t}
                   \;=\; \frac{\partial \Delta}{\partial t}.
 \end{equation*}
-Charm is theta for delta --- the rate at which the delta hedge
+Charm is theta for delta: the rate at which the delta hedge
 bleeds with time. A trader hedging at the open and going to lunch
 returns to find delta drifted by $\text{charm} \cdot \Delta t$
 even on zero spot move. Overnight \emph{charm risk} forces the
@@ -932,8 +932,8 @@ Long-gamma books love gaps; short-gamma books fear them. 1987,
 Round 4 of IMC Prosperity~3 introduced
 \texttt{VOLCANIC\_ROCK\_VOUCHERS} on \texttt{VOLCANIC\_ROCK}
 (\cref{ch:black_scholes}). Each voucher is a European call, and
-teams harvesting the IV-rich side of the surface had to delta-hedge
---- otherwise directional \texttt{VOLCANIC\_ROCK} moves swamped
+teams harvesting the IV-rich side of the surface had to delta-hedge;
+otherwise directional \texttt{VOLCANIC\_ROCK} moves swamped
 the vol edge. The mechanics:
 \begin{enumerate}
   \item Compute $d_1$ from the voucher's strike, the current
@@ -981,7 +981,7 @@ net vega in the SPX vol book overnight.''
 
 The five Greeks all derive from $d_1$, $d_2$, $\CDFN$, $\pdfN$.
 The function below computes all in one pass. Every options-firm
-quant interview expects this in under five minutes --- commit to
+quant interview expects this in under five minutes; commit it to
 muscle memory.
 
 \begin{lstlisting}[caption={Black--Scholes Greeks for a European call on a non-dividend-paying stock. Returns a dict of the five primary Greeks. No side effects, no plotting, no persistence. Calling \texttt{bs\_greeks(100, 100, 0.05, 0.20, 1.0)} returns delta $\approx 0.6368$, gamma $\approx 0.01876$, vega $\approx 37.52$, theta $\approx -6.414$ per year, rho $\approx 53.23$.}]
@@ -1034,7 +1034,7 @@ $\Spx, \volat, \rrf$; per year). Trader conventions:
 
   \item \textbf{BS PDE in Greek form:}
   $\Theta + \rrf \Spx\,\Delta + \tfrac12 \volat^2 \Spx^2 \Gamma =
-  \rrf \Call$ --- the delta-hedged call earns risk-free when
+  \rrf \Call$: the delta-hedged call earns risk-free when
   realised equals implied.
 
   \item \textbf{Delta-hedged P\&L:}

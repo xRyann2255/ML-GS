@@ -1,7 +1,7 @@
 \chapter{Hybrid and Ensemble Models}\label{ch:hybrid}
 
 %% ============================================================
-%% SECTION 1 — Motivation
+%% SECTION 1 - Motivation
 %% ============================================================
 \section{Why This Chapter Matters}
 
@@ -28,7 +28,7 @@ approach~\citep{RahimikiaPoon2020}.
 
 
 %% ============================================================
-%% SECTION 2 — Why Hybrids Win
+%% SECTION 2 - Why Hybrids Win
 %% ============================================================
 \section{Why Hybrids Win}\label{sec:hybrid:why}
 
@@ -138,7 +138,7 @@ explain.
     plus/.style={circle, draw, thick, inner sep=2pt, font=\large}
   ]
 
-  % Nodes — row 1
+  % Nodes - row 1
   \node[data] (rv) {$\RV$ lags};
   \node[stage, right=of rv, fill=blue!12] (har) {HAR Model};
   \node[data, right=of har] (harhat) {$\widehat{\HAR}_t$};
@@ -176,7 +176,7 @@ targets only the residual.  The final forecast sums both components.}
 
 
 %% ============================================================
-%% SECTION 3 — HAR-SVR
+%% SECTION 3 - HAR-SVR
 %% ============================================================
 \section{HAR-SVR: Support Vector Regression on HAR Residuals}
 \label{sec:hybrid:har-svr}
@@ -222,13 +222,13 @@ you want when most of the signal has already been removed.
         \end{equation}
         where each term is:
         \begin{itemize}
-          \item $\frac{1}{2}\|w\|^2$ --- the regularization penalty that
+          \item $\frac{1}{2}\|w\|^2$: the regularization penalty that
                 controls model complexity,
-          \item $C$ --- the trade-off parameter between margin width and
+          \item $C$: the trade-off parameter between margin width and
                 training error,
-          \item $\varepsilon$ --- the tube width; residuals smaller than
+          \item $\varepsilon$: the tube width; residuals smaller than
                 $\varepsilon$ in absolute value incur zero loss,
-          \item $f(\bX_t) = w^\top \phi(\bX_t) + b$ --- the SVR prediction
+          \item $f(\bX_t) = w^\top \phi(\bX_t) + b$: the SVR prediction
                 in the kernel-induced feature space.
         \end{itemize}
 
@@ -256,7 +256,7 @@ $\QLIKE$ or MSE, not on the number of support vectors.
 
 
 %% ============================================================
-%% SECTION 4 — GINN
+%% SECTION 4 - GINN
 %% ============================================================
 \section{GARCH-Informed Neural Networks}\label{sec:hybrid:ginn}
 
@@ -295,15 +295,15 @@ time-varying outputs of a neural network $g_{\btheta}$:
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $g_{\btheta}(\bX_t)$ --- a small feedforward network (typically 2
+  \item $g_{\btheta}(\bX_t)$: a small feedforward network (typically 2
         hidden layers, 32--64 units each) that maps auxiliary features
         $\bX_t$ to time-varying GARCH parameters,
-  \item $\omega_t, \alpha_t, \beta_t$ --- the GARCH coefficients at time
+  \item $\omega_t, \alpha_t, \beta_t$: the GARCH coefficients at time
         $t$, constrained to satisfy $\omega_t > 0$, $\alpha_t \geq 0$,
         $\beta_t \geq 0$, and $\alpha_t + \beta_t < 1$ via softmax and
         sigmoid output activations~\citep{GINN2024},
-  \item $\epsilon_t^2$ --- the squared innovation (return shock),
-  \item $\sigma^2_t$ --- the previous conditional variance, fed back
+  \item $\epsilon_t^2$: the squared innovation (return shock),
+  \item $\sigma^2_t$: the previous conditional variance, fed back
         recurrently.
 \end{itemize}
 
@@ -383,7 +383,7 @@ substantially fewer parameters than the LSTM.
 
 
 %% ============================================================
-%% SECTION 5 — NLP + HAR
+%% SECTION 5 - NLP + HAR
 %% ============================================================
 \section{NLP-Augmented Volatility Models}\label{sec:hybrid:nlp}
 
@@ -419,9 +419,9 @@ The procedure has three stages:
         \end{equation}
         where:
         \begin{itemize}
-          \item $s_t$ --- the daily text-derived signal (negative values
+          \item $s_t$: the daily text-derived signal (negative values
                 indicate bearish tone),
-          \item $\gamma$ --- the text loading; if news carries
+          \item $\gamma$: the text loading; if news carries
                 incremental information beyond lagged $\RV$, then
                 $\gamma \neq 0$.
         \end{itemize}
@@ -435,8 +435,8 @@ The procedure has three stages:
         \begin{projectconnection}[Why This Matters]
         At Goldman Sachs you may have access to proprietary news feeds
         or internal research sentiment.  Public NLP signals show modest
-        and conditional improvements---primarily on volatility jump
-        days---but a curated internal signal could do better.
+        and conditional improvements, primarily on volatility jump
+        days, but a curated internal signal could do better.
         \end{projectconnection}
 
   \item \textbf{Evaluation.}  Compare $\QLIKE$ loss of HAR vs.\
@@ -470,7 +470,7 @@ first'' principle of this chapter.
 
 
 %% ============================================================
-%% SECTION 6 — Ensemble HAR + LightGBM
+%% SECTION 6 - Ensemble HAR + LightGBM
 %% ============================================================
 \section{Ensemble: HAR + LightGBM}\label{sec:hybrid:ensemble}
 
@@ -488,11 +488,11 @@ Choose a fixed weight $w \in [0,1]$ and combine:
 \end{equation}
 where:
 \begin{itemize}
-  \item $w$ --- the HAR weight, typically calibrated on a validation set
+  \item $w$: the HAR weight, typically calibrated on a validation set
         or set to $w = 0.7$ as a robust default,
-  \item $\widehat{\HAR}_t$ --- the HAR forecast from
+  \item $\widehat{\HAR}_t$: the HAR forecast from
         Equation~\eqref{eq:har-fit-hybrid},
-  \item $\widehat{\text{GBM}}_t$ --- the LightGBM forecast trained on the
+  \item $\widehat{\text{GBM}}_t$: the LightGBM forecast trained on the
         full feature set of Chapter~\ref{ch:features}.
 \end{itemize}
 
@@ -587,7 +587,7 @@ a ridge meta-learner learns the optimal combination.}
 
 
 %% ============================================================
-%% SECTION 7 — Comparing Ensemble Architectures
+%% SECTION 7 - Comparing Ensemble Architectures
 %% ============================================================
 \section{Comparing Ensemble Architectures}\label{sec:hybrid:architectures}
 
@@ -617,13 +617,13 @@ The combined feature vector fed to LightGBM becomes:
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $\bX_t^{\text{tab}}$ --- the tabular feature matrix (RV lags,
+  \item $\bX_t^{\text{tab}}$: the tabular feature matrix (RV lags,
         jump indicators, leverage, microstructure proxies, cross-asset
         signals) from Chapter~\ref{ch:features},
-  \item $\bh_t^{\text{LSTM}}$ --- the $k$-dimensional embedding vector
+  \item $\bh_t^{\text{LSTM}}$: the $k$-dimensional embedding vector
         extracted from the LSTM's final hidden state after processing the
         intraday sequence,
-  \item $\|$ --- concatenation along the feature axis.
+  \item $\|$: concatenation along the feature axis.
 \end{itemize}
 
 \begin{intuition}[In Plain English]
@@ -682,20 +682,20 @@ trains on the residuals left by all prior stages.  The canonical
 three-stage pipeline for volatility forecasting is:
 
 \begin{enumerate}
-  \item \textbf{Stage 1 --- HAR (linear baseline).}  Fit HAR on the
+  \item \textbf{Stage 1: HAR (linear baseline).}  Fit HAR on the
         training set exactly as in
         Equation~\eqref{eq:har-fit-hybrid}.  HAR captures the dominant
         multi-scale autoregressive structure of realized volatility.
         Compute residuals: $e_t^{(1)} = \RV_{t+1} -
         \widehat{\HAR}_t$.
-  \item \textbf{Stage 2 --- LightGBM (nonlinear interactions).}  Train
+  \item \textbf{Stage 2: LightGBM (nonlinear interactions).}  Train
         LightGBM on Stage~1 residuals $e_t^{(1)}$ using the full
         tabular feature set.  The tree captures nonlinear patterns that
         HAR misses: regime interactions, jump-asymmetry effects,
         cross-asset spillovers.  Compute residuals:
         $e_t^{(2)} = e_t^{(1)} - \widehat{\text{GBM}}(e_t^{(1)},
         \bX_t)$.
-  \item \textbf{Stage 3 --- LSTM (sequential dynamics).}  Train an
+  \item \textbf{Stage 3: LSTM (sequential dynamics).}  Train an
         LSTM on Stage~2 residuals $e_t^{(2)}$ using intraday sequences.
         If any temporal structure remains after the tree has operated,
         the recurrent network can capture it.  This stage is optional:
@@ -711,11 +711,11 @@ The final forecast sums all stage contributions:
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $\widehat{\HAR}_t$ --- the HAR baseline forecast
+  \item $\widehat{\HAR}_t$: the HAR baseline forecast
         (Equation~\eqref{eq:har-fit-hybrid}),
-  \item $\widehat{\text{GBM}}(\bX_t)$ --- the LightGBM correction
+  \item $\widehat{\text{GBM}}(\bX_t)$: the LightGBM correction
         trained on HAR residuals with tabular features,
-  \item $\widehat{\text{LSTM}}(\bX_t^{\text{seq}})$ --- the LSTM
+  \item $\widehat{\text{LSTM}}(\bX_t^{\text{seq}})$: the LSTM
         correction trained on Stage~2 residuals with intraday
         sequences (set to zero if Stage~3 is dropped).
 \end{itemize}
@@ -759,8 +759,8 @@ The general blending formula for $K$ models is:
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $\hat{y}_{t+1}^{(k)}$ --- the independent forecast from model $k$,
-  \item $w_k$ --- the blend weight for model $k$, constrained to sum
+  \item $\hat{y}_{t+1}^{(k)}$: the independent forecast from model $k$,
+  \item $w_k$: the blend weight for model $k$, constrained to sum
         to one (though a ridge meta-learner as in
         Equation~\eqref{eq:stacking} relaxes this constraint).
 \end{itemize}
@@ -778,9 +778,9 @@ simplest principled choice is \textbf{inverse-$\QLIKE$ weighting}:
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $\QLIKE_k$ --- the $\QLIKE$ loss of model $k$ on the
+  \item $\QLIKE_k$: the $\QLIKE$ loss of model $k$ on the
         validation set,
-  \item $\QLIKE_k^{-1}$ --- the inverse loss; models with lower
+  \item $\QLIKE_k^{-1}$: the inverse loss; models with lower
         (better) $\QLIKE$ receive higher weight.
 \end{itemize}
 
@@ -863,7 +863,7 @@ Literature support
 
 
 %% ============================================================
-%% NEW SECTION — Identifying Regimes (GMM / EM / BIC / Markov-switching)
+%% NEW SECTION - Identifying Regimes (GMM / EM / BIC / Markov-switching)
 %% ============================================================
 \section{Identifying Regimes: GMM, EM, and BIC}
 \label{sec:hybrid:regimes}
@@ -872,12 +872,12 @@ The regime-dependent weighting scheme of the next subsection, and the
 regime-switching combination of Chapter~\ref{ch:trees}
 (Equation~\eqref{eq:trees:regime_combo}), both rely on a single ingredient
 we have so far left undefined: a \emph{regime indicator}.  Until now we
-have used ad-hoc thresholds --- $\RV_t^{(w)}$ above its 75th percentile,
-or $\IVol_t > 30$ for the VIX --- to declare a market ``stressed.''  Those
+have used ad-hoc thresholds ($\RV_t^{(w)}$ above its 75th percentile,
+or $\IVol_t > 30$ for the VIX) to declare a market ``stressed.''  Those
 rules are easy to state but arbitrary: \emph{why $75$th and not $80$th?}
 This section replaces the
 hand-picked threshold with a probabilistic model that lets the data decide
-both how many regimes exist and which one each day belongs to --- the
+both how many regimes exist and which one each day belongs to: the
 ``GMM-based regime probability'' that Chapter~\ref{ch:trees} promised when
 it defined the stress indicator $s_t$.
 
@@ -891,7 +891,7 @@ A $d$-dimensional Gaussian density is
 \]
 where $\bm{\mu} \in \R^d$ is the mean and
 $\bm{\Sigma} \in \R^{d \times d}$ is the covariance matrix (symmetric
-positive-definite --- a square table recording each feature's spread on
+positive-definite: a square table recording each feature's spread on
 its diagonal and how every pair of features co-moves off it).  A
 \textbf{mixture model} says the data come from several such Gaussians,
 each chosen with some probability.  If this is unfamiliar, review
@@ -905,7 +905,7 @@ $\bx$ sits close to the center $\bm{\mu}$ and shrinks as $\bx$ moves away;
 the quadratic $(\bx-\bm{\mu})^\top \bm{\Sigma}^{-1}(\bx-\bm{\mu})$ measures
 that distance while accounting for how the features spread and co-move. The
 fraction in front is just a normalizing constant that makes the total
-probability sum to one --- you never compute it by hand. Notationally,
+probability sum to one; you never compute it by hand. Notationally,
 $|\bm{\Sigma}|$ is the \textbf{determinant} (a single number summarizing
 the overall spread), the superscript $^\top$ is the \textbf{transpose}
 (turn a column into a row so the multiplication works), and
@@ -931,15 +931,15 @@ $\bx \in \R^d$ as
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $K$ --- the number of mixture components, interpreted here as the
+  \item $K$: the number of mixture components, interpreted here as the
         number of \textbf{volatility regimes},
-  \item $\pi_k \geq 0$ --- the \textbf{mixing weight} (prior probability)
+  \item $\pi_k \geq 0$: the \textbf{mixing weight} (prior probability)
         of regime $k$, with $\sum_{k=1}^K \pi_k = 1$; the long-run
         fraction of days spent in regime $k$,
-  \item $\bm{\mu}_k \in \R^d$ --- the \textbf{mean} feature vector of
+  \item $\bm{\mu}_k \in \R^d$: the \textbf{mean} feature vector of
         regime $k$ (e.g., the typical $(\RV, \text{jump}, \IVol)$ profile
         of a crisis),
-  \item $\bm{\Sigma}_k \in \R^{d \times d}$ --- the \textbf{covariance}
+  \item $\bm{\Sigma}_k \in \R^{d \times d}$: the \textbf{covariance}
         of regime $k$, describing how tightly days cluster around
         $\bm{\mu}_k$ and how the features co-move within the regime.
 \end{itemize}
@@ -963,7 +963,7 @@ variation that separates good from bad volatility
 variance risk premium $\VRP_t$ (Chapter~\ref{ch:vrp}).  A fitted GMM turns
 these into a soft regime label per day, which becomes the
 stress-indicator $s_t$ that drives the regime-dependent blend weights in
-Section~\ref{sec:hybrid:regime-weights} --- replacing the arbitrary
+Section~\ref{sec:hybrid:regime-weights}, replacing the arbitrary
 ``$\RV^{(w)} > 75$th percentile'' rule with a data-driven one.
 \end{projectconnection}
 \end{definition}
@@ -978,21 +978,21 @@ RV forecasting is
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $\RV_t,\,\RV_t^{(w)},\,\RV_t^{(m)}$ --- the daily, weekly, and
+  \item $\RV_t,\,\RV_t^{(w)},\,\RV_t^{(m)}$: the daily, weekly, and
         monthly HAR components, capturing the level and slope of the
         volatility term structure,
-  \item $J_t^{+},\,J_t^{-}$ --- the signed (positive and negative) jump
+  \item $J_t^{+},\,J_t^{-}$: the signed (positive and negative) jump
         variation, separating ``good'' upside jumps from ``bad'' downside
         jumps (Chapter~\ref{ch:jumps}),
-  \item $\IVol_t$ --- the option-implied volatility (VIX), a
+  \item $\IVol_t$: the option-implied volatility (VIX), a
         forward-looking risk gauge,
-  \item $\VRP_t = \IVol_t^2 - \E_t[\RV_{t+1}]$ --- the variance risk
+  \item $\VRP_t = \IVol_t^2 - \E_t[\RV_{t+1}]$: the variance risk
         premium.  Here $\E_t[\RV_{t+1}]$ is the market's \emph{expected}
         next-day realized variance given everything known by day $t$ (the
         subscript $t$ means ``conditional on information up to today''; in
         practice this is a forecast such as the HAR prediction itself). The
         VRP is then how much more the option market is charging
-        ($\IVol_t^2$) than that expected realized amount --- large when
+        ($\IVol_t^2$) than that expected realized amount, large when
         investors are paying up for crash protection
         (Chapter~\ref{ch:vrp}, which uses the full multi-day horizon).
 \end{itemize}
@@ -1007,7 +1007,7 @@ $20$s swamps one measured in $0.0001$s, so the model would only ever
 from Chapter~\ref{ch:features} (Section~\ref{sec:feat-triple}) to every
 input.  \textbf{Z-scoring} means subtract each feature's mean and divide
 by its standard deviation, so it is recentred to a mean of $0$ and
-rescaled to a typical size of $1$ --- putting every feature on the same
+rescaled to a typical size of $1$, putting every feature on the same
 footing.  Use only a trailing window to compute the standardization
 moments, so the regime label for day $t$ uses no future information.
 \end{warning}
@@ -1016,7 +1016,7 @@ moments, so the regime label for day $t$ uses no future information.
 \label{sec:hybrid:em}
 
 How do we find the $\pi_k$, $\bm{\mu}_k$, $\bm{\Sigma}_k$ that best explain
-the data?  By \textbf{maximum likelihood} --- pick the parameters that make
+the data?  By \textbf{maximum likelihood}: pick the parameters that make
 the data we actually observed as probable as possible.  The log-likelihood
 of the parameters
 $\btheta = \{\pi_k, \bm{\mu}_k, \bm{\Sigma}_k\}_{k=1}^K$ is
@@ -1026,10 +1026,10 @@ $\btheta = \{\pi_k, \bm{\mu}_k, \bm{\Sigma}_k\}_{k=1}^K$ is
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $T$ --- the number of trading days in the fitting window,
-  \item the inner sum --- the GMM density~\eqref{eq:hybrid:gmm}
+  \item $T$: the number of trading days in the fitting window,
+  \item the inner sum: the GMM density~\eqref{eq:hybrid:gmm}
         evaluated at day $t$'s descriptor $\bx_t$,
-  \item the outer $\log$-sum --- the total log-probability the model
+  \item the outer $\log$-sum: the total log-probability the model
         assigns to the observed history.
 \end{itemize}
 
@@ -1038,7 +1038,7 @@ Equation~\eqref{eq:hybrid:gmm-loglik} scores a candidate set of regime
 blobs by asking ``how likely is the actual volatility history under these
 blobs?''  We want the blobs that make the data look most ordinary.  The
 trouble is the $\log$ wraps a \emph{sum} over regimes, so there is no
-\emph{closed form} --- a direct formula you could just plug numbers into.
+\emph{closed form}, a direct formula you could just plug numbers into.
 Taking the log of a single bell curve simplifies nicely (the $\exp$
 cancels), but taking the log of a \emph{sum} of bell curves does not
 simplify, so we have to iterate instead: knowing the best blobs requires
@@ -1058,7 +1058,7 @@ steps until the log-likelihood stops increasing.
   \gamma_{tk} = \frac{\pi_k\,\N(\bx_t \mid \bm{\mu}_k, \bm{\Sigma}_k)}
     {\sum_{j=1}^{K} \pi_j\,\N(\bx_t \mid \bm{\mu}_j, \bm{\Sigma}_j)},
 \end{equation}
-where $\gamma_{tk}$ is how strongly regime $k$ claims day $t$ ---
+where $\gamma_{tk}$ is how strongly regime $k$ claims day $t$:
 literally regime $k$'s share of the total density at that day, a number
 between $0$ and $1$ (top divided by the sum of all the tops).  In words:
 what fraction of today belongs to the calm cloud, the crisis cloud, the
@@ -1082,7 +1082,7 @@ where $N_k$ is the \textbf{effective number of days} assigned to regime
 $k$.  The mean update~\eqref{eq:hybrid:mstep-mu} is just a weighted average
 of the days (each day weighted by how much it claims to belong).  The
 covariance update~\eqref{eq:hybrid:mstep-sigma} is the weighted average
-\emph{squared spread} of the days around the new center --- it measures how
+\emph{squared spread} of the days around the new center: it measures how
 wide and what shape each cloud is.  The outer product
 $(\bx_t - \bm{\mu}_k^{\text{new}})(\bx_t - \bm{\mu}_k^{\text{new}})^\top$ is
 the multi-feature version of squaring a deviation: the second factor is
@@ -1093,7 +1093,7 @@ Iterate~\eqref{eq:hybrid:estep}--\eqref{eq:hybrid:mstep-pi} until
 $|\ell^{(i+1)} - \ell^{(i)}| < \tau_{\text{EM}}$, where $\ell^{(i)}$ is the
 log-likelihood after iteration $i$ (the parenthesized superscript is an
 iteration counter, not a power) and $\tau_{\text{EM}}$ is a small stopping
-threshold (e.g.\ $10^{-6}$) --- stop when the log-likelihood barely changes.
+threshold (e.g.\ $10^{-6}$).  Stop when the log-likelihood barely changes.
 EM guarantees $\ell(\btheta)$ never decreases
 \citep{DempsterLairdRubin1977}.
 \end{keyidea}
@@ -1105,7 +1105,7 @@ records those fractions.  The M-step then redraws each cloud's center and
 spread using every day, but weighting each day by how much it claims to
 belong.  A day that is 90\% crisis pulls the crisis center hard and the
 calm center barely at all.  Repeat, and the clouds drift until they settle
-on the natural groupings in the volatility data --- no hand-labelling
+on the natural groupings in the volatility data, with no hand-labelling
 required.
 \end{intuition}
 
@@ -1122,8 +1122,8 @@ threshold.
 \end{projectconnection}
 
 \begin{workedexample}{One EM Iteration on $(\RV, \text{jump variation})$}
-Take $d=2$ regime descriptors --- standardized daily $\RV$ and signed jump
-variation --- with $K=3$ regimes (calm, elevated, crisis) and, after
+Take $d=2$ regime descriptors (standardized daily $\RV$ and signed jump
+variation) with $K=3$ regimes (calm, elevated, crisis) and, after
 initialization,
 \[
   \pi_1 = 0.6,\quad \pi_2 = 0.3,\quad \pi_3 = 0.1,
@@ -1138,14 +1138,14 @@ standardized).  Consider a quiet day $\bx_1 = (-0.7, -0.4)^\top$.
 
 \textbf{E-step.}  With $\bm{\Sigma}_k=\mathbf{I}_2$,
 $\N(\bx \mid \bm{\mu}, \mathbf{I}) = \tfrac{1}{2\pi}\exp(-\tfrac12\|\bx-\bm{\mu}\|^2)$,
-where $\|\bx-\bm{\mu}\|^2$ is the \textbf{squared distance} --- the sum of
+where $\|\bx-\bm{\mu}\|^2$ is the \textbf{squared distance}, the sum of
 squared differences in each coordinate.  The squared distances are
 \[
   \|\bx_1 - \bm{\mu}_1\|^2 = 0.01 + 0.01 = 0.02,\quad
   \|\bx_1 - \bm{\mu}_2\|^2 = 1.21 + 0.49 = 1.70,\quad
   \|\bx_1 - \bm{\mu}_3\|^2 = 10.24 + 5.76 = 16.0.
 \]
-Now apply the $-\tfrac12$ factor inside the exponent --- e.g.\ for regime~1,
+Now apply the $-\tfrac12$ factor inside the exponent: e.g.\ for regime~1,
 $\exp(-0.02/2) = \exp(-0.01)$, halving each squared distance.  Unnormalized
 responsibilities ($\tilde\gamma_{1k} = \pi_k\,\tfrac{1}{2\pi}e^{-\|\cdot\|^2/2}$,
 dropping the common $\tfrac{1}{2\pi}$):
@@ -1162,7 +1162,7 @@ Normalizing,
 \]
 
 \textbf{Takeaway.}  The day is $82\%$ calm and $18\%$ elevated, with
-essentially zero crisis weight --- and notice it is \emph{not} 100\% calm.
+essentially zero crisis weight.  Notice it is \emph{not} 100\% calm.
 A hard threshold would have forced a binary calm/not-calm call and thrown
 away the $18\%$ of doubt.  The soft label preserves that uncertainty,
 which is exactly what lets the downstream blend hedge between models on
@@ -1173,7 +1173,7 @@ barely moves $\bm{\mu}_3$.
 \subsection{Choosing the Number of Regimes: BIC}
 \label{sec:hybrid:bic}
 
-How many regimes should there be --- two (calm/crisis), three, four?  You
+How many regimes should there be: two (calm/crisis), three, four?  You
 cannot read $K$ off the log-likelihood, because adding components always
 improves in-sample fit: a GMM with one blob per day fits perfectly and
 learns nothing.  The \textbf{Bayesian Information Criterion (BIC)}
@@ -1185,23 +1185,23 @@ learns nothing.  The \textbf{Bayesian Information Criterion (BIC)}
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $\ell(\hat{\btheta})$ --- the maximized log-likelihood
+  \item $\ell(\hat{\btheta})$: the maximized log-likelihood
         from~\eqref{eq:hybrid:gmm-loglik} at the EM solution,
-  \item $p$ --- the number of free parameters; for a $K$-component GMM in
+  \item $p$: the number of free parameters; for a $K$-component GMM in
         $d$ dimensions with full covariances,
         $p = K\bigl(1 + d + \tfrac{d(d+1)}{2}\bigr) - 1$.  Reading the
         count: each regime needs $1$ mixing weight, $d$ numbers for its
         mean vector, and $\tfrac{d(d+1)}{2}$ numbers for its (symmetric)
-        covariance matrix --- times $K$ regimes, minus $1$ because the
+        covariance matrix, all times $K$ regimes, minus $1$ because the
         mixing weights must sum to one so the last one is determined by the
         rest.  (For $K=2$ regimes and $d=7$ features,
         $p = 2(1+7+28) - 1 = 71$ parameters.)
-  \item $T$ --- the sample size (trading days), so $\log T$ scales the
+  \item $T$: the sample size (trading days), so $\log T$ scales the
         per-parameter penalty.
 \end{itemize}
 
 \begin{intuition}[In Plain English]
-In volatility data, $K=2$ or $K=3$ usually wins --- markets
+In volatility data, $K=2$ or $K=3$ usually wins: markets
 have a calm state, a crisis state, and sometimes an in-between ``elevated
 but orderly'' state.
 \end{intuition}
@@ -1230,11 +1230,11 @@ non-obvious knob is \texttt{n\_init}.
 The GMM log-likelihood~\eqref{eq:hybrid:gmm-loglik} is \textbf{non-convex}:
 the likelihood surface has multiple hills, not one.  EM always climbs
 uphill, so it can get stuck on a smaller hill (a \emph{local} maximum)
-depending on where it starts --- that is why we try several random starting
+depending on where it starts.  That is why we try several random starting
 points and keep the best.  A single bad start can merge a crisis regime
 into the calm one.  Set \texttt{n\_init=10} (ten random restarts, keeping the
 highest-likelihood solution) so the regimes are stable across reruns.  Use
-\texttt{covariance\_type='full'} unless you are short on data --- volatility
+\texttt{covariance\_type='full'} unless you are short on data: volatility
 features are correlated within a regime (high $\RV$ comes with high VIX),
 and a diagonal covariance would miss that.
 \end{warning}
@@ -1245,7 +1245,7 @@ and a diagonal covariance would miss that.
 The GMM has a blind spot that matters enormously for volatility:
 \emph{it has no memory}.  It classifies each day independently, so its
 labels can flicker calm-crisis-calm-crisis on consecutive days even though
-we know volatility regimes are sticky --- a crisis that starts today is
+we know volatility regimes are sticky: a crisis that starts today is
 overwhelmingly likely to persist tomorrow.  How do we bake that
 stickiness into the regime model?
 
@@ -1272,14 +1272,14 @@ missing persistence.  The latent state still indexes the regime, but now a
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $s_t \in \{0,1\}$ --- the latent regime (here $0=$ low-vol,
+  \item $s_t \in \{0,1\}$: the latent regime (here $0=$ low-vol,
         $1=$ high-vol, so the diagonal $p_{00}$ is the calm-regime
         persistence; this is the opposite of Hamilton's expansion$=1$
         coding),
-  \item $p_{ij}$ --- the probability of moving from regime $i$ today to
+  \item $p_{ij}$: the probability of moving from regime $i$ today to
         regime $j$ tomorrow,
-  \item the \textbf{diagonal} entries $p_{00}, p_{11}$ --- the
-        \textbf{persistence} of each regime: how likely it is to stay
+  \item the \textbf{diagonal} entries $p_{00}, p_{11}$: the
+        \textbf{persistence} of each regime, how likely it is to stay
         put.
 \end{itemize}
 
@@ -1289,14 +1289,14 @@ today as a fresh draw, Equation~\eqref{eq:hybrid:transition} says ``if you
 were calm yesterday, you are probably calm today'' through a high $p_{00}$
 (rows are today's regime, columns are tomorrow's, so $p_{ij}$ reads ``from
 $i$ to $j$'').  If each day you stay with probability $p$, the average run
-length before you leave is $1/(1-p)$ --- the same arithmetic as ``if a coin
+length before you leave is $1/(1-p)$, the same arithmetic as ``if a coin
 lands heads $98\%$ of the time, you wait about $50$ flips for a tail.''  So
 the expected length of a regime is $1/(1-p_{ii})$ days, and a persistence
 near $0.98$ implies spells of roughly $50$ days.  Estimating the
 regime now requires running forward through the whole sequence with the
 \textbf{Hamilton filter} \citep{Hamilton1989}, which combines yesterday's
 regime belief, the transition matrix, and today's observation into
-today's filtered probability $\Pr(s_t = k \mid \bx_{1:t})$ --- the
+today's filtered probability $\Pr(s_t = k \mid \bx_{1:t})$, the
 probability of today's regime using only data up to and including today
 (days $1$ through $t$).
 \end{intuition}
@@ -1325,18 +1325,18 @@ Fit a two-state Markov-switching model to daily (log) realized volatility,
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $\mu_{s_t}$ --- the regime-dependent average level of log-$\RV$,
+  \item $\mu_{s_t}$: the regime-dependent average level of log-$\RV$,
         which flips between a calm value and a crisis value as the latent
         state $s_t$ switches (the double subscript means ``the mean for
         whichever regime applies on day $t$''),
-  \item $\phi$ --- the \textbf{persistence} (autoregressive) coefficient,
+  \item $\phi$: the \textbf{persistence} (autoregressive) coefficient,
         between $-1$ and $1$, controlling how strongly yesterday's deviation
         carries into today,
-  \item $\bigl(\log \RV_{t-1} - \mu_{s_{t-1}}\bigr)$ --- yesterday's gap
+  \item $\bigl(\log \RV_{t-1} - \mu_{s_{t-1}}\bigr)$: yesterday's gap
         above or below \emph{its} regime mean,
-  \item $\varepsilon_t \sim \N(0,\sigma_{s_t}^2)$ --- random noise (the
+  \item $\varepsilon_t \sim \N(0,\sigma_{s_t}^2)$: random noise (the
         ``$\sim$'' reads ``is distributed as'') whose size $\sigma_{s_t}$
-        is itself regime-dependent --- bigger in a crisis,
+        is itself regime-dependent (bigger in a crisis),
 \end{itemize}
 with $s_t \in \{\text{low},\text{high}\}$ and transition
 matrix~\eqref{eq:hybrid:transition}.  A representative equity-index fit
@@ -1354,13 +1354,13 @@ yields two clearly separated regimes:
 \end{itemize}
 The filtered probability $\Pr(s_t = \text{high} \mid \bx_{1:t})$ spikes
 during known stress episodes (2008, 2020) without those dates being
-supplied as inputs --- the analogue of Hamilton's filtered recession
+supplied as inputs, the analogue of Hamilton's filtered recession
 probabilities tracking NBER dates.
 \end{keyresult}
 
 \begin{intuition}[In Plain English]
-Equation~\eqref{eq:hybrid:ms-rv} is just an AR(1) --- autoregressive of
-order $1$, meaning today depends on yesterday plus noise --- for
+Equation~\eqref{eq:hybrid:ms-rv} is just an AR(1) (autoregressive of
+order $1$, meaning today depends on yesterday plus noise) for
 log-volatility whose
 \emph{level} $\mu_{s_t}$ flips between a calm value and a crisis value, with
 the flips governed by the transition matrix.  The two estimated means tell
@@ -1377,8 +1377,8 @@ variance recursion} gives the \textbf{Markov-switching GARCH} model: the
 $(\omega, \alpha, \beta)$ parameters of the GARCH update from
 Chapter~\ref{ch:garch} themselves switch with the latent state.  This is
 the econometric cousin of the GINN idea in
-Section~\ref{sec:hybrid:ginn}, where a neural network --- rather than a
-two-state Markov chain --- supplies the time-varying GARCH parameters.
+Section~\ref{sec:hybrid:ginn}, where a neural network, rather than a
+two-state Markov chain, supplies the time-varying GARCH parameters.
 Both answer the same question: ``what if the volatility dynamics
 themselves depend on the current regime?''
 \end{projectconnection}
@@ -1400,7 +1400,7 @@ matter for a volatility-forecasting pipeline.
 \textbf{Dimension} & \textbf{GMM} & \textbf{Markov-Switching} \\
 \midrule
 Temporal structure / persistence
-  & None --- each day classified independently, so labels can flicker
+  & None: each day classified independently, so labels can flicker
   & Markov chain: $s_t$ depends on $s_{t-1}$; persistence explicit via
     transition matrix $\mathbf{P}$ \\
 \addlinespace
@@ -1425,8 +1425,8 @@ Best for
 \end{table}
 
 \begin{keyidea}[Start with GMM; Upgrade to Markov-Switching for Persistence]
-For a first regime feature --- a column of soft probabilities to hand the
-LightGBM model or a quick blend dial --- the GMM is simpler, faster, and
+For a first regime feature (a column of soft probabilities to hand the
+LightGBM model or a quick blend dial), the GMM is simpler, faster, and
 sufficient.  Reach for Markov-switching only when day-to-day flickering of
 the regime label is actively hurting the blend, or when you want a regime
 signal whose persistence is calibrated from the data.  The two are
@@ -1449,13 +1449,13 @@ Three disciplines keep a regime overlay honest:
   \item \textbf{Use soft probabilities, not hard labels} (workflow
         step~4 above).  A strategy that flips fully risk-on at a hard
         ``calm'' label implicitly assumes a perfect classification you do
-        not have --- today's responsibility might be only $60\%$ calm,
+        not have: today's responsibility might be only $60\%$ calm,
         $40\%$ elevated.
   \item \textbf{Test with lagged regime labels.}  Apply yesterday's
         regime classification to today's blend, never a label that used
         today's or future data.  For Markov-switching, use the
-        \emph{filtered} probability $\Pr(s_t \mid \bx_{1:t})$ --- which uses
-        only data up to and including today (days $1$ through $t$) --- not
+        \emph{filtered} probability $\Pr(s_t \mid \bx_{1:t})$, which uses
+        only data up to and including today (days $1$ through $t$), not
         the \emph{smoothed} $\Pr(s_t \mid \bx_{1:T})$, which uses the
         \emph{entire} sample (days $1$ through the last day $T$) and so
         secretly looks into the future: fine for describing history, fatal
@@ -1493,11 +1493,11 @@ depending on the current volatility regime:
 \end{equation}
 where each term is:
 \begin{itemize}
-  \item $\RV_t^{(w)}$ --- the weekly realized volatility, used as a
+  \item $\RV_t^{(w)}$: the weekly realized volatility, used as a
         regime indicator,
-  \item $\tau$ --- the regime threshold (e.g., the 75th percentile
+  \item $\tau$: the regime threshold (e.g., the 75th percentile
         of the training-set $\RV^{(w)}$ distribution),
-  \item $w_k^{\text{low}}, w_k^{\text{high}}$ --- separate blend
+  \item $w_k^{\text{low}}, w_k^{\text{high}}$: separate blend
         weights for the low-volatility and high-volatility regimes,
         each calibrated on the corresponding subset of the validation
         data.
@@ -1526,7 +1526,7 @@ justified upgrade.  Document the per-regime performance gap as evidence.
 
 
 %% ============================================================
-%% SECTION 8 — When to Use What (was Section 7)
+%% SECTION 8 - When to Use What (was Section 7)
 %% ============================================================
 \section{When to Use Pure ML vs.\ Hybrid}\label{sec:hybrid:decision}
 
@@ -1658,7 +1658,7 @@ on the residual, reducing both model complexity and overfitting risk.}
 
 
 %% ============================================================
-%% SECTION 9 — Summary
+%% SECTION 9 - Summary
 %% ============================================================
 \section{Summary}\label{sec:hybrid:summary}
 

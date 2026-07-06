@@ -6,9 +6,9 @@ Most derivatives lack closed-form prices.  Black--Scholes
 (\cref{ch:black_scholes}) is the famous exception; American options,
 path-dependent exotics, multi-asset baskets, callable bonds, CDOs, and
 structured notes must be priced numerically.  This chapter covers the
-three pillars a Strat uses daily --- \textbf{Monte Carlo} (with
+three methods a Strat uses daily: \textbf{Monte Carlo} (with
 variance reduction), \textbf{finite-difference PDE}, and
-\textbf{lattices (trees)} --- plus the \textbf{Longstaff--Schwartz}
+\textbf{lattices (trees)}, plus the \textbf{Longstaff--Schwartz}
 algorithm, which converts the American-option optimal-stopping problem
 into a sequence of linear regressions.  The aim is to let you
 \emph{read} production code, understand its failure modes, and pick
@@ -32,7 +32,7 @@ From earlier chapters:
 \end{itemize}
 Linear algebra (matrix--vector products, tridiagonal solves) is
 assumed.  Numerical PDE and lattice sections use only elementary
-Taylor expansions --- if you have seen the heat equation and a forward
+Taylor expansions; if you have seen the heat equation and a forward
 difference, you have enough.
 \end{backgroundbox}
 
@@ -51,8 +51,8 @@ price
 under the risk-neutral measure $\Qm$.  Monte Carlo takes this at
 face value: simulate thousands of random price paths under $\Qm$,
 evaluate the payoff at each terminal (or along each path), average,
-and discount.  When the payoff depends on the whole path --- Asian
-averages, barrier knock-outs, lookback maxima --- no closed form
+and discount.  When the payoff depends on the whole path (Asian
+averages, barrier knock-outs, lookback maxima), no closed form
 exists, and this path-by-path averaging is often the only tool that
 works.
 
@@ -92,14 +92,15 @@ The MC estimator $\hat V_0$ is unbiased, with standard error
   \;=\; e^{-\rrf\Tmat}\, \frac{\sigma_g}{\sqrt{N}},
   \qquad \sigma_g^2 \defeq \Var\!\left[ g(\Spx_\Tmat) \right].
 \end{equation}
-Halving error quadruples path count --- the defining number about MC:
+Halving the error quadruples the path count, the defining number
+about MC:
 
 \begin{keyfactbox}[Monte Carlo convergence rate]
 The root-mean-square error of a plain-vanilla Monte Carlo estimator
 is $O(1/\sqrt{N})$ regardless of dimension.  This
 dimension-independence is what makes MC the only practical method for
 high-dimensional problems (basket options, CDOs, multi-factor rates),
-but $O(1/\sqrt{N})$ also means brute force alone is slow --- hence
+but $O(1/\sqrt{N})$ also means brute force alone is slow; hence
 variance reduction.
 \end{keyfactbox}
 
@@ -109,7 +110,7 @@ The $O(1/\sqrt N)$ rate assumes the $Z_k$ are independent draws.
 \emph{Quasi-Monte Carlo} (QMC) replaces pseudo-random uniforms with
 a low-discrepancy sequence (Sobol, Halton, Faure) that covers
 $[0,1]^d$ more uniformly than random noise.  Its error is
-$O(\log^d(N)/N)$ --- effectively $O(1/N)$ --- and dominates MC for
+$O(\log^d(N)/N)$, effectively $O(1/N)$, and dominates MC for
 moderate dimensions ($d \lesssim 50$).  Sobol with Brownian-bridge
 construction is the production choice for low-to-moderate dimensional
 European exotics.  A naive sequential time-grid fill concentrates the
@@ -134,8 +135,8 @@ Drawing $N = 10^6$ standard normals (seed 42) yields
 The absolute error is within $1.1\,\mathrm{SE}$ of the true price,
 consistent with the estimator's Gaussian sampling
 distribution~\citeGlasserman.  Pushing the error below one cent needs
-$(0.0147/0.005)^2 \approx 9$ times more paths --- where variance
-reduction earns its keep.
+$(0.0147/0.005)^2 \approx 9$ times more paths, which is where
+variance reduction earns its keep.
 
 The $O(1/\sqrt N)$ rate is visible in a convergence table for the
 same setup (seed 42):
@@ -155,7 +156,7 @@ $10^6$  & $10.434$ & $0.015$ & $0.016$ \\
 \end{tabular}
 \end{center}
 
-Each tenfold path increase shrinks SE by $\sqrt{10} \approx 3.16$ ---
+Each tenfold path increase shrinks SE by $\sqrt{10} \approx 3.16$,
 one significant digit.  Six-digit accuracy from $10^6$ paths would
 need $10^{12}$ paths (weeks of compute); variance reduction replaces
 that brute force.
@@ -338,8 +339,8 @@ stratified sampling; the savings compound multiplicatively.
 \end{intuitionbox}
 
 \begin{pitfallbox}[Antithetic variates can backfire]
-If the payoff is not monotone in the shock --- a straddle, a
-butterfly, anything with a kink in both directions --- antithetics can
+If the payoff is not monotone in the shock (a straddle, a
+butterfly, anything with a kink in both directions), antithetics can
 \emph{increase} variance.  Always measure the post-antithetic standard
 error empirically rather than assume the technique helps.
 \end{pitfallbox}
@@ -354,8 +355,8 @@ American options (exercisable any time before expiry) are the default
 in equity derivatives.  A single-stock American put is worth strictly
 more than its European counterpart because of early exercise.  The
 pricing problem is \emph{optimal stopping}: the optimal exercise time
-depends on the future distribution conditional on the current state
---- exactly what simulations do not give path-by-path.
+depends on the future distribution conditional on the current state,
+exactly what simulations do not give path-by-path.
 
 Before 2001, practical American pricers were limited to lattices and
 low-dimensional PDEs.  \citet{longstaffschwartz2001} changed that:
@@ -496,7 +497,7 @@ consistent~\citep{longstaffschwartz2001}.
 \subsection{Dimensionality: where LS genuinely wins}
 
 For a single-stock American put, CRR trees with $N=5000$ steps
-deliver four-decimal accuracy in $\sim 100\,\mathrm{ms}$ --- LS is
+deliver four-decimal accuracy in $\sim 100\,\mathrm{ms}$; LS is
 slower.  LS wins decisively once the state space has two or more
 dimensions:
 \begin{itemize}
@@ -562,8 +563,8 @@ decimal places.
 \begin{intuitionbox}
 LS converts the optimal-control problem (when to exercise?) into a
 sequence of regressions (what is the expected continuation value?).
-The regressed $\hat C(\cdot)$ is biased --- only as good as the basis
---- but the resulting exercise policy is \emph{low-biased}: a
+The regressed $\hat C(\cdot)$ is biased (only as good as the basis),
+but the resulting exercise policy is \emph{low-biased}: a
 suboptimal rule gives a lower bound on the true American price,
 useful for conservative pricing.  Upper bounds from duality methods
 exist too, but LS low bounds are the industry workhorse.
@@ -606,10 +607,10 @@ Finite-difference methods solve the Black--Scholes PDE from
 \cref{ch:black_scholes} \emph{directly on a grid}: discretise both
 time and asset price, replace derivatives with differences, step
 backward from the terminal payoff.  This is the natural tool when you
-already have the PDE but no closed-form solution.  For low-dimensional
-products (one or two state variables) with a PDE characterisation ---
-vanilla European and American options, barriers, single-curve rates
-products --- finite-difference methods win.  They are deterministic,
+already have the PDE but no closed-form solution.  Finite-difference
+methods win for low-dimensional products (one or two state variables)
+with a PDE characterisation: vanilla European and American options,
+barriers, single-curve rates products.  They are deterministic,
 converge at $O(\Delta t + \Delta S^2)$ or better, and deliver
 high-quality Greeks as grid by-products.
 
@@ -734,7 +735,7 @@ node,
     \frac{V(t + \Delta t, \Spx_i) - V(t, \Spx_i)}{\Delta t},
 \end{align}
 all from a single grid solve.  MC needs one price per bumped parameter
-per Greek --- a $2 N_\text{paths}$ penalty per Greek, mitigated only
+per Greek, a $2 N_\text{paths}$ penalty per Greek, mitigated only
 by pathwise or likelihood-ratio estimators (\citeGlasserman, ch.~7).
 
 \subsection{American options on the FD grid}
@@ -862,8 +863,8 @@ convergence~\citeHull.  For $10^{-4}$ accuracy, a $1000\times 100$
 CN grid is about as fast as a CRR tree with $N=5000$.
 
 \begin{intuitionbox}
-CRR is pedagogically beautiful --- it visualises risk-neutral
-valuation as a discrete conditional expectation --- and cheap for
+CRR is pedagogically beautiful (it visualises risk-neutral
+valuation as a discrete conditional expectation) and cheap for
 simple single-factor Americans.  For serious work, Crank--Nicolson
 (better accuracy, same cost) or Longstaff--Schwartz (path-dependence,
 multi-factor) supersedes it.
@@ -906,8 +907,8 @@ naive \emph{bump and reprice} estimator
 \end{equation}
 has two problems: (i) fresh paths give independent noise with variance
 $\propto 2/\sqrt N$, amplified by $1/\epsilon$; (ii) bump discretisation
-error is $O(\epsilon^2)$.  The fix --- \emph{common random numbers}
-across bumped prices --- kills independent noise and cuts Greek
+error is $O(\epsilon^2)$.  The fix, \emph{common random numbers}
+across bumped prices, kills independent noise and cuts Greek
 variance by $10$--$100\times$.
 
 Two more sophisticated estimators dominate production:
@@ -1042,7 +1043,7 @@ them:
 
 A derivatives book typically wraps all four pricers behind one
 \verb|Pricer.price(product)| facade with a config flag.  The
-engineering challenge is rarely the maths --- it is wiring the right
+engineering challenge is rarely the maths: it is wiring the right
 solver to the right product and making every solver return the same
 Greek.
 
@@ -1058,7 +1059,7 @@ vanilla market prices.  For local-vol:
 with each $\Call^{\mathrm{model}}$ evaluation a PDE or MC run.  A
 thousand quotes over a hundred LM iterations fires the inner pricer
 $10^5$ times, so inner-pricer speed is the dominant library metric.
-When accuracy ties, the faster method wins --- why Carr--Madan FFT
+When accuracy ties, the faster method wins, which is why Carr--Madan FFT
 (Heston) and Crank--Nicolson (local-vol) dominate their niches.
 
 \subsection{Numerical hazards in production}
@@ -1070,7 +1071,7 @@ A partial list of bugs every derivatives library has hit once:
     as systematic PV bias under \cref{ch:risk_production}'s P\&L-
     explain scrutiny.
   \item \textbf{Antithetic on two-sided kink payoffs.}  Variance
-    silently increases, the price still converges --- just slower.
+    silently increases, the price still converges, just slower.
     Regress empirical SE against $1/\sqrt N$ as a check.
   \item \textbf{LS regression on OTM paths.}  Price biased low by
     $5$--$20$ bp depending on moneyness, never flagged by unit tests.
@@ -1130,8 +1131,8 @@ Unit tests without cross-pricer agreement are theatre.
     fastest given dimension and exercise style.
   \item \textbf{Monte Carlo}: $O(N^{-1/2})$, dimension-free, the only
     option for high-dim baskets or path-dependence.
-  \item \textbf{Variance reduction} --- antithetics, control variates,
-    importance sampling --- cuts MC variance by $5$--$100\times$.
+  \item \textbf{Variance reduction} (antithetics, control variates,
+    importance sampling) cuts MC variance by $5$--$100\times$.
   \item \textbf{Longstaff--Schwartz}: the canonical American pricer.
     Run paths forward; at each exercise date regress continuation on
     a polynomial basis.  $\sim$30 lines price the universe.
@@ -1155,14 +1156,14 @@ Variance-reduction logic transfers: run many days (MC averaging),
 compute paired deltas when you tweak a parameter (antithetic: same
 shocks, new parameter), and use a simpler strategy as a control
 variate.  The Frankfurt Hedgehogs credit ``backtest on as many days
-as possible'' as their single most important rule --- variance
+as possible'' as their single most important rule: variance
 reduction applied to algo trading research.
 \end{prosperitybox}
 
 
 \begin{gsbox}
 On a Strats desk the numerical toolkit is productised as a library
---- call it \verb|PricerLib| in SecDB dialect --- that all desks
+(call it \verb|PricerLib| in SecDB dialect) that all desks
 consume.  A structuring Strat rarely writes MC from scratch: the
 workflow is (i) check the product-to-pricer routing table, (ii) pick
 the default (CN for low-dim exotics, LS for Americans, Carr--Madan
@@ -1183,7 +1184,7 @@ and owning the stability and convergence tests in CI.
     industry standard for 22 years.
   \item \citet{longstaffschwartz2001}: replaced the tree with a
     regression on simulated paths, breaking the curse of dimension
-    for Americans.  The most-cited paper in computational finance ---
+    for Americans.  The most-cited paper in computational finance;
     read the eight-path Section~1 example until you can reproduce it
     without looking.
 \end{itemize}

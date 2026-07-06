@@ -11,8 +11,8 @@ pairs them off without missing any willing trade?} The answer
 dominates this chapter and every chapter that follows: the
 \textbf{limit order book} (LOB), a simple data structure that every
 professional trading venue converges on, and the \textbf{matching
-engine} that operates on it. This chapter defines the vocabulary ---
-bid, ask, spread, order types, maker/taker, tick size --- that every
+engine} that operates on it. This chapter defines the vocabulary
+(bid, ask, spread, order types, maker/taker, tick size) that every
 later chapter assumes. Nothing here is mathematically deep, but every
 bold term is load-bearing.
 
@@ -32,15 +32,15 @@ From outside the book the reader should bring:
 \section{Double-sided auctions}
 \label{sec:double_sided}
 
-An \textbf{exchange} is a venue --- nowadays almost always software in
-a colocation data centre --- whose only job is to accept messages
+An \textbf{exchange} is a venue (nowadays almost always software in
+a colocation data centre) whose only job is to accept messages
 called \emph{orders}, match buyers with sellers according to a fixed
 published rule, and report the resulting trades. A \textbf{product} is
 whatever is being traded; think of a stock, but it could equally be a
 bond, a futures contract, a Prosperity \texttt{RAINFOREST\_RESIN}, or
 a kilo of coffee. The exchange runs one such auction per product, in
 parallel, continuously. Because a product has both buyers and sellers
-at any instant, the mechanism is a \emph{double-sided auction} --- as
+at any instant, the mechanism is a \emph{double-sided auction}, as
 opposed to a one-sided auction like eBay, where bids are collected
 against a single seller.
 
@@ -48,10 +48,10 @@ against a single seller.
 Before the late 1990s a ``double-sided auction'' meant a physical
 \emph{pit}: human traders shouting bids and asks in hand signals.
 The NYSE ran its floor this way from 1792; the CBOT and LIFFE kept
-their pits through the 1990s. Electronic matching arrived gradually
---- NASDAQ's SelectNet (1988), the Swiss Exchange fully electronic
+their pits through the 1990s. Electronic matching arrived gradually:
+NASDAQ's SelectNet (1988), the Swiss Exchange fully electronic
 (1996), the LSE abandoning its floor (1997), Eurex absorbing the
-Deutsche Terminb\"orse (1998) --- and by about 2010 equity and
+Deutsche Terminb\"orse (1998). By about 2010 equity and
 futures volume was essentially all electronic. The mental model of
 this chapter, orders as messages and the book as a data structure,
 only became universally applicable in the last two decades; before
@@ -98,7 +98,7 @@ non-zero spread as an empirical fact.
   \midp \;\defeq\; \tfrac{1}{2}(\bidp + \askp).
 \]
 These four numbers are the minimum summary of a market's current
-state. \emph{None} of them is ``the price'' of the product --- that
+state. \emph{None} of them is ``the price'' of the product; that
 ambiguity is the subject of \cref{ch:price_value}, which introduces
 five more candidates.
 \end{keyfactbox}
@@ -191,8 +191,8 @@ limit order with an extra constraint on price or time-in-force.
 \index{market order|textbf}\index{order!market|textbf}
 A \emph{market order} is an order to buy or sell $q$ units
 \emph{immediately} at whatever prices are available, sweeping from the
-best quote outward until $q$ units are filled. Equivalently --- the
-cleanest implementation in the Python section below --- a market buy
+best quote outward until $q$ units are filled. Equivalently (the
+cleanest implementation in the Python section below), a market buy
 is a limit buy with $p = +\infty$, and a market sell is a limit sell
 with $p = 0$.
 \end{definition}
@@ -213,7 +213,7 @@ moment later.
 An \emph{FOK} order executes in full immediately, or not at all. If
 the full quantity $q$ cannot be filled against the current book, the
 exchange rejects the order entirely and no partial fill is reported.
-Used when partial fills are operationally costly --- for example,
+Used when partial fills are operationally costly, for example
 a hedge that is only valid as one unit.
 \end{definition}
 
@@ -222,7 +222,7 @@ fundamental (you won't need them algorithmically in this book) but
 every practitioner is expected to know them. A \textbf{stop order} is
 dormant until the last traded price crosses a \emph{trigger} $p_s$,
 at which point it becomes a market order (or a limit order, for a
-\emph{stop-limit}); the classic example is a stop-loss sell --- ``if
+\emph{stop-limit}); the classic example is a stop-loss sell: ``if
 the price drops to $p_s$, sell me out.'' A \textbf{hidden order} is a
 resting limit order the exchange will match against but does not
 publish in public book data; the trader loses price--time priority
@@ -250,11 +250,11 @@ will see everywhere:
 
 IOC and FOK are technically TIFs too: ``cancel the unfilled remainder
 now'' and ``cancel the whole order now if it cannot fill in full''.
-Prosperity orders behave as ``immediate only'' --- they match in the
+Prosperity orders behave as ``immediate only'': they match in the
 current tick or are cancelled when the next \texttt{TradingState}
 arrives (\cref{sec:first_prosperity}).
 
-The key distinction to internalise --- limit vs market vs IOC/FOK ---
+The key distinction to internalise (limit vs market vs IOC/FOK)
 controls whether an order \emph{provides} liquidity (rests) or
 \emph{consumes} it (hits something resting). \Cref{sec:makers_takers}
 turns that split into the maker/taker dichotomy that runs through the
@@ -360,9 +360,9 @@ priority.
 
 \begin{intuitionbox}
 A limit order book is two sorted lists. That's it. Everything people
-call ``the market'' --- depth, spread, mid, slippage, impact, adverse
+call ``the market'' (depth, spread, mid, slippage, impact, adverse
 selection, market making, queue position, BBO feeds, the entire
-vocabulary of HFT --- is built from manipulations of those two lists.
+vocabulary of HFT) is built from manipulations of those two lists.
 Parts~II and~III of this book are, at bottom, an attempt to explain
 what those two lists look like, why they look that way, and how to
 trade against them.
@@ -402,8 +402,8 @@ That is better than the current best bid of $102.54$ and does not
 cross the ask ($102.55 < 103.23$). The engine finds no cross and
 inserts the order at the top of the bid side.
 
-A second participant submits a limit buy for $14$ shares at $102.55$
---- same price, so it does not improve or cross. Under price--time
+A second participant submits a limit buy for $14$ shares at
+$102.55$, the same price, so it does not improve or cross. Under price--time
 priority it queues \emph{behind} the $24$-share order. The book is
 now:
 
@@ -472,7 +472,7 @@ engine from Pelgrims's blog. It keeps only what's needed to reproduce
 the worked example: an \texttt{Order}, a \texttt{Trade}, an
 \texttt{OrderBook} with two sorted lists, and a \texttt{match} method
 implementing the Step~3 fill loop. Not production code (no threading,
-error handling, cross-trader accounting, or feed publication) --- just
+error handling, cross-trader accounting, or feed publication), just
 enough to \emph{run} the example.
 
 \begin{lstlisting}[language=Python, caption={Minimal price--time-priority matching engine. Adapted from \citep{pelgrims2020matching}.}]
@@ -512,8 +512,8 @@ class OrderBook:
 \end{lstlisting}
 
 \begin{intuitionbox}
-The \texttt{price} field comment --- ``+inf for a market buy, 0 for a
-market sell'' --- is the whole point of the listing. A market buy is
+The \texttt{price} field comment (``+inf for a market buy, 0 for a
+market sell'') is the whole point of the listing. A market buy is
 a limit buy with $p = +\infty$: the crossing predicate
 ``$r.\mathrm{price} \leq \mathrm{incoming}.\mathrm{price}$'' is true
 for \emph{every} resting sell, so the fill loop eats levels until
@@ -561,7 +561,7 @@ and use slightly different names, but the skeleton is universal.
 
 For strategy content you will rarely care about steps~5 and~6: on
 Prosperity both happen instantly, and on a sell-side desk the Strat
-role touches post-trade infrastructure little. But know the names ---
+role touches post-trade infrastructure little. But know the names:
 every real trading system logs events at every stage, and you will
 read those logs when debugging.
 
@@ -593,7 +593,7 @@ construction, makers provide liquidity by posting quotes; takers
 consume liquidity by hitting them.
 \end{definition}
 
-Exchanges want a deep, tight book --- it attracts more traders, more
+Exchanges want a deep, tight book: it attracts more traders, more
 volume, and more fees. But someone has to \emph{post} the resting
 orders, and that someone is exposed to adverse selection, inventory
 risk, and opportunity cost. The standard solution is a
@@ -615,7 +615,7 @@ notional: $1{,}000 \times 50 = \$50{,}000$. Then:
   \item The exchange pockets the difference, $\$0.50$.
 \end{itemize}
 
-The rebate of \$1.00 on \$50{,}000 is tiny --- two ten-thousandths
+The rebate of \$1.00 on \$50{,}000 is tiny: two ten-thousandths
 of a percent. For a strategy that crosses the spread once per trade
 it is irrelevant. For a market maker who collects the rebate on every
 fill, turns over billions of notional daily, and barely breaks even
@@ -686,7 +686,7 @@ options are exactly:
 The pitfall: a model that ignores the tick lattice can confidently
 tell you to quote numbers that are illegal on the venue. Which of the
 three legal roundings is optimal depends on inventory, queue position,
-and adverse selection --- \cref{ch:market_making} content. For now,
+and adverse selection, the subject of \cref{ch:market_making}. For now,
 just remember the lattice constrains every quoting strategy.
 \end{pitfallbox}
 
@@ -747,19 +747,19 @@ the subject of \cref{ch:price_value}.
 
 This chapter's LOB model is the \emph{central-limit-order-book (CLOB)
 exchange}: one venue, one book, anonymous participants, price--time
-priority. The right mental model for equities, listed futures, and
-Prosperity. Not the right model for much of what a sell-side bank
+priority. That is the right mental model for equities, listed
+futures, and Prosperity, but not for much of what a sell-side bank
 quotes.
 
 \begin{gsbox}
 A Goldman Sachs rates desk that makes a market in, say, a $10$-year
 USD interest rate swap does \emph{not} post resting limit orders into
-a public CLOB. The desk receives RFQs (requests for quote) ---
-``what's your price on \$500m $10$y fixed-for-float?'' --- and
+a public CLOB. The desk receives RFQs (requests for quote) such as
+``what's your price on \$500m $10$y fixed-for-float?'' and
 responds with a bid and an ask bespoke to that client, size, and
-instant. There is a book of sorts --- the Strat's pricing system
+instant. There is a book of sorts (the Strat's pricing system
 maintains a theoretical mid from curve models plus an
-inventory-adjusted skew --- but it is internal; client quotes are
+inventory-adjusted skew), but it is internal; client quotes are
 individually-priced two-way streams, not resting orders in a public
 queue. The CLOB model still applies in two places: the \emph{hedge}
 leg (the desk offsets the swap against exchange-traded instruments
@@ -775,7 +775,7 @@ If you forget everything else, carry forward this list.
 
 \begin{itemize}
   \item A \textbf{limit order book} is two sorted lists of resting
-  limit orders --- bids descending, asks ascending. Everything later
+  limit orders: bids descending, asks ascending. Everything later
   chapters call ``the market'' is a manipulation of those lists.
 
   \item \textbf{Best bid} $\bidp$, \textbf{best ask} $\askp$,

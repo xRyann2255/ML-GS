@@ -8,8 +8,8 @@ market against you by tens of basis points. Trailing them out
 one-by-one over the full session exposes you to all-day price risk,
 where a random adverse drift of half a percent on tens of millions
 of dollars notional wipes out a week of desk P\&L. Between the two
-extremes sits a schedule --- how many shares to sell at each minute
---- that balances rushing against dawdling. Under linear impact
+extremes sits a schedule (how many shares to sell at each minute)
+that balances rushing against dawdling. Under linear impact
 and Gaussian price noise, ``when should you sell each share'' has
 a clean closed-form answer, and this chapter derives it from scratch.
 
@@ -44,8 +44,8 @@ From earlier in the book:
   relationship. Warning: A--S uses $\riskav$ for the
   market-maker's risk aversion; here $\riskav$ is the
   permanent-impact coefficient (pitfallbox below).
-  \item \Cref{ch:mean_reversion_ou}: mean-variance thinking ---
-  fix an expected cost, minimise variance, or vice versa. A--C
+  \item \Cref{ch:mean_reversion_ou}: mean-variance thinking
+  (fix an expected cost, minimise variance, or vice versa). A--C
   applies it to a schedule rather than a scalar.
 \end{itemize}
 From outside the book:
@@ -118,8 +118,8 @@ with two constants:
   liquidation $\epsilon\sum|n_k| = \epsilon X$ is a constant
   offset and drops out of every optimisation.
   \item $\eta > 0$: linear slope on rate. Twice the rate, twice
-  the temporary impact per share --- the term that makes ``rush''
-  expensive and shapes the optimal schedule.
+  the temporary impact per share. This is the term that makes
+  ``rush'' expensive and shapes the optimal schedule.
 \end{itemize}
 With constant rate over the interval, the average execution price
 in period $k$ is the starting mid minus $g(n_k/\tau)$. Total
@@ -134,7 +134,7 @@ The constant $\epsilon X$ will be dropped everywhere below.
 \paragraph{Permanent impact $h(v)$.} Selling signals that somebody
 thinks fair value has moved; the market updates its belief and
 the mid drifts down. Unlike the temporary component, this drift
-does not revert --- it lives on the efficient price. \citeAC{}
+does not revert; it lives on the efficient price. \citeAC{}
 models it linearly:
 \begin{equation}
   h(v) \;=\; \riskav\, v,
@@ -148,7 +148,7 @@ In \cref{ch:market_making}, Avellaneda--Stoikov's reservation price
 $r = \Spx - \invq\,\riskav\,\volat^2(T-t)$ used $\riskav$ for the
 market-maker's exponential-utility risk aversion. Same Greek, but
 here $\riskav$ is the \emph{permanent-impact slope} $h(v) = \riskav
-v$ --- a venue/asset property, not a trader preference. For the
+v$, a venue/asset property rather than a trader preference. For the
 A--C liquidator, ``risk aversion'' is $\lambda$, introduced below.
 Henceforth: $\riskav$ means permanent-impact coefficient, $\lambda$
 means liquidator urgency.
@@ -280,7 +280,7 @@ by independence of the $\xi_k$. The sum $\sum x_k^2$ is the
 discrete $L^2$-norm of the inventory path, so \textbf{variance is
 the area under the squared-inventory curve}, weighted by
 $\volat^2\tau$. A slow schedule (large $x_k$ throughout) carries
-more variance --- price moves act on more shares for longer.
+more variance: price moves act on more shares for longer.
 
 \subsection{The objective}
 \label{subsec:ac_obj}
@@ -326,7 +326,7 @@ $\volat^2\tau\sum x_k^2$ under $x_0=X, x_N=0$ sends everything at
 $k=1$: all $x_k = 0$ thereafter, variance collapses, cost blows up.
 
 Intermediate $\lambda$: deterministic, monotone-decreasing,
-\emph{front-loaded} relative to TWAP --- trading some expected
+\emph{front-loaded} relative to TWAP, trading some expected
 cost for variance reduction by shedding the large early positions
 that dominate $\sum x_k^2$.
 \end{intuitionbox}
@@ -529,7 +529,7 @@ mid-cap US equity liquidation that appears in every textbook.
   heavy-liquidation magnitude.
   \item $\riskav = 2.5\times 10^{-7}$. Permanent impact over the
   whole day is $\riskav X = 0.25$, an order of magnitude below
-  the temporary cost --- matching the empirical observation that
+  the temporary cost, matching the empirical observation that
   permanent impact is a minority of execution cost.
   \item $\lambda = 10^{-6}$, mildly risk-averse.
 \end{itemize}
@@ -579,7 +579,7 @@ construction.
 \textbf{Vs.\ TWAP.} TWAP sends $X/N \approx 76\,923.08$ per bin;
 A--C's first trade is $77\,743.35$ ($+1.07\%$ vs.\ TWAP), its
 last $76\,464.43$ ($-0.60\%$). At $\lambda = 10^{-6}$, A--C is
-almost indistinguishable from TWAP --- $\kappa T = 0.19$ is small,
+almost indistinguishable from TWAP: $\kappa T = 0.19$ is small,
 so $\sinh(\kappa(T-t))/\sinh(\kappa T) \approx (T-t)/T$. Curvature
 emerges at higher $\lambda$ (see \cref{sec:ac_frontier}). For a
 gently risk-averse trader, A--C says ``don't deviate from TWAP''.
@@ -589,7 +589,7 @@ The smallness of $\kappa T$ is not a parameter accident: for
 one-day liquidations of liquid names, linear impact and vol balance
 so $\kappa T \ll 1$, and optimal execution is only mildly
 front-loaded vs.\ TWAP. A--C's main payoff over TWAP is not a
-dramatic schedule change --- it is a principled way to pick
+dramatic schedule change but a principled way to pick
 $\lambda$ from client risk tolerance, and to compute the chosen
 schedule's expected cost and standard deviation for post-trade
 benchmarking.
@@ -658,8 +658,8 @@ curve that minimises $\mathbb{E}[\mathrm{cost}] + \lambda\,\mathrm{Var}[\mathrm{
 \end{figure}
 
 Endpoints: $\lambda = 0$ sits at the rightmost (highest-variance,
-lowest-cost) point --- TWAP; $\lambda \to \infty$ sits at the
-leftmost --- the instant block trade. Interior points are
+lowest-cost) point, TWAP; $\lambda \to \infty$ sits at the
+leftmost, the instant block trade. Interior points are
 hyperbolic-sine schedules.
 
 For the worked example parameters, using
@@ -682,7 +682,7 @@ we compute:
 
 Increasing $\lambda$ drives $\sqrt{\Var[C]}$ down (good) and
 $\E[C]$ up (bad). At $\lambda = 10^{-3}$ the first trade is over
-a third of the position --- the trader pays nearly $3\times$ the
+a third of the position: the trader pays nearly $3\times$ the
 expected cost to shed overnight variance. The desk's job is to
 pick the point matching client risk tolerance; A--C maps the
 qualitative ``client wants out fast'' to a specific $\lambda$ and
@@ -693,7 +693,7 @@ Two observations. First, the permanent-impact term
 $\tfrac{1}{2}\riskav X^2 = 1.25\times 10^5$ is small vs.\ the
 $\sim 2.5\times 10^6$ expected-cost totals; most cost is temporary
 impact from $\sum n_k^2$. In this regime the $\tilde\eta$-vs-$\eta$
-distinction is a small correction --- but the one that makes the
+distinction is a small correction, but it is the one that makes the
 discrete closed form exact.
 
 Second, at $\lambda = 10^{-3}$ the trader pays an extra $\$4.9$m
@@ -710,14 +710,14 @@ frontier is a menu, not a prescription.
 Sell-side execution algorithms come in a small zoo. Four matter
 for this book.
 
-\paragraph{TWAP --- Time-Weighted Average Price.} Equal size
+\paragraph{TWAP (Time-Weighted Average Price).} Equal size
 per interval, $n_k = X/N$. The name: when price is martingale, fill
 VWAP equals the mid's TWAP. TWAP is the $\lambda \to 0$ limit of
 A--C, default for ``lowest expected cost, don't care about timing
 risk''. Simple, benchmark-friendly, gaming-proof under martingale
 mid.
 
-\paragraph{VWAP --- Volume-Weighted Average Price.} Trade in
+\paragraph{VWAP (Volume-Weighted Average Price).} Trade in
 proportion to the \emph{historical} intraday volume profile ($10\%$
 of daily volume in the first half-hour $\Rightarrow 10\%$ of the
 order). Benchmark: session realised VWAP. The default institutional
@@ -726,10 +726,10 @@ minimises tracking error to the market's average print. Not a
 direct A--C special case, but A--C re-weighted by a volume profile
 reproduces it.
 
-\paragraph{POV --- Percentage of Volume.} Trade a fixed fraction
+\paragraph{POV (Percentage of Volume).} Trade a fixed fraction
 $\rho$ of \emph{realised} volume. If the last minute printed
 $10{,}000$ shares at $\rho = 5\%$, send $500$ next minute. Reactive:
-speeds up with the market, slows with it --- the liquidator's
+speeds up with the market, slows with it, so the liquidator's
 footprint stays proportional. Default for hiding in flow at the
 cost of deadline risk (insufficient volume $\Rightarrow$ incomplete
 fill).
@@ -751,7 +751,7 @@ flagship.
   TWAP & Equal per time bin & Session mid TWAP \\
   VWAP & Proportional to historical volume profile & Session realised VWAP \\
   POV  & Fixed \% of realised volume live & Realised VWAP (participation-matched) \\
-  A--C & Hyperbolic-sine, front-loaded by $\lambda$ & Arrival (decision) mid --- implementation shortfall \\
+  A--C & Hyperbolic-sine, front-loaded by $\lambda$ & Arrival (decision) mid, i.e.\ implementation shortfall \\
   \bottomrule
 \end{tabular}\end{center}
 All four are deterministic given inputs; none uses a private
@@ -773,7 +773,7 @@ where $Q$ is metaorder size, $V_{\text{daily}}$ ADV, and $Y \sim
 0.5$ a dimensionless prefactor. Traded at constant rate over
 interval $\tau$, linear $g(v)$ gives $I(Q) = \eta Q/\tau \propto
 Q$ vs.\ the square-root's $I(Q) \propto \sqrt{Q}$. The two curves
-meet at exactly one order size --- where $\eta$ was calibrated ---
+meet at exactly one order size (where $\eta$ was calibrated)
 and diverge elsewhere.
 
 \textbf{Why teach linear anyway?} Three reasons, none being
@@ -861,7 +861,7 @@ final $100$ timesteps after the basket--constituent spread you
 were harvesting has collapsed. You want flat by $T = 100$: the
 round ends and unliquidated inventory marks to the last mid
 regardless of realisable exit. You also want to avoid dumping all
-$30$ at once --- the basket is thin and a market order of that
+$30$ at once: the basket is thin and a market order of that
 size walks the book down several ticks per unit.
 
 Take parameters $X = 30$, $T = 100$, $N = 10$ (one decision every
@@ -875,7 +875,7 @@ trajectory is computed exactly as in \cref{sec:ac_worked}:
   \qquad \kappa = \sqrt{10^{-6}\cdot 4 / 0.045} \approx 0.00943,
 \]
 so $\kappa T \approx 0.943$, larger than the equity example's
-$0.19$ --- the trader is closer to the deadline in P\&L-standard-deviation
+$0.19$: the trader is closer to the deadline in P\&L-standard-deviation
 units. The schedule:
 \begin{center}
 \begin{tabular}{rrrr}\toprule
@@ -898,7 +898,7 @@ and $2.60$ last ($-13\%$), trading a little early impact for tail
 variance reduction. $\sum n_k = 30.000$ exactly by construction.
 
 \textbf{Prosperity caveats.} (1) Position limits: if the limit is
-$\pm 30$, A--C does not help when flipping from $+30$ to $-30$ ---
+$\pm 30$, A--C does not help when flipping from $+30$ to $-30$;
 that is reversing, not liquidating. (2) Discrete units: round
 $n_k$ to integers and hold the slack in $x_k$; do not let rounding
 accumulate into a non-zero terminal. (3) Mid vs fill: A--C uses
@@ -932,9 +932,9 @@ systematically wrong loses clients and gets the Strat paged.
 \section{A short reference implementation}
 \label{sec:ac_code}
 
-Twenty lines of Python compute the whole trajectory. Not production
---- real engines need volume profiles, queue-position logic,
-child-order sizing against book depth, venue routing --- but this
+Twenty lines of Python compute the whole trajectory. It is not
+production code (real engines need volume profiles, queue-position
+logic, child-order sizing against book depth, venue routing), but it
 is the core calculation underneath any A--C execution stack.
 
 \begin{lstlisting}[caption={Almgren--Chriss optimal liquidation trajectory.}]

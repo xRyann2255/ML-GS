@@ -109,9 +109,9 @@ def run(state, product):
 Key design choices:
 \begin{enumerate}
   \item \textbf{Take first, then make.}  Sweep any ask below true
-  price or bid above it---free money.
+  price or bid above it: free money.
   \item \textbf{Clip position.}  Bound \texttt{buy\_qty} and
-  \texttt{sell\_qty} so you never breach the limit---exceeding it
+  \texttt{sell\_qty} so you never breach the limit; exceeding it
   cancels \emph{all} orders (\cref{ch:prosperity_setup}).
   \item \textbf{Flatten at par.}  If inventory is maxed, suppress the
   passive quote on the overweight side.  Frankfurt Hedgehogs also
@@ -122,8 +122,8 @@ Key design choices:
 \subsection{Pitfalls}
 
 \begin{pitfallbox}[Quoting too wide]
-Too large an edge parameter means you never get filled---other market
-makers undercut you.  For RAINFOREST\_RESIN, Frankfurt Hedgehogs
+Too large an edge parameter means you never get filled, because other
+market makers undercut you.  For RAINFOREST\_RESIN, Frankfurt Hedgehogs
 overbid the best existing bid by one tick while keeping positive
 edge; fill probability rose far more than edge decreased.
 \end{pitfallbox}
@@ -139,7 +139,7 @@ before submission.
 
 Frankfurt Hedgehogs' \texttt{StaticTrader} used this pattern on
 RAINFOREST\_RESIN, contributing $\approx$39{,}000 SeaShells per
-round---$\approx$10\% of total Prosperity~3 PnL---from a strategy
+round ($\approx$10\% of total Prosperity~3 PnL) from a strategy
 ``anyone could have come up with by carefully studying the
 competition's matching rules''~\citep{frankfurthedgehogs2025}.
 
@@ -167,7 +167,7 @@ Bid & 9{,}996  & 15 \\
 \medskip
 
 \textbf{Step 1: Take.}  Ask at 10{,}001 is above true price, no bid
-above 10{,}000---nothing to sweep.
+above 10{,}000, so there is nothing to sweep.
 
 \textbf{Step 2: Make.}  Buy capacity $= 50 - 12 = 38$, sell capacity
 $= 62$, both capped at clip size 20.  Post:
@@ -210,7 +210,7 @@ continuations.
   \item \textbf{SQUID\_INK} (Prosperity~3, Round~1): wider relative
   spread, sharp jumps.  Officially described as short-term
   mean-reverting, but the main edge came from an informed-trader signal
-  (Olivia---see \cref{sec:archetype_signal}).
+  (Olivia; see \cref{sec:archetype_signal}).
 \end{itemize}
 
 \subsection{Theory chapter}
@@ -226,7 +226,7 @@ Two chapters are relevant:
 \end{itemize}
 
 The diagnostic question: \emph{mean-revert or trend?}  KELP was
-``neither''---a random walk best traded as fixed-price MM with a
+``neither'': a random walk best traded as fixed-price MM with a
 rolling fair-value estimate~\citep{frankfurthedgehogs2025}.
 SQUID\_INK's description said ``mean-reverting,'' but no pure
 price-based strategy was as reliable as detecting the informed trader
@@ -286,7 +286,7 @@ defaulting to price-only models
 
 Frankfurt Hedgehogs' \texttt{DynamicTrader} traded KELP as moving
 fair-value MM; their \texttt{InkTrader} traded SQUID\_INK purely on
-Olivia's daily-extrema pattern---no MM or mean-reversion for that
+Olivia's daily-extrema pattern, with no MM or mean-reversion for that
 product~\citep{frankfurthedgehogs2025}.
 
 \begin{intuitionbox}
@@ -379,14 +379,14 @@ Core loop:
 \textbf{Key design choices:}
 \begin{enumerate}
   \item \textbf{Subtract the running premium.}  The spread mean is
-  non-zero---baskets trade at a persistent premium.  Frankfurt
+  non-zero: baskets trade at a persistent premium.  Frankfurt
   Hedgehogs tracked and subtracted a running
   estimate~\citep{frankfurthedgehogs2025}.
   \item \textbf{Fixed thresholds.}  A light grid search prioritising
   ``landscape stability'' (flat regions of good PnL) over peak
   performance~\citep{frankfurthedgehogs2025}.
   \item \textbf{Half-hedge.}  In the final round they hedged 50\% of
-  basket exposure---a compromise between full-hedge variance
+  basket exposure, a compromise between full-hedge variance
   reduction and unhedged expected value.
   \item \textbf{Flatten at zero.}  Close on zero-crossing (adjusted
   for Olivia) rather than waiting for the opposite threshold.
@@ -412,7 +412,7 @@ cross-product signal left 20{,}000+ SeaShells per round on the table.
 
 \begin{pitfallbox}[No creation/redemption]
 Real-world ETF arb has authorised participants creating/redeeming
-shares to enforce NAV tracking.  Prosperity has no such mechanism---
+shares to enforce NAV tracking.  Prosperity has no such mechanism;
 basket and constituents are merely correlated, so spreads persist
 longer and move further than textbook ETF arb predicts.
 \end{pitfallbox}
@@ -431,7 +431,7 @@ Basket stat-arb in Prosperity is the closest analogue to real-world
 ETF arbitrage absent creation/redemption.  That absence is both the
 opportunity (wider spreads, more PnL) and the risk (longer
 dislocations).  Winning recipe: fixed thresholds, premium adjustment,
-and---if present---an informed-flow signal on a constituent.
+and, if present, an informed-flow signal on a constituent.
 \end{intuitionbox}
 
 \begin{prosperitybox}[title={PICNIC\_BASKET1 spread calculation}]
@@ -460,7 +460,7 @@ half-hedge ($3\times$CROISSANTS, $1.5\times$JAMS, $0.5\times$DJEMBES,
 rounded).  Hold until adjusted spread crosses zero; flatten.
 
 If Olivia was short CROISSANTS (falling prices expected, spread
-widening), thresholds shifted to $\{-530, +70\}$---harder longs,
+widening), thresholds shifted to $\{-530, +70\}$: harder longs,
 easier shorts~\citep{frankfurthedgehogs2025}.
 \end{prosperitybox}
 
@@ -542,8 +542,8 @@ shortened~\citep{frankfurthedgehogs2025}.
 \subsection{Pitfalls}
 
 \begin{pitfallbox}[Wrong volatility estimate]
-A poorly calibrated parabola---too few points, outliers from deep
-OTM options with near-zero extrinsic value---yields a bad ``fair
+A poorly calibrated parabola (too few points, or outliers from deep
+OTM options with near-zero extrinsic value) yields a bad ``fair
 price'' and trades noise.  Discard outliers where extrinsic value is
 too low for reliable IV.
 \end{pitfallbox}
@@ -568,15 +568,15 @@ aggregate portfolio delta, hedge at portfolio level.
 
 Frankfurt Hedgehogs' \texttt{OptionTrader} did IV scalping with a
 parabolic smile fit; it contributed $\approx$100{,}000--150{,}000
-SeaShells per round---their single most profitable
+SeaShells per round, their single most profitable
 strategy~\citep{frankfurthedgehogs2025}.  A secondary VOLCANIC\_ROCK
 mean-reversion position produced volatile returns ($+$100k, $-$50k,
 $-$10k across rounds), serving as a relative hedge against other top
 teams pursuing pure mean-reversion.
 
 \begin{intuitionbox}
-Prosperity options are not directional bets---they are
-\emph{relative value on the vol smile}.  Fit the smile, find the
+Prosperity options are \emph{relative value on the vol smile}, not
+directional bets.  Fit the smile, find the
 outlier, trade it back.  Exactly what a real vol desk does
 (\cref{ch:vol_surface}); Prosperity just enlarges the mispricings and
 speeds up feedback.
@@ -702,8 +702,8 @@ writeup\footnote{See \texttt{research/writeups/LinearUtility\_P2/}.}).
 Studying prior-year writeups was a direct competitive advantage.
 
 \begin{intuitionbox}
-Prosperity locational arb is not pure textbook---it requires
-discovering hidden structure (the taker bot) empirically.
+Prosperity locational arb goes beyond the pure textbook version: it
+requires discovering hidden structure (the taker bot) empirically.
 \Cref{ch:arbitrage_zoo} tells you \emph{where} to look;
 competition-specific microstructure tells you \emph{how much}.
 \end{intuitionbox}
@@ -796,8 +796,8 @@ a false positive.  Monitor for new extrema and reset.
 \begin{pitfallbox}[Detection latency before trader IDs]
 Without trader IDs (Rounds 1--4), detection relied on 15-lot
 quantity plus price-extreme matching.  Other bots occasionally hit
-15 lots at non-extreme prices, producing false positives---low per-event
-cost but lower Sharpe.
+15 lots at non-extreme prices, producing false positives with low
+per-event cost but lower Sharpe.
 \end{pitfallbox}
 
 \subsection{Reference writeup}
@@ -835,7 +835,7 @@ buy at a new daily low (Olivia reversal), (b)~a new daily high above
 1{,}895 (invalidation), or (c)~end of day.
 
 \textbf{Invalidation:} if SQUID\_INK hits 1{,}900 at timestep 750,
-the original sell was not the true maximum---flatten immediately.
+the original sell was not the true maximum; flatten immediately.
 
 This detection-and-invalidation logic kept the strategy robust:
 false positives closed quickly before losses compounded.
@@ -844,8 +844,8 @@ false positives closed quickly before losses compounded.
 \begin{intuitionbox}
 Olivia is a simplified informed-trading model
 (\cref{ch:kyle_gm}).  Real markets hide individual traders, but
-the \emph{pattern}---unusual sizes at unusual prices preceding
-reversals---is exactly what VPIN and order-flow-toxicity metrics
+the \emph{pattern} (unusual sizes at unusual prices preceding
+reversals) is exactly what VPIN and order-flow-toxicity metrics
 target.  Prosperity makes it concrete.
 \end{intuitionbox}
 
@@ -854,7 +854,7 @@ target.  Prosperity makes it concrete.
 \label{sec:archetype_flowchart}
 %======================================================================
 
-Run new products through the following decision table---the
+Run new products through the following decision table, which is the
 Prosperity-specific version of \cref{ch:which_strategy_when}'s
 framework.
 
@@ -903,7 +903,8 @@ trade-data study.  Time budget per round:
 
 \begin{enumerate}
   \item \textbf{Minutes 0--5.}  Test for fixed price (Archetype~1) or
-  conversion mechanism (Archetype~5)---instant to spot, fast to code.
+  conversion mechanism (Archetype~5); both are instant to spot and
+  fast to code.
   \item \textbf{Minutes 5--30.}  Check for baskets/ETFs
   (Archetype~3); compute spread, test stationarity.
   \item \textbf{Minutes 30--120.}  For options (Archetype~4): IVs,
@@ -916,7 +917,7 @@ trade-data study.  Time budget per round:
 \begin{keyfactbox}[The five-minute rule]
 A product unclassifiable within five minutes is Archetype~2
 (trending/EMA) or Archetype~6 (signal-driven).  Default to dynamic
-MM while investigating---it extracts spread PnL without a directional
+MM while investigating; it extracts spread PnL without a directional
 commitment.
 \end{keyfactbox}
 
@@ -960,8 +961,8 @@ introduced fixed-price MM (Amethysts), trend (Starfruit), basket arb
 (Gift Baskets), locational (Orchids).  P2 (2024) repeated the same
 archetypes with renamed products.  P3 (2025) added options (Volcanic
 Rock Vouchers) and foregrounded Olivia.  Teams who studied
-prior-year writeups---Stanford Cardinal (P1), Jasper/LinearUtility
-(P2), Frankfurt Hedgehogs (P3)---entered each competition with
+prior-year writeups (Stanford Cardinal in P1, Jasper/LinearUtility
+in P2, Frankfurt Hedgehogs in P3) entered each competition with
 detection code, parameter ranges, and strategy skeletons ready.
 Highest-Sharpe pre-competition activity available.
 \end{historybox}
@@ -990,7 +991,7 @@ diagnostic into a 48-hour round.
   scalping, locational arb, informed-flow exploitation.
 
   \item \textbf{Fixed-price} (RAINFOREST\_RESIN, AMETHYSTS): known
-  constant price---quote around it.  Simplest archetype; implement
+  constant price; quote around it.  Simplest archetype; implement
   within 30 minutes of identifying.
 
   \item \textbf{Dynamic} (KELP): random walks.  Replace fixed price
@@ -1016,7 +1017,7 @@ diagnostic into a 48-hour round.
   \item \textbf{Take first, then make.}  Sweep mispriced orders
   before placing passive quotes.
 
-  \item \textbf{Clip every order} against the position limit---
+  \item \textbf{Clip every order} against the position limit;
   exceeding it cancels \emph{all} orders.
 
   \item \textbf{Diagnose before coding.}  Spend the first 30 minutes

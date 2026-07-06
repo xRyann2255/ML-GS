@@ -9,13 +9,13 @@ it. You can post any limit bid at any tick and any limit ask at any
 tick. What do you quote?
 
 A first guess: bid one tick below $10\,000$, ask one tick above,
-collect the spread forever. The guess is almost right --- top
-Prosperity teams quote something close to it --- but it has to survive
+collect the spread forever. The guess is almost right (top
+Prosperity teams quote something close to it), but it has to survive
 two adversaries already met in \cref{ch:participants,ch:kyle_gm}: a
 counterparty who knows more than you, and flow that drifts the price
 against whatever inventory you hold. The bid-ask spread a maker earns
-is precisely the compensation demanded for bearing those two risks
---- \emph{adverse selection} (trading against better-informed
+is precisely the compensation demanded for bearing those two
+risks: \emph{adverse selection} (trading against better-informed
 counterparties) and \emph{inventory risk} (carrying unwanted positions
 through a volatile mid). A naive symmetric quoter beats neither. This chapter builds from first principles the machinery that
 fixes it: the \textbf{Avellaneda--Stoikov (A--S) market-making model}
@@ -51,7 +51,7 @@ From earlier in the book:
   A--S, which is this chapter's unifying theme.
   \item \Cref{ch:kyle_gm}: Kyle's linear equilibrium with
   price impact $\lamk$ and the Glosten--Milgrom equilibrium
-  spread as an adverse-selection premium --- the formal
+  spread as an adverse-selection premium, the formal
   machinery behind why a zero-spread market maker loses money.
   \item \Cref{ch:market_impact}: the empirical square-root
   impact law and the distinction between permanent and
@@ -87,8 +87,8 @@ arriving buyer lifting the ask earns $\delta$ above the mid; each
 seller hitting the bid earns $\delta$ below. The round-trip gain per
 matched buy--sell pair is $2\delta$, the \emph{spread capture}.
 
-In a world of symmetric uninformed flow --- equal Poisson buyers and
-sellers, no mid drift, no memory --- this policy is optimal and
+In a world of symmetric uninformed flow (equal Poisson buyers and
+sellers, no mid drift, no memory), this policy is optimal and
 profits grow linearly. \Cref{ch:participants} called that world
 fiction. The real world has two structural deviations, either of
 which can dominate spread capture on any single run; the numerical
@@ -160,8 +160,8 @@ benign run the model looks fine.
 Rerun the same policy on less friendly flow. Ten orders arrive, all
 buys: every one lifts the ask, none hits the bid. The maker sells
 ten shares into the buying crowd and ends ten shares \emph{short}.
-Meanwhile --- the key point --- the mid drifts up by $2$ seashells
-as buying pressure carries the market with it. The decomposition:
+Meanwhile, and this is the key point, the mid drifts up by $2$
+seashells as buying pressure carries the market with it. The decomposition:
 \begin{align}
   \text{edge}
   \;&=\; 10 \cdot (\askp_{\mathrm{mm}} - \midp)
@@ -184,9 +184,9 @@ the half-spread $\delta$: it grows at most like
 $O(\text{fills} \cdot \delta)$. The \emph{inventory-drift} term
 scales like $\invq \cdot \Delta \midp$, which can grow as fast as
 (number of fills) $\times$ (total mid move) when flow is
-one-sided. On any persistent directional run --- trend,
+one-sided. On any persistent directional run (trend,
 newsbreak, stop cascade, or informed flow in the
-\cref{ch:kyle_gm} sense --- the second term wins and the maker
+\cref{ch:kyle_gm} sense), the second term wins and the maker
 loses more on the inventory than they collected on the spread.
 This is the entire economic content of the observation
 ``market makers lose to trends.'' The fix is not to widen
@@ -197,7 +197,7 @@ themselves mean-revert the position.
 
 The run also exposes adverse selection in the sense of
 \cref{ch:kyle_gm}: the ten buyers were not drawn from a zero-drift
-distribution --- they knew something the maker did not. The
+distribution; they knew something the maker did not. The
 Glosten--Milgrom calculation of \cref{sec:gm} predicts a symmetric
 quoter loses at least $\alpha(V_H - V_L)/2$ per fill against informed
 counterparties; on this run every counterparty was informed. The
@@ -205,7 +205,7 @@ loss shows up as the $-20$ seashells of drift, Kyle's $\lamk$ acting
 on the flow.
 
 A maker who refuses to skew against inventory is exposed to both
-failures. A--S fixes both through a single knob --- the risk-aversion
+failures. A--S fixes both through a single knob, the risk-aversion
 coefficient $\riskav$.
 
 \section{Inventory-aware quoting: the reservation price}
@@ -384,7 +384,7 @@ which is the Avellaneda--Stoikov reservation price
 \citeAS{, eq.\ (9)}. The full HJB solution reproduces this formula
 with no correction terms in the large-$\arrate\volat^2\Tmat/\riskav$
 regime that \citeCartea{} flag as practically-relevant. The
-indifference derivation above is not an approximation --- it is the
+indifference derivation above is not an approximation but the
 exact marginal statement.
 
 \begin{keyfactbox}[Avellaneda--Stoikov reservation price]
@@ -454,7 +454,7 @@ on this private mid, not on the market mid.
 \end{tikzpicture}
 \caption{Avellaneda--Stoikov quoting structure. The maker posts bid at
 $r - \delta^b$ and ask at $r + \delta^a$, where $r$ is the
-\emph{reservation price} --- the mid adjusted downward (upward) when
+\emph{reservation price}, the mid adjusted downward (upward) when
 inventory is long (short). When the maker holds excess long inventory,
 $r$ shifts below the market mid, making the bid less competitive and
 the ask more competitive, steering inventory back to zero.}
@@ -478,7 +478,7 @@ aversion parameter is $\riskav = 0.1$. Plug in:
   \label{eq:ch8_r_bad}
 \end{align}
 The formula says a maker holding ten shares long should shift the
-private mid to $7500$ --- a $2500$-seashell shift. That is absurd:
+private mid to $7500$, a $2500$-seashell shift. That is absurd:
 no maker would lower quotes by that much to offload ten shares on a
 product whose round-trip spread is a few seashells.
 
@@ -502,9 +502,9 @@ Rerun the same example with $\riskav = 0.001$:
   \;=\; 9975.
   \label{eq:ch8_r_good}
 \end{align}
-The reservation price shifts by $25$ seashells --- enough to lean
-noticeably against the long inventory, not so much that the quotes
-walk off one side of the book.
+The reservation price shifts by $25$ seashells, enough to lean
+noticeably against the long inventory but not so much that the
+quotes walk off one side of the book.
 
 \begin{pitfallbox}[The product $\riskav \volat^2 (\Tmat - t)$ is what matters]
 $\riskav$ is dimensioned (1/currency); only the product
@@ -570,7 +570,7 @@ $v(t, x, \Spx, \invq) = -\exp(-\riskav(x + \invq\Spx))\,
 \theta(t, \invq)^{-\riskav/\arrate}$, turning the PDE into a linear
 ODE in $\theta$; \citet{cartea2015algorithmic} give the same
 derivation in cleaner notation. The output is closed-form optimal
-quotes and --- crucial for teaching --- an asymptotic formula for
+quotes and, crucially for teaching, an asymptotic formula for
 the \emph{total} bid-ask spread $\delta^* = \delta^a + \delta^b$
 holding in the regime $\arrate \volat^2 \Tmat / \riskav \gg 1$.
 
@@ -612,7 +612,7 @@ any position across the uncertain window. At $\riskav = 0$
 \paragraph{Fill-rate term, $(2/\riskav)\ln(1 + \riskav/\arrate)$.}
 Independent of $\volat$ and the horizon; widens as $\arrate$
 \emph{decreases} (thinner book). As $\arrate \to \infty$ (infinitely
-liquid), the term vanishes --- the maker earns the same expected
+liquid), the term vanishes: the maker earns the same expected
 edge at $\delta = 0$. As $\arrate \to 0$, the term grows without
 bound. This is the descendant of the ``order-processing / fill-rate''
 cause: to get filled at all, the maker must quote at positive
@@ -657,8 +657,8 @@ The inventory term is the extra width for carrying inventory across
 a volatile horizon. At $\riskav = 0$ the inventory term vanishes; at
 $\volat = 0$ or $\Tmat = t$ it vanishes too. The real work the model
 does is the \emph{ratio} between the two terms: it tells you which
-failure mode --- narrow spreads eaten by variance, or wide spreads
-going unfilled --- dominates, so you size them against each other.
+failure mode (narrow spreads eaten by variance, or wide spreads
+going unfilled) dominates, so you size them against each other.
 \end{intuitionbox}
 
 \subsection{Connecting the two terms to the three causes of the spread}
@@ -760,7 +760,7 @@ Compare against a symmetric maker centred on the mid $10\,000$ with
 the same width $3.833$: that maker quotes $9998.08 / 10\,001.92$.
 The A--S quote sits about $25$ seashells lower on both sides, so
 the next buy is far more likely to lift our ask at $9976.92$ than a
-competitor's at $10\,001.92$ --- each such fill reduces the long by
+competitor's at $10\,001.92$; each such fill reduces the long by
 one. Meanwhile our bid at $9973.08$ sits well below the mid, so the
 next sell is less likely to hit it. That asymmetry is the skew
 \cref{sec:ch8_naive} asked for.
@@ -804,7 +804,7 @@ gets hit, not by widening the edge demanded.
 Four parameters, four different sources, four different tuning
 stories.
 
-\paragraph{$\volat$ --- from the data.} Mid volatility is not a
+\paragraph{$\volat$: from the data.} Mid volatility is not a
 free knob; it is whatever a short-window estimator (e.g.\ an EWMA of
 $(\Delta\midp)^2$) reports. Production systems re-estimate $\volat$
 at high frequency. On Prosperity estimate it from the previous few
@@ -813,7 +813,7 @@ root of time, in whichever clock $\Tmat - t$ is measured. Confusing
 per-tick with per-session time makes the inventory-risk term land
 orders of magnitude off.
 
-\paragraph{$\arrate$ --- fit from fill data.} The decay $\arrate$
+\paragraph{$\arrate$: fit from fill data.} The decay $\arrate$
 is a property of the book, not a knob. Fit it by logging every quote
 at distance $\delta$ and whether it filled before cancellation, then
 regressing $\log(\text{fill prob})$ on $\delta$ with slope
@@ -822,7 +822,7 @@ inverse tick; Prosperity is typically $0.5$--$1.5$ because bot fills
 are less price-sensitive than human ones. $\arrate$ is
 asset-specific and should be refit when the regime changes.
 
-\paragraph{$\Tmat - t$ --- given by the session.} On Prosperity a
+\paragraph{$\Tmat - t$: given by the session.} On Prosperity a
 ``session'' is one submitted episode (a few hundred to a few
 thousand timesteps). In live equity making it is usually one trading
 day; the inventory-risk term shrinks into the close. Trap: as
@@ -831,7 +831,7 @@ skew vanish, so the model loses inventory control in the final
 minutes. Production systems either force a flat position or cap
 $(\Tmat - t)$ from below.
 
-\paragraph{$\riskav$ --- the only real knob.} Per
+\paragraph{$\riskav$: the only real knob.} Per
 \cref{subsec:ch8_r_worked}, $\riskav$ is the only freely tunable
 parameter. Operational rule: pick $\riskav$ so that the inventory
 skew at maximum \emph{tolerable} inventory is a meaningful fraction
@@ -843,13 +843,13 @@ backtest.
 Inventory-dependent dealer quotes predate A--S. \citet{hostoll1981}
 wrote a two-period model where a risk-averse dealer with inventory
 $\invq$ quotes asymmetrically to drive expected post-trade inventory
-to zero --- the same skewing logic, without continuous-time
+to zero: the same skewing logic, without continuous-time
 machinery. \citeGM{} added the informational (adverse-selection)
 side four years later, deriving a spread from Bayesian updating
 alone. A--S \citeAS{} is the first closed-form unification:
 continuous-time, risk-averse, Poisson fills with
 distance-dependent intensity. Every subsequent inventory-aware
-treatment --- including \citet{cartea2015algorithmic} --- builds
+treatment, including \citet{cartea2015algorithmic}, builds
 on the same two-term decomposition.
 \end{historybox}
 
@@ -859,7 +859,7 @@ on the same two-term decomposition.
 The whole A--S rule fits in under a dozen lines of Python. The
 reference implementation below is a \emph{pure function} from
 $(\midp, \invq, \riskav, \volat, \arrate, \Tmat - t)$ to
-$(p^{*,\mathrm{bid}}, p^{*,\mathrm{ask}})$ --- the shape the
+$(p^{*,\mathrm{bid}}, p^{*,\mathrm{ask}})$, the shape the
 Prosperity \texttt{Trader.run(state)} loop wants to call.
 
 \begin{lstlisting}[caption={Avellaneda--Stoikov quoting as a pure function.}]
@@ -885,8 +885,8 @@ def as_quotes(mid: float, q: int, gamma: float, sigma: float,
 \end{lstlisting}
 
 Two production-use remarks the skeleton does not encode. First,
-$\arrate$ should be refit online from the last few hundred fills
---- the function assumes the caller passes a fresh value. Second,
+$\arrate$ should be refit online from the last few hundred
+fills; the function assumes the caller passes a fresh value. Second,
 $\invq$ should already be clipped to the position limit (e.g.\
 $\pm 50$ for RAINFOREST\_RESIN). A well-calibrated bot rarely hits
 the clip; a miscalibrated one will produce quotes so skewed that
@@ -922,7 +922,7 @@ $\Tmat - t = 500$:
   $\approx 3.623$ at $\volat = 1.5$.
   \item \textbf{Half-spread}: $\approx 2.249$ or $\approx 1.812$.
   \item \textbf{Quotes at $\volat = 2$}: bid
-  $\approx 9989.75$, ask $\approx 9994.25$ --- both
+  $\approx 9989.75$, ask $\approx 9994.25$, both
   \emph{below} the true fair value $10\,000$, skewed down by
   the $+4$ inventory so that the maker is more likely to sell
   than buy.
@@ -931,7 +931,7 @@ Now compare against the actual top-team policy. The Frankfurt
 Hedgehogs' RAINFOREST\_RESIN trader
 (\texttt{imc-prosperity-3/FrankfurtHedgehogs\_polished.py},
 \texttt{StaticTrader.get\_orders()}) quotes $\texttt{bid\_wall}
-+ 1$ and $\texttt{ask\_wall} - 1$ --- exactly one tick inside
++ 1$ and $\texttt{ask\_wall} - 1$: exactly one tick inside
 the deepest visible wall prices. The wall mid is always
 $10\,000$, so the base-case quotes are the fixed offsets
 $9\,999$ bid / $10\,001$ ask (or very near it). Inventory
@@ -946,7 +946,7 @@ not wrong; its inventory-risk term is conservatively provisioned for
 a product whose true risk is dominated by a known-flat fair value
 and a hard position limit, not by mid variance. On RAINFOREST\_RESIN
 the mark-to-market variance comes almost entirely from reversals
-within a tight range, not accumulating drift --- so A--S overstates
+within a tight range, not accumulating drift, so A--S overstates
 the risk and prices it into an overly-wide spread.
 
 The lesson that transfers off Prosperity is the decomposition, not
@@ -954,7 +954,7 @@ the literal formula: A--S's reservation-price skew is the right
 control knob for inventory management, but when the price process
 is not driftless Brownian (flat-value, mean-reverting, news-driven),
 the variance term must be recalibrated against the actual source of
-risk --- or, as top Prosperity teams do, replaced with an external
+risk, or replaced (as top Prosperity teams do) with an external
 device like a hard position clip or an EMA fair-value re-anchor.
 
 \begin{gsbox}
@@ -966,13 +966,13 @@ window, $\arrate$ refit continuously from live fill rates at each
 offset, $\riskav$ set by the risk committee from the desk's daily
 VaR (Value at Risk) budget. The trader has one override: a
 ``desk-breaker'' raising $\riskav$ in real time, tightening
-inventory control and widening the fill-rate term at once --- pressed
+inventory control and widening the fill-rate term at once, pressed
 when a name's inventory drifts past an internal soft limit (set
 lower than the hard regulatory limit). As a Strats intern, expect
 to write the code that reestimates $\arrate$ from overnight fill
 logs and to explain why a name's A--S spread widened from $3$ bps
-to $5$ bps --- answer almost always: a $\volat$ spike from
-overnight news, or $\arrate$ drop because a flow provider pulled
+to $5$ bps; the answer is almost always a $\volat$ spike from
+overnight news, or an $\arrate$ drop because a flow provider pulled
 out and the book thinned. See \cref{ch:strats_role} for the role
 itself.
 \end{gsbox}
@@ -1005,12 +1005,12 @@ with $\Spx + \hat{\mu}(\Tmat - t)$ where $\hat{\mu}$ is a
 short-horizon drift estimator (EMA of recent returns).
 
 \paragraph{Informed flow.} \eqref{eq:ch8_arrival} makes fill
-intensities symmetric in distance to mid --- a strong
+intensities symmetric in distance to mid, a strong
 simplification. With informed traders in the \cref{ch:kyle_gm}
 sense, fill intensities are \emph{anti}-correlated with the
 direction the mid is about to move. A maker filled on the ask at
 $\midp + \delta$ has just received a signal that the mid is more
-likely to rise --- the adverse-selection effect Glosten--Milgrom
+likely to rise: the adverse-selection effect Glosten--Milgrom
 formalised, ignored by A--S. Fix: use an OFI-based estimator
 (\cref{ch:order_flow}) and add a drift adjustment to $r$ when OFI
 is persistently one-sided.
@@ -1029,16 +1029,16 @@ concern, applied after the A--S rule.
 
 \begin{pitfallbox}[Don't run vanilla A--S on a trending asset]
 A--S's reservation-price skew controls inventory \emph{variance},
-not \emph{drift}. On a persistently drifting asset --- a trending
+not \emph{drift}. On a persistently drifting asset (a trending
 stock, a commodity in storage glut, Prosperity's SQUID\_INK during
-an Olivia informed-trading window --- the machinery will keep
+an Olivia informed-trading window), the machinery will keep
 recentering quotes on a mid that is drifting the wrong way, and the
 maker accumulates an unhedged position at precisely the wrong time.
 Increasing $\riskav$ does not cure it (it widens quotes without
 correcting drift); the cure is a separate drift estimator that
 shifts the whole quote pair, or refusing to quote when OFI is
 persistently one-sided. Vanilla A--S is a pure variance-control
-device --- plugging it into a drifting environment without a drift
+device; plugging it into a drifting environment without a drift
 signal is how \cref{sec:ch8_naive}'s pathological run
 \eqref{eq:ch8_bad_net} comes back to bite.
 \end{pitfallbox}
@@ -1070,7 +1070,7 @@ signal is how \cref{sec:ch8_naive}'s pathological run
   informed-flow assets, pair with a drift estimator (EMA of
   returns, OFI from \cref{ch:order_flow}).
   \item Top Prosperity teams use fixed offsets from a known flat
-  value on RAINFOREST\_RESIN with a hard position clip --- A--S is
+  value on RAINFOREST\_RESIN with a hard position clip; A--S is
   the right lens but overstates risk on that product.
   \item A--S is the default automated maker on live sell-side
   equity desks; Strats own $\volat, \arrate$ calibration, trader

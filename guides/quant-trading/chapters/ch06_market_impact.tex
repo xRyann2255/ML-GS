@@ -48,7 +48,7 @@ From outside the book:
 \begin{itemize}
   \item Basic calculus and square-root arithmetic (if the reader
   finds $\sqrt{50} \approx 7.07$ surprising, start here).
-  \item Standard descriptive statistics --- mean, standard
+  \item Standard descriptive statistics: mean, standard
   deviation, daily volatility. The ``$\sigma$'' in this chapter is
   always a daily return volatility unless otherwise stated.
   \item The notion of a \textbf{basis point} (bp): one hundredth of
@@ -77,8 +77,8 @@ minutes or hours, letting the market refill in between.
 \begin{definition}[Metaorder]
 \index{metaorder|textbf}
 A \textbf{metaorder} (also called a \textbf{parent order}) is a
-trading decision taken at one moment by one agent --- ``buy
-$1{,}000{,}000$ shares of AAPL by the close'' --- that is then
+trading decision taken at one moment by one agent (``buy
+$1{,}000{,}000$ shares of AAPL by the close'') that is then
 implemented by a sequence of smaller child orders sent to the market
 over an execution window of finite duration $T$. The total executed
 size is~$Q$. A metaorder is atomic from the point of view of the
@@ -249,22 +249,22 @@ size $Q$ scales as
 Each symbol has a precise meaning:
 \begin{itemize}
   \item $I_{\text{tot}}(Q)$ is the total impact in \emph{fractional
-  price units} --- i.e.\ a dimensionless return. To convert to
+  price units}, i.e.\ a dimensionless return. To convert to
   absolute currency per share, multiply by the price $\midp$. To
   convert to basis points, multiply by $10{,}000$.
   \item $Y$ is a dimensionless constant depending on asset class
   and calibration window but not on $Q$. Empirical estimates fall
   in $Y \in [0.3, 1.5]$, with $Y \approx 1$ a default for mid-cap
   equities.
-  \item $\sigma$ is the \textbf{daily return volatility} --- the
+  \item $\sigma$ is the \textbf{daily return volatility}, the
   standard deviation of daily close-to-close log returns, computed
   over a recent rolling window (say $60$ trading days). ``$\sigma =
   2\%$'' means a $2\%$ daily standard deviation.
   \item $Q$ is the executed size in shares (or contracts, or notional).
   \item $V_{\text{daily}}$ is the \textbf{average daily trading
-  volume} in the same units as $Q$. The ratio $Q / V_{\text{daily}}$
-  --- the \textbf{participation rate} or \textbf{volume fraction}
-  --- is the scale-free measure of trade size relative to the market.
+  volume} in the same units as $Q$. The ratio $Q / V_{\text{daily}}$,
+  the \textbf{participation rate} or \textbf{volume fraction},
+  is the scale-free measure of trade size relative to the market.
 \end{itemize}
 
 The law is attributed to Almgren et al.~(2005)
@@ -296,9 +296,9 @@ Three features of \cref{eq:sqrt_law}:
   \item \textbf{Scale-free in $Q / V$.} Impact depends on the
   participation rate, not $Q$ absolutely. A $10$k-share trade in a
   stock with $10$M daily volume has the same impact as a $100$k-share
-  trade in a stock with $100$M daily volume (all else equal) ---
-  execution cost in a single liquidity-normalised coordinate across
-  all stocks.
+  trade in a stock with $100$M daily volume (all else equal).
+  Execution cost is measured in a single liquidity-normalised
+  coordinate across all stocks.
   \item \textbf{Proportional to $\sigma$.} Impact scales with the
   asset's own volatility, not its price-per-share. A penny stock and
   a blue chip at the same $\sigma$ and participation rate have the
@@ -400,7 +400,7 @@ genuine emergent feature of liquidity formation.
 \label{subsec:bouchaud_latent}
 
 Bouchaud et al.\ \citeBouchaud{} argue as follows. At any moment the
-limit order book shows only a tiny fraction --- maybe $1\%$ --- of
+limit order book shows only a tiny fraction (maybe $1\%$) of
 the true liquidity that would match a buy order. The rest is
 \textbf{latent liquidity}: orders not yet in the book because agents
 are waiting, not because they do not intend to sell. Think of a
@@ -414,8 +414,8 @@ proportional to the price move; steady state is reached when
 consumption rate (metaorder intensity) matches backfill rate (price
 move).
 
-The algebra --- a diffusion-reaction model for the latent supply
-density --- yields a steady-state impact scaling as $\sqrt{Q}$.
+The algebra, a diffusion-reaction model for the latent supply
+density, yields a steady-state impact scaling as $\sqrt{Q}$.
 Supply is not fixed: new sellers enter \emph{because} the price has
 moved, keeping marginal cost below linear.
 
@@ -480,8 +480,8 @@ ties them together. The $3/2$ tail is itself well-established.
 \begin{intuitionbox}
 Common theme: \emph{the market is not a fixed stack of liquidity but
 a living system that partially refills as you consume it}. Trading
-triggers other participants --- latent sellers, front-runners, HFTs,
-mean-reversion bots --- to absorb part of your flow. Your cost is
+triggers other participants (latent sellers, front-runners, HFTs,
+mean-reversion bots) to absorb part of your flow. Your cost is
 the fraction you had to push through before replenishment kicked in.
 Under broad assumptions, that fraction scales as $\sqrt{Q}$.
 \end{intuitionbox}
@@ -490,8 +490,8 @@ Under broad assumptions, that fraction scales as $\sqrt{Q}$.
 \label{sec:kyle_contradiction}
 
 How does $\sqrt{Q}$ reconcile with the two central microstructure
-models --- Kyle (\cref{ch:kyle_gm}) and Almgren--Chriss
-(\cref{ch:almgren_chriss}) --- that both assume linear impact?
+models, Kyle (\cref{ch:kyle_gm}) and Almgren--Chriss
+(\cref{ch:almgren_chriss}), which both assume linear impact?
 
 \subsection{Kyle: linear by construction}
 \label{subsec:kyle_linear_construction}
@@ -509,7 +509,7 @@ $\sqrt{|y|}$ rule.
 
 Is Kyle's linearity wrong? Kyle is a \emph{single-period} model:
 one auction, one price. The square-root metaorder lives over many
-periods, and repeated interaction generates concavity --- each
+periods, and repeated interaction generates concavity: each
 child order moves the price, latent liquidity enters in response,
 the next child faces a partially-replenished book. Kyle is silent
 on multi-period dynamics, not wrong.
@@ -541,7 +541,7 @@ hyperbolic-sine optimal trajectory. Square-root impact has no clean
 closed form.
 
 So Almgren--Chriss is linear \emph{for tractability}, not because
-the authors believed in linear impact --- the same compromise as
+the authors believed in linear impact; it is the same compromise as
 pricing a vanilla option with Black--Scholes
 (\cref{ch:black_scholes}) despite fat tails and smiles.
 
@@ -564,7 +564,7 @@ sell-side execution desk will:
 The model's form is chosen for tractability, the parameter for
 empirical agreement near typical trade sizes. The trader gets the
 closed-form trajectory and approximately correct costs at the sizes
-they execute --- but no accuracy on order-of-magnitude extrapolation.
+they execute, but no accuracy on order-of-magnitude extrapolation.
 \Cref{ch:almgren_chriss} returns to this calibration point.
 
 \begin{pitfallbox}[Don't extrapolate linear impact outside its calibration range]
@@ -674,7 +674,7 @@ $50$--$200$ shares). With $Y = 1$:
   \;=\; 1 \cdot 0.01 \cdot \sqrt{50 / 2000} \cdot 102.885
   \;\approx\; 0.163,
 \]
-about $15.8$ bps --- less than half the walking-the-book estimate.
+about $15.8$ bps, less than half the walking-the-book estimate.
 Normal at Prosperity scale: the square-root law is a large-sample
 fit, and a single $50$-share trade against a thin four-level book
 is dominated by the idiosyncratic geometry of the top two levels.
@@ -846,6 +846,6 @@ information; the square-root law gives the integrated cost of a
 metaorder; Roll gives the spread decomposition into inventory,
 processing, and informed flow. Holding all three at once is what
 lets a quant strat read a trade log usefully. \Cref{ch:order_flow}
-turns to short-horizon order-flow dynamics --- imbalance, queue
-position, and order-flow signals as return predictors ---
+turns to short-horizon order-flow dynamics (imbalance, queue
+position, and order-flow signals as return predictors), the
 tick-by-tick analogues of the metaorder-scale story here.

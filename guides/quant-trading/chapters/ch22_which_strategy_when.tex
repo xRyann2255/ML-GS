@@ -16,9 +16,9 @@ blog \citep{chan2020cpo}, the QuantStart HMM tutorial
 Model} (HMM) detects regimes on the slow clock (regimes last
 weeks). A \textbf{decision tree} maps observables to a strategy on
 the strategy's own clock (per bar/tick). Chan's \textbf{Conditional
-Parameter Optimisation} (CPO) adapts parameters --- its regression
+Parameter Optimisation} (CPO) adapts parameters; its regression
 is retrained nightly/weekly but queried per tick.
-\textbf{Meta-labeling} (\cref{ch:ml_trading}) runs fastest --- once
+\textbf{Meta-labeling} (\cref{ch:ml_trading}) runs fastest, once
 per proposed trade. Downstream, Kelly sizes and Almgren--Chriss
 schedules. Thinking about each layer's clock is half the
 engineering; making each layer's output legible to the next is the
@@ -42,14 +42,14 @@ From earlier in the book:
   \item \Cref{ch:greeks_hedging,ch:vol_surface}: long gamma
   makes money when realised vol exceeds implied.
   \item \Cref{ch:ml_trading}: triple-barrier labels and
-  meta-labeling --- the trade-level selector in the framework
+  meta-labeling, the trade-level selector in the framework
   below.
   \item \Cref{ch:backtesting}: walk-forward and CPCV. Every
   component must be validated under these rules.
   \item \Cref{ch:kelly_risk}: Kelly sizing.
 \end{itemize}
 From outside the book: elementary HMM vocabulary (hidden states,
-transition matrix, forward/backward, EM --- Rabiner's 1989 tutorial
+transition matrix, forward/backward, EM; Rabiner's 1989 tutorial
 is the standard reference); basic regression and random forests at
 the level of \cref{ch:ml_trading}.
 \end{backgroundbox}
@@ -63,21 +63,21 @@ Prosperity-style desk with four products on the screen. This is how
 the framework should \emph{feel}; the rest of the chapter explains
 how each step is computed. The universe:
 \begin{itemize}
-  \item \texttt{RAINFOREST\_RESIN} --- nearly flat price around
+  \item \texttt{RAINFOREST\_RESIN}: nearly flat price around
   $\approx 10{,}000$ seashells, with a tight, stable spread. No
   information-driven flow. A textbook candidate for passive
   market making (\cref{ch:market_making}).
-  \item \texttt{KELP} --- mid-volatility, mean-reverting on the
+  \item \texttt{KELP}: mid-volatility, mean-reverting on the
   minute-scale time axis. Historical ADF $p$-value small, OU
   half-life on the order of tens of ticks. A textbook
   $z$-score mean-reversion candidate
   (\cref{ch:mean_reversion_ou}).
-  \item \texttt{SQUID\_INK} --- volatile, occasionally driven by
+  \item \texttt{SQUID\_INK}: volatile, occasionally driven by
   an informed trader (Olivia in the Prosperity 3 worked
   examples of \cref{ch:momentum}). When she is buying, the
   price runs in the same direction for many ticks. A textbook
   TSMOM candidate, conditional on the informed-flow signal.
-  \item \texttt{PICNIC\_BASKET1} --- a known basket of
+  \item \texttt{PICNIC\_BASKET1}: a known basket of
   individual products (6 \texttt{CROISSANTS}, 3
   \texttt{JAMS}, 1 \texttt{DJEMBE}). The basket and its
   replicating portfolio can deviate from each other; the
@@ -117,7 +117,7 @@ the pool are discriminable from these eight numbers.}
 Reading \cref{tab:wsw_toy_observables} row by row: \texttt{RESIN}
 has tiny vol (1.8~bps), a non-trivial 0.5~bps half-spread (so full
 spread $\approx$ half the per-5-min vol), and zero lag-1
-autocorrelation --- no trend, no mean-reverting edge. Passive
+autocorrelation: no trend, no mean-reverting edge. Passive
 quoting is the only positive-expectancy move. \textbf{Select:
 market making}.
 
@@ -129,7 +129,7 @@ $z$-score mean reversion}.
 
 \texttt{SQUID\_INK} has the Olivia flag on, $+1.2\%$ trailing
 return, positive lag-1 autocorrelation, and ADF $p = 0.41$ (unit
-root --- no mean-reversion branch fires). Trend is present and
+root, so no mean-reversion branch fires). Trend is present and
 informed-trader-confirmed. \textbf{Select: time-series momentum
 long}.
 
@@ -138,7 +138,7 @@ For \texttt{PICNIC\_BASKET1} the tradeable is the basket spread
 entry threshold: basket is rich relative to replicating portfolio.
 \textbf{Select: short basket / long replicating portfolio}.
 
-Four products, eight numbers, four strategies --- each selection is
+Four products, eight numbers, four strategies: each selection is
 the gating condition of a previously-written chapter, read off a
 single table. The rest of this chapter formalises this.
 
@@ -148,8 +148,8 @@ All four strategies in \cref{sec:wsw_toy_example} appear in the
 Frankfurt Hedgehogs' second-place write-up: market making on flat
 low-vol products, OU mean reversion on mid-vol mean-reverting
 products, basket arb on \texttt{PICNIC\_BASKET1}/\texttt{2}, and
-TSMOM on \texttt{SQUID\_INK} conditional on the Olivia signal ---
-seven strategies combined. This chapter formalises ``how did they
+TSMOM on \texttt{SQUID\_INK} conditional on the Olivia signal
+(seven strategies combined). This chapter formalises ``how did they
 pick which strategy to run where?'' from \citeChanQT{} and
 \citep{chan2020cpo}; the write-up is what the output looks like
 when done right.
@@ -160,7 +160,7 @@ when done right.
 \label{sec:wsw_hmm}
 
 The toy example cheated: observables drift with the \emph{market
-regime} --- the hidden state that makes returns, spreads,
+regime}, the hidden state that makes returns, spreads,
 volatility, and correlations covary. A $z = 2$ in a calm regime is
 real; in a crisis regime $z = 2$ is small relative to intraday
 shocks and means something different. A \textbf{regime-aware}
@@ -223,7 +223,7 @@ history and read the current-state posterior off the last column
 \citep{quantstart2016hmm}.
 \end{keyfactbox}
 
-We do not re-derive the three algorithms --- the derivation is
+We do not re-derive the three algorithms; the derivation is
 four pages of index algebra that reduces to ``law of total
 probability plus memoisation'' (see \citep{rabiner1989tutorial}).
 Define the forward variable
@@ -240,7 +240,7 @@ the hidden state at the current time being $i$. Its recursion is
   \qquad \alpha_1(j) = \pi_j\, b_j(o_1),
   \label{eq:wsw_forward_recursion}
 \end{equation}
---- law of total probability: arrive in any $i$ at $t-1$,
+which is the law of total probability: arrive in any $i$ at $t-1$,
 transition to $j$, emit $o_t$. Summing $\alpha_T$ over states
 gives the total likelihood $\Prob(o_{1:T})$ as a by-product. The
 filtered posterior is
@@ -330,7 +330,7 @@ $o_2 = 0.006$ are $b_1 = 39.37$, $b_2 = 18.76$. Propagate:
   \;=\; 0.3071 \cdot 18.76
   \;=\; 5.76.
 \end{align}
-After renormalisation, $\alpha_2 = (0.8256,\, 0.1744)$ --- a second
+After renormalisation, $\alpha_2 = (0.8256,\, 0.1744)$: a second
 low-vol-consistent observation sharpens the inference.
 
 \paragraph{Step 3: $t = 3$, $o_3 = -0.30\%$.} Still inside state
@@ -358,7 +358,7 @@ diagonal cannot hold state 1 against this:
   &\propto (0.9083\cdot 0.02 + 0.0917\cdot 0.98)(9.71)
   \;=\; 1.0514.
 \end{align}
-After renormalisation, $\alpha_4 = (0.2086,\, 0.7914)$ --- posterior
+After renormalisation, $\alpha_4 = (0.2086,\, 0.7914)$. The posterior
 flipped onto state 2 in one observation.
 
 \paragraph{Step 5: $t = 5$, $o_5 = -3.00\%$.} A second high-vol
@@ -400,15 +400,15 @@ preserve it; observations deep in one state's tail and inside
 another's body snap it over. Stickiness controls the evidence
 required: large off-diagonals flip on one bad day, small ones
 require several. Choosing stickiness is the single most important
-HMM parameter decision --- too nervous and the pipeline swaps
-strategies daily; too confident and it sits in the wrong regime for
+HMM parameter decision. Too nervous, and the pipeline swaps
+strategies daily; too confident, and it sits in the wrong regime for
 a month.
 \end{intuitionbox}
 
 \begin{pitfallbox}[Number of states and the Gaussianity assumption]
 Two failure modes dominate. \textbf{Too many states}: $N = 2$ finds
 ``quiet vs crisis''; $N = 3$ sometimes finds ``up/range/down'',
-sometimes garbage; $N = 6$ almost always overfits --- states
+sometimes garbage; $N = 6$ almost always overfits: states
 capture one or two outliers and the posterior flickers. Start at
 $N = 2$; only increase with a-priori reason and out-of-sample
 evidence. \textbf{Gaussian emissions on raw returns}: daily equity
@@ -431,12 +431,12 @@ backtest literature:
   upward drift. TSMOM (\cref{ch:momentum}) earns its highest
   Sharpe. Mean reversion is anti-correlated with the trend and
   gets run over. Market making earns a steady spread (low adverse
-  selection). Long gamma loses --- realised vol below implied.
+  selection). Long gamma loses: realised vol stays below implied.
   \item \textbf{High-vol bear}: wide spreads, thin books. TSMOM
   short side earns highest Sharpe (2008 is the textbook case);
   cross-sectional momentum still works at reduced Sharpe. Mean
   reversion catches falling knives. Market making is dangerous
-  --- the book walks; \citeChan{} recommends aggressive inventory
+  (the book walks); \citeChan{} recommends aggressive inventory
   skew. Long gamma earns its highest returns.
   \item \textbf{Range-bound}: tightly bracketed, tight spreads,
   short half-lives. OU mean reversion
@@ -488,7 +488,7 @@ Synthesised from \citeChan{}, \citeChanQT{}, and \citep{quantstart2016hmm}.}
 \label{tab:wsw_regime_map}
 \end{table}
 
-The point is not the specific cells but that most strategies have
+The specific cells matter less than the pattern: most strategies have
 \emph{sharp sign flips} across regimes. Running mean reversion
 through a bull trend, or TSMOM through a range, is the most common
 money-loss pattern.
@@ -513,7 +513,7 @@ column because the basket spread is a price \emph{relationship},
 not a direction. A trend in both legs leaves the spread unchanged.
 The basket branch comes \emph{before} regime-conditional branches
 for this reason. On the Frankfurt Hedgehogs' leaderboard basket arb
-P\&L was top-three --- ``regime-neutral'' means ``runs in every
+P\&L was top-three: ``regime-neutral'' means ``runs in every
 regime,'' not ``small.''
 
 \begin{intuitionbox}
@@ -523,7 +523,7 @@ strategies that bet on a \textbf{relationship} between prices do
 not}. Momentum and mean reversion are directional bets on
 autocorrelation. Market making is a directional bet on the sign of
 adverse selection. Arbitrage and basket spreads are relationship
-bets --- they pay when the relationship is dislocated regardless
+bets: they pay when the relationship is dislocated regardless
 of leg direction. Long gamma is realised-vs-implied (a
 relationship), less regime-sensitive than directional strategies
 but more than cross-sectional arbitrage because the relationship
@@ -531,8 +531,8 @@ itself moves with regime.
 \end{intuitionbox}
 
 A synthetic check makes the sign flip concrete. On 2000-step
-series --- half trending (drift $\pm 0.001$, $\sigma = 0.005$),
-half mean-reverting (OU with $\theta = 0.1$, $\sigma = 0.3$) --- a
+series, half trending (drift $\pm 0.001$, $\sigma = 0.005$) and
+half mean-reverting (OU with $\theta = 0.1$, $\sigma = 0.3$), a
 20-step TSMOM and a 50-step $|z|>1.5$ OU strategy gave:
 \begin{itemize}
   \item Trending regime: TSMOM Sharpe $= +1.65$,
@@ -669,7 +669,7 @@ At each decision tick, for each product $p$ in the universe:
   \item Else, \texttt{SKIP} (no strategy fires for this product
   at this tick).
 \end{enumerate}
-Each threshold is a tunable parameter --- and in the next section,
+Each threshold is a tunable parameter; in the next section,
 CPO makes them all regime-conditional.
 \end{keyfactbox}
 
@@ -678,7 +678,7 @@ first (regime-free, riskless). Basket arbitrage next
 (regime-neutral, \cref{tab:wsw_regime_map}). Mean reversion and
 TSMOM in the middle, mutually exclusive via the
 cointegration/regime tests. Market making near the bottom (default
-when no stronger signal). SKIP as last resort --- more often
+when no stronger signal). SKIP as last resort, more often
 correct than beginners think. The most common money-loss in
 Prosperity 3 write-ups was strategies firing every tick because the
 author refused to hold no position.
@@ -742,7 +742,7 @@ start of the section. The formalisation just makes it reproducible,
 auditable, and tunable.
 
 \begin{intuitionbox}
-The decision tree is not a classifier --- it is a priority-ordered
+The decision tree is not a classifier but a priority-ordered
 list of sufficient conditions, an if-elif chain in which each
 branch's expected edge dominates the lower branches when its guard
 fires. The default branch is ``do nothing'', not ``pick the most
@@ -767,7 +767,7 @@ are dropped.
 \begin{keyfactbox}[Meta-labeling in the decision framework]
 Let $x_t$ be the feature vector (observables, regime posterior,
 proposed-trade features) and let $y_t \in \{0, 1\}$ be the triple-barrier
-label (\cref{ch:ml_trading}) of the proposed trade --- $1$ if
+label (\cref{ch:ml_trading}) of the proposed trade: $1$ if
 profit-taker hit first, $0$ otherwise. Train a binary classifier
 $\hat{p}(x_t) = \Prob(y_t = 1 \mid x_t)$ on historical proposals
 under CPCV (\cref{ch:backtesting}). At decision time, fire the
@@ -792,12 +792,12 @@ $1000$ trades; $550$ are profitable (55\%), averaging $+10$~bps on
 winners and $-8$~bps on losers. Per-trade P\&L: $0.55 \cdot 10 -
 0.45 \cdot 8 = 1.9$~bps. A meta-classifier at AUC $0.60$ with
 $\tau_{\text{meta}} = 0.55$ keeps $700$ trades, of which $420$ win
-(60\%). Per-trade P\&L: $0.6 \cdot 10 - 0.4 \cdot 8 = 2.8$~bps ---
+(60\%). Per-trade P\&L: $0.6 \cdot 10 - 0.4 \cdot 8 = 2.8$~bps,
 up 47\%, with 30\% fewer trades and proportionally less turnover
 cost (where the Sharpe uplift lives). Drawdown reduction is larger
 still because the classifier disproportionately drops runs of
-correlated losers. The shape --- modest hit-rate uplift,
-disproportionate Sharpe/drawdown improvement --- is what \citeAFML{}
+correlated losers. The shape (modest hit-rate uplift,
+disproportionate Sharpe/drawdown improvement) is what \citeAFML{}
 reports.
 
 \begin{pitfallbox}[Meta-labeling is not a return predictor]
@@ -844,7 +844,7 @@ strategy returns on held-out data and solve
   \mathbf{w}^{\top}\Sigma\mathbf{w},
   \label{eq:wsw_mv_combine}
 \end{equation}
---- Markowitz over strategies, not assets, with $\lambda$ the risk
+which is Markowitz over strategies, not assets, with $\lambda$ the risk
 aversion. $\Sigma$ is unstable on small samples; shrink or
 regularise before use.
 
@@ -871,7 +871,7 @@ volatile one; a TSMOM threshold is too low in chop. Fixed
 parameters across regimes is the biggest slow-bleed source
 \citeChanQT{}.
 
-The naive fix --- refit on a rolling window --- has three failure
+The naive fix, refitting on a rolling window, has three failure
 modes. \textbf{Lag}: a 60-day window cannot adapt faster than
 $\sim 20$ days (how long new data needs to crowd out old), and
 regimes transition faster. \textbf{Loss of significance}: shorter
@@ -884,8 +884,8 @@ optimum.
 \citep{chan2020cpo} reframes parameter optimisation as regression:
 given market features $\phi_t$ (vol, HMM posterior, spread,
 term-structure slope) and candidate parameter vector $\theta$,
-predict held-out performance $R$. Fit $\hat{R}(\phi, \theta)$ ---
-Chan uses gradient-boosted trees --- on a historical dataset of
+predict held-out performance $R$. Fit $\hat{R}(\phi, \theta)$
+(Chan uses gradient-boosted trees) on a historical dataset of
 $\big(\phi_t, \theta, R(\phi_t, \theta)\big)$ tuples, evaluated
 under CPCV. At decision time, observe $\phi_{t^*}$ and solve
 \begin{equation}
@@ -906,7 +906,7 @@ the marginal optimum averaged over history.
   grid of candidate $\theta$ and evaluate held-out performance
   under CPCV.
   \item \textbf{Fit a regression} $\hat{R}(\phi, \theta)$
-  --- typically gradient-boosted trees --- on the collected
+  (typically gradient-boosted trees) on the collected
   tuples. The regression learns the joint dependence on
   features and parameters, so it implicitly learns the
   regime-conditional optimum.
@@ -918,7 +918,7 @@ the marginal optimum averaged over history.
 \end{keyfactbox}
 
 CPO sits cleanly on top of the HMM because you do not need to
-identify regimes explicitly --- the features $\phi$ already encode
+identify regimes explicitly: the features $\phi$ already encode
 them jointly. In practice include both the HMM posterior (which
 carries the sticky prior) and raw features (which carry
 microstructure state).
@@ -951,7 +951,7 @@ maximise over the grid at $p_{t^*}$. Suppose the fitted rule:
   \label{eq:wsw_cpo_rule}
 \end{equation}
 The optimal threshold is larger in high-vol regimes because the
-OU process's unconditional $\sigma$ is larger --- $z = 1.5$ is
+OU process's unconditional $\sigma$ is larger, so $z = 1.5$ is
 weaker evidence of a true deviation. The non-CPO quant averages to
 $1.5$; the CPO quant picks $1.5$ in calm and $2.5$ in volatile,
 capturing higher OOS Sharpe in both.
@@ -971,8 +971,8 @@ single-threshold baseline as the acceptance criterion.
 
 \begin{historybox}
 CPO was popularised by Ernest Chan in the 2020s via PredictNow and
-\citep{chan2020cpo}. The idea --- context-aware parameter tuning
---- appears in the 1980s adaptive-control literature, but Chan
+\citep{chan2020cpo}. The idea, context-aware parameter tuning,
+appears in the 1980s adaptive-control literature, but Chan
 packaged it for trading. Before CPO the practitioner habit was
 rolling-window refit.
 \end{historybox}
@@ -1034,7 +1034,7 @@ meta-classifier's OOS predictions as CPO input is a subtle leak).
 Three implementation details. \textbf{Order is load-bearing}: CPO
 (4) must follow selection (3) because the candidate grid depends
 on the strategy; meta-labeling (6) must follow CPO (4) because the
-classifier is trained on regime-conditional proposals --- deploying
+classifier is trained on regime-conditional proposals; deploying
 it downstream of CPO after fixed-parameter training silently
 miscalibrates it (training distribution $\neq$ deployment
 distribution).
@@ -1062,7 +1062,7 @@ every filter has had a veto.
 \begin{pitfallbox}[The pipeline's weakest step is usually the HMM]
 Step 2 is usually the weak link. A Gaussian HMM on a short window,
 wrong number of states, or non-Gaussian tails produces regime
-labels wrong for half of history --- and every downstream layer
+labels wrong for half of history, and every downstream layer
 conditions on them. Monitor regime detection in isolation: plot
 the forward posterior against crashes/VIX spikes, watch
 transition-matrix stickiness for drift, retrain slowly enough that
@@ -1074,7 +1074,7 @@ cannot see its output.
 On a Goldman central-risk desk, a slimmer pipeline runs
 continuously across the single-stock book. Strat owns the pipeline
 code (regime model, tree, CPO regression, meta-classifier). The
-trader owns the override --- the red button that disables the
+trader owns the override, the red button that disables the
 regime layer for N ticks or forces strategy $X$ on product $Y$. The
 quant researcher owns the regime model's retraining cadence and
 investigates anomalies. When it works the pipeline runs for weeks
@@ -1091,7 +1091,7 @@ code. Academic HMM-for-regime papers (Hamilton's 1989
 Markov-switching model) predate it by two decades. Meta-labeling
 was popularised by L\'opez de Prado (2018, \citeAFML{}), ch.\ 3.
 CPO is Chan's more recent contribution \citep{chan2020cpo}. The
-pipeline assembled here is a mid-2020s synthesis --- components
+pipeline assembled here is a mid-2020s synthesis: components
 all at least a decade old, but rarely written down combined.
 \end{historybox}
 
@@ -1113,7 +1113,7 @@ it beats straight averaging.
 \paragraph{Black-box end-to-end model.} Train one large model (NN,
 RL, transformer) to emit trade proposals directly. Appeal: no
 hand-coded tree, no HMM, no CPO. Reality: every quant RL group has
-tried it and produced Sharpe-$<$-1 models (\cref{ch:ml_trading} ---
+tried it and produced Sharpe-$<$-1 models (\cref{ch:ml_trading};
 financial series are not stationary and do not contain enough
 information to train end-to-end). The layered pipeline works
 \emph{because} each layer is small and imposes structure (HMM:
@@ -1122,7 +1122,7 @@ meta: triple-barrier), and each can be validated independently. An
 end-to-end model is a monolithic failure mode.
 
 \paragraph{Manual discretion.} A human reads the screen and picks a
-strategy --- implicitly running the tree. Advantage: qualitative
+strategy, implicitly running the tree. Advantage: qualitative
 state (news, CB announcement, block cross) enters the decision.
 Disadvantage: slow, unreproducible, cannot scan $10{,}000$
 products. The compromise every desk converges on is pipeline +
@@ -1131,8 +1131,8 @@ reproducible part; human handles the rest.
 
 Limitations worth flagging. The pipeline assumes regimes exist
 and are detectable (not universally true); assumes the strategy
-pool covers plausible states (novel regimes --- pandemic, war,
-rate shocks --- may fit nothing); assumes clean input data (bad
+pool covers plausible states (novel regimes such as pandemic, war,
+or rate shocks may fit nothing); assumes clean input data (bad
 ticks and outages need their own pre-processing layer, not
 discussed here). Every production desk has a dedicated monitoring
 layer.
@@ -1142,8 +1142,8 @@ layer.
 \label{sec:wsw_code}
 
 The pipeline is a pure function. We show only the glue, not the
-underlying HMM, CPO, meta-classifier, or strategy implementations
---- each object exposes the interface of its own chapter.
+underlying HMM, CPO, meta-classifier, or strategy implementations;
+each object exposes the interface of its own chapter.
 
 \begin{lstlisting}[language=Python, caption={Pipeline composition.
 Each dependency object implements the interface of its chapter.

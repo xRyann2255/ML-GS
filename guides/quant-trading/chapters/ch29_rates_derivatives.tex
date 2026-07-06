@@ -5,7 +5,7 @@
 \Cref{ch:fixed_income_foundations} built the zero curve and priced a
 plain-vanilla interest rate swap.  This chapter prices the
 \emph{options on} those rates: caps, floors, and swaptions.  The
-models that do this --- Black'76, Hull--White, BGM/LMM, and SABR ---
+models that do this (Black'76, Hull--White, BGM/LMM, and SABR)
 are the daily tools of a rates Strat.  Understanding how they work,
 how they calibrate, and which to reach for in which situation is the
 core of what a rates desk does every morning.
@@ -60,8 +60,8 @@ desks today \citeHagan.
 \label{sec:caps_floors_swaptions}
 %% ================================================================
 
-The three most heavily traded rate options --- \emph{caps},
-\emph{floors}, \emph{swaptions} --- account for most rate-option
+The three most heavily traded rate options (\emph{caps},
+\emph{floors}, and \emph{swaptions}) account for most rate-option
 volume on dealer desks.  Each is built from a simple block; the trick
 is seeing how the pieces fit together.
 
@@ -92,8 +92,8 @@ period; the $\max$ makes it an option.
 \begin{definition}[Cap]
 \index{cap (rate option)|textbf}
 \label{def:cap}
-A \emph{cap} is a strip of caplets, one per reset date --- literally
-a portfolio of independent call options on the floating rate.  A
+A \emph{cap} is a strip of caplets, one per reset date; it is
+literally a portfolio of independent call options on the floating rate.  A
 3-year cap on 6-month SOFR with semi-annual resets contains 6~caplets
 (months 0, 6, 12, 18, 24, 30), each paying at the end of its accrual
 period; a 5-year quarterly-reset cap would contain 20~caplets.
@@ -148,8 +148,8 @@ This is the interest-rate analogue of put--call parity.
 A \textbf{swap} exchanges a floating rate (e.g.\ SOFR) for a fixed
 rate: a company with floating-rate debt swaps to fixed to make its
 interest costs predictable, and the dealer on the other side earns
-the bid--offer.  A \textbf{swaption} is the option --- not the
-obligation --- to enter such a swap at a pre-agreed fixed rate on a
+the bid--offer.  A \textbf{swaption} is the option, not the
+obligation, to enter such a swap at a pre-agreed fixed rate on a
 future date, letting a borrower lock in worst-case funding costs
 today while walking away if rates move in their favour.
 
@@ -187,7 +187,7 @@ where $A(T_0) = \sum_{i=1}^{n} \tau_i\, D(T_0, T_i)$ is the
 \begin{pitfallbox}[Caps vs.\ swaptions]
 Caps and swaptions are \emph{not} interchangeable.  A cap is a basket
 of independent options on individual forward rates (one caplet per
-period).  A swaption is a single option on a \emph{swap rate} --- a
+period).  A swaption is a single option on a \emph{swap rate}, a
 weighted average of forwards.  Forward-rate correlation matters
 enormously for swaptions, not for caps.
 \end{pitfallbox}
@@ -409,7 +409,7 @@ options, each with a closed-form Hull--White price (details in
 European swaptions have a closed-form Hull--White price.  Free
 parameters $(a, \volat)$ are calibrated to market swaptions.  With
 only two parameters, the model fits a limited slice of the swaption
-matrix --- typically one row or column.
+matrix, typically one row or column.
 \end{keyfactbox}
 
 \subsection{Strengths and limitations}
@@ -433,8 +433,8 @@ matrix --- typically one row or column.
 \end{center}
 
 The lack of smile is Hull--White's main limitation.  It prices
-European options with a single vol per strike --- fine for ATM risk
-but inadequate for away-from-ATM instruments.  Smile-consistent
+European options with a single vol per strike, which is fine for ATM
+risk but inadequate for away-from-ATM instruments.  Smile-consistent
 pricing needs SABR (\cref{sec:sabr}).
 
 \subsection{Numerical implementation: the trinomial tree}
@@ -457,7 +457,7 @@ priced in practice.
 \begin{intuitionbox}
 The Hull--White trinomial tree is the rates analogue of
 Cox--Ross--Rubinstein.  Key difference: it is calibrated to the
-entire initial term structure, not just one spot and vol --- $\theta(t)$
+entire initial term structure, not just one spot and vol: $\theta(t)$
 bends the tree so today's bond prices are recovered exactly.
 \end{intuitionbox}
 
@@ -488,7 +488,7 @@ measure, drift terms depending on forward-rate correlations appear
 
 \paragraph{Key property: caplets are Black-priced by construction.}
 Each $F_k$ is log-normal under its own forward measure, so every
-caplet is priced exactly by Black'76 with vol $\volat_k(T_k)$ --- read
+caplet is priced exactly by Black'76 with vol $\volat_k(T_k)$, read
 directly from market cap quotes.  BGM is built to reproduce the cap
 market automatically.
 
@@ -508,14 +508,14 @@ practical approaches:
     Accurate but slow; used for exotics.
   \item \textbf{Analytical approximations}: freeze the weights at
     $t=0$, yielding an approximately log-normal swap rate and a
-    Black-like swaption formula --- accurate enough for many purposes
+    Black-like swaption formula, accurate enough for many purposes
     \citeHull.
 \end{enumerate}
 
 \begin{keyfactbox}[BGM / LMM: key facts]
 \begin{itemize}
   \item Models observable forwards directly, not the short rate.
-  \item Caplets are Black-priced by construction --- fits the cap
+  \item Caplets are Black-priced by construction, so it fits the cap
     market automatically.
   \item Swaptions need MC or analytical approximations.
   \item Requires a forward-rate \textbf{correlation matrix} (the main
@@ -538,7 +538,7 @@ approximation, not an exact result.
 %% ================================================================
 
 Black assumes constant vol per forward, but the market quotes
-strike-dependent implied vols --- the smile/skew seen for equities in
+strike-dependent implied vols, the smile/skew seen for equities in
 \cref{ch:vol_surface}.  The \textbf{SABR model} (Stochastic Alpha
 Beta Rho) is the rates-desk standard for capturing this \citeHagan.
 
@@ -573,8 +573,8 @@ $\beta=1, \nu=0$: log-normal (Black).  $\beta=0, \nu=0$: normal
 \subsection{Hagan's approximation formula}
 
 Hagan et al.\ derived a closed-form approximation for the Black
-implied vol as a function of strike \citeHagan --- no numerical SDE
-solving needed.  For $F \neq K$:
+implied vol as a function of strike \citeHagan; no numerical SDE
+solving is needed.  For $F \neq K$:
 \begin{equation}
   \volat_{\text{Black}}(K) \;=\;
     \frac{\alpha}{(FK)^{(1-\beta)/2}
@@ -649,9 +649,9 @@ quoted strikes:
       - \volat_{\text{mkt}}(K_j)\bigr]^2.
   \label{eq:sabr_calib_obj}
 \end{equation}
-A 2D optimisation, fast enough to run in milliseconds --- critical
-since rates desks recalibrate SABR at every (expiry, tenor) cell of
-the swaption matrix every morning.
+This is a 2D optimisation, fast enough to run in milliseconds, which
+is critical because rates desks recalibrate SABR at every (expiry,
+tenor) cell of the swaption matrix every morning.
 
 \subsection{Worked example: qualitative SABR smile}
 \label{sec:sabr_worked}
@@ -675,7 +675,7 @@ $\nu = 0.40$.  Hagan's formula at five strikes:
 \end{center}
 
 Clear \emph{negative skew}: vol is higher for low strikes (rates
-falling) than high (rates rising), driven by $\rho = -0.30$ --- when
+falling) than high (rates rising), driven by $\rho = -0.30$: when
 the forward drops, $\alpha_t$ rises, pushing vol higher.  Wings are
 elevated by $\nu = 0.40$: higher vol-of-vol $\Rightarrow$ fatter
 tails $\Rightarrow$ richer OTM options.
@@ -721,11 +721,11 @@ commodities it is positive.
 
 \paragraph{Effect of changing $\nu$.}
 Raising $\nu$ from 0.4 to 0.8 lifts both wings dramatically while
-leaving ATM nearly unchanged --- higher vol-of-vol fattens the tails.
+leaving ATM nearly unchanged: higher vol-of-vol fattens the tails.
 $\nu = 0$ collapses the smile to flat (Black).
 
 \begin{pitfallbox}[SABR is a smile interpolator]
-SABR is a snapshot of the smile --- it does not describe how the
+SABR is a snapshot of the smile: it does not describe how the
 smile evolves over time (its dynamics are known to be unrealistic;
 the backbone moves too predictably).  Many desks overlay SABR with
 empirical adjustments for hedging.  Use SABR for \emph{marking}
@@ -833,7 +833,7 @@ are smoother.
 
 The \textbf{vol cube} extends this to 3D by adding a strike axis.  At
 each (expiry, tenor) cell, replace the single ATM vol with a
-SABR-calibrated smile --- a function from strike to implied vol:
+SABR-calibrated smile, a function from strike to implied vol:
 \[
   (\text{expiry}, \;\text{tenor}, \;\text{strike}) \;\longmapsto\; \volat_{\text{Black}}.
 \]
@@ -848,8 +848,8 @@ query to the vol cube.
 %% ================================================================
 
 \begin{prosperitybox}
-The SABR workflow --- observe prices, extract implied vols, fit a
-parametric smile, re-price --- mirrors the vol-surface calibration of
+The SABR workflow (observe prices, extract implied vols, fit a
+parametric smile, re-price) mirrors the vol-surface calibration of
 \cref{ch:vol_surface}.  In Prosperity's Volcanic Rock Vouchers you
 did exactly this: observe bot option prices, back out vols, fit,
 quote.  The rates version applies the same logic to caps and
@@ -865,7 +865,7 @@ pipeline}.  Daily workflow:
     strikes).
   \item \textbf{Calibration:} at each (expiry, tenor) cell, fit
     $(\alpha, \rho, \nu)$ with $\beta$ fixed.  Result: the
-    \textbf{vol cube} --- expiry $\times$ tenor $\times$ strike.
+    \textbf{vol cube} (expiry $\times$ tenor $\times$ strike).
   \item \textbf{Pricing:} the cube feeds the pricing engine (SecDB at
     GS).  Traders price any rate option by interpolating the SABR
     surface.
@@ -905,7 +905,7 @@ pipeline}.  Daily workflow:
   \item SABR parameters: $\alpha$ = level, $\beta$ = backbone, $\rho$
     = skew, $\nu$ = wings.  Fix $\beta$, fit the rest.
   \item The \textbf{vol cube} (expiry $\times$ tenor $\times$ strike)
-    comes from SABR at each grid point --- the central rates-desk
+    comes from SABR at each grid point; it is the central rates-desk
     object.
   \item Flow: SABR $\to$ smile $\to$ Black'76 prices $\to$ Hull--White
     / BGM for exotics.

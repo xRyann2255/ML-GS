@@ -4,7 +4,7 @@
 
 You have a snapshot of the limit order book and a few seconds of
 trade history. In thirty seconds' time, will the mid-price have
-moved up or down? No crystal ball, no news feed --- just what has
+moved up or down? No crystal ball, no news feed: just what has
 been happening in the book for the last few hundred milliseconds.
 Can you do better than a coin flip?
 
@@ -12,7 +12,7 @@ Yes, and by a surprising margin. The single most informative
 number is the \textbf{order-flow imbalance} (OFI): the net
 aggressive buying pressure over a short window. Over sub-minute
 horizons, OFI explains a larger share of the variation in
-mid-price changes than any other easily-computed signal --- larger
+mid-price changes than any other easily-computed signal: larger
 than lagged returns, larger than volume alone, and larger than the
 raw bid--ask depth \citeBouchaud. Read the book, compute OFI, and
 act on it faster than the next trader: this is close to the only
@@ -20,12 +20,12 @@ honest edge at the microsecond scale.
 
 This chapter builds three related pieces of structure around that
 claim. First, OFI itself: definition, empirical regularity, and
-mechanism. Second, \textbf{queue position} --- where in the line
-of resting orders you sit --- and why being near the front is
+mechanism. Second, \textbf{queue position} (where in the line
+of resting orders you sit) and why being near the front is
 worth measurably more than being near the back. Third, two
 machinery observations: arrivals \emph{cluster in time} (the
 Hawkes observation) rather than being independent, and
-\emph{latency is a second-derivative game} --- being fast is only
+\emph{latency is a second-derivative game}: being fast is only
 useful up to the point where nobody faster can pick you off.
 
 Hawkes processes and latency are treated qualitatively; a full
@@ -79,8 +79,8 @@ from the bid. Passive traders post inside the existing quotes
 (removing depth).
 
 If over the last few hundred milliseconds the ask is being eaten
-faster than the bid --- six market buys for every sell, lots of
-cancels on the bid and none on the ask --- buyers are the urgent
+faster than the bid (six market buys for every sell, lots of
+cancels on the bid and none on the ask), buyers are the urgent
 side: willing to pay the half-tick for immediacy. An urgent side
 is almost always an \emph{informed} side
 (\cref{ch:kyle_gm}-sense), because informed traders cannot
@@ -198,11 +198,11 @@ length is approximately linear in OFI:
   \Delta \midp \;\approx\; \beta \cdot \mathrm{OFI} + \varepsilon,
 \end{equation}
 with $\beta > 0$, and $R^2$ on sub-minute bars typically
-several percent --- small-sounding but an enormous
+several percent, small-sounding but an enormous
 signal-to-noise ratio for short-horizon forecasting. A slope
 $\beta \approx 0.01$ ticks per unit of OFI is typical on a
 mid-cap equity; for the toy example, that gives an expected
-next-window mid move of $\beta \cdot 25 = 0.25$ ticks --- a
+next-window mid move of $\beta \cdot 25 = 0.25$ ticks, a
 quarter-tick drift in the direction of the buying pressure. A
 strategy trading on this signal is \emph{not} predicting the
 direction of this window's flow; it uses this window's flow to
@@ -332,7 +332,7 @@ the two differ only in how they convert the signal into action.
 \Cref{ch:lob} established that the matching engine runs
 price--time priority within a level: among resting orders at the
 same price, the first-in is filled first. That rule is why queue
-position --- where in the FIFO line your order sits --- is a
+position, where in the FIFO line your order sits, is a
 dimension of the book you can extract edge from.
 
 \subsection{Front of the queue is not the same as back of the queue}
@@ -350,13 +350,13 @@ Bob's. Alice collects the full half-spread; Bob gets a slice.
 Over the next minute, both want their full order filled: what
 are the respective probabilities?
 
-The empirical shape is stark. On the big equity futures ---
-Moallemi--Yuan and Huang--Polak on CME products ---
+The empirical shape is stark. On the big equity futures
+(Moallemi--Yuan and Huang--Polak on CME products),
 \emph{front-of-queue} (first $10\%$ of level depth) minute-horizon
 fill probabilities run $50$--$70\%$, while \emph{back-of-queue}
 (last $10\%$) sit at $5$--$15\%$ \citeBouchaud. The ratio is
 typically four to seven. Queue position matters more than price
-level --- since the two orders are, by construction, at the same
+level, since the two orders are, by construction, at the same
 price.
 
 \subsection{Pricing the queue position}
@@ -393,7 +393,7 @@ front is a first-order consideration.
 
 \begin{keyfactbox}[Queue position is worth a factor of six]
 Under representative fill probabilities, a quote at the front of
-the queue is worth roughly $6\times$ a quote at the back --- on
+the queue is worth roughly $6\times$ a quote at the back, on
 the same product, at the same price level, at the same time. The
 only thing separating the two numbers is when each order arrived.
 \end{keyfactbox}
@@ -550,15 +550,15 @@ seismograph. Bacry, Delattre, Hoffmann, and Muzy were among the
 first to calibrate Hawkes processes to HF financial data, and by
 the late 2010s a Hawkes kernel somewhere in the stack was
 standard on sell-side HFT desks. Quant trading has always
-imported tools from other data-rich sciences --- signal
+imported tools from other data-rich sciences: signal
 processing, ML, fluid dynamics, and here, seismology.
 \end{historybox}
 
 \section{Latency economics}
 \label{sec:latency}
 
-Everything so far --- OFI, queue position, intensity estimation
---- has a clock attached. OFI is computed over hundreds of
+Everything so far (OFI, queue position, intensity estimation)
+has a clock attached. OFI is computed over hundreds of
 milliseconds; queue position changes on the timescale of
 individual orders; Hawkes kicks decay over seconds. If your
 trading loop runs slower than those clocks, you are reading
@@ -623,9 +623,8 @@ desk:
 Benefits decompose along three axes: (i) better queue position
 (you post first), (ii) fewer stale-quote fills (you cancel
 before pickoff), (iii) ability to act on faster-decaying signals
-(OFI on shorter windows has larger slope). ``How fast do I need
-to be?'' has no universal answer; it depends on who else is in
-the product.
+(OFI on shorter windows has larger slope). How fast you need to
+be depends on who else is in the product.
 
 \begin{pitfallbox}[Latency is a second-derivative game]
 The common mistake is treating latency as an arms race to be
@@ -641,8 +640,8 @@ The damage function is nonlinear in the latency gap: last to
 middle of the pack is worth more than middle to first. A
 $10\,\mu$s improvement can save a strategy; a $1$\,ms
 improvement rarely matters outside explicit latency-arb.
-The question is not ``am I the fastest?'' but ``am I fast
-enough that nobody can systematically pick me off?''. On
+The relevant threshold is being fast enough that nobody can
+systematically pick you off, not being the fastest. On
 Prosperity, which fixes tick granularity and processes all bots
 simultaneously, the question does not arise; on real venues it
 is the difference between a profitable and unprofitable
@@ -713,7 +712,7 @@ $\Delta Q_a$, and the Trader can accumulate OFI over the last
 five ticks. Synthetic tests on Prosperity-style KELP data with
 moderate autocorrelation in aggressive-side flow show the sign
 of rolling OFI agrees with the next-tick mid change around
-$70\%$ of the time --- well above the $50\%$ coin flip. Because
+$70\%$ of the time, well above the $50\%$ coin flip. Because
 KELP is \emph{trending} (unlike mean-reverting
 RAINFOREST\_RESIN), the natural strategy is \emph{directional
 following}: take the side indicated by positive OFI, exit on OFI
@@ -732,8 +731,8 @@ new strat builds from tick data. Two production uses:
   Goldman receives a client equity order above a size threshold,
   the SI engine chooses between filling from Goldman's book
   (``internalise'') or routing to an exchange. The decision
-  depends on whether the short-horizon expected move ---
-  estimated from OFI and related signals --- is larger than the
+  depends on whether the short-horizon expected move,
+  estimated from OFI and related signals, is larger than the
   internalisation fee. If OFI says the market is about to rally,
   the engine prefers to fill from inventory at the current mid
   rather than pay up on the open market.
@@ -750,9 +749,9 @@ Hasbrouck \citeHasbrouck{} gives the econometric framing: the
 signed trade series (or OFI) is treated as a covariance-stationary
 process whose impulse response on the mid is the quantity of
 interest; the research question is robust estimation of that
-impulse response. This framing --- and VAR-style decompositions of
-price and trade series --- is a standard interview topic for
-equities-desk strat placements.
+impulse response. This framing, together with VAR-style
+decompositions of price and trade series, is a standard interview
+topic for equities-desk strat placements.
 \end{gsbox}
 
 \section{Key facts to memorise}
@@ -791,9 +790,8 @@ equities-desk strat placements.
   $10\,\mu$s slower than the fastest HFT on a venue can
   destroy a market-making strategy via pickoff; being
   $1$\,ms slower is usually survivable outside of explicit
-  latency-arb plays. The question is never ``am I the
-  fastest?''; it is ``am I fast enough to avoid being picked
-  off?''
+  latency-arb plays. What matters is being fast enough to
+  avoid being picked off, not being the fastest.
   \item \textbf{Every model using a single arrival rate is making
   a Poisson approximation.} That includes Glosten--Milgrom, Roll,
   and Avellaneda--Stoikov. Acceptable for coarse reasoning; in
@@ -809,8 +807,8 @@ equities-desk strat placements.
 \bigskip
 
 This chapter closes Part II. \Cref{ch:spreads_roll,ch:kyle_gm,ch:market_impact}
-gave \emph{cross-sectional} results --- why spreads exist, how
-information reaches prices, how impact scales with size; this
+gave \emph{cross-sectional} results: why spreads exist, how
+information reaches prices, how impact scales with size. This
 chapter added the \emph{time-series} layer: how flow looks on a
 clock, what short-horizon signal it carries, what constraints the
 clock imposes. Part III turns to strategies that use them,

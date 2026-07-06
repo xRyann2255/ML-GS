@@ -3,7 +3,7 @@
 \chaptermark{Fixed income foundations}
 
 This chapter fills the largest gap for a CS reader: the language of
-\emph{fixed income} --- bonds, interest rates, and swaps.
+\emph{fixed income} (bonds, interest rates, and swaps).
 \Cref{ch:rates_derivatives,ch:credit_derivatives} depend on it.  Five
 objects do all the work: zero rates $z(T)$, discount factors $D(T)$,
 forward rates $f(T_1,T_2)$, duration $D_{\text{Mac}}$ (with convexity
@@ -90,7 +90,7 @@ $z(T)$, you receive $e^{z(T)\,T}$ at time~$T$.
 \end{definition}
 
 ``Zero-coupon'' means no intermediate cash flows: a single lump sum
-at maturity.  This is the purest interest rate --- the price of
+at maturity.  This is the purest interest rate: the price of
 moving money from today to one future date.
 
 The map $z : (0, \infty) \to \R$ is the \textbf{zero curve} (or
@@ -102,7 +102,7 @@ A zero rate is not a coupon-bond yield.  A 5-year 3\% Treasury's YTM
 blends returns across many maturities (6m, 1y, \ldots, 5y); $z(5)$
 is the return on a \emph{single} cash flow at year~5.  A YTM also
 implicitly assumes every coupon is \emph{reinvested} at that same
-YTM until maturity --- an unrealistic assumption, since coupons paid
+YTM until maturity, an unrealistic assumption, since coupons paid
 at year~1 will actually be reinvested at whatever the 1-year rate is
 at that time.  Zero rates embed no reinvestment assumption: each
 $z(T)$ is the clean price of moving money to one specific future
@@ -129,7 +129,7 @@ $(c_i)$ at times $(t_i)$:
   \text{Price} \;=\; \sum_{i=1}^{n} c_i \, D(t_i).
   \label{eq:pv_cashflows}
 \end{equation}
-This is the \textbf{present-value identity} --- the single most
+This is the \textbf{present-value identity}, the single most
 important equation in fixed income.
 
 \begin{intuitionbox}
@@ -147,7 +147,7 @@ Forward rates extend zero rates: the cost of lending between two
 \emph{future} dates, implied by today's curve.  In plain English, the
 forward rate $f(T_1,T_2)$ is the interest rate you can lock in
 \emph{today} for a loan that will start at time $T_1$ and mature at
-time $T_2$ --- no money actually moves today, just a contractual
+time $T_2$.  No money actually moves today, just a contractual
 promise about the rate on a future loan.
 
 \begin{definition}[Forward rate]
@@ -194,13 +194,13 @@ In the limit $T_2 \to T_1 = T$:
   \;=\; -\frac{\partial}{\partial T}\ln D(T).
   \label{eq:instantaneous_forward}
 \end{equation}
-This is the \emph{instantaneous forward rate} at time~$T$ --- the
+This is the \emph{instantaneous forward rate} at time~$T$: the
 forward rate for an infinitesimally short period beginning at~$T$.
 
 \begin{intuitionbox}
 $f(T_1,T_2)$ is the break-even lending rate that makes an investor
 indifferent between lending straight to $T_2$ at $z(T_2)$ or rolling
-over from $T_1$.  It is \emph{not} a forecast --- it is the rate
+over from $T_1$.  It is \emph{not} a forecast but the rate
 implied by today's curve.
 \end{intuitionbox}
 
@@ -258,8 +258,8 @@ From the bootstrap example (\cref{sec:fi_bootstrap_example}):
 \end{tabular}
 \end{center}
 
-Forward rates are the ``marginal'' rate, zero rates the ``average''
---- the marginal exceeds the average exactly when the average is
+Forward rates are the ``marginal'' rate, zero rates the ``average'':
+the marginal exceeds the average exactly when the average is
 rising (same relationship as marginal vs.\ average cost).
 
 \paragraph{Interpreting forward rates.}
@@ -370,8 +370,8 @@ building a pricer is getting day-counts right and unit-testing them.
 %% ================================================================
 
 The market does not quote zero rates directly.  We observe prices of
-deposits, futures, and swaps, and extract the implied rates ---
-\textbf{bootstrapping}.  Start with the shortest-maturity instrument;
+deposits, futures, and swaps, and extract the implied rates, a
+process called \textbf{bootstrapping}.  Start with the shortest-maturity instrument;
 at each step use previously determined rates to solve for the next.
 
 \subsection{The instruments}
@@ -578,7 +578,7 @@ Its price is the present value of these cash flows:
 \end{equation}
 \end{definition}
 
-The price depends on the entire zero curve --- each cash flow
+The price depends on the entire zero curve: each cash flow is
 discounted at its own rate.  Market convention, however, quotes bonds
 via a single number: the yield.
 
@@ -617,7 +617,7 @@ Duration quantifies how much the bond price moves when yields move.
 It is the rates trader's core hedging unit: if you own a bond with
 5-year duration and want to be rate-neutral, you short an offsetting
 position (a futures contract, another bond, or a swap) whose
-duration-weighted size matches --- so that a parallel shift in rates
+duration-weighted size matches, so that a parallel shift in rates
 leaves your book's value unchanged.
 
 \begin{definition}[Macaulay duration]
@@ -734,7 +734,7 @@ overstates losses on rises and understates gains on falls.
   \label{eq:dv01}
 \end{equation}
 DV01 is the absolute dollar change in bond price per 1\,bp (0.01\%)
-yield move --- the standard rates-desk risk measure.  Portfolio DV01
+yield move, the standard rates-desk risk measure.  Portfolio DV01
 sums across positions.
 \end{definition}
 
@@ -872,7 +872,7 @@ Required hedge face value $F_B$ satisfies:
 \]
 Short approximately \$41.1\,M face of the 2-year bond to neutralise
 DV01.  This protects against parallel shifts only, not curve
-rotations --- hence desks also monitor \emph{key rate DV01} (sensitivity
+rotations; hence desks also monitor \emph{key rate DV01} (sensitivity
 to individual curve points).
 \end{example}
 
@@ -935,12 +935,12 @@ Key features:
     the central-bank policy rate (Fed Funds target in the US).
   \item \textbf{Overnight repo} renegotiates daily; \textbf{term repo}
     locks in a rate for a fixed period.
-  \item Repo is how bond traders finance positions --- repo bonds out
+  \item Repo is how bond traders finance positions: repo bonds out
     overnight for cash, pay the repo rate (``leveraged book'').
   \item Spread between SOFR (unsecured) and repo reflects collateral
     quality: governments go at ``general collateral,'' others higher.
-  \item A bond in demand for shorting repos below the general level
-    --- trading \emph{on special}.
+  \item A bond in demand for shorting repos below the general level;
+    it is said to trade \emph{on special}.
 \end{itemize}
 
 \begin{intuitionbox}
@@ -967,7 +967,7 @@ A \emph{plain vanilla interest rate swap} is an agreement between two
 parties to exchange interest payments on a \emph{notional principal}
 $N$ for a fixed number of years.  One party pays a \textbf{fixed rate}
 $s$; the other pays a \textbf{floating rate} (typically SOFR, formerly
-LIBOR).  The notional principal is never exchanged --- it is used
+LIBOR).  The notional principal is never exchanged; it is used
 only to calculate the interest payments.
 \end{definition}
 
@@ -1085,7 +1085,7 @@ The par swap rate is:
 \begin{itemize}
   \item Numerator $= 1 - D(T)$: the PV of the floating leg
     (net of notional).
-  \item Denominator $= A$: the annuity factor --- the PV of receiving
+  \item Denominator $= A$: the annuity factor, the PV of receiving
     \$1 per year on the fixed-leg payment schedule.
   \item The swap rate is completely determined by the zero curve.
 \end{itemize}
@@ -1094,8 +1094,8 @@ The par swap rate is:
 \begin{intuitionbox}
 A swap is a portfolio of FRAs (each floating payment bets on one
 forward rate).  The par swap rate is the single fixed rate making
-the package worth zero --- equivalently, exchanging a fixed bond for
-a floating bond, both at par.
+the package worth zero; equivalently, it is the rate at which a
+fixed bond exchanges for a floating bond, both at par.
 \end{intuitionbox}
 
 \subsection{Running example: 5-year IRS on \$100\,M}
@@ -1162,7 +1162,7 @@ If the curve shifts up by 50\,bp, the floating leg is worth more; the
 fixed leg's contractual rate is unchanged.  The fixed-rate payer
 profits: they locked 5.13\% when the market now demands 5.63\%.
 For a 1\,bp shift the swap value changes by
-$N \times A \times 0.0001 = \$43{,}842$ --- the swap's DV01.
+$N \times A \times 0.0001 = \$43{,}842$, the swap's DV01.
 
 \subsection{Swap valuation after inception}
 
@@ -1258,8 +1258,8 @@ reading market conditions.
     signal (market expects future cuts).  Every US recession since
     1960 was preceded by a 2s10s inversion.
   \item \textbf{Flat:} all maturities equal; transitional.
-  \item \textbf{Humped:} rises then falls --- near-term hikes, later
-    cuts.
+  \item \textbf{Humped:} rises then falls, reflecting near-term
+    hikes and later cuts.
 \end{itemize}
 
 \subsection{Three theories of the term structure}
@@ -1309,14 +1309,14 @@ LIBOR.  Overnight references: effective fed funds (pre-2020) or SOFR
 \subsection{Basis swaps}
 
 A \textbf{basis swap} has both legs floating against different rates
---- e.g.\ 3m SOFR vs.\ 6m SOFR, or SOFR vs.\ fed funds.  The gap is
+(e.g.\ 3m SOFR vs.\ 6m SOFR, or SOFR vs.\ fed funds).  The gap is
 the \textbf{basis spread}.  Participants use them to manage benchmark
 mismatches between assets and liabilities.
 
 \subsection{The LIBOR to SOFR transition}
 
 LIBOR (London Interbank Offered Rate) underpinned \$300+ trillion of
-contracts --- the floating rate in most swaps, loans, and rates
+contracts: it was the floating rate in most swaps, loans, and rates
 derivatives.
 
 \paragraph{Why LIBOR was retired (30 June 2023).}
@@ -1331,7 +1331,7 @@ derivatives.
 
 \paragraph{SOFR as replacement.}
 The Secured Overnight Financing Rate, administered by the NY Fed, is
-based on overnight Treasury repo (\$1\,T+ daily volume) --- far more
+based on overnight Treasury repo (\$1\,T+ daily volume), far more
 robust than LIBOR.
 
 Key differences from LIBOR:
@@ -1370,26 +1370,27 @@ lock-in-now-or-wait decisions: the forward is the break-even rate.
 \begin{gsbox}
 A GS rates desk rebuilds the zero curve every morning from deposit
 rates, futures, and swap quotes.  The ``morning curve build'' is the
-Strat's critical daily deliverable --- every swap, bond, swaption,
+Strat's critical daily deliverable: every swap, bond, swaption,
 cap, floor, and structured product reprices off it.  Wrong curve
 $\Rightarrow$ wrong prices and wrong hedge ratios desk-wide.
 
 The Strat owns the curve code (usually SecDB/Slang), interpolation
 choice (linear-in-zeros simple, cubic spline or monotone convex
 fancier), and the bootstrap instrument set.  Traders flag the curve
-in real time when it looks off --- typically a new instrument trading
-or an existing one going stale.
+in real time when it looks off, typically because a new instrument
+is trading or an existing one has gone stale.
 
 A junior Strat's first project is often to improve the build: add an
-instrument, fix a day-count bug, or switch interpolation method ---
-excellent because it touches the whole rates infrastructure.
+instrument, fix a day-count bug, or switch interpolation method.
+Such projects are excellent because they touch the whole rates
+infrastructure.
 \end{gsbox}
 
 \begin{historybox}
 The first IRS was a 1981 IBM/World Bank deal arranged by Salomon
 Brothers: IBM had DM and CHF bonds it wanted synthetically converted
 to dollars; the World Bank wanted DM/CHF but borrowed cheaper in
-dollars.  From there the market grew explosively --- \$1\,T by 1987,
+dollars.  From there the market grew explosively: \$1\,T by 1987,
 \$60\,T by 2000, \$500\,T+ by 2024, making swaps the largest
 derivatives market in the world (larger than any single country's
 government bond market).
@@ -1405,7 +1406,7 @@ government bond market).
   \item \textbf{Zero rate} $z(T)$: continuously compounded rate for
     lending from now to~$T$.
 
-  \item \textbf{Discount factor}: $D(T) = e^{-z(T)\,T}$ --- the
+  \item \textbf{Discount factor}: $D(T) = e^{-z(T)\,T}$, the
     price today of \$1 at~$T$.
 
   \item \textbf{Forward rate}:
@@ -1435,7 +1436,7 @@ government bond market).
   \item \textbf{DV01} $= P \times D \times 0.0001$: dollar price
     change per basis point.  \emph{The} risk metric on a rates desk.
 
-  \item \textbf{Convexity}: second-order correction ---
+  \item \textbf{Convexity}: second-order correction,
     $\frac{\Delta P}{P} \approx -D\,\Delta y +
     \frac{1}{2}C(\Delta y)^2$.
 

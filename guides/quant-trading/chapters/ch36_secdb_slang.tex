@@ -6,12 +6,12 @@ SecDB is Goldman's risk/pricing database; Slang is the proprietary
 language that runs inside it.  Together they price a
 trillion-dollar derivatives book overnight.  Concretely: SecDB is a
 real-time, in-memory graph database holding the firm's entire
-position and risk state --- every trade, curve, vol, Greek, and
-P\&L --- updated as bookings and market data arrive, so any desk
+position and risk state (every trade, curve, vol, Greek, and
+P\&L), updated as bookings and market data arrive, so any desk
 can query live risk at any instant.  A CS reader should not picture
 SQL: picture a reactive spreadsheet the size of a bank, where every
 cell recomputes automatically when any input changes.  SecDB and Slang are
-internal to one firm --- no vendor manual, no open-source repo.
+internal to one firm: no vendor manual, no open-source repo.
 What we know comes from interviews with former Goldman engineers,
 Mike Dubno's InfoQ talk on the Slang VM, and trade-press coverage.
 Most claims here are \textbf{training-knowledge-based}, reflecting
@@ -31,7 +31,7 @@ From earlier chapters:
     sentence most often repeated in Goldman job descriptions.
   \item \Cref{ch:risk_production}: portfolio-scale Greeks, P\&L
     Explain, and the idea that pricing a derivatives book is a
-    \emph{graph computation} --- a curve changes, a million
+    \emph{graph computation}: a curve changes, a million
     sensitivities must follow.  SecDB is the object that makes
     this tractable.
 \end{itemize}
@@ -46,8 +46,8 @@ chapter about a database schema and a domain-specific language.
 %% ================================================================
 
 Consider Goldman's problem at 5pm New York on a Tuesday.  The firm
-holds five million live derivative trades --- swaps, swaptions,
-exotics, bonds, FX forwards, equity options --- each with a
+holds five million live derivative trades (swaps, swaptions,
+exotics, bonds, FX forwards, equity options), each with a
 mark-to-market value, Greeks, CVA, FVA.  Those numbers depend on
 today's market data: zero curves in every currency, vol surfaces
 on every underlying, credit spreads for every counterparty.  By
@@ -56,7 +56,7 @@ repriced, its Greeks recomputed, and the risk distributed to every
 downstream system.
 
 Repricing five million trades from scratch every night is hopeless:
-slow, and --- more importantly --- it gives the Strat no way to
+slow, and, more importantly, it gives the Strat no way to
 ask ``\emph{which} input moved this number?'', the substance of
 P\&L Explain (\cref{ch:risk_production}).  SecDB's answer is to
 store the bank as a single \emph{directed acyclic graph} (DAG) of
@@ -68,17 +68,17 @@ an edge.
 A SecDB \emph{node} is a financial object with a value and a set of
 inputs.  Typical nodes:
 \begin{itemize}
-  \item An individual \textbf{trade} --- a five-year USD swap, a
+  \item An individual \textbf{trade}: a five-year USD swap, a
     six-month Brent Call.  Its value depends on curves, vols, spot.
-  \item A \textbf{curve} --- the USD SOFR zero curve, bootstrapped
+  \item A \textbf{curve}: the USD SOFR zero curve, bootstrapped
     from quoted swap rates.  Its value depends on the market quotes
     that fed the bootstrap.
-  \item A \textbf{quote} --- the 2y swap rate, a leaf node fed by
+  \item A \textbf{quote}: the 2y swap rate, a leaf node fed by
     the market-data system.
-  \item A \textbf{Greek} --- the delta of a specific trade to a
+  \item A \textbf{Greek}: the delta of a specific trade to a
     specific input bucket.  Its value is itself a node, computed by
     bumping one input and re-evaluating the trade.
-  \item A \textbf{portfolio aggregate} --- the desk's total dollar
+  \item A \textbf{portfolio aggregate}: the desk's total dollar
     delta to SOFR 2y, summed over every position whose pricer
     depends on that bucket.
 \end{itemize}
@@ -92,16 +92,16 @@ they would produce undefined values.
 
 \begin{keyfactbox}[SecDB graph architecture]
 \begin{itemize}
-  \item Every financial number in the bank --- trade value, curve
-    point, vol, Greek, aggregate --- is a node.
+  \item Every financial number in the bank (trade value, curve
+    point, vol, Greek, aggregate) is a node.
   \item Every pricing dependency is a directed edge.
   \item The whole structure is a DAG; cycles are prohibited.
   \item When a leaf node (e.g.\ a market quote) changes, SecDB
     automatically re-evaluates every descendant node in
     topological order.  No Strat writes ``update everything that
-    depends on SOFR 2y'' --- that is what the graph is \emph{for}.
-  \item The graph is persisted: a node is not just a value in
-    memory, it is a row in the database with a history.
+    depends on SOFR 2y''; that is what the graph is \emph{for}.
+  \item The graph is persisted: each node is a row in the
+    database with a history, in addition to its in-memory value.
 \end{itemize}
 \end{keyfactbox}
 
@@ -126,13 +126,13 @@ rate input $r$:
 \end{enumerate}
 The Strat writes no plumbing: she does not enumerate which curves
 rebuild, which surfaces refit, which trades reprice.  The graph
-does it.  This is SecDB's most important property ---
+does it.  This is SecDB's most important property:
 \emph{sensitivities are first-class}.  A book-level
 dollar-delta-to-SOFR-2y has the same structure as a single-trade
 dollar delta; only the downstream nodes differ.
 
-The naive approach --- ``bump one factor, reprice from scratch,
-repeat $N$ times'' --- scales as $O(N \cdot M)$ where $M$ is the
+The naive approach (``bump one factor, reprice from scratch,
+repeat $N$ times'') scales as $O(N \cdot M)$ where $M$ is the
 work to price the portfolio.  SecDB's cached graph reprices only
 the nodes actually affected, a 10--100x speed-up on a large book.
 
@@ -153,11 +153,11 @@ A plain graph database is insufficient: banks must answer two
 kinds of historical question, with different answers:
 \begin{enumerate}
   \item ``What was the trade's value \emph{as of} 31 December
-    2023?''  --- the question an auditor asks.  This is
+    2023?'', the question an auditor asks.  This is
     \textbf{business date} (also called \emph{valuation date} or
     \emph{as-of date}).
   \item ``What was the value of that trade \emph{as we believed
-    it} on 2 January 2024 at 9am?'' --- the question a regulator
+    it} on 2 January 2024 at 9am?'', the question a regulator
     asks after a fat-finger, or a Strat asks after a bug is fixed.
     This is \textbf{system date} (also called \emph{knowledge date}
     or \emph{transaction time}).
@@ -229,7 +229,7 @@ as follows:
 \end{itemize}
 If an auditor next year asks ``what did Goldman believe this
 trade was worth on 16-Mar?'', the query (business = 15-Mar,
-system = 16-Mar) returns \$123{,}456 --- the value used in that
+system = 16-Mar) returns \$123{,}456, the value used in that
 day's regulatory capital report.  Both answers are correct, both
 retrievable, neither overwrites the other.  That is what
 bi-temporal storage \emph{does}.
@@ -244,8 +244,8 @@ Slang is the DSL that runs inside SecDB.  It was designed in the
 1990s by Mike Dubno and a small team around the question ``what
 does the Strat need to write a pricer, and what can the VM do to
 make that writing productive?''  The result is unlike any
-mainstream production language.  The mental model: Slang is to
-SecDB what a cell formula is to a spreadsheet --- the language in
+mainstream production language.  The mental model is that Slang is
+to SecDB what a cell formula is to a spreadsheet: the language in
 which pricing rules (option pricers, curve builds, Greek
 formulas) are expressed, executing in the same process as the risk
 data rather than in a separate client talking to a database.
@@ -260,7 +260,7 @@ Exploratory pricing code writes quickly; refactoring a
 fifty-million-line codebase is harder because type errors appear
 at runtime.
 
-\paragraph{No keywords --- \texttt{if} and \texttt{while} are
+\paragraph{No keywords: \texttt{if} and \texttt{while} are
 functions.}  Control-flow constructs are not built-in keywords
 but user-callable functions, and therefore \emph{overridable}.  A
 Strat wanting a specialised \texttt{if} that logs both branches
@@ -295,11 +295,11 @@ recomputes.
 \begin{itemize}
   \item Dynamic typing, C-like syntax.
   \item Control-flow constructs (\texttt{if}, \texttt{while},
-    \texttt{for}) are functions, not keywords --- and are
+    \texttt{for}) are functions, not keywords, and are
     overridable.
   \item Identifiers can contain spaces:
     \texttt{forward swap rate} is a legal variable name.
-  \item Functional style --- pure functions the VM can cache
+  \item Functional style: pure functions the VM can cache
     correctly.
   \item The Slang VM is graph-aware: cached results are keyed by
     the set of SecDB nodes read, and invalidated when any of those
@@ -309,7 +309,7 @@ recomputes.
 
 \subsection{A stylised example}
 
-The following is a stylised Slang-like pricer --- pseudocode
+The following is a stylised Slang-like pricer: pseudocode
 capturing the flavour, not real Slang syntax.
 
 \begin{lstlisting}[language=C, basicstyle=\ttfamily\small, frame=single, caption={Stylised Slang-like pricer for a European call (pseudocode)}]
@@ -350,7 +350,7 @@ price european call trade(trade) {
 A second snippet shows the purity \emph{contract} for safe VM
 caching, contrasted with a subtly-wrong version:
 
-\begin{lstlisting}[language=C, basicstyle=\ttfamily\small, frame=single, caption={Pure vs impure --- why the VM cache depends on purity}]
+\begin{lstlisting}[language=C, basicstyle=\ttfamily\small, frame=single, caption={Pure vs impure: why the VM cache depends on purity}]
 // CORRECT: pure, graph-aware.  All reads go through
 // declared SecDB inputs; no hidden state.
 
@@ -382,7 +382,7 @@ cache.''
 Three features of real Slang show up in the stylised form: spaced
 identifiers (\texttt{black scholes call}); function composition
 whose inputs are all SecDB nodes, so the VM tracks exactly which
-cache entries to invalidate; and no explicit types --- all
+cache entries to invalidate; and no explicit types, all
 inferred from usage.
 
 \subsection{The VM's job: aggressive caching}
@@ -393,7 +393,7 @@ function in every trade.  With caching, the VM observes:
 \begin{itemize}
   \item \texttt{black scholes call(100, 100, 0.05, 0.2, 1.0)} has
     already been computed once today, returning 10.45.  If
-    queried again with identical inputs --- return the cache.
+    queried again with identical inputs, the VM returns the cache.
   \item \texttt{price european call trade(trade\_42)} previously
     depended on \texttt{market spot["AAPL"]},
     \texttt{discount curve["USD"]}, and
@@ -455,8 +455,8 @@ Tooling lagged commercial ecosystems by a decade.
 
 Goldman's response was gradual.  Post-2015, \emph{new} development
 moves to Java (performance-sensitive production) and Python
-(research, scripting), while the SecDB core --- graph engine,
-persistence, the decades of production pricers --- stays in Slang.
+(research, scripting), while the SecDB core (graph engine,
+persistence, the decades of production pricers) stays in Slang.
 The strategy is coexistence: Python and Java read/write SecDB
 nodes via bindings; heavy graph computation runs on the Slang VM.
 
@@ -465,7 +465,7 @@ Three practical shapes this takes:
   \item \textbf{Slang $\leftrightarrow$ Python bindings.}  Research
     Strats pull a curve from SecDB, manipulate it in NumPy/pandas,
     and write the result back.  The Python code is not graph-aware
-    --- dependencies are not tracked for auto-invalidation --- but
+    (dependencies are not tracked for auto-invalidation), but
     for ad-hoc analysis that is acceptable.
   \item \textbf{Java services calling the graph.}  Trading systems,
     risk dashboards, and regulatory reporting increasingly run as
@@ -473,9 +473,9 @@ Three practical shapes this takes:
     pricers.  Java is chosen for ecosystem, performance, and
     ubiquity.
   \item \textbf{Slang stays where graph semantics matter.}  A new
-    exotic pricer, curve-build function, or xVA calculation --- any
+    exotic pricer, curve-build function, or xVA calculation (any
     code that must participate in overnight propagation with
-    correct cache invalidation --- stays in Slang.  The VM's graph
+    correct cache invalidation) stays in Slang.  The VM's graph
     awareness is not cheaply replicated elsewhere.
 \end{itemize}
 \subsection{Interop mechanics}
@@ -484,7 +484,7 @@ Three interop patterns recur:
 \begin{itemize}
   \item \textbf{Pull a node into Python.}  A binding reads a SecDB
     node as-of a (business, system) date pair and materialises it
-    as a Python object --- NumPy array for a curve, DataFrame for
+    as a Python object: NumPy array for a curve, DataFrame for
     a blotter, scalar for a Greek.  The value is a snapshot; if
     the underlying node moves, the Python copy goes stale
     silently.  Fine for notebooks, catastrophic for production
@@ -505,7 +505,7 @@ A research Strat pulls a SOFR curve into Python, derives a stress
 scenario, runs backtests for a week, reports to the desk head.
 Between day 1 and day 7, SecDB corrected its 15-March SOFR 2y fix
 (\cref{sec:bitemporal_example}).  The Python copy still holds the
-\emph{old} value --- the pull was a snapshot --- so the backtest
+\emph{old} value (the pull was a snapshot), so the backtest
 silently refers to retracted market data.
 
 The fix is discipline: tag every snapshot with its (business,
@@ -551,7 +551,7 @@ and demonstrate the economic impact before touching production.
 \subsection{Versioning and auditability}
 
 Every Slang function change is versioned bi-temporally in SecDB
-itself --- Slang code lives in the same graph it computes on.
+itself: Slang code lives in the same graph it computes on.
 When a function updates:
 \begin{itemize}
   \item The previous version is preserved and tagged with its
@@ -576,7 +576,7 @@ graph engine as production.  Typical patterns:
   \item \textbf{Snapshot test.}  Run the production and candidate
     pricers on a representative trade set against yesterday's
     business-date data; flag any price diff above threshold.
-    Bi-temporal storage makes this reproducible --- yesterday's
+    Bi-temporal storage makes this reproducible: yesterday's
     data is frozen and queryable.
   \item \textbf{Bump-parity test.}  Finite-difference Greeks
     should agree to leading order with any analytical Greeks the
@@ -592,8 +592,8 @@ graph engine as production.  Typical patterns:
     and retire.  Shadow runs are the industry's answer to
     ``change an airplane's engine in flight''.
 \end{itemize}
-Each pattern leans on graph-replay --- rerun a calculation with
-business date fixed, system date stepped --- which falls out of
+Each pattern leans on graph-replay (rerun a calculation with
+business date fixed, system date stepped), which falls out of
 the same bi-temporal persistence that supports the audit.
 
 \begin{prosperitybox}
@@ -614,10 +614,10 @@ Three SecDB analogies:
     keyed by inputs; update only on material moves.  SecDB-style
     memoisation, a thousand times simpler.
   \item Debug post-hoc by replaying ticks with the stored
-    \texttt{traderData} --- the bi-temporal-replay analogue.
+    \texttt{traderData}, the bi-temporal-replay analogue.
 \end{itemize}
 The scale is laughable (kilobytes vs.\ petabytes) but the
-\emph{shape} --- persistent, versioned, auditable state --- is
+\emph{shape} (persistent, versioned, auditable state) is
 the same.
 \end{prosperitybox}
 
@@ -629,8 +629,8 @@ and Slang exploits it'', not ``recites the language spec''.
 \begin{itemize}
   \item \emph{Memoisation and invalidation.}  ``The VM caches pure
     functions by the set of SecDB nodes they read.  When a node
-    changes bi-temporally --- new system-date entry for the same
-    business date --- every cache entry whose read-set includes
+    changes bi-temporally (a new system-date entry for the same
+    business date), every cache entry whose read-set includes
     that node invalidates, and dependents recompute on next
     access.  The correctness hinges on functions being pure; a
     function with hidden mutable state would return stale cached
@@ -650,7 +650,7 @@ and Slang exploits it'', not ``recites the language spec''.
     most-used feature.''
   \item \emph{Why not rewrite in Python?}  ``Because the graph
     engine, the cache, the bi-temporal persistence, and the
-    auditability are not a language feature --- they are a
+    auditability are not a language feature; they are a
     fifty-million-line ecosystem, and the VM's integration with
     the database is load-bearing.  Python and Java are layered on
     top; Slang is not going away.''
@@ -662,9 +662,9 @@ and Slang exploits it'', not ``recites the language spec''.
 \label{sec:competition}
 %% ================================================================
 
-Every major sell-side bank faces the same problem --- price a
+Every major sell-side bank faces the same problem (price a
 huge derivatives book, propagate sensitivities, reproduce
-historical valuations --- and the responses converge on the same
+historical valuations), and the responses converge on the same
 architectural idea with different implementations.  A Strat
 interviewing at Goldman benefits from knowing how the firm's
 stack compares.
@@ -701,7 +701,7 @@ Why graph-plus-bi-temporal rather than relational-plus-batch?
 Three forcing functions:
 \begin{itemize}
   \item \textbf{Sensitivity requests are ad-hoc.}  ``What is my
-    P\&L if EUR 10y spreads 1bp?'' --- a relational system needs
+    P\&L if EUR 10y spreads 1bp?''  A relational system needs
     a purpose-built job per question; a graph system bumps one
     node and queries another.
   \item \textbf{Regulators audit history.}  Bi-temporal storage is
@@ -723,18 +723,18 @@ Three things set SecDB/Slang apart.  \emph{Language}: no other
 major bank kept a proprietary DSL at Goldman's scale; productivity
 arguments pushed peers to Python or Java.  \emph{Coverage}: SecDB
 prices every derivative across every asset class, an unusual
-centralisation --- some banks run separate systems per asset
+centralisation; some banks run separate systems per asset
 class.  \emph{Age}: the graph design was in place by the
 mid-1990s, before commercial vendors had anything comparable, and
 Goldman has run a proprietary graph database for three decades
-while peers moved to vendor stacks --- a cultural choice as much
+while peers moved to vendor stacks, a cultural choice as much
 as a technical one.
 
 \begin{intuitionbox}
 A spreadsheet shows the core idea Goldman generalised to bank
 scale: cells depend on other cells via formulas, and updates
-propagate automatically.  Everything SecDB adds --- persistence,
-bi-temporality, graph-aware caching, purity-focused language ---
+propagate automatically.  Everything SecDB adds (persistence,
+bi-temporality, graph-aware caching, purity-focused language)
 is engineering to make the spreadsheet idea survive five million
 trades and a regulator.  The interview takeaway: Goldman invested
 early in a graph-database model the industry later converged on,
@@ -773,7 +773,7 @@ commodity-trading desk.
     language that runs inside it.  Together they price the
     firm's trillion-dollar derivatives book overnight.
   \item SecDB stores the bank as a DAG.  Every financial
-    number --- trade value, curve, vol, Greek, aggregate --- is a
+    number (trade value, curve, vol, Greek, aggregate) is a
     node; every pricing dependency is an edge.
   \item A leaf node changes; SecDB propagates downstream in
     topological order, recomputing exactly the affected
@@ -786,7 +786,7 @@ commodity-trading desk.
     overwrites.  Bi-temporal storage is the basis of
     reproducibility and audit.
   \item Slang is dynamically typed, C-like in syntax, but has
-    no keywords --- \texttt{if} and \texttt{while} are functions
+    no keywords: \texttt{if} and \texttt{while} are functions
     and overridable.  Identifiers can contain spaces.  Functions
     are expected to be pure; the Slang VM caches their results
     keyed by the set of SecDB nodes read, and invalidates via the

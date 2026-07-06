@@ -1,5 +1,5 @@
 % ══════════════════════════════════════════════════════════════
-%  Chapter 11 — Tree-Based Methods for Volatility
+%  Chapter 11 -- Tree-Based Methods for Volatility
 % ══════════════════════════════════════════════════════════════
 
 \chapter{Tree-Based Methods for Volatility}\label{ch:trees}
@@ -346,11 +346,11 @@ built-in validation set: score each day using only the trees that did
 \emph{not} see it, and the resulting \textbf{out-of-bag (OOB) error}
 approximates leave-one-out cross-validation (test on each day in turn while
 training on all the others) with no separate holdout needed.
-That is genuinely useful, for cross-sectional, exchangeable data.
+That is genuinely useful for cross-sectional, exchangeable data.
 
 \begin{warning}[OOB Error Is Invalid for Volatility Time Series]
 OOB error assumes the observations are \textbf{exchangeable}
-(i.i.d.\ -- independent and identically distributed; the order of the rows
+(i.i.d., independent and identically distributed; the order of the rows
 does not matter).
 Volatility is not: if day $t{+}1$ is in a tree's bootstrap sample while day
 $t$ is out-of-bag, scoring day $t$ on that tree lets it ``predict the past
@@ -488,8 +488,8 @@ directions equally.
 
 \begin{projectconnection}[Why This Matters]
 \citet{AudrinoKnaus2016} show that QLIKE-optimized trees outperform
-MSE-optimized trees for realized volatility, so this custom loss is not
-optional; it is a core part of the pipeline.
+MSE-optimized trees for realized volatility, so this custom loss is a core
+part of the pipeline.
 \end{projectconnection}
 
 Neither LightGBM nor XGBoost provides $\QLIKE$ natively, but both accept
@@ -509,7 +509,7 @@ custom objective functions.  You supply the gradient and Hessian:
 
 \begin{projectconnection}[Why This Matters]
 Implementing these two formulas as a custom objective function in LightGBM
-or XGBoost is a 10-line code change, but it is the single most impactful
+or XGBoost is a 10-line code change, but it is the most effective
 modification you can make to the default pipeline.
 \end{projectconnection}
 
@@ -636,9 +636,9 @@ ensemble cheaply, and \emph{which} plot do you reach for when?
 You have a tuned LightGBM forecasting next-day log-$\RV$ on the feature
 matrix from Chapter~\ref{ch:features} (lagged RV transforms, realized
 quarticity, VIX, jumps).  It beats HAR by 7.7\% in $\QLIKE$
-(Section~\ref{sec:trees:hyperparams}).  Your sponsor's first question is not
-``what is the $\QLIKE$?'' but ``\emph{why} did the model forecast a vol spike
-for next Tuesday?''  Equation~\ref{eq:shap} promises an exact additive answer
+(Section~\ref{sec:trees:hyperparams}).  Your sponsor's first question will be
+``\emph{why} did the model forecast a vol spike for next Tuesday?'', not
+``what is the $\QLIKE$?''  Equation~\ref{eq:shap} promises an exact additive answer
 per day, but computing it honestly looks hopeless.
 
 \subsection{The exponential cost that TreeSHAP defeats}
@@ -652,7 +652,7 @@ features'' mean the same thing here).  The notation $2^p$ means $2$
 multiplied by itself $p$ times, so every extra feature \emph{doubles} the
 number of subsets.  On the Chapter~\ref{ch:features} matrix with, say,
 $p = 20$ features, that already gives $2^{20} \approx 10^6$ (about a million)
-model evaluations per day, times $\sim$1{,}250 days,
+model evaluations per day, times $\sim$1{,}250 days, which is
 far too slow for a generic model.  This exponential wall is exactly why
 \citet{Lundberg2017} introduced model-specific shortcuts.
 
@@ -674,7 +674,7 @@ where:
 \end{itemize}
 In plain terms: TreeSHAP's cost grows with trees $\times$ leaves $\times$
 depth-squared (manageable), while the naive method's cost grows with $2^p$,
-which doubles every time you add one feature (hopeless) -- so TreeSHAP is fast
+which doubles every time you add one feature (hopeless), so TreeSHAP is fast
 enough to run and the naive method is not.
 
 \begin{intuition}[In Plain English]
@@ -692,7 +692,7 @@ SHAP value for a feature is simply the sum of its values across all trees.
 \begin{projectconnection}[Why This Matters]
 Because TreeSHAP is exact, it
 removes a confound when you compare importance across purged-CV folds for
-stability, any ranking changes you see are real instability, not Monte-Carlo
+stability: any ranking changes you see are real instability, not Monte-Carlo
 noise from the explainer.
 \end{projectconnection}
 
@@ -807,11 +807,11 @@ In practice you compute all three on your $\RV$ model and reconcile:
 \begin{itemize}[leftmargin=1.8em]
   \item \textbf{All three agree} on the top features (typically lagged
         $\RV$ then $\sqrt{\operatorname{RQ}}$): robust evidence, proceed.
-  \item \textbf{SHAP and MDA agree but MDI disagrees}: trust SHAP/MDA -- this
-        is the MDI cardinality bias (see the warning below); ignore MDI.
+  \item \textbf{SHAP and MDA agree but MDI disagrees}: trust SHAP/MDA and
+        ignore MDI; this is the MDI cardinality bias (see the warning below).
   \item \textbf{SHAP and MDA disagree}: the importance is likely driven by a
         few extreme days (vol spikes) that SHAP attributes per-observation
-        but MDA averages away, inspect a SHAP dependence plot to locate
+        but MDA averages away; inspect a SHAP dependence plot to locate
         them.
 \end{itemize}
 
@@ -853,7 +853,7 @@ The three waterfalls to pick for an $\RV$ forecaster:
   \item \textbf{A missed forecast from an unseen event.}  ``The model
         predicted a calm day from low lagged $\RV$ and a flat VIX, but an
         unscheduled macro announcement triggered a spike.  SHAP shows the
-        forecast rested entirely on backward-looking RV features, the model
+        forecast rested entirely on backward-looking RV features; the model
         cannot see a surprise that is not in its inputs.''
   \item \textbf{A tree-vs-HAR disagreement.}  ``HAR forecast a mild rise;
         the tree forecast a sharp one.  SHAP shows the gap came from an
@@ -864,7 +864,7 @@ The three waterfalls to pick for an $\RV$ forecaster:
 \end{enumerate}
 
 \begin{projectconnection}[Why This Matters]
-The waterfall is the single most persuasive chart in a volatility-model
+The waterfall is the most persuasive chart in a volatility-model
 review because it mirrors the additive P\&L attribution risk committees
 already use.  ``Lagged $\RV$ contributed $+$X, the jump term $+$Y, VIX $+$Z''
 is a sentence a portfolio manager can challenge on economic grounds, which is
@@ -1295,8 +1295,8 @@ In LightGBM, enable DART by setting \texttt{boosting\_type='dart'}.  The key
 hyperparameter is the drop rate: start with
 \texttt{drop\_rate}$\,\in [0.05, 0.15]$ and tune via purged CV
 (Section~\ref{sec:trees:hyperparams}).  Higher drop rates increase diversity
-but slow convergence; lower rates approach standard GBDT behavior.  Note that
-DART disables early stopping (because the loss is non-monotone due to random
+but slow convergence; lower rates approach standard GBDT behavior.  DART
+disables early stopping (because the loss is non-monotone due to random
 dropping), so you must set \texttt{num\_iterations} explicitly rather than
 relying on patience-based stopping.
 \end{projectconnection}
@@ -1365,7 +1365,7 @@ benefit of dropout often compensates.
   randomly dropping previous trees during each boosting round prevents
   over-specialization, where later trees become overly dependent on early
   trees that captured the dominant autoregressive signal.  Use
-  \texttt{drop\_rate} $\in [0.05, 0.15]$; note that DART disables early
+  \texttt{drop\_rate} $\in [0.05, 0.15]$; DART disables early
   stopping.
 
 \item The gains from ML come from richer features and longer horizons, not

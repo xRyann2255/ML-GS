@@ -26,11 +26,11 @@ of places lower.
 \label{sec:top_same}
 %======================================================================
 
-Across every top-10 writeup we examined---Frankfurt Hedgehogs (2nd,
-P3), CMU Physics (7th, P3), Linear Utility (2nd, P2), Stanford
-Cardinal (P1), Alpha Animals (9th, P3), jmerle (9th P2, 25th P3),
-and others---five patterns recur reliably as necessary (though not
-sufficient) conditions for a top finish.
+Across every top-10 writeup we examined, five patterns recur
+reliably as necessary (though not sufficient) conditions for a top
+finish.  The set spans Frankfurt Hedgehogs (2nd, P3), CMU Physics
+(7th, P3), Linear Utility (2nd, P2), Stanford Cardinal (P1), Alpha
+Animals (9th, P3), jmerle (9th P2, 25th P3), and others.
 
 Prosperity~3 had over 12,000 teams and a heavy-tailed PnL
 distribution: the top~10 earn 5--10$\times$ the median, and 1st
@@ -83,7 +83,7 @@ top finishes across P2 and P3.
 
 Top teams treat prior-year writeups as primary source material.
 Frankfurt Hedgehogs discovered Olivia's daily-extrema pattern on
-Squid Ink---one of P3's highest-value signals---because they had
+Squid Ink, one of P3's highest-value signals, because they had
 studied Stanford Cardinal (P1) and Jasper (P2), both documenting
 similar informed-bot behaviour.  They state: ``Anyone who
 carefully analyzed historical Prosperity~2 data or public
@@ -99,10 +99,10 @@ Linear Utility's P2 writeup itself became a key source for the
 Macaron hidden-taker exploit, which Frankfurt Hedgehogs note had
 been ``discussed already'' by Jasper and Linear Utility.
 
-The lesson is not just ``read writeups'': \emph{identify recurring
-product archetypes}, build skeletons for each before the
-competition, and slot new products into the matching skeleton as
-sample data arrives.
+Reading writeups is only the first step.  The full lesson is to
+\emph{identify recurring product archetypes}, build skeletons for
+each before the competition, and slot new products into the
+matching skeleton as sample data arrives.
 
 \begin{keyfactbox}[Archetype recycling across editions]
 Archetypes appearing in every Prosperity edition (P1--P3):
@@ -147,7 +147,7 @@ work from first principles, then any `outperformance' in
 historical data is probably noise.''
 
 CMU Physics' basket strategy used z-scores, but with a hard-coded
-historical mean and short rolling-window standard deviation---still
+historical mean and short rolling-window standard deviation, still
 simpler than textbook implementations.  Their Round~5 ``YOLO
 Croissants'' was simpler still: detect Olivia's signal, go max
 long Croissants via baskets as leverage.
@@ -171,13 +171,13 @@ Top teams submit early and learn from live results rather than
 perfecting strategies in simulation.
 
 CMU Physics lived this.  After Round~3 they dropped from 7th to
-241st---two bugs: Jasper's visualiser exceeding memory (crashing
+241st because of two bugs: Jasper's visualiser exceeding memory (crashing
 Lambda, wiping rolling windows) and a quadratic IV fit that
 stopped tracking true IV on submission day.  They iterated:
 removed the visualiser, switched to a short rolling window of
 mid IV (boosting backtested PnL from 80k to 200k/day), and in
 Round~4 posted the highest single-round algo PnL of \emph{all}
-12{,}000+ teams---447{,}251 SeaShells---climbing back to 8th.
+12{,}000+ teams (447{,}251 SeaShells), climbing back to 8th.
 
 Frankfurt Hedgehogs re-optimised all parameters after every round,
 treating each as a new calibration opportunity.
@@ -195,7 +195,7 @@ backtesting.
 Top teams compute worst-case losses before deploying.  CMU Physics
 estimated unhedged Volcanic Rock Vouchers could cost 40{,}000
 SeaShells/step worst case, but average delta was closer to 160
-units (not 400), giving a realistic worst case $\sim$16{,}000---less
+units (not 400), giving a realistic worst case $\sim$16{,}000, less
 than the 40{,}000 saved by avoiding hedging spread costs.  They
 took the risk.  Frankfurt Hedgehogs computed a 95\% VaR of
 $\sim$50{,}000 for their mean-reversion leg (25\% of their
@@ -207,9 +207,9 @@ positions so the worst plausible outcome does not eliminate you.
 Frankfurt Hedgehogs pushed this into \emph{relative} risk
 management in the final round.  With a 200{,}000 lead, they could
 have dropped mean-reversion entirely.  Instead, reasoning that
-close competitors were trading mean reversion aggressively---so if
+close competitors were trading mean reversion aggressively (if
 the market mean-reverted, those teams would gain while Frankfurt
-stood still---they kept a moderate position, hedging
+stood still), they kept a moderate position, hedging
 \emph{ranking} risk rather than chasing EV.  VaR of 50{,}000 was
 25\% of their lead: tournament-aware risk management.
 
@@ -240,7 +240,7 @@ bought at daily lows and sold at daily highs on multiple products
 her \emph{before} trader IDs were revealed in Round~5 by filtering
 for quantity-15 trades and observing their placement at daily
 extrema.  They then used her inferred position to bias basket
-spread thresholds---cross-product integration that compounded the
+spread thresholds, a cross-product integration that compounded the
 edge.
 
 CMU Physics independently spotted ``suspicious trade quantity~15
@@ -252,13 +252,13 @@ direction.
 Detection methodology: track daily running min/max price.  A
 trade at a daily extreme in the expected direction (buy at min,
 sell at max) is a potential Olivia signal.  New extrema
-invalidate earlier signals---a new low after a supposed buy kills
+invalidate earlier signals: a new low after a supposed buy kills
 the prior flag.
 
 Pre-Round~5, the only tell was quantity: Olivia traded 15 lots.
 Frankfurt Hedgehogs' dashboard had a quantity filter that made
-quantity-15 clustering at extrema visually obvious---purpose-built
-tooling creating analytical leverage the raw trade log hid.
+quantity-15 clustering at extrema visually obvious: purpose-built
+tooling exposed a pattern the raw trade log hid.
 
 \begin{keyfactbox}[Olivia detection: the P3 meta-signal]
 In P3, Olivia bought 15 lots at daily lows and sold 15 at daily
@@ -287,7 +287,7 @@ exposure.  This ``YOLO'' made up to 120{,}000 on its best day.
 The risk calculus was principled, not reckless.  A bad day's
 Croissants high--low range was $\sim$40 SeaShells, giving a PnL
 lower bound of $40 \times 1{,}050 = 42{,}000$.  Basket-premium
-risk had a 300-SeaShell/basket worst case, 45{,}000 total---but
+risk had a 300-SeaShell/basket worst case, 45{,}000 total, but
 premiums were stationary (95\%/90\% confidence for Baskets~1/2),
 making the extreme move near-impossible.  Expected premium loss
 $\approx 0$; expected Olivia gain large and positive.
@@ -317,8 +317,8 @@ Volcanic Rock Vouchers (Round~3) produced the largest PnL
 dispersion among top teams.  The choices here show theory plus
 empirical discipline.
 
-Frankfurt Hedgehogs ran two alpha sources.  Primary: \emph{IV
-scalping}---fit a parabolic smile to observed IVs across strikes,
+Frankfurt Hedgehogs ran two alpha sources.  The primary was \emph{IV
+scalping}: fit a parabolic smile to observed IVs across strikes,
 price via Black--Scholes, trade deviations.  (In plain English:
 implied volatility is what option prices \emph{imply} the market
 thinks future volatility will be; scalping means trading short,
@@ -336,14 +336,14 @@ scalping edge.
 
 CMU Physics used the same quadratic smile but as \emph{sole} fair
 value.  When the fit diverged from market IV on submission day,
-they entered large directionals and held---only 75{,}755
-SeaShells versus 200{,}000+ for the top.  Post-round: a short
+they entered large directionals and held, finishing with only
+75{,}755 SeaShells versus 200{,}000+ for the top.  Post-round: a short
 rolling window of mid IV would have tracked the market far better,
 boosting backtested PnL from 80k to 200k/day.
 
 General principle: \emph{adaptive} models (rolling windows, EMAs)
 beat \emph{static} fitted curves when the DGP (data-generating
-process---the underlying statistical law producing the observed
+process, the underlying statistical law producing the observed
 prices) can shift between sample and evaluation.
 
 \subsection{The ``Wall Mid'' and fair-value estimation}
@@ -351,7 +351,7 @@ prices) can shift between sample and evaluation.
 
 A subtler differentiator: fair-value estimation.  Most teams used
 the raw mid of best bid/ask.  Frankfurt Hedgehogs used the
-``Wall Mid''---the average of the bid-wall and ask-wall prices,
+``Wall Mid'': the average of the bid-wall and ask-wall prices,
 order-book levels with consistently deep market-maker-bot
 liquidity.
 
@@ -369,7 +369,7 @@ several ticks in volatile periods.
 This mattered most for Kelp (slow random walk).  Quoting around
 the Wall Mid instead of raw mid reduced adverse-selection losses
 on passive orders.  Frankfurt Hedgehogs estimate Kelp generated
-$\sim$5{,}000 SeaShells/round---modest in absolute terms, but
+$\sim$5{,}000 SeaShells/round, modest in absolute terms but
 entirely from fair-value precision.
 
 \subsection{Edge-case handling}
@@ -387,7 +387,7 @@ merely correct ones:
         and market-make with the last 8\%.
 
   \item \textbf{Integer rounding.}  Frankfurt Hedgehogs' Macaron
-        sell orders priced at \texttt{int(externalBid + 0.5)}---the
+        sell orders priced at \texttt{int(externalBid + 0.5)}, the
         max price that still triggered fills from a hidden taker
         bot executing $\sim$60\% of eligible trades.  Wrong by
         1~SeaShell meant never filling (too high) or leaving edge
@@ -415,7 +415,7 @@ merely correct ones:
   \item \textbf{Storage fees and holding costs.}  Macarons had a
         0.1 SeaShell/step/unit storage fee.  Over 10{,}000 steps,
         holding the 75-unit limit would cost
-        $75 \times 0.1 \times 10{,}000 = 75{,}000$ SeaShells---enough
+        $75 \times 0.1 \times 10{,}000 = 75{,}000$ SeaShells, enough
         to wipe out most arbitrage profits.  CMU Physics sold
         locally and converted immediately, minimising holding.
         Teams accumulating inventory for better prices were eaten
@@ -451,7 +451,7 @@ biased) and Monte Carlo'd over it; Frankfurt Hedgehogs mapped P2
 allocation patterns onto P3 containers.
 
 For the Round~5 news-trading manual, Frankfurt Hedgehogs calibrated
-expected price-move magnitudes from the identical P1/P2 manuals---
+expected price-move magnitudes from the identical P1/P2 manuals:
 prior-year study again.
 
 Key lesson: \emph{real players do not play Nash}.  Both teams
@@ -466,10 +466,10 @@ prior-year outcome as prior, current round as likelihood.
 
 Further: Frankfurt Hedgehogs noted that opening a second Round~2
 container (50{,}000 SeaShells) exceeded the Nash EV (expected
-value---the probability-weighted average payoff) of any single
+value, the probability-weighted average payoff) of any single
 container, making the second pick negative-EV.  CMU Physics
 reached the same conclusion by Monte Carlo.  Teams who opened two
-anyway---``more picks $=$ more diversification''---lost money at
+anyway (``more picks $=$ more diversification'') lost money at
 the margin.  Quantitative reasoning overrode intuition.
 
 
@@ -480,8 +480,8 @@ the margin.  Quantitative reasoning overrode intuition.
 
 In P3 Rounds~1--2, bot behaviour replicated earlier competitions
 with 95\%+ accuracy.  True prices were regenerated (unlike P2,
-which reused some price paths), but bot \emph{actions}---exact
-timesteps, sizes, and directions of market orders---matched
+which reused some price paths), but bot \emph{actions} (exact
+timesteps, sizes, and directions of market orders) matched
 historical data almost perfectly.
 
 \subsection{What teams actually did}
@@ -499,13 +499,13 @@ bot behaviour diverged from history.
 
 CMU Physics learned the exploit the hard way.  After Round~1
 they were 771st.  When IMC re-ran after ruling hardcoding as
-cheating, they jumped to 9th---a 762-place swing.
+cheating, they jumped to 9th, a 762-place swing.
 
 \subsection{When hardcoding is rational and when it is a trap}
 
 \begin{pitfallbox}[The hardcoding temptation]
 Hardcoding tempts because it gives huge backtests with zero
-parameter risk---the ``strategy'' is a lookup table.  It is a
+parameter risk: the ``strategy'' is a lookup table.  It is a
 trap for three reasons:
 \begin{enumerate}
   \item \textbf{Fragility.}  If IMC changes bots (as after P3
@@ -521,7 +521,7 @@ trap for three reasons:
 
 The rational response (Frankfurt Hedgehogs) was to build
 hardcoding \emph{with a fallback}: exploit while it works, revert
-seamlessly when it breaks.  Same principle as production systems:
+automatically when it breaks.  Same principle as production systems:
 no single data source without a degraded-mode alternative.
 
 After Round~2, Frankfurt Hedgehogs reported the exploit to IMC
@@ -548,8 +548,8 @@ market structure, not implementation accidents.
 
 Lesson for P4: assume IMC makes bot behaviour harder to predict
 from prior-year data, but also assume \emph{some} predictable bot
-behaviour persists---the competition needs bots to provide
-liquidity and create opportunities; fully random bots would kill
+behaviour persists: the competition needs bots to provide
+liquidity and create opportunities, and fully random bots would kill
 the alpha.  The skill is distinguishing structural patterns (which
 persist) from implementation artefacts (which get patched).
 
@@ -564,7 +564,7 @@ Starfruit (random walk).  By P3 (2025), participation hit 12{,}000+
 worldwide.  Format evolved: P2 added conversion (Orchids) and ETF
 baskets; P3 added options (Volcanic Rock Vouchers), cross-island
 arb (Macarons), and the controversial hardcoding exploit.  IMC
-uses Prosperity as a recruiting pipeline---top finishers get
+uses Prosperity as a recruiting pipeline: top finishers get
 interview invitations.  P3 rules excluded prior top-10 teams from
 prize money (Frankfurt Hedgehogs still competed for ranking).
 \end{historybox}
@@ -645,7 +645,7 @@ Concrete P4 expectations:
         market making, drifting-value market making, basket
         stat-arb, option pricing / IV scalping, conversion
         arbitrage, and informed-bot detection.
-  \item Join the Discord server on day one---moderator hints and
+  \item Join the Discord server on day one; moderator hints and
         community analysis are decisive information sources.
   \item Set up \texttt{traderData} serialisation and test it
         under the 100\,MB Lambda memory limit.
@@ -687,7 +687,7 @@ avoid the trap of overfitting or changing your approach
 impulsively just because of noise on Discord.''
 
 \begin{pitfallbox}[Discord psychological warfare]
-In P3, Discord posts showed extraordinary backtest numbers---some
+In P3, Discord posts showed extraordinary backtest numbers, some
 from massively overfit strategies that would collapse live, some
 outright fabrications.  If a competitor claims 500{,}000+ on one
 product, do not panic; verify your own strategy against your own
@@ -698,7 +698,7 @@ underperformed their own backtests.
 \subsection{The ``Wall Mid'' fair-value concept}
 
 Frankfurt Hedgehogs' ``Wall Mid'' is the average of the bid-wall
-and ask-wall prices---levels with consistently deep designated-MM
+and ask-wall prices, the levels with consistently deep designated-MM
 liquidity, typically corresponding to the true internal price
 $\pm 2$ ticks.  Averaging them gives a more stable, accurate fair
 value than the raw mid (which is distorted by aggressive takers).
@@ -710,7 +710,7 @@ Prosperity product with an official backtesting environment.
 
 For P4, the specific Wall Mid form may change (different quoting
 patterns, tick sizes), but the principle endures: true fair value
-is rarely the simple best-bid/ask mid---it is usually better
+is rarely the simple best-bid/ask mid; it is usually better
 estimated from deep-liquidity levels.
 
 \subsection{Backtesting discipline}
@@ -725,7 +725,7 @@ They used two complementary approaches:
 
 \begin{itemize}
   \item \textbf{Jasper's backtester} for taking/simple-quoting
-        strategies---fast, flexible, parameterised for systematic
+        strategies: fast, flexible, parameterised for systematic
         optimisation.
   \item \textbf{The official website} for bot-interaction
         strategies (Rainforest Resin MM, Macaron hidden-taker),
@@ -739,13 +739,13 @@ treated as bugs, never noise.
 
 CMU Physics learned this the hard way.  Their Squid Ink
 spike-detector was backtested on limited data and happened to
-work on the Round~1 re-run---they recognised luck, not edge.
+work on the Round~1 re-run; they recognised luck, not edge.
 They cut Squid Ink to 10\% of max position and focused on robust
 signals, trading upside for stability.
 
 
 %======================================================================
-\section{Honest: what cannot be planned}
+\section{What cannot be planned}
 \label{sec:cannot_plan}
 %======================================================================
 
@@ -767,9 +767,9 @@ static fit could not.
 
 \textbf{Infrastructure failures.}  CMU Physics' Round~3 crash
 (visualiser memory) was unpredictable from local testing and
-missed by the official backtester.  Only mitigation: defensive
-programming---memory well below limits, worst-case-volume testing,
-kill-switches for runaway state.
+missed by the official backtester.  The only mitigation is
+defensive programming: memory well below limits, worst-case-volume
+testing, kill-switches for runaway state.
 
 \textbf{Team coordination under pressure.}  Both teams describe
 late-night sessions (``6~a.m.\ discussing Squid Ink dynamics'')
@@ -784,10 +784,10 @@ posted 850{,}000 SeaShells (vs.\ the typical 200--400k top range)
 to take first.  They accepted it: ``in any probabilistic
 environment \ldots\ some degree of randomness is inevitable.''
 CMU Physics' Round~1 Squid Ink happened to spike \emph{for} them
-on the re-run---pure luck in their 9th-place finish.
+on the re-run: pure luck in their 9th-place finish.
 
 \textbf{The spread cost of hedging.}  CMU Physics found hedging
-Volcanic Rock Vouchers cost 40{,}000+ SeaShells/day in spread---the
+Volcanic Rock Vouchers cost 40{,}000+ SeaShells/day in spread: the
 underlying had a 1-tick spread and frequent rebalancing piled up.
 The ``correct'' textbook move (always hedge delta) was wrong in
 this microstructure.  Frankfurt Hedgehogs concurred: ``explicit
@@ -805,7 +805,7 @@ whether a teammate will push through a bad round.
 
 \begin{intuitionbox}
 The unplannable share a structure: they are \emph{out-of-sample}
-(OOS---outside the historical data used to build and test the
+(OOS, outside the historical data used to build and test the
 strategy) risks no in-sample analysis can eliminate.  Novel products are
 OOS by definition; regime changes make your calibration
 non-representative; infrastructure failures sit outside the tested
@@ -837,7 +837,7 @@ taking three months to deploy is dominated by a simpler one that
 ships in a week and refines over the next eleven.  Desk traders
 value reliability and responsiveness over theoretical optimality.
 An off-cycle engineer who ships fast, iterates on live feedback,
-and handles edge cases earns trust---the same trust Prosperity
+and handles edge cases earns trust, the same trust Prosperity
 teams earn by submitting early rather than optimising in
 isolation.
 \end{gsbox}

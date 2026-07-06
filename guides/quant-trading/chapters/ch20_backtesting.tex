@@ -6,8 +6,8 @@ A \textbf{backtest} is a simulation of what a trading strategy would
 have made on historical data. Done wrong, it is a lie: a strategy
 that ``made 20\% per year in backtest'' can lose money live, for
 avoidable reasons. \Cref{ch:mean_reversion_ou,ch:pairs_cointegration}
-already met two --- the look-ahead from fitting an OU model on the
-full dataset, and the over-refit hedge ratio --- and in both the
+already met two (the look-ahead from fitting an OU model on the
+full dataset, and the over-refit hedge ratio), and in both the
 cure was walk-forward. This chapter treats backtest discipline as a
 first-class subject and catalogues the \emph{seven standard ways
 backtests lie}, with numerical examples and defences. The centrepiece
@@ -19,7 +19,7 @@ learning.
 Calmar, information ratio, and drawdown. Every one of those numbers
 \emph{only means something if the backtest was honest}. A Sharpe of
 $1.8$ from $1000$ parameter sweeps is worth about $0.6$ after
-multiple-testing deflation --- derived by hand in
+multiple-testing deflation, as derived by hand in
 \cref{sec:bt_deflated_sharpe}. Hence the \textbf{Deflated Sharpe
 Ratio} \citeAFML{} as the principled correction.
 
@@ -37,8 +37,8 @@ From earlier in the book:
   pitfall on look-ahead OU fitting is the canonical example of
   Lie~1 below.
   \item \Cref{ch:pairs_cointegration}: the ``over-refit
-  $\hat\beta$'' pitfall --- refitting the hedge ratio every bar
-  on windows that include the current observation --- is the
+  $\hat\beta$'' pitfall (refitting the hedge ratio every bar
+  on windows that include the current observation) is the
   canonical example of Lies~1 and~3 acting together.
   \item \Cref{ch:kelly_risk}: the Sharpe ratio, the drawdown
   recovery identity, and the framing of performance metrics as
@@ -68,8 +68,8 @@ From outside the book:
 \section{The seven lies a backtest can tell you}
 \label{sec:bt_seven_lies}
 
-Every subsequent section --- walk-forward, CPCV, deflated Sharpe,
-framework choice --- defends against one or more of these seven
+Every subsequent section (walk-forward, CPCV, deflated Sharpe,
+framework choice) defends against one or more of these seven
 failure modes. The list is adapted from \citet{lopezdeprado2018afml}
 (Ch.~11--12) and \citet{chan2013algorithmic} (Ch.~3).
 
@@ -79,7 +79,7 @@ failure modes. The list is adapted from \citet{lopezdeprado2018afml}
 A backtest commits \textbf{look-ahead bias} when the simulated
 strategy, at time $t$, uses information unavailable at $t$ in real
 trading. The cartoon version: the backtest buys today because it
-already knows tomorrow's closing price went up --- live, tomorrow's
+already knows tomorrow's closing price went up; live, tomorrow's
 close does not yet exist. Archetype: the OU pitfall of \cref{ch:mean_reversion_ou},
 where $\hat\mu$ and $\hat\theta$ are fitted on the \emph{full} series
 and used to compute every historical $z$-score. Each entry is timed
@@ -124,7 +124,7 @@ equal-weighted S\&P~500 backtest $2000$--$2020$ using current
 constituents. The current list contains firms that \emph{survived};
 bankruptcies, delistings, and distressed acquisitions between 2000
 and 2020 are missing. Enron, Lehman, WorldCom, Washington Mutual,
-pre-bankruptcy GM, Bear Stearns --- none appear, because none are in
+pre-bankruptcy GM, Bear Stearns: none appear, because none are in
 today's constituent list.
 
 \paragraph{Magnitude.} \citet{lopezdeprado2018afml} and
@@ -175,8 +175,8 @@ upward by the same multiple-testing inflation as Lie~3.
 The dangerous case is not counting trials. Six months of iteration
 typically touches $N \in [50, 500]$ strategies; uncounted, the
 Sharpe in the final writeup is silently inflated and the strategy
-goes live on noise. A research log --- every idea, parameter set, and
-result --- is the only mechanical defence;
+goes live on noise. A research log (every idea, parameter set, and
+result) is the only mechanical defence;
 \cref{sec:bt_deflated_sharpe} turns it into a formula.
 
 \subsection{Lie 5: Transaction-cost neglect}
@@ -234,7 +234,7 @@ Common backtest slippage lies:
   book; filling the whole order at the top ask underestimates
   cost.
   \item \textbf{``No queue at the top.''} A passive bid does not
-  fill just because the market trades there --- its price-time
+  fill just because the market trades there; its price-time
   priority position matters. Assuming instant passive fills is
   over-optimistic by a factor proportional to queue length.
 \end{itemize}
@@ -253,7 +253,7 @@ tightening. A vol seller looks wonderful $2013$--$2019$ and
 catastrophic on COVID-March 2020 or ``Volmageddon'' 2018.
 
 Regime dependence is not ``the backtest was wrong'' but ``the sample
-was unrepresentative''. There is no statistical cure --- statistics
+was unrepresentative''. There is no statistical cure: statistics
 assume the future resembles the past. Partial cures:
 \begin{itemize}
   \item Extend the window as far back as data supports.
@@ -264,26 +264,26 @@ assume the future resembles the past. Partial cures:
   based label, reporting Sharpe, return, drawdown per regime. A
   strategy with Sharpe $1.8$ low-vol and $-2.0$ high-vol is two
   strategies that should be switched on a signal.
-  \item Reserve a \textbf{final hold-out} --- the last $1$--$2$
-  years --- \emph{never} looked at during research. Evaluate on
+  \item Reserve a \textbf{final hold-out}, the last $1$--$2$
+  years, \emph{never} looked at during research. Evaluate on
   it exactly once, at the end.
 \end{itemize}
 
 \begin{pitfallbox}[The seven deadly backtest sins]
 \begin{enumerate}
-  \item \textbf{Look-ahead} --- using data from after decision
+  \item \textbf{Look-ahead}: using data from after decision
   time.
-  \item \textbf{Survivorship} --- running a universe defined by
+  \item \textbf{Survivorship}: running a universe defined by
   today's membership.
-  \item \textbf{Overfitting} --- tuning parameters on the same
+  \item \textbf{Overfitting}: tuning parameters on the same
   data used for evaluation.
-  \item \textbf{Data snooping} --- trying many strategies on the
+  \item \textbf{Data snooping}: trying many strategies on the
   same data and reporting only the winners.
-  \item \textbf{Transaction-cost neglect} --- omitting spread,
+  \item \textbf{Transaction-cost neglect}: omitting spread,
   impact, financing.
-  \item \textbf{Slippage} --- assuming the fill price equals the
+  \item \textbf{Slippage}: assuming the fill price equals the
   signal-time price.
-  \item \textbf{Regime dependence} --- relying on a sample
+  \item \textbf{Regime dependence}: relying on a sample
   period whose conditions do not persist.
 \end{enumerate}
 Each can turn a break-even strategy into a ``backtested
@@ -311,8 +311,8 @@ a loop:
 \end{enumerate}
 Sharpe, return, and drawdown come from the \emph{concatenation of
 test-period P\&Ls}. No test observation was used in fitting the
-parameters that generated its signal --- out-of-sample by
-construction.
+parameters that generated its signal, so the result is
+out-of-sample by construction.
 
 \begin{keyfactbox}[Walk-forward procedure]
 Fix window $W$ and step $R$. For each time $t$:
@@ -328,7 +328,7 @@ when its parameters were fit.
 
 \paragraph{Why it beats a single split.} Walk-forward simulates the
 real passage of time: repeatedly fit on the past, trade the next
-unseen period, then advance --- exactly what a live strategy does.
+unseen period, then advance, which is exactly what a live strategy does.
 A random train/test shuffle (the ML default) would scatter future
 points into the training set, leaking tomorrow's prices into
 yesterday's fit; a fixed split
@@ -341,7 +341,7 @@ and catches regime drift by refitting.
 
 \paragraph{Why it is not enough.} Walk-forward fixes parameter-level
 look-ahead, but two leaks remain. (i)~Grid-searching over $100$
-values of $W$ and reporting the winner brings Lie~3 back --- the
+values of $W$ and reporting the winner brings Lie~3 back: the
 loop was honest, but the choice of $W$ was in-sample. (ii)~It
 misses \textbf{preprocessing leakage}: normalising features with
 the global mean/variance before the loop leaks information into
@@ -395,7 +395,7 @@ Financial time series break i.i.d.\ in two ways:
   triple-barrier outcomes over $h$ bars. If $t$ is in train and
   $t + 1$ in test, the training label at $t$ was computed from
   the same price path that generates the test features at
-  $t + 1$ --- the model is trained on test data through the
+  $t + 1$; the model is trained on test data through the
   labels.
 \end{enumerate}
 The second is fatal: every naive $k$-fold Sharpe in ML-for-trading
@@ -412,9 +412,9 @@ range must go: its label was computed from data the model will soon
 see as a feature.
 
 \textbf{Embargo} drops training observations for $h$ observations
-\emph{after} every test fold --- feature-side insurance: even without
-label overlap, a training point near the test edge may have highly
-correlated features.
+\emph{after} every test fold. This is feature-side insurance: even
+without label overlap, a training point near the test edge may have
+highly correlated features.
 
 For test fold $[a, b]$, the surviving training set is
 \[
@@ -470,11 +470,11 @@ i \notin \{0,\ldots,7\}
 Of $i = 8, \ldots, 19$, only $i = 8$ is within distance $1$ of
 $j = 7$, so it is embargoed. Training indices:
 $\{9, 10, \ldots, 19\}$, size $11$. The single $i = 8$ is neither
-trained on nor tested on --- purged.
+trained on nor tested on: it is purged.
 
 \paragraph{Step 4: purge + embargo on split~2, $\{F_0, F_2\}$.}
-Test indices: $\{0,1,2,3,8,9,10,11\}$ --- two non-contiguous blocks,
-embargo applied around each:
+Test indices: $\{0,1,2,3,8,9,10,11\}$, two non-contiguous blocks,
+with the embargo applied around each:
 \begin{itemize}
   \item Observation $i = 4$ is distance $1$ from $j = 3$
   (embargoed).
@@ -484,7 +484,7 @@ embargo applied around each:
   (embargoed).
 \end{itemize}
 Training set: $\{5, 6, 13, 14, 15, 16, 17, 18, 19\}$, size $9$.
-Three observations ($4, 7, 12$) are purged --- the non-contiguous
+Three observations ($4, 7, 12$) are purged: the non-contiguous
 test set costs more than the contiguous split~1.
 
 \paragraph{Step 5: purge + embargo on split~3, $\{F_0, F_3\}$.}
@@ -496,14 +496,14 @@ The other seven splits use the same mechanics. Across all $10$, the
 researcher gets $10$ out-of-sample P\&L paths. The reported statistic
 is the \emph{distribution} of the ten Sharpes, revealing dependence
 on which observations fell where. Sharpes
-$\{1.3, 1.4, 1.2, 1.5, 1.4, 1.3, 1.2, 1.5, 1.3, 1.4\}$ is robust;
+$\{1.3, 1.4, 1.2, 1.5, 1.4, 1.3, 1.2, 1.5, 1.3, 1.4\}$ is stable;
 $\{2.8, 1.1, -0.4, 2.2, 0.3, 1.6, 0.8, 2.1, 1.4, -0.2\}$ has the
 same mean ($\approx 1.17$) but is one unlucky draw from unrunnable.
 
 \paragraph{Test coverage.} Each of the $5$ folds appears in
 $\binom{4}{1} = 4$ of the $10$ splits, so every observation is a
 test point $4$ times. Total test-observation count:
-$10 \times 8 = 80$, i.e.\ $4$ per observation --- four times the
+$10 \times 8 = 80$, i.e.\ $4$ per observation, four times the
 coverage of ordinary $5$-fold, with $10$ (overlap-dependent) Sharpe
 estimates.
 
@@ -550,7 +550,7 @@ See \citet{lopezdeprado2018afml} Ch.~7.
 The second statistical lie is multiple-testing inflation. CPCV
 controls leakage \emph{inside} a single strategy's evaluation;
 deflated Sharpe controls inflation from having tried \emph{many}
-strategies. The two are orthogonal --- you need both. ``Deflation''
+strategies. The two are orthogonal; you need both. ``Deflation''
 is the plain-English operation of shrinking a reported Sharpe to
 account for the number of strategies tried: the best of $100$
 zero-edge coin-flip strategies will itself look like an edge, and
@@ -643,7 +643,7 @@ DSR $\approx 0.93$: under $N = 100$, a $93\%$ chance of genuine edge
 rather than tournament noise. At $N = 1000$ the expected maximum
 climbs to $3.2414 \times 0.02817 = 0.0913$, argument drops to
 $(0.1134 - 0.0913)/0.02827 = 0.7831$, $\text{DSR} = \Phi(0.7831) =
-0.7832$ --- below $0.95$. Ten times more trials flips ``probably
+0.7832$, below $0.95$. Ten times more trials flips ``probably
 real'' to ``probably noise'' with no data change.
 
 \paragraph{Headline.} The \emph{effective} annualised Sharpe is
@@ -706,7 +706,7 @@ bar, so intra-bar order-book dynamics are out of scope, and the
 vector API tempts next-bar look-ahead.
 
 \paragraph{\texttt{NautilusTrader}} (Nautech Systems). Rust core,
-Python API, tick-by-tick with a full order-book model --- can
+Python API, tick-by-tick with a full order-book model: it can
 replay raw LOBSTER dumps with realistic queue-position fills.
 Operationally heavy; overkill for daily-bar sweeps. Use when
 microstructure correctness matters.
@@ -759,7 +759,7 @@ whichever framework is chosen.}
 \begin{itemize}
   \item \texttt{Backtesting.py}: simple, event-driven,
   single-asset. Teach yourself on this.
-  \item \texttt{vectorbt}: vectorised, blazing fast. Best for
+  \item \texttt{vectorbt}: vectorised, very fast. Best for
   parameter sweeps. Easy to leak look-ahead if you're not
   careful.
   \item \texttt{NautilusTrader}: tick-level, order-book,
@@ -900,7 +900,7 @@ label-window intersection test per \citeAFML{} Ch.~7.
   $\binom{k}{2}$ two-fold splits). Report a
   \emph{distribution}.
   \item \textbf{CPCV coverage}: each observation is a test
-  point in $k - 1$ of the $\binom{k}{2}$ splits --- $k - 1$
+  point in $k - 1$ of the $\binom{k}{2}$ splits, $k - 1$
   times richer than $k$-fold.
   \item \textbf{Expected max Sharpe (null)} per-period:
   $\E[\max]/\sqrt{T}$, $\E[\max]$ the max of $N$ iid

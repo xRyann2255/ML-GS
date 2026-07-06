@@ -11,7 +11,7 @@ input is flagged ``non-modellable,'' spends the first year of the
 job nodding at acronyms in meetings.
 
 This chapter is a vocabulary tour.  The aim is to make four
-acronyms --- Basel~III, FRTB, CCAR, MiFID~II --- intelligible the
+acronyms (Basel~III, FRTB, CCAR, MiFID~II) intelligible the
 first time a senior Strat uses them in a sentence, and to give a
 crisp account of the LIBOR-to-SOFR transition, the largest
 rates-market project of the 2020s, which still shapes every curve
@@ -62,15 +62,15 @@ Basel frameworks are organised around \emph{three pillars}.  The
 language is standard and appears in every Basel document.
 
 \begin{enumerate}
-  \item \textbf{Pillar~1 --- minimum capital requirements.}  A
+  \item \textbf{Pillar~1: minimum capital requirements.}  A
     numerical rulebook: compute risk-weighted assets (RWA) from
     credit, market, and operational exposures; hold capital of
     at least a specified fraction of RWA.
-  \item \textbf{Pillar~2 --- supervisory review.}  The local
+  \item \textbf{Pillar~2: supervisory review.}  The local
     regulator examines the bank's internal capital assessment
     (the ICAAP in Europe) and may impose bank-specific add-ons
     over the Pillar~1 minimum.
-  \item \textbf{Pillar~3 --- market discipline.}  The bank
+  \item \textbf{Pillar~3: market discipline.}  The bank
     publishes standardised disclosures (the ``Pillar~3 report'')
     so that counterparties, investors, and analysts can price
     the bank's risk.  Transparency lets the market discipline
@@ -164,7 +164,7 @@ risk), FRTB is narrowly about \emph{market risk}: capital a bank
 holds against its trading-book positions moving adversely.
 Market-risk capital is the number that most directly bites a
 derivatives Strat, because it is computed from their pricers'
-sensitivities.  Fundamentally FRTB did two things: it replaced
+sensitivities.  FRTB did two things: it replaced
 Value-at-Risk with Expected Shortfall as the risk measure, and
 it drew a much harder line between the trading book (marked to
 market daily) and the banking book (held to maturity) to close
@@ -173,9 +173,9 @@ long-standing arbitrage between the two.
 \subsection{Trading book versus banking book}
 
 Banks carve the balance sheet in two.  The \textbf{banking book}
-holds assets the bank intends to hold to maturity --- most
+holds assets the bank intends to hold to maturity, most
 obviously loans.  The \textbf{trading book} holds positions to be
-traded --- market-making inventory, hedges, proprietary positions.
+traded: market-making inventory, hedges, proprietary positions.
 Banking-book assets attract credit-risk capital; trading-book
 positions attract market-risk capital.  A long-standing problem
 was regulatory \emph{arbitrage} between the two: a bank could
@@ -215,9 +215,9 @@ over a liquidity-horizon-weighted 10-day basis.
 The change is conceptual.  VaR at $99\%$ is a quantile: ``the
 smallest loss I exceed with probability at most $1\%$,'' silent
 on tail severity.  ES at $97.5\%$ is the \emph{expected} loss
-given that the loss exceeds the $97.5\%$ quantile --- a tail
+given that the loss exceeds the $97.5\%$ quantile, a tail
 mean.  For a Gaussian loss distribution the two numbers are
-similar; for fat tails --- the case that matters --- ES is
+similar; for fat tails, the case that matters, ES is
 substantially larger, and the capital charge scales with tail
 severity.  FRTB picked $97.5\%$ rather than $99\%$ so that on
 Gaussian distributions the new and old numbers are comparable,
@@ -308,8 +308,8 @@ banks are in scope; Goldman Sachs is a CCAR firm.
 
 Early each year the Fed publishes three scenarios: baseline,
 adverse, severely adverse.  Each is a path for several dozen
-macro and market variables --- GDP, unemployment, the Dow, the
-10-year Treasury, VIX, house prices, credit spreads --- over a
+macro and market variables (GDP, unemployment, the Dow, the
+10-year Treasury, VIX, house prices, credit spreads) over a
 nine-quarter horizon.  The severely adverse scenario is
 deliberately deeper than the historical norm: a plausible
 worst-case recession.
@@ -327,7 +327,7 @@ Each in-scope bank is required to:
 \end{enumerate}
 
 The Fed also runs its own \textbf{supervisory stress test}
-(DFAST --- Dodd-Frank Act Stress Test) using Fed-built models.
+(DFAST, the Dodd-Frank Act Stress Test) using Fed-built models.
 CCAR is the bank's exercise; DFAST is the Fed's.  Together they
 form the annual stress-test cycle.
 
@@ -443,8 +443,8 @@ largely parallel regime with its own tweaks.
 %% ================================================================
 
 For decades the most important interest-rate benchmark in global
-finance was \textbf{LIBOR} --- the London Interbank Offered Rate
---- a daily-published set of rates intended to represent the cost
+finance was \textbf{LIBOR} (the London Interbank Offered Rate),
+a daily-published set of rates intended to represent the cost
 at which major banks could borrow unsecured from one another in
 London, across five currencies (USD, GBP, EUR, JPY, CHF) and
 seven tenors (overnight out to 12 months).  At its peak LIBOR was
@@ -472,8 +472,8 @@ much economic weight was unsustainable.
 \begin{historybox}[title={LIBOR scandal 2012}]
 Investigations in 2011--2013 revealed coordinated manipulation
 of LIBOR submissions at several panel banks.  Emails between
-traders and submitters --- ``an extra basis point would be much
-appreciated'' --- became enforcement exhibits.  Cross-jurisdiction
+traders and submitters (``an extra basis point would be much
+appreciated'') became enforcement exhibits.  Cross-jurisdiction
 fines reached roughly \$9~billion; several individuals were
 convicted.  In 2017 the UK FCA announced it would no longer
 compel LIBOR submissions after end-2021, triggering the global
@@ -489,20 +489,20 @@ rate (RFR)} as successor.  All RFRs share two features: they are
 rather than submissions.
 
 \begin{itemize}
-  \item \textbf{SOFR} (Secured Overnight Financing Rate) ---
+  \item \textbf{SOFR} (Secured Overnight Financing Rate):
     USD.  A transaction-based overnight rate backed by US
     Treasury repo volume.  Published by the Federal Reserve
     Bank of New York.
-  \item \textbf{SONIA} (Sterling Overnight Index Average) ---
+  \item \textbf{SONIA} (Sterling Overnight Index Average):
     GBP.  A transaction-based overnight rate from unsecured
     sterling deposits.  Published by the Bank of England.
-  \item \textbf{ESTR} (Euro Short-Term Rate) ---
+  \item \textbf{ESTR} (Euro Short-Term Rate):
     EUR.  Published by the ECB, based on unsecured overnight
     borrowing by euro-area banks.
-  \item \textbf{TONA} (Tokyo Overnight Average Rate) --- JPY.
+  \item \textbf{TONA} (Tokyo Overnight Average Rate): JPY.
     Published by the Bank of Japan, unsecured overnight call
     market.
-  \item \textbf{SARON} (Swiss Average Rate Overnight) ---
+  \item \textbf{SARON} (Swiss Average Rate Overnight):
     CHF, secured, published by SIX Swiss Exchange.
 \end{itemize}
 
@@ -517,7 +517,7 @@ each RFR and the defunct LIBOR curves.
 
 \subsection{Backward-looking versus forward-looking}
 
-A crucial shift: RFRs are \emph{backward-looking}; LIBOR was
+RFRs are \emph{backward-looking}; LIBOR was
 \emph{forward-looking}.
 
 LIBOR was a term rate: 3-month USD LIBOR fixed at the start of a
