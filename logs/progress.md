@@ -131,3 +131,19 @@
 - Noted: uncommitted prose-editing changes across all three guides' chapters are sitting in the working tree (not mine, left uncommitted); once committed, the Stop hook will correctly demand a mirror regen + sync-docs for both covered guides
 
 ---
+
+## 2026-07-06
+
+**Focus:** De-slopping all three LaTeX guides (unslop + unslop-text) end to end
+
+- Ran a two-pass de-slop workflow over 77 chapters + 3 main.tex (~365k words, 160 agents): pass 1 applied the unslop methodology per file (em dashes, antithesis cadences, throat-clearing, filler diction; math/citations/tables/TikZ/box structure sacred); pass 2 ran the unslop-text audit and adversarially verified every diff hunk
+- Results: prose em dashes 1,620 -> 85 (all survivors are table empty-cell placeholders or sacred box titles), scanner slop score 484 -> 384 with the residual being protected domain terms (leverage effect, robust estimator, elevated vol). Structure delta-gate (brace/env/$ parity + cite/ref/label counts vs baseline snapshot) OK on all 80 files
+- Pass 2 earned its cost: caught and repaired real pass-1 damage -- comma splices, double colons from dash->colon swaps, one dropped clause, several weakened technical claims ("critical", "elevated", "robust" chased too hard)
+- Mid-run session-limit outage killed 40 of 80 verify agents; resumed the workflow from its journal cache so only the missing 40 re-ran
+- Compile gate: all three guides build clean (vol-learning-guide 369pp, quant-trading 570pp, vol-project-ref 55pp, zero LaTeX errors)
+- Mirrored the 199 rendered tex hunks into the markdown copies (22 agents, 20 files changed, 0 reconversions, 0 em dashes in mirrors)
+- 3 commits to main (tex, markdown, PDFs) + push; docs-only synced + pushed (restores vol-learning main.pdf and markdown/ that an earlier branch cleanup had dropped)
+
+**Next:** Presentation diagrams (2026-07-03 spec) or next research topic from open-questions
+
+---
