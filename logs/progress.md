@@ -145,6 +145,7 @@
 - 3 commits to main (tex, markdown, PDFs) + push; docs-only synced + pushed (restores vol-learning main.pdf and markdown/ that an earlier branch cleanup had dropped)
 
 - Follow-up: user caught that the vol-learning-guide PDF was committed one pdflatex pass short of pagination convergence (TOC off by one page from mid-ch1). Verified via pdftotext diff (all 650 changed lines were page numbers/running heads; quant-trading and vol-project-ref text-identical on recompile), recompiled to the .toc/.aux fixpoint, recommitted, resynced docs-only
+- Updated /sync-docs Step 2 and the CLAUDE.md docs-only recipe: compile to the .toc/.aux/.ind fixpoint (loop, max 5 passes, non-convergence warning) instead of a fixed 3-pass pipeline; verified the new snippet live on vol-project-ref (converged in 3 post-bibtex passes)
 
 **Next:** Presentation diagrams (2026-07-03 spec) or next research topic from open-questions
 

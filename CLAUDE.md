@@ -109,11 +109,19 @@ The `docs-only` branch contains only compiled PDFs, deliverables, and markdown n
 
 **To update it from main:**
 
-1. Compile all guides that have changed:
+1. Compile all guides that have changed — to the pagination fixpoint, not a fixed pass count (a shifted page break can leave the TOC one page stale after three passes):
    ```bash
-   cd guides/vol-learning-guide && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && cd ../..
-   cd guides/quant-trading && pdflatex -interaction=nonstopmode main.tex && cd ../..
-   cd guides/vol-project-ref && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && cd ../..
+   for g in vol-learning-guide quant-trading vol-project-ref; do
+     cd guides/$g
+     pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1; bibtex main >/dev/null 2>&1
+     for i in 1 2 3 4 5; do
+       before=$(md5sum main.toc main.aux main.ind 2>/dev/null)
+       pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1
+       [ "$before" = "$(md5sum main.toc main.aux main.ind 2>/dev/null)" ] && break
+     done
+     grep 'Output written on' main.log | tail -1
+     cd ../..
+   done
    ```
 2. Commit any updated PDFs to main.
 3. Switch to docs-only and reset it from main, keeping only the target files:
