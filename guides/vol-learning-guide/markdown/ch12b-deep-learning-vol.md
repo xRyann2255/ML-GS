@@ -246,7 +246,7 @@ Chen and Roberts (2022) extend the transformer with a graph structure over asset
 >
 > The attention weight matrix $\mathbf{A} \in \mathbb{R}^{N \times N}$ across $N$ assets connects directly to the spillover analysis in [Chapter 15](ch15-spillovers-connectedness.md) and the multivariate models in [Chapter 14](ch14-multivariate-volatility.md), but learns the network structure from data rather than imposing it via a VAR or DCC.
 
-Transformer variants have also been applied to LOB data (TLOB), replacing the LSTM component of DeepLOB with multi-head self-attention. Early results are promising but not yet conclusive.
+Transformer variants have also been applied to LOB data (TLOB), replacing the LSTM component of DeepLOB with multi-head self-attention. Early results are promising but not yet conclusive. [Chapter 17](ch16-graph-neural-networks.md) develops graph neural networks from first principles and returns to this model with full machinery.
 
 > **Warning: Transformer Evidence on Volatility Is Thin**
 >
