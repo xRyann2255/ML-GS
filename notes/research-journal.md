@@ -186,3 +186,54 @@ Each step has a clear scientific question and is independently reportable.
 **Open threads:** the chapter specifies 4 experiments for the GS machine -- (1) 5-min bar-by-bar hedging-error floor sim ($\mathrm{Var}=a/N+b$), (2) cost-band Sharpe (quoted / effective / timing-aware), (3) per-(symbol,day) PnL regressed on the variance gap and forecast error with a DM test, (4) pooled vs per-symbol deflated Sharpe with honest $N$. Branch `research/ivrv-straddle-backtest` is unmerged.
 
 ---
+
+## 2026-07-06 -- Regime Detection + Regime×GNN Fusion for SPX RV (deep-research sweep)
+
+**Question explored:** What is the 2025-26 state of the art for (a) market-regime detection aimed at volatility forecasting, (b) injecting regimes into an RV forecaster, and (c) fusing regimes with a cross-asset GNN spillover layer -- the Part II/III half of the SPX RV GNN+regimes design prompt (Part I GNN landscape was swept the same day into `notes/deep-research/2026-07-06-gnn-cross-asset-vol.md`)?
+
+**Method:** Ran `deep-research-distill` (25 agents; 58 sources harvested, 15 kept, 13 adversarially verified; 11 PDFs downloaded, 2 of them open-access recoveries of paywalled journals). Brief: `notes/deep-research/spx-rv-gnn-regime-pipeline.md`.
+
+**What we found:**
+- Best-documented regime injection pattern: filtered (real-time) two-state MS-GJR-GARCH probability re-injected as one extra HARQ regressor -- QLIKE 0.171013 -> 0.162259 (-5.1%) with DM significance in 3 of 4 conditional splits (Fang & Slepaczuk 2026, arXiv 2606.09478; CSI 300, explicitly leakage-clean)
+- Peer-reviewed anchor: MS-TVTP-HAR beats HAR OOS at weekly/monthly horizons on 8 indices incl. SPX, but the daily-horizon edge is mixed; abrupt Markov switching beats smooth-transition specs (Ding et al. 2025, IREF 101)
+- Detector frontier has moved past vanilla HMMs to statistical jump models (k-means loss + jump penalty): flickering cut from 9.7 to 0.4-2.7 shifts/yr, beats HMM on point-in-time SPX signals with an explicit 1-day-delay protocol (Shu et al. 2024, J. Asset Mgmt; code: Yizhan-Oliver-Shu/jump-models)
+- Counter-evidence is real: MS-GARCH loses to a fitted single-regime GARCH under MSFE *and* QLIKE (JRFM 2025, 4 LatAm indices), replicating the Fed-FEDS pattern (regime edge dies under QLIKE); MS-GARCH's established wins are VaR/ES tail-risk, not point vol (Ardia et al. 2018)
+- The regime×GNN fusion layer (Part III) has no credible published incumbent: Kumar et al. 2026 is a "regime-dependent GNN" with no regime mechanism, and the only causal regime->graph pipeline (Cho & Lee 2025, Hurst-triggered edge swap) loses to naive periodic re-estimation in both the 2008 and 2020 crashes
+
+**What surprised us:**
+- The "regimes only help in turbulence" folk claim is contradicted by the cleanest paper's own tables: Fang & Slepaczuk's strongest DM stat (3.09, p=0.0010) is in the *low/normal-vol* bucket -- gains are broad-based (direct but conflicting evidence for our 2026-05-12 open thread)
+- No quantified regime win in the entire dossier is on SPX intraday RV under QLIKE -- the strong numbers come from CSI 300, EUR/USD, LatAm, and country-ETF panels; the regime edge is loss-function- and benchmark-fragile
+- The verify pass caught fabricated table numbers in the Cho & Lee harvest extraction (corrected against the live page) -- second time adversarial verification has caught invented digits
+- Huge regime separation does not imply forecast gains: Chaudhary 2026 gets KS p=1.35e-153 between regimes but only -1.87% RMSE
+- Filtered-vs-smoothed ambiguity persists even in peer-reviewed work: Ding et al. 2025 never states which probabilities feed its recursive OOS forecasts
+
+**Open threads:**
+- Resolving experiment (cheapest high-information build in the program): rolling HAR-WLS (JLDC spec, 630-day window) +/- filtered MS-GJR-GARCH residual probability as one extra regressor, SPX 5-min RV, h in {1,5,22}, QLIKE + DM + MCS, regime-conditional breakdown
+- Regime-conditional graphs vs single dynamic graph: no head-to-head exists anywhere; prior from this sweep is that a monthly re-estimated single graph wins or ties -- test (i) periodic vs (ii) jump-model-triggered vs (iii) probability-blended per-regime graphs on the 34-symbol universe
+- Abrupt vs smooth transitions: MS-TVTP-HAR vs jump-model-conditioned HAR on the same panel (neither paper tests the other's winner)
+- Still paywalled: Wang, Shrestha & Sun 2019 (MS-HAR-TVTP, Wiley) and Cartea, Cucuringu & Fang 2026 (idiosyncratic jump spillovers, SSRN 6333798, ~30% 1-day MSE claim from abstract only)
+- Build order settled by evidence: regime feature into HAR first, regime-gated ensembles (MoE with observable-state routing) second, regime-conditioned graphs last
+
+---
+
+## 2026-07-07 -- Writing the GNN chapter: what the synthesis itself taught
+
+**Question explored:** Consolidating the two 2026-07-06 GNN/regime briefs plus all 17 d-graph-gnn papers into a teaching chapter -- does the full-corpus view change any verdicts?
+
+**What we found:**
+- The corpus-wide pattern is starker in one table than in any single paper: of 8 model families surveyed, only GNNHAR (and partially EMGNN) carries DM tests, and only the GNNHAR lineage computes QLIKE at all. The audit-table exercise (model x losses x DM x MCS x QLIKE-verdict) is reusable for any future sweep.
+- GHAR is more load-bearing than the briefs emphasized: six pooled OLS slopes capture roughly half of GNNHAR's total gain, which makes the linear graph ablation (identity vs FC vs GLASSO vs rolling-DY) strictly the first experiment -- the GNN is only justified if it beats that AND a per-symbol-embedding MLP (STID control).
+- Kumar et al.: the PDF we hold is arXiv v1 (Oct 2024) which has NO HAR baseline at all -- the "TemporalGAT vs HAR-RV" numbers in the regime brief belong to the 2026 journal version we do not hold. Chapter cites only v1 content; worth re-acquiring the journal version if it ever opens.
+- Fine-grained corrections that verification forced on the briefs' shorthand: "FC beats GLASSO" is really "the top of the QLIKE ranking is all-FC and each GL config loses to its like-for-like FC twin" (the best GL config ties/beats several FC configs); the leakage benchmark's graph-lookahead effect is -0.2 to +0.4 Sharpe across cells averaging ~+0.1 (my two-range summary was wrong); GNNHAR's monthly-horizon MSE penalty for QLIKE training is 44-53%, not 30-50%; GHAR(GL,L~) is rank-2 (p=0.768) under Frobenius, not rank-1 under all three losses.
+
+**What surprised us:**
+- A blind diagram reviewer confidently FAILed a correct figure (claimed the two permutation-demo adjacency matrices encode different graphs; both are 3-edge relabelings -- it hallucinated a 4th edge from the node layout). Receiving-review discipline (verify before implementing) mattered even for diagram review.
+- The naive-reader pass found the fundamentals arc well-supported but the frontier sections "speeding up" exactly where the math got hardest (magnetic Laplacian, diffusion convolutions, GSE) -- a systematic failure mode worth pre-empting in future chapters: intuition-box density should INCREASE with section difficulty, not decay.
+- Writing the GLASSO/GNNHAR sections surfaced that the GNNHAR paper never states in one sentence that the graph is re-estimated monthly -- the cleanest leakage template in the literature is itself partly implicit.
+
+**Open threads:**
+- Run the chapter's Step 1 (GHAR graph ablation) and Step 3 (STID control) on our data -- both are new experiments the chapter design added beyond the briefs' list.
+- The FC-vs-GLASSO reconciliation hypothesis (sparsification pays on larger heterogeneous universes, costs on small integrated ones) is untested at our N=34 cross-asset scale.
+- Re-score open-source DCRNN-HAR / GSP-HAR forecasts under Patton-QLIKE with DM (the horizon-conflict arbiter).
+
+---
