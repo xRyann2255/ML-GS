@@ -148,15 +148,23 @@ prose below explains it.
   \node[part, fill=gray!10, below=of P4] (P6) {Part VI\\Prosperity};
   \node[part, fill=gray!10, right=of P6] (P7) {Part VII\\GS Strats};
 
+  % Orthogonal routing: the long links run through the empty corridors
+  % between the boxes instead of cutting diagonally across them.
+  \coordinate (gapmid) at ($(P4.east)!0.5!(P5.west)$);
+  \coordinate (p3out) at ([yshift=-2.5mm]P3.west);
+  \coordinate (p7in) at ([xshift=-6mm]P7.north);
+
   \draw[arrow] (P1) -- (P2);
   \draw[arrow] (P2) -- (P3);
-  \draw[arrow] (P1) -- (P4);
-  \draw[arrow] (P3) -- (P5);
+  \draw[arrow] (P1) |- (P4);
+  \draw[arrow] (P3) -- (P3 |- P5.north);
   \draw[arrow] (P4) -- (P5);
-  \draw[arrow] (P3) -- (P6);
+  \draw[arrow] (p3out) -- (p3out -| gapmid) -- (gapmid |- P6.east) -- (P6.east);
   \draw[arrow] (P4) -- (P6);
-  \draw[arrow] (P4) -- (P7);
-  \draw[arrow] (P5) -- (P7);
+  \draw[thick, line cap=rect] ([xshift=6mm]P4.south) -- ++(0,-4mm) coordinate (elb);
+  \draw[thick, line cap=rect] (elb) -- (elb -| p7in);
+  \draw[arrow] (elb -| p7in) -- (p7in);
+  \draw[arrow] (P5) -- (P5 |- P7.north);
 \end{tikzpicture}
 \caption{Coarse dependency graph between Parts. An arrow $X \to Y$ means
 $Y$ assumes the content of $X$. Parts~I and~II are prerequisites for

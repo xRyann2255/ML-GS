@@ -597,15 +597,19 @@ linearity is an equilibrium property, taken as given.)
 \node[box, fill=yellow!20] (insider) at (0, 0)  {Insider\\knows $v$};
 \node[box, fill=gray!15]   (noise)   at (0,-2)  {Noise traders\\flow $u$};
 \node[box, fill=orange!20] (agg)     at (4.5,-1) {Aggregate\\flow $y=x+u$};
-\node[box, fill=green!15]  (mm)      at (9,-1)  {Market maker\\sets $p$};
+\node[box, fill=green!15]  (mm)      at (9.6,-1)  {Market maker\\sets $p$};
 \draw[arr] (insider) -- node[above, sloped, font=\footnotesize]
     {$x=\beta(v-p)$} (agg);
 \draw[arr] (noise)   -- node[below, sloped, font=\footnotesize]
     {$u\sim\mathcal{N}(0,\sigma_u^2)$} (agg);
-\draw[arr] (agg) -- node[above, font=\footnotesize]{observes $y$ only} (mm);
-\draw[arr] (mm.north) -- ++(0,1.2) -|
-    node[pos=0.25, above, font=\footnotesize]{$p=\lambda y+\mu_0$}
-    (insider.north);
+\draw[arr] (agg) -- node[above, font=\footnotesize, align=center]
+    {observes\\$y$ only} (mm);
+% feedback route drawn as three axis-aligned segments
+\draw[thick] (mm.north) -- (mm.north |- 0,0.9);
+\draw[thick] (mm.north |- 0,0.9) --
+    node[above, font=\footnotesize]{$p=\lambda y+\mu_0$}
+    (insider.north |- 0,0.9);
+\draw[arr] (insider.north |- 0,0.9) -- (insider.north);
 \end{tikzpicture}
 \caption{Kyle (1985) information flow. The insider submits order size $x$
 proportional to the gap between fundamental value $v$ and the current price.

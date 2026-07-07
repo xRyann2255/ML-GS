@@ -613,37 +613,40 @@ curve you want.
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-  width=8.5cm, height=6cm,
+  width=10cm, height=6.5cm,
   xlabel={Variance of execution cost $\mathrm{Var}[\mathrm{cost}]$},
   ylabel={Expected execution cost $\mathbb{E}[\mathrm{cost}]$},
   xmin=0, xmax=1.1,
   ymin=0, ymax=1.1,
+  axis lines=left,
+  major tick length=0pt,
   xtick={0,0.5,1},
   xticklabels={0, medium risk, high risk},
   ytick={0,0.5,1},
   yticklabels={0, , high cost},
   title={Almgren--Chriss efficient frontier},
   title style={font=\small\bfseries},
-  grid=major, grid style={dashed,gray!25},
 ]
 \addplot[blue!70, thick] coordinates {
-  (0.04,1.0)(0.08,0.80)(0.15,0.58)(0.25,0.42)
-  (0.38,0.31)(0.53,0.24)(0.70,0.20)(0.88,0.17)(1.05,0.16)
-};
+  (0.04,1.0)(0.08,0.80)(0.15,0.58)};
+\addplot[blue!70, thick] coordinates {
+  (0.15,0.58)(0.25,0.42)(0.38,0.31)};
+\addplot[blue!70, thick] coordinates {
+  (0.38,0.31)(0.53,0.24)(0.70,0.20)(0.88,0.17)(1.05,0.16)};
 \node[circle, fill=red!70, inner sep=2.5pt]
   at (axis cs:0.53,0.24) {};
-\node[font=\footnotesize, above right, red!80]
+\node[font=\footnotesize, above right=2pt, red!80]
   at (axis cs:0.53,0.24) {TWAP};
 \node[circle, fill=green!60!black, inner sep=2.5pt]
   at (axis cs:0.08,0.80) {};
-\node[font=\footnotesize, right, green!60!black, align=center]
+\node[font=\footnotesize, above right=2pt, green!60!black, align=center]
   at (axis cs:0.08,0.80) {fast execution\\(high impact)};
 \node[circle, fill=orange!80, inner sep=2.5pt]
   at (axis cs:0.88,0.17) {};
-\node[font=\footnotesize, left, orange!80, align=center]
+\node[font=\footnotesize, above=5pt, orange!80, align=center]
   at (axis cs:0.88,0.17) {slow execution\\(high price risk)};
 \draw[-Stealth, dashed, gray!70]
-  (axis cs:0.80,0.28) -- (axis cs:0.18,0.60)
+  (axis cs:0.62,0.56) -- (axis cs:0.18,0.70)
   node[midway, above, sloped, font=\footnotesize]{$\lambda\uparrow$};
 \end{axis}
 \end{tikzpicture}

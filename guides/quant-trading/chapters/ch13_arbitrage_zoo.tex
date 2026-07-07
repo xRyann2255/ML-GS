@@ -162,15 +162,20 @@ guaranteed-fill order types.
   cur/.style={circle, draw, minimum size=1.6cm, text centered,
     font=\small\bfseries, fill=yellow!20},
   arr/.style={-Stealth, thick, blue!65},
+  seg/.style={thick, blue!65},
 ]
-\node[cur] (eur) at (90:3.2cm)  {EUR};
-\node[cur] (usd) at (210:3.2cm) {USD};
-\node[cur] (jpy) at (330:3.2cm) {JPY};
-\draw[arr] (eur) -- node[left=5pt, font=\small]{$E_{\mathrm{EUR/USD}}$} (usd);
+\node[cur] (eur) at (90:4.0cm)  {EUR};
+\node[cur] (usd) at (210:4.0cm) {USD};
+\node[cur] (jpy) at (330:4.0cm) {JPY};
+% Diagonals are drawn as two collinear halves meeting at the chord midpoints
+% (150:2.0cm) and (30:2.0cm) so neither edge sweeps across the centre box.
+\draw[seg] (eur) -- node[pos=1, left=5pt, font=\small]{$E_{\mathrm{EUR/USD}}$} (150:2.0cm);
+\draw[arr] (150:2.0cm) -- (usd);
 \draw[arr] (usd) -- node[below=5pt, font=\small]{$E_{\mathrm{USD/JPY}}$} (jpy);
-\draw[arr] (jpy) -- node[right=5pt, font=\small]{$E_{\mathrm{JPY/EUR}}$} (eur);
+\draw[seg] (jpy) -- node[pos=1, right=5pt, font=\small]{$E_{\mathrm{JPY/EUR}}$} (30:2.0cm);
+\draw[arr] (30:2.0cm) -- (eur);
 \node[draw, rounded corners=3pt, fill=red!8, font=\footnotesize, align=center,
-  inner sep=6pt] at (0,0)
+  inner sep=4pt] at (0,0)
   {Arbitrage when\\[2pt]
    $E_{\mathrm{EUR/USD}}$\\[-2pt]$\times\;E_{\mathrm{USD/JPY}}$\\[-2pt]$\times\;E_{\mathrm{JPY/EUR}}\neq 1$};
 \end{tikzpicture}

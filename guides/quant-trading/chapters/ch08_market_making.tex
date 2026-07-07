@@ -435,10 +435,12 @@ on this private mid, not on the market mid.
 \fill[black!50] (-0.6,0) circle (3pt);
 \fill[gray!50]  ( 0.0,0) circle (2pt);
 \fill[red!70]   ( 2.4,0) circle (3pt);
-% Labels above
+% Labels above (reservation-price label raised to its own row,
+% with a leader line, so it clears the Mid label)
 \node[above=6pt, font=\small, blue!80]  at (-2.4,0) {Bid $r-\delta^b$};
-\node[above=6pt, font=\small, black!60] at (-0.6,0)
-    {\shortstack{Reservation\\price $r$}};
+\draw[black!40, thin] (-0.6,0.12) -- (-0.6,0.62);
+\node[above=22pt, font=\small, black!60] at (-0.6,0)
+    {Reservation price $r$};
 \node[above=6pt, font=\small, gray]     at ( 0.0,0) {Mid $s$};
 \node[above=6pt, font=\small, red!80]   at ( 2.4,0) {Ask $r+\delta^a$};
 % Braces below
@@ -448,9 +450,9 @@ on this private mid, not on the market mid.
 \draw[decorate, decoration={brace, mirror, amplitude=6pt}]
     (0,-0.15) -- (2.4,-0.15)
     node[midway, below=8pt, font=\footnotesize]{$\delta^a$};
-\draw[decorate, decoration={brace, amplitude=6pt}]
-    (-2.4,0.15) -- (2.4,0.15)
-    node[midway, above=12pt, font=\footnotesize]{spread $\delta^a+\delta^b$};
+\draw[decorate, decoration={brace, mirror, amplitude=6pt}]
+    (-2.4,-0.95) -- (2.4,-0.95)
+    node[midway, below=10pt, font=\footnotesize]{spread $\delta^a+\delta^b$};
 \end{tikzpicture}
 \caption{Avellaneda--Stoikov quoting structure. The maker posts bid at
 $r - \delta^b$ and ask at $r + \delta^a$, where $r$ is the
