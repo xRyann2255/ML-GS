@@ -237,3 +237,26 @@ Each step has a clear scientific question and is independently reportable.
 - Re-score open-source DCRNN-HAR / GSP-HAR forecasts under Patton-QLIKE with DM (the horizon-conflict arbiter).
 
 ---
+
+## 2026-07-07 -- Planning the GNN build against the real codebase (second session)
+
+**Question explored:** What does it actually take to put the chapter's whole GNN roster into ml-vol-estimator -- and what does the fresh GS snapshot already contain that the plans must extend rather than rebuild?
+
+**What we found:**
+- The codebase is further along than assumed: `models/gnn.py` is a full 2-layer GATv2 (QLIKE loss in log-RV space, early stopping, bf16 autocast, mega-batch-on-GPU optimization, attention extraction) with a correlation-threshold adjacency builder and a ran experiment (trial_068). But it is reachable ONLY through `feature_stack` into XGBoost -- there is no standalone `requires_graph` dispatch in `run_pooled`, so a GNN cannot be a tournament entry, join the MCS, or be DM-tested as a model. That one missing path is the single highest-leverage piece of infrastructure (Plan 02).
+- Every 8-GPU pattern needed already exists for other model families: fold-per-GPU `ProcessPoolExecutor(spawn)` with `cuda:{fold % n_gpus}` pinning (XGBoost + LSTM paths), multi-GPU Optuna via JournalStorage with per-GPU workers and `tuning_epoch` -> per-GPU Rich bars (`lstm_tuning.py`), and the strip-callbacks/queue-poster invariants for cross-process progress. The GNN GPU plan is a generalization exercise, not an invention exercise.
+- `PanelExpandingWindowCV` splits on unique dates (all symbols of a date share a fold) -- exactly the property graph snapshots need; the pooled MultiIndex panel and `forward_log_rv` target slot into the graph-dict contract with a thin bridge.
+- The Copilot workflow has evolved past the old handoff-file prompt style: the current contract is inline YAML context packets (`policy/subagent_protocol.md`: goal/file_scope/write_scope/acceptance_criteria/constraints/context_summary/depends_on) with a structured return contract, model pinning, `./vol`-only execution, and a TDD hard gate in `.github/copilot-instructions.md`. Plans written against the old format would have been rejected by the repo's own policy files.
+- `torch-geometric>=2.4` is already a declared optional extra; GLASSO needs only sklearn, DY needs only statsmodels (both core deps) -- the entire 10-plan program adds zero new dependencies (torch-geometric-temporal deliberately avoided; diffusion convolution is ~40 lines dense at N<=34).
+
+**What surprised us:**
+- `regime_blend`, `blend`, and `stacking` model classes already exist in the registry -- the regime-fusion plan had to be scoped as extension, not creation, which the exploration only caught because the registry map listed every `@register_model` name.
+- statsmodels' `fevd()` is orthogonalized (Cholesky, order-dependent), not the generalized FEVD the DY literature uses -- the existing `compute_dy_spillover` in `features/cross_asset.py` inherits that subtlety. The plan implements generalized FEVD manually with hand-computed bivariate VAR(1) gold values (theta = [[0.868, 0.132],[0.038, 0.962]], total spillover 8.53%).
+- The clean PIT recipe for filtered regime probabilities needs TWO disciplines, not one: filtered-not-smoothed AND frozen-parameter forward filtering (`MarkovRegression(extended).filter(old_params)`) -- in-window filtered probabilities still leak parameter information estimated on later dates. No paper in the briefs states the second discipline explicitly.
+
+**Open threads:**
+- Execute Plan 01 on the GS machine; the trial_080 gate (GHAR x identity/full/glasso/dy) decides how much of Plans 04-07 runs as science vs replication.
+- Does `ghar_identity` == `har` hold to a basis point in the real harness? (Built-in sanity check of the whole Plan 01-03 stack; if not, hunt the node-feature or Duan asymmetry bug before interpreting anything.)
+- Wall-clock reality of `refit_every: 1` DY graphs (~2,800 VAR fits) for DCRNN-HAR -- fallback to refit_every: 5 documented if prohibitive.
+
+---
