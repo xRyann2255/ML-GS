@@ -1,0 +1,1104 @@
+% ══════════════════════════════════════════════════════════════
+% Chapter 16 -- Graph Neural Networks for Volatility
+% ══════════════════════════════════════════════════════════════
+
+\chapter{Graph Neural Networks for Volatility}\label{ch:gnn}
+
+\begin{application}[Where This Chapter Fits]
+This is the deep treatment that three earlier passages promised: the graph-transformer preview in Section~\ref{sec:dl:transformers}, the two-page survey in Section~\ref{sec:multivariate:graph}, and the hand-crafted spillover features that closed Chapter~\ref{ch:spillovers}. The first half teaches graph neural networks from zero, following the celebrated Distill tutorial of \citet{SanchezLengeling2021}; the second half covers everything the 2022--2026 literature knows about GNNs for realized volatility, ending with a build order for the project.
+\end{application}
+
+\begin{prereq}[What You Need]
+\begin{itemize}[nosep]
+  \item Neural network basics: layers, activations, backpropagation, and the attention mechanism of Section~\ref{sec:dl:transformers} (Eq.~\ref{eq:attention}).
+  \item The HAR model and its lag structure (Chapter~\ref{ch:har}).
+  \item Realized covariance and HAR-DRD (Chapter~\ref{ch:multivariate}).
+  \item Diebold--Yilmaz spillover matrices (Section~\ref{sec:dy-spillover}).
+  \item $\QLIKE$, Diebold--Mariano tests, and the Model Confidence Set (referenced throughout; full treatment in the evaluation chapter).
+\end{itemize}
+\end{prereq}
+
+% ──────────────────────────────────────────────────────────────
+\section{The Market as a Graph}\label{sec:gnn:market-graph}
+% ──────────────────────────────────────────────────────────────
+
+Suppose crude oil crashed 8\% yesterday and bank credit spreads gapped wider, while the S\&P~500 itself barely moved. Your HAR model, which sees only SPX's own history, forecasts a quiet week. Should you believe it?
+
+Every model in this book so far answers that question with some version of ``look harder at SPX's own past.'' Chapter~\ref{ch:spillovers} gave the first structured alternative: volatility \emph{travels} between markets, and the Diebold--Yilmaz decomposition measures how much. But measuring a network and \emph{learning on} a network are different things. The DY spillover index compresses the whole web of cross-asset linkages into a handful of summary numbers, then hands those numbers to a model that still treats each asset in isolation. This chapter takes the last step: we keep the network intact and give the forecasting model direct access to it.
+
+The data structure that holds ``entities plus their linkages'' is a \textbf{graph}. A graph $G$ consists of a set of \textbf{nodes} (also called vertices), a set of \textbf{edges} connecting pairs of nodes, and, in the general form we adopt from \citet{Battaglia2018}, a \textbf{global attribute} describing the graph as a whole. Each piece can carry information:
+
+\begin{itemize}[nosep]
+  \item \textbf{Node attributes}: a feature vector attached to each node. For us: each asset's daily, weekly, and monthly $\RV$ lags, its implied volatility, its jump measures, everything Chapter~\ref{ch:features} built per asset.
+  \item \textbf{Edge attributes}: a scalar or vector attached to each connection. For us: the strength of the spillover channel between two assets, a realized correlation, or a DY directional share.
+  \item \textbf{Global attributes}: one vector for the whole graph. For us: market-wide state such as the VIX level or aggregate realized volatility.
+\end{itemize}
+
+Edges may be \textbf{directed} (information flows from a \emph{sender} node to a \emph{receiver} node) or \textbf{undirected} (flows both ways). The distinction matters for volatility: Chapter~\ref{ch:spillovers} showed that spillovers are asymmetric, with equities transmitting more than they receive during stress. An undirected edge is just a pair of directed edges, one in each direction, so directed graphs are the general case \citep{SanchezLengeling2021}.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth,
+  asset/.style={circle, draw, thick, minimum size=1.05cm, font=\footnotesize, align=center},
+  gbox/.style={draw, rounded corners, thick, fill=memgold!10, font=\small, align=center, inner sep=5pt}]
+  % Equity cluster
+  \node[asset, fill=defblue!20]  (spx) at (0,0)    {SPX};
+  \node[asset, fill=defblue!20]  (ndx) at (2.2,0.9)  {NDX};
+  % Rates / credit
+  \node[asset, fill=prereqpurple!20] (ty)  at (4.8,0.6)  {10Y};
+  \node[asset, fill=prereqpurple!20] (cdx) at (6.6,-0.5) {CDX};
+  % Commodities / FX
+  \node[asset, fill=warnred!20]  (clo) at (1.2,-2.2) {Oil};
+  \node[asset, fill=warnred!20]  (gld) at (3.6,-2.6) {Gold};
+  \node[asset, fill=intgreen!20] (dxy) at (5.6,-2.2) {USD};
+  % Directed edges with weights
+  \draw[arrow, defblue]  (ndx) to[bend right=12] node[above, font=\scriptsize, pos=0.45] {$0.41$} (spx);
+  \draw[arrow, gray!70]  (spx) to[bend right=12] node[below, font=\scriptsize, pos=0.55] {$0.22$} (ndx);
+  \draw[arrow, warnred, thick]  (clo) -- node[left, font=\scriptsize] {$0.31$} (spx);
+  \draw[arrow, gray!60]  (ty) -- node[above, font=\scriptsize] {$0.18$} (ndx);
+  \draw[arrow, prereqpurple] (cdx) -- node[above, font=\scriptsize, sloped] {$0.27$} (ty);
+  \draw[arrow, gray!60]  (dxy) -- node[below, font=\scriptsize, sloped] {$0.12$} (gld);
+  \draw[arrow, gray!60]  (clo) -- node[below, font=\scriptsize] {$0.15$} (gld);
+  \draw[arrow, prereqpurple!70] (cdx) to[bend left=18] node[below right, font=\scriptsize] {$0.24$} (spx);
+  % Node feature callout
+  \node[draw, rounded corners, fill=defblue!5, font=\scriptsize, align=left, anchor=west] (feat) at (-3.6,-0.9)
+    {node attributes:\\ $\RV^{(d)},\RV^{(w)},\RV^{(m)}$,\\ $\IVol$, jumps, \ldots};
+  \draw[arrow, dashed, gray] (feat.east) -- (spx.west);
+  % Global attribute
+  \node[gbox] (glob) at (7.6,1.4) {global attribute $\mathbf{u}$:\\ VIX, regime state};
+  \draw[dashed, gray] (glob.south) -- (cdx.north east);
+  \draw[dashed, gray] (glob.west) -- (ty.north);
+  % Edge callout
+  \node[font=\scriptsize, gray, align=center] at (1.0,-3.4) {edge attribute: spillover strength\\ (directed: sender $\to$ receiver)};
+\end{tikzpicture}
+\caption{A slice of the project's cross-asset universe as a directed, attributed graph. Nodes are assets grouped by class (equity, rates/credit, commodities, FX), each carrying a feature vector of volatility measures; directed edges carry spillover strengths (illustrative numbers); a global attribute holds market-wide state shared by every node. Forecasting SPX's next-day $\RV$ is a prediction about one node of this graph.}
+\label{fig:gnn:market-graph}
+\end{figure}
+
+\Cref{fig:gnn:market-graph} draws a slice of the project's universe this way. Nothing about the picture is new: Chapter~\ref{ch:multivariate} drew asset graphs from correlations (\Cref{fig:asset-graph}) and Chapter~\ref{ch:spillovers} visualized DY networks. What is new is the question we now ask: \emph{can a neural network consume this entire object, attributes and wiring together, and produce a better forecast for each node?}
+
+\subsection{You Already Know Three Graph Models}
+
+Before graphs feel exotic, notice that every architecture from Chapter~\ref{ch:deeplearning} is secretly a graph model with the wiring frozen in advance \citep{SanchezLengeling2021}:
+
+\begin{itemize}[nosep]
+  \item \textbf{Images as graphs.} Each pixel is a node connected to its eight neighbors. A convolution aggregates a node's neighborhood, which is exactly what a graph layer does; the only difference is that an image's neighborhood structure is identical everywhere, so the network never needs to be told the wiring.
+  \item \textbf{Text as graphs.} A token sequence is a directed chain graph: each token connects to the token that follows it. An RNN walks this chain.
+  \item \textbf{Transformers as graphs.} Self-attention lets every token attend to every other token, which is a \emph{fully-connected} graph over tokens where the model learns how much each connection matters. We will make this precise in \Cref{sec:gnn:attention}.
+\end{itemize}
+
+\citet{Battaglia2018} organize this observation into a taxonomy of \textbf{relational inductive biases}: the assumptions about entity-to-entity structure that each architecture hard-codes (their Table~1, p.~6). The last column lists each architecture's \textbf{invariance}, the transformation of the input that provably does not change what the model computes: shift an image and a CNN's features shift with it; relabel a graph's nodes and a graph network's outputs relabel identically, a property we will define precisely in \Cref{sec:gnn:representation} and lean on for the rest of the chapter.
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Component & Entities & Relations & Invariance \\
+\midrule
+Fully connected & units & all-to-all & none \\
+Convolutional & grid elements & local & spatial translation \\
+Recurrent & timesteps & sequential & time translation \\
+Graph network & nodes & edges & node, edge permutations \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{intuition}[In Plain English]
+A CNN assumes ``nearby pixels matter''; an RNN assumes ``yesterday matters''; both bake the relationship structure into the architecture. A graph network makes the structure an \emph{input}: you hand it the wiring diagram along with the data. That is precisely what we want for markets, where the wiring (which asset moves which) is not a grid, not a sequence, and not the same in calm and crisis.
+\end{intuition}
+
+\begin{projectconnection}
+The last row of the table is the pitch for this chapter. A pooled LSTM over 34 stacked asset series (Chapter~\ref{ch:deeplearning}) imposes an arbitrary ordering of assets and learns nothing about which pairs interact. A graph network is \textbf{permutation invariant} over assets, so the forecast for SPX cannot depend on whether oil is column 7 or column 23 of the feature matrix, and the estimated spillover structure from Chapter~\ref{ch:spillovers} becomes a first-class model input rather than a hand-crafted feature.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{Three Prediction Tasks on Graphs}\label{sec:gnn:tasks}
+% ──────────────────────────────────────────────────────────────
+
+Graph prediction problems come in three granularities, distinguished by \emph{where the label lives} \citep{SanchezLengeling2021}. Keeping them apart matters because the same network body supports all three; only the prediction head changes.
+
+\begin{description}[nosep]
+  \item[Node-level tasks] predict a property for each node. The canonical machine-learning example is Zachary's karate club, a 34-member social network split by a feud, where the task is to predict each member's allegiance. In our world: \emph{predict next-day $\RV$ for every asset in the universe}. This is the project's task, and, in a pleasant coincidence, our universe has the same number of nodes as the karate club.
+  \item[Edge-level tasks] predict a property of each connection: does asset $i$ spill volatility into asset $j$, and how strongly? Formally this is what GLASSO or transfer-entropy estimation does when it builds the graph (Section~\ref{sec:gnn:graph-construction}); a GNN can also learn it end to end.
+  \item[Graph-level tasks] predict one property of the whole graph. The classic example is molecular property prediction (does this molecule smell pungent?). In our world: is the market in a calm or turbulent regime, or what will \emph{aggregate} market volatility be tomorrow?
+\end{description}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth, scale=0.92, transform shape,
+  asset/.style={circle, draw, thick, minimum size=0.75cm, font=\scriptsize},
+  lab/.style={font=\small\bfseries, align=center}]
+  % Panel 1: node-level
+  \begin{scope}[xshift=0cm]
+    \node[lab] at (1.1,2.1) {Node-level:\\ per-asset $\widehat{\RV}$};
+    \node[asset, fill=keyorange!50] (a1) at (0,0) {SPX};
+    \node[asset, fill=gray!15] (b1) at (1.6,0.9) {NDX};
+    \node[asset, fill=gray!15] (c1) at (2.2,-0.6) {Oil};
+    \draw[thick, gray] (a1)--(b1); \draw[thick, gray] (a1)--(c1); \draw[thick, gray!50] (b1)--(c1);
+    \node[font=\scriptsize, keyorange] at (0,-1.0) {predict here};
+  \end{scope}
+  % Panel 2: edge-level
+  \begin{scope}[xshift=4.9cm]
+    \node[lab] at (1.1,2.1) {Edge-level:\\ spillover strength};
+    \node[asset, fill=gray!15] (a2) at (0,0) {SPX};
+    \node[asset, fill=gray!15] (b2) at (1.6,0.9) {NDX};
+    \node[asset, fill=gray!15] (c2) at (2.2,-0.6) {Oil};
+    \draw[line width=2pt, keyorange] (a2)--(c2) node[midway, below left, font=\scriptsize, keyorange] {?};
+    \draw[thick, gray] (a2)--(b2); \draw[thick, gray!50] (b2)--(c2);
+  \end{scope}
+  % Panel 3: graph-level
+  \begin{scope}[xshift=9.8cm]
+    \node[lab] at (1.1,2.1) {Graph-level:\\ market regime};
+    \node[asset, fill=gray!15] (a3) at (0,0) {SPX};
+    \node[asset, fill=gray!15] (b3) at (1.6,0.9) {NDX};
+    \node[asset, fill=gray!15] (c3) at (2.2,-0.6) {Oil};
+    \draw[thick, gray] (a3)--(b3); \draw[thick, gray] (a3)--(c3); \draw[thick, gray!50] (b3)--(c3);
+    \node[draw, dashed, keyorange, rounded corners, fit={(a3) (b3) (c3)}, inner sep=7pt] {};
+    \node[font=\scriptsize, keyorange] at (1.1,-1.35) {one label for the whole graph};
+  \end{scope}
+\end{tikzpicture}
+\caption{One market graph, three prediction granularities. The project's estimator is a node-level regression (left); estimating who spills into whom is edge-level (middle); regime detection is graph-level (right). The same GNN body serves all three, with different heads.}
+\label{fig:gnn:tasks}
+\end{figure}
+
+\begin{projectconnection}
+The project needs two of the three levels at once: the vol estimator is a \emph{node-level regression} (SPX's node output is the deliverable), while a regime detector is a \emph{graph-level} prediction. The global attribute $\mathbf{u}$ from \Cref{sec:gnn:market-graph} is where a graph-level regime signal naturally lives, which is exactly how we will wire regime information into the model in \Cref{sec:gnn:hybrids}.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{Representing Graphs for Neural Networks}\label{sec:gnn:representation}
+% ──────────────────────────────────────────────────────────────
+
+A graph carries up to four kinds of information: node attributes, edge attributes, the global attribute, and the \textbf{connectivity} (which nodes are wired to which). The first three are easy to hand to a neural network: stack the node vectors into a matrix, the edge vectors into another, and keep one global vector. Connectivity is the awkward one \citep{SanchezLengeling2021}.
+
+\subsection{The Adjacency Matrix and Its Two Problems}
+
+The textbook encoding of connectivity is the \textbf{adjacency matrix} $\mathbf{A} \in \R^{N \times N}$ for $N$ nodes: entry $A_{ij} \neq 0$ records an edge from node $j$ to node $i$, with the value carrying the edge weight. Chapter~\ref{ch:multivariate} used exactly this object (there written $W$) for its correlation graphs; from here on we reserve $\bW$ for learnable weight matrices and always write the adjacency as $\mathbf{A}$.
+
+The adjacency matrix has two problems as a neural-network input. First, \textbf{sparsity}: for a large graph, $N^2$ entries mostly record the absence of edges, which wastes memory and computation. Real systems store an \textbf{adjacency list}, the set of (sender, receiver) index pairs, which costs only as much as there are edges. At our scale ($N \approx 34$) this hardly matters, but it explains the data structures you will meet in every GNN library.
+
+Second, and fatally for a naive approach: \textbf{permutation dependence}. Node order is arbitrary. Relabel the assets and you get a different matrix describing the \emph{same} market. \Cref{fig:gnn:permutation} shows a four-node graph and two of its adjacency matrices; there are up to $N!$ of them, and nothing distinguishes one as canonical.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth, scale=0.95, transform shape,
+  asset/.style={circle, draw, thick, minimum size=0.7cm, font=\scriptsize, fill=defblue!15}]
+  % The graph
+  \begin{scope}
+    \node[asset] (s) at (0,1.5) {SPX};
+    \node[asset] (n) at (1.7,1.5) {NDX};
+    \node[asset] (o) at (0,0) {Oil};
+    \node[asset] (g) at (1.7,0) {Gold};
+    \draw[thick] (s)--(n); \draw[thick] (s)--(o); \draw[thick] (o)--(g);
+    \node[font=\small\bfseries] at (0.85,2.35) {one graph};
+  \end{scope}
+  % Matrix ordering 1
+  \begin{scope}[xshift=4.6cm, yshift=1.9cm]
+    \node[font=\small, anchor=west] at (-0.4,0.5) {order: SPX, NDX, Oil, Gold};
+    \node[anchor=north west, font=\footnotesize] at (0,0) {$\begin{pmatrix} 0&1&1&0\\ 1&0&0&0\\ 1&0&0&1\\ 0&0&1&0 \end{pmatrix}$};
+  \end{scope}
+  % Matrix ordering 2
+  \begin{scope}[xshift=9.4cm, yshift=1.9cm]
+    \node[font=\small, anchor=west] at (-0.4,0.5) {order: Gold, Oil, NDX, SPX};
+    \node[anchor=north west, font=\footnotesize] at (0,0) {$\begin{pmatrix} 0&1&0&0\\ 1&0&0&1\\ 0&0&0&1\\ 0&1&1&0 \end{pmatrix}$};
+  \end{scope}
+  \node[font=\small, gray, align=center] at (7.0,-0.9) {same market, different matrices};
+\end{tikzpicture}
+\caption{Permutation dependence of the adjacency matrix. Reordering the four assets produces a different matrix for the same graph. Any model whose output changes under such reorderings is fitting an accident of data layout.}
+\label{fig:gnn:permutation}
+\end{figure}
+
+Why not just flatten $\mathbf{A}$ and the features into one long vector and use an MLP? Because the MLP's output would change under relabeling: it would be free to learn ``column 7 predicts column 1,'' which is a statement about our spreadsheet, not about oil and SPX. A usable graph model must be \textbf{permutation invariant}: reorder the nodes at the input and the per-node outputs reorder the same way, nothing else changes. This single requirement drives essentially all GNN design \citep{SanchezLengeling2021, Battaglia2018}.
+
+\subsection{Matrix Multiplication Is Already Message Passing}\label{sec:gnn:matmul}
+
+Here is the observation that makes everything that follows concrete. We want a single operation that, for every asset at once, collects the features of that asset's neighbors. Take the node feature matrix $\bX \in \R^{N \times d}$ (one row per asset, one column per feature) and simply multiply:
+\begin{equation}\label{eq:gnn:ax}
+  \mathbf{B} \;=\; \mathbf{A}\,\bX,
+  \qquad
+  B_{i\cdot} \;=\; \sum_{j:\,A_{ij}\neq 0} A_{ij}\, X_{j\cdot}.
+\end{equation}
+where:
+\begin{itemize}[nosep]
+  \item $\mathbf{A} \in \R^{N \times N}$: the adjacency matrix (weighted or binary).
+  \item $\bX \in \R^{N \times d}$: node features; row $X_{j\cdot}$ is asset $j$'s feature vector.
+  \item $\mathbf{B} \in \R^{N \times d}$: row $i$ is the \emph{weighted sum of asset $i$'s neighbors' features}.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+One matrix multiplication by the adjacency makes every asset ``listen'' to its neighbors simultaneously: each row of the result is that asset's neighborhood, added up with edge weights. No loops, no per-asset code, and the result respects the graph because only wired pairs contribute.
+\end{intuition}
+
+Two consequences follow immediately. First, powers of the adjacency reach further \citep{SanchezLengeling2021}: $(\mathbf{A}^2)_{ij}$ counts (weighted) walks of length two from $j$ to $i$, so $\mathbf{A}^2\bX$ gathers neighbors-of-neighbors, and $\mathbf{A}^k\bX$ gathers the $k$-hop neighborhood. Stacking graph layers will do exactly this. Second, the operation is permutation \emph{equivariant}, the sibling of invariance: an \emph{invariant} output (say, a whole-market forecast) does not change at all when assets are relabeled, while an \emph{equivariant} output (per-asset forecasts) relabels in exactly the same way as the input, so that each asset still gets its own answer. Relabel the assets and the rows of $\mathbf{B}$ relabel identically; the graph, not the ordering, determines the answer.
+
+\begin{workedexample}{One Hop of Spillover, by Hand}
+Three assets: SPX, Oil, Banks. Yesterday's feature is a single number, the daily $\RV$ (in daily variance units $\times 10^4$): $\bX = (1.0,\; 9.0,\; 4.0)^\top$, a calm SPX, a crashing oil market, stressed banks. The estimated spillover graph says oil and banks both feed SPX, oil feeds banks, and nothing feeds back:
+\[
+\mathbf{A} =
+\begin{pmatrix}
+0 & 0.3 & 0.5 \\
+0 & 0 & 0 \\
+0 & 0.4 & 0
+\end{pmatrix},
+\qquad
+\mathbf{A}\bX =
+\begin{pmatrix}
+0.3 \times 9.0 + 0.5 \times 4.0 \\
+0 \\
+0.4 \times 9.0
+\end{pmatrix}
+=
+\begin{pmatrix}
+4.7 \\
+0 \\
+3.6
+\end{pmatrix}.
+\]
+SPX's own history says ``calm'' ($\RV = 1.0$), but its aggregated neighborhood says ``incoming stress'' ($4.7$). A model with access to both numbers can forecast the vol spike that a univariate HAR must wait a day to see. Note also what the zero row means: oil receives nothing because no edges point into it; direction matters.
+\end{workedexample}
+
+\begin{projectconnection}
+Equation~\eqref{eq:gnn:ax} is not a toy: the GHAR model that anchors \Cref{sec:gnn:gnnhar} augments each HAR regression with exactly the terms $(\mathbf{A}\,\RV_t)_i$, a linear one-hop neighborhood aggregate. When we say ``one graph layer,'' at bottom we mean this multiplication, possibly wrapped in learned weights and a nonlinearity. If you understand \eqref{eq:gnn:ax}, the rest of the chapter is variations.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{Building a GNN: From Per-Node MLPs to Message Passing}\label{sec:gnn:building}
+% ──────────────────────────────────────────────────────────────
+
+We now assemble a graph neural network the way \citet{SanchezLengeling2021} do: start with the simplest thing that deserves the name, notice what it cannot do, and add one capability at a time. By the end of the section you will have every ingredient the volatility literature uses.
+
+A \textbf{graph neural network (GNN)} is an optimizable transformation on all attributes of a graph (nodes, edges, global) that preserves the graph's symmetries, i.e.\ permutation invariance. GNNs are \emph{graph-in, graph-out}: the input is a graph with feature vectors loaded into its parts; the output is the same graph, same wiring, with \emph{updated} feature vectors, now called \textbf{embeddings}. Prediction heads read the final embeddings.
+
+\subsection{The Simplest GNN Layer}\label{sec:gnn:simplest}
+
+The minimal GNN layer applies a separate small MLP to each kind of attribute: one network transforms every node vector, another every edge vector, a third the global vector. Connectivity is not used at all inside the layer.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth,
+  lane/.style={draw, rounded corners, minimum width=1.7cm, minimum height=0.75cm, align=center, font=\small},
+  mlp/.style={draw, rounded corners, fill=keyorange!15, minimum width=1.6cm, minimum height=0.7cm, align=center, font=\small}]
+  % input graph column
+  \node[lane, fill=defblue!10]  (v0) at (0,1.6)  {nodes $\mathbf{V}$};
+  \node[lane, fill=intgreen!10] (e0) at (0,0.4)  {edges $\mathbf{E}$};
+  \node[lane, fill=memgold!15]  (u0) at (0,-0.8) {global $\mathbf{u}$};
+  % MLPs
+  \node[mlp] (fv) at (3.1,1.6)  {$\text{MLP}_V$};
+  \node[mlp] (fe) at (3.1,0.4)  {$\text{MLP}_E$};
+  \node[mlp] (fu) at (3.1,-0.8) {$\text{MLP}_u$};
+  % output column
+  \node[lane, fill=defblue!10]  (v1) at (6.2,1.6)  {nodes $\mathbf{V}'$};
+  \node[lane, fill=intgreen!10] (e1) at (6.2,0.4)  {edges $\mathbf{E}'$};
+  \node[lane, fill=memgold!15]  (u1) at (6.2,-0.8) {global $\mathbf{u}'$};
+  % arrows
+  \draw[arrow] (v0) -- (fv); \draw[arrow] (fv) -- (v1);
+  \draw[arrow] (e0) -- (fe); \draw[arrow] (fe) -- (e1);
+  \draw[arrow] (u0) -- (fu); \draw[arrow] (fu) -- (u1);
+  % connectivity note
+  \node[font=\scriptsize, gray, align=center] at (3.1,-2.0) {connectivity passes through untouched};
+  \draw[thick, gray, dashed] (0,-1.55) -- node[below=8pt] {} (6.2,-1.55);
+\end{tikzpicture}
+\caption{The simplest GNN layer: independent MLPs update node, edge, and global attributes; the wiring is carried through unchanged. Each lane's MLP is shared across all items in that lane, which is what preserves permutation invariance.}
+\label{fig:gnn:simplest-layer}
+\end{figure}
+
+Two details carry all the weight. The MLPs are \emph{shared}: every node passes through the same $\text{MLP}_V$, so relabeling nodes relabels outputs and nothing more. And because the layer returns a graph, layers stack, just like any other deep network. What this layer lacks is communication: each asset is transformed in isolation, so it is really a per-asset MLP wearing a graph costume. Useful as a baseline; not yet a network model.
+
+\subsection{Pooling: Moving Information Between Parts}\label{sec:gnn:pooling}
+
+Prediction often needs information to move between attribute types. If you want a \emph{graph-level} regime label but only have node embeddings, you must collect the nodes into one vector. The operation is \textbf{pooling}: gather the relevant embeddings, then reduce them with an order-insensitive \textbf{aggregation} such as a sum or mean \citep{SanchezLengeling2021}. Order-insensitivity is not cosmetic: it is what keeps the whole pipeline permutation invariant (Section~\ref{sec:gnn:aggregation} returns to the choice of aggregator, which turns out to matter).
+
+The same trick routes information anywhere: edges to nodes, nodes to global, global to nodes. This flexibility is why missing attributes are never fatal in a GNN: if your dataset has edge weights but no node features, pool the incident edges to manufacture node inputs.
+
+\subsection{Message Passing}\label{sec:gnn:message-passing}
+
+The decisive upgrade lets the \emph{layer itself} use connectivity, so that embeddings become neighborhood-aware. \textbf{Message passing} works in three steps for every node, simultaneously \citep{SanchezLengeling2021}: gather each neighbor's embedding (the \emph{messages}), aggregate them with an order-insensitive reduction, and pass the result through a learned \textbf{update function} to produce the node's new embedding. That is \Cref{eq:gnn:ax} plus learnable pieces.
+
+\citet{Gilmer2017} showed that essentially every GNN in the literature is a choice of three functions in one template, the \textbf{message passing neural network (MPNN)}. We reproduce it exactly because it is the chapter's Rosetta stone: every architecture below is an entry in this template.
+
+The framework formalizes ``gather, aggregate, update, then read out a prediction'' over $T$ rounds:
+\begin{align}
+  m_v^{t+1} &= \sum_{w \in \mathcal{N}(v)} M_t\!\left(\bh_v^t,\, \bh_w^t,\, \mathbf{e}_{vw}\right) \label{eq:gnn:mpnn-message}\\
+  \bh_v^{t+1} &= U_t\!\left(\bh_v^t,\, m_v^{t+1}\right) \label{eq:gnn:mpnn-update}\\
+  \hat{y} &= R\!\left(\{\, \bh_v^T \mid v \in G \,\}\right) \label{eq:gnn:mpnn-readout}
+\end{align}
+where \citep[eqs.~1--3, p.~3]{Gilmer2017}:
+\begin{itemize}[nosep]
+  \item $\bh_v^t$: node $v$'s embedding after $t$ rounds, initialized to its raw features.
+  \item $\mathcal{N}(v)$: the neighbors of $v$ in the graph; $\mathbf{e}_{vw}$: the edge features between $v$ and $w$.
+  \item $M_t$: the \textbf{message function}, which decides what information a neighbor sends (it may use both endpoints' states and the edge attributes).
+  \item $U_t$: the \textbf{update function}, which merges the aggregated messages into the node's state.
+  \item $R$: the \textbf{readout}, which turns final embeddings into the prediction; it must be permutation invariant for the whole model to be.
+  \item $M_t$, $U_t$, $R$ are all learned, differentiable functions; $T$ is the number of message-passing rounds.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Each round of message passing is a rumor mill with learned manners: every asset composes a message for each neighbor (``here is my state, adjusted for our relationship''), every asset adds up what it hears, and then rewrites its own state in light of the gossip. After one round each asset knows its neighbors; after $T$ rounds it has heard, indirectly, from everything within $T$ hops.
+\end{intuition}
+
+\begin{projectconnection}
+The choice of $(M_t, U_t, R)$ is where volatility modeling decisions live, and every named model later in this chapter is a row in that design table. To preview three you will meet shortly: GHAR (\Cref{sec:gnn:ghar}) takes $M$ linear and $U$ trivial (a regression on the aggregate); GNNHAR (\Cref{sec:gnn:gnnhar-model}) makes $U$ a one-hidden-layer nonlinearity; GAT (\Cref{sec:gnn:attention}) makes $M$ attention-weighted. The readout $R$ for our node-level task is simply a per-node regression head with $\QLIKE$ loss. When you read any vol-GNN paper, your first move should be to identify its $(M, U, R)$; return to this box after \Cref{sec:gnn:gnnhar} and the sentence will read as a summary rather than a preview.
+\end{projectconnection}
+
+\subsection{The GCN Layer}\label{sec:gnn:gcn}
+
+The most widely used concrete message-passing layer is the \textbf{graph convolutional network (GCN)} of \citet{KipfWelling2017}. It fixes the message function to a degree-normalized copy of the neighbor's state and the update to a single learned linear map plus nonlinearity, all expressible in one matrix equation.
+
+We want a layer that averages each node's neighborhood (including itself), transforms the result with learned weights, and stays numerically stable when stacked:
+\begin{equation}\label{eq:gnn:gcn}
+  \mathbf{H}^{(l+1)} \;=\; \sigma\!\left( \tilde{\mathbf{D}}^{-\frac{1}{2}}\, \tilde{\mathbf{A}}\, \tilde{\mathbf{D}}^{-\frac{1}{2}}\, \mathbf{H}^{(l)}\, \bW^{(l)} \right)
+\end{equation}
+where \citep[eq.~2, p.~2]{KipfWelling2017}:
+\begin{itemize}[nosep]
+  \item $\mathbf{H}^{(l)} \in \R^{N \times d_l}$: the matrix of node embeddings at layer $l$, with $\mathbf{H}^{(0)} = \bX$.
+  \item $\tilde{\mathbf{A}} = \mathbf{A} + \mathbf{I}_N$: the adjacency with \textbf{self-loops} added, so each node's own state joins the average.
+  \item $\tilde{\mathbf{D}}$: the diagonal degree matrix of $\tilde{\mathbf{A}}$, $\tilde{D}_{ii} = \sum_j \tilde{A}_{ij}$; the symmetric sandwich $\tilde{\mathbf{D}}^{-1/2}\tilde{\mathbf{A}}\tilde{\mathbf{D}}^{-1/2}$ turns the raw sum of \Cref{eq:gnn:ax} into a degree-normalized average.
+  \item $\bW^{(l)}$: the layer's learned weight matrix; $\sigma$: an activation such as $\relu$.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+A GCN layer is \Cref{eq:gnn:ax} made trainable and polite: every asset averages its neighborhood (itself included, thanks to the self-loops), with popular, high-degree nodes damped so they do not shout over everyone; then a shared linear layer re-describes the average and a nonlinearity lets layers compose into something richer than one big average.
+\end{intuition}
+
+Three remarks anchor this equation to things you already know; none is needed to follow the rest of the chapter, so skim on first read. \emph{Why the self-loops and the normalization?} Repeatedly multiplying by a fixed matrix scales activations by that matrix's \textbf{eigenvalues}, the factors by which the operation stretches or shrinks along its natural directions; the un-normalized operator has eigenvalues up to 2, so stacked layers can double activations each time (or crush them toward zero), and the \textbf{renormalization trick} $\tilde{\mathbf{D}}^{-1/2}\tilde{\mathbf{A}}\tilde{\mathbf{D}}^{-1/2}$ exists precisely to tame this instability \citep[p.~3]{KipfWelling2017}. \emph{Where does the name ``convolutional'' come from?} Equation~\eqref{eq:gnn:gcn} is the endpoint of a derivation that defines convolutions in a graph's frequency (Fourier) domain, built on the \textbf{graph Laplacian}, a matrix derived from the adjacency that measures how bumpy a signal is across edges, and then truncates them to their cheapest approximation \citep[eqs.~3--8]{KipfWelling2017}. We will meet this spectral view concretely in GSP-HAR (\Cref{sec:gnn:gsp}). \emph{And as an MPNN?} The GCN is the template with message $M(\bh_v, \bh_w) = (\deg(v)\deg(w))^{-1/2} A_{vw}\, \bh_w$ and update $U(\cdot) = \relu(\bW\, m_v)$ \citep[p.~4]{Gilmer2017}: fixed structural weights, no learned per-pair importance. That last limitation is what attention will remove.
+
+\subsection{GraphSAGE: Sampling and the Inductive Setting}\label{sec:gnn:graphsage}
+
+One more classical layer earns a short stop. \textbf{GraphSAGE} \citep{Hamilton2017} modifies the GCN recipe in two ways: it \emph{concatenates} the node's own previous state with the neighborhood aggregate before the learned transform, a \textbf{skip connection}, meaning the layer keeps an untouched copy of its input alongside the transformed version instead of blending them away, which empirically ``leads to significant gains'' over averaging self and neighbors together \citep[p.~5]{Hamilton2017}; and it \emph{samples} a fixed-size subset of neighbors rather than using them all, so that web-scale graphs fit in memory. It also names an important distinction: a \textbf{transductive} model (like spectral methods tied to one graph's Laplacian eigenbasis) only works on the graph it was trained on, while an \textbf{inductive} model like GraphSAGE learns aggregator \emph{functions} that transfer to unseen nodes and graphs.
+
+\begin{projectconnection}
+Read GraphSAGE with our scale in mind. Neighborhood sampling is machinery for graphs with millions of nodes; at $N \approx 34$, full neighborhoods are free and sampling adds noise for nothing. The two ideas that do transfer: the concatenation skip (keep the asset's own history distinct from its neighborhood summary rather than blending them) and the inductive framing (an aggregator trained on one estimation window applies when the graph is re-estimated next month, or when a ticker enters the universe).
+\end{projectconnection}
+
+\subsection{Edge and Global Updates: The Full Graph Networks Block}\label{sec:gnn:gnblock}
+
+Everything so far updates node embeddings only. The general layer, the \textbf{graph networks (GN) block} of \citet{Battaglia2018}, updates all three attribute types in one pass, each conditioned on the others. This is the framework the Distill article's diagrams are drawn in, and the natural home for our global market-state vector.
+
+One block performs three updates ($\phi$, learned) interleaved with three aggregations ($\rho$, fixed and permutation invariant):
+\begin{equation}\label{eq:gnn:gnblock}
+\begin{aligned}
+  \mathbf{e}'_k &= \phi^e\!\left(\mathbf{e}_k,\, \mathbf{v}_{r_k},\, \mathbf{v}_{s_k},\, \mathbf{u}\right),
+  &\qquad \bar{\mathbf{e}}'_i &= \rho^{e \rightarrow v}\!\left(E'_i\right),\\
+  \mathbf{v}'_i &= \phi^v\!\left(\bar{\mathbf{e}}'_i,\, \mathbf{v}_i,\, \mathbf{u}\right),
+  &\qquad \bar{\mathbf{e}}' &= \rho^{e \rightarrow u}\!\left(E'\right),\\
+  \mathbf{u}' &= \phi^u\!\left(\bar{\mathbf{e}}',\, \bar{\mathbf{v}}',\, \mathbf{u}\right),
+  &\qquad \bar{\mathbf{v}}' &= \rho^{v \rightarrow u}\!\left(V'\right),
+\end{aligned}
+\end{equation}
+where \citep[eq.~1, p.~12]{Battaglia2018}:
+\begin{itemize}[nosep]
+  \item $\mathbf{e}_k$: the $k$-th edge's attribute, with $s_k$ and $r_k$ the indices of its \textbf{sender} and \textbf{receiver} nodes; $\mathbf{v}_i$: node $i$'s attribute; $\mathbf{u}$: the global attribute.
+  \item $\phi^e$, the \textbf{edge update}, refreshes each edge from its endpoints and the global state; $\phi^v$, the \textbf{node update}, refreshes each node from its aggregated incoming edges $\bar{\mathbf{e}}'_i$; $\phi^u$, the \textbf{global update}, refreshes $\mathbf{u}$ from everything. In practice each $\phi$ is an MLP on the concatenated inputs \citep[eq.~2, p.~15]{Battaglia2018}.
+  \item Watch the primes: $E'_i$ is only the updated edges arriving at node $i$; $E'$ is \emph{every} updated edge in the graph; $V'$ is every updated node. The $\rho$ functions (sums, means, maxima) collapse these variable-size sets into fixed-size vectors and must be permutation invariant.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+One GN block runs the market meeting in a fixed order: first every \emph{relationship} updates (each spillover channel looks at the two assets it connects and the market mood), then every \emph{asset} updates (digesting its refreshed incoming channels), then the \emph{market mood} itself updates (digesting all assets and channels). Edges, nodes, and the global state take turns being speaker and audience.
+\end{intuition}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth,
+  stage/.style={draw, rounded corners, minimum width=2.5cm, minimum height=0.95cm, align=center, font=\small},
+  agg/.style={circle, draw, thick, minimum size=0.55cm, font=\footnotesize, fill=gray!10}]
+  % three stages
+  \node[stage, fill=intgreen!12] (es) at (0,0) {edge update $\phi^e$\\ \scriptsize per spillover channel};
+  \node[agg] (rho1) at (2.85,0) {$\rho$};
+  \node[stage, fill=defblue!12] (vs) at (5.7,0) {node update $\phi^v$\\ \scriptsize per asset};
+  \node[agg] (rho2) at (8.45,0) {$\rho$};
+  \node[stage, fill=memgold!18] (us) at (11.1,0) {global update $\phi^u$\\ \scriptsize market state};
+  \draw[arrow] (es) -- (rho1);
+  \draw[arrow] (rho1) -- (vs);
+  \draw[arrow] (vs) -- (rho2);
+  \draw[arrow] (rho2) -- (us);
+  \node[font=\scriptsize, gray] at (2.85,0.62) {incoming edges};
+  \node[font=\scriptsize, gray] at (8.45,0.62) {all nodes, edges};
+  % conditioning arrows from u
+  \draw[arrow, dashed, gray] (us.north) .. controls (8.5,1.7) and (2.5,1.7) .. node[above, font=\scriptsize, pos=0.5] {$\mathbf{u}$ conditions every update in the \emph{next} block} (es.north);
+  % inputs below
+  \node[font=\scriptsize, gray, align=center] at (0,-1.35) {inputs: $\mathbf{e}_k$, endpoints\\ $\mathbf{v}_{s_k}, \mathbf{v}_{r_k}$, global $\mathbf{u}$};
+  \node[font=\scriptsize, gray, align=center] at (5.7,-1.35) {inputs: $\bar{\mathbf{e}}'_i$, own state $\mathbf{v}_i$,\\ global $\mathbf{u}$};
+  \node[font=\scriptsize, gray, align=center] at (11.1,-1.35) {inputs: $\bar{\mathbf{e}}'$, $\bar{\mathbf{v}}'$, old $\mathbf{u}$};
+\end{tikzpicture}
+\caption{One graph networks block \citep{Battaglia2018}: edges update first, aggregate into their receiver nodes, nodes update, everything aggregates into the global attribute, which updates last and conditions all updates in the next block. The $\rho$ aggregations (sum/mean/max) are the permutation-invariant joints of the machine.}
+\label{fig:gnn:message-passing}
+\end{figure}
+
+\begin{projectconnection}
+The GN block is the most general wiring we will need, and each specialization has a project meaning. Drop $\phi^e$ and $\phi^u$ and fix $\rho$ to a degree-normalized sum: you recover the GCN. Keep edge attributes as inputs but never update them: that is SpotV2Net's use of vol-of-vol edge features (\Cref{sec:gnn:frontiers}). The global lane $\mathbf{u}$ is where a regime probability or VIX state naturally enters so that \emph{every} asset's update is regime-conditioned; we exploit this in \Cref{sec:gnn:hybrids}.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{Attention on Graphs}\label{sec:gnn:attention}
+% ──────────────────────────────────────────────────────────────
+
+The GCN treats all neighbors alike up to degree normalization: oil's message to SPX gets the same structural weight on a calm Tuesday as mid-crash. But you already own the fix. Section~\ref{sec:dl:transformers} introduced attention as a learned, input-dependent weighting over positions; the \textbf{graph attention network (GAT)} of \citet{Velickovic2018GAT} is that same mechanism restricted, or \emph{masked}, to each node's graph neighborhood.
+
+We want each receiving asset to score how relevant each neighbor is right now, normalize the scores into weights, and average neighbor states with those weights. GAT does this in three steps:
+\begin{align}
+  e_{ij} &= \operatorname{LeakyReLU}\!\left(\mathbf{a}^\top \left[\bW\bh_i \,\Vert\, \bW\bh_j\right]\right) \label{eq:gnn:gat-score}\\[2pt]
+  \alpha_{ij} &= \frac{\exp(e_{ij})}{\sum_{k \in \mathcal{N}(i)} \exp(e_{ik})} \label{eq:gnn:gat-softmax}\\[2pt]
+  \bh'_i &= \sigma\!\Bigl(\sum_{j \in \mathcal{N}(i)} \alpha_{ij}\, \bW \bh_j\Bigr) \label{eq:gnn:gat-agg}
+\end{align}
+where \citep[eqs.~1--4, pp.~3--4]{Velickovic2018GAT}:
+\begin{itemize}[nosep]
+  \item $\bh_i \in \R^{F}$: node $i$'s current embedding; $\bW \in \R^{F' \times F}$: a shared linear map applied to every node before scoring.
+  \item $e_{ij}$: the \textbf{attention score}, the ``importance of node $j$'s features to node $i$,'' computed by a tiny one-layer network: concatenate ($\Vert$) the transformed pair, project onto a learned vector $\mathbf{a} \in \R^{2F'}$, apply a LeakyReLU.
+  \item $\alpha_{ij}$: the normalized \textbf{attention coefficient}; the softmax runs only over $i$'s neighborhood $\mathcal{N}(i)$ (which includes $i$ itself), so the weights on each node's inbox sum to one. This restriction is the \textbf{masked attention} that injects the graph structure.
+  \item $\bh'_i$: the new embedding, an attention-weighted average of transformed neighbors passed through a nonlinearity $\sigma$.
+\end{itemize}
+In practice $K$ independent attention heads run in parallel and their outputs are concatenated in hidden layers and averaged at the output layer \citep[eqs.~5--6, p.~4]{Velickovic2018GAT}, exactly the multi-head pattern of Section~\ref{sec:dl:transformers}.
+
+\begin{intuition}[In Plain English]
+A GCN gives every neighbor a fixed microphone volume set by the wiring; a GAT lets the listener adjust each volume knob based on what is being said. When oil is quiet, SPX can turn oil down; when oil is crashing, the same trained mechanism turns it up. The weights $\alpha_{ij}$ are recomputed from the current features every day, so the \emph{effective} graph changes with the state of the market even when the wiring is static.
+\end{intuition}
+
+\begin{workedexample}{Attention Weights, by Hand}
+SPX has three neighbors with (scalar, for simplicity) transformed states and learned scores already computed: $e_{\text{SPX,Oil}} = 2.0$, $e_{\text{SPX,NDX}} = 0.5$, $e_{\text{SPX,Gold}} = -1.0$. The softmax of \Cref{eq:gnn:gat-softmax} gives
+\[
+\alpha_{\text{Oil}} = \frac{e^{2.0}}{e^{2.0} + e^{0.5} + e^{-1.0}} = \frac{7.39}{7.39 + 1.65 + 0.37} \approx 0.79,
+\qquad
+\alpha_{\text{NDX}} \approx 0.18, \qquad \alpha_{\text{Gold}} \approx 0.04.
+\]
+A two-point raw-score gap becomes a four-to-one weight ratio: the exponential in the softmax makes attention decisive, not gently proportional. If tomorrow's features flip the scores, the weights flip with them; nothing about $0.79$ is baked into the model.
+\end{workedexample}
+
+\subsection{Transformers Are Fully-Connected GATs}\label{sec:gnn:transformers-gnn}
+
+Now the bridge promised in \Cref{sec:gnn:market-graph} can be stated exactly: a transformer is a GNN with an attention mechanism on a fully-connected graph; a GAT is a transformer whose attention is masked by the adjacency matrix \citep{SanchezLengeling2021}. The difference is the assumed connectivity, sparse versus complete, and that is a modeling choice, not a law. The graph-transformer approach previewed in Section~\ref{sec:dl:transformers} \citep{ChenRobert2022} sits at this junction: transformer-style attention run over a sparse, precomputed multi-relation graph rather than the complete one (details in \Cref{sec:gnn:frontiers}). Two practical GAT properties matter for us: it supports \emph{directed} graphs (simply omit $\alpha_{ij}$ when the edge $j \to i$ is absent), and its per-layer cost is on par with a GCN \citep[pp.~4--5]{Velickovic2018GAT}.
+
+\begin{keyidea}[Attention Weights as a Learned Spillover Matrix]
+Collect the coefficients $\alpha_{ij}$ into a matrix and you have a row-normalized, state-dependent, learned analogue of the Diebold--Yilmaz spillover table from Chapter~\ref{ch:spillovers}. This is the interpretability hook of graph attention: \citet{GongWangZhouXie2025} report (in a study of 18 markets) that attention-based interrelations differ systematically between tranquil and turbulent periods, and SpotV2Net reads its trained attention weights as time-varying co-movement importances (\Cref{sec:gnn:frontiers}). Treat the idea with care: attention weights are trained parameters that co-move with regimes, not identified causal spillovers, and the \citet{GongWangZhouXie2025} evidence is qualitative here because the paper's numbers sit behind a paywall.
+\end{keyidea}
+
+\begin{projectconnection}
+For the project, GAT is the natural upgrade path once a GCN-style layer works: same inputs, same one-hop structure, but state-dependent weights that can, in principle, deliver regime-varying spillovers without an explicit regime model. The honest caveat comes from the evidence discipline of \Cref{sec:gnn:skeptic}: no vol paper has yet shown, under $\QLIKE$ with significance tests, that the attention upgrade beats fixed weights. It is a hypothesis our data can test, not a settled result.
+\end{projectconnection}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth,
+  asset/.style={circle, draw, thick, minimum size=0.95cm, font=\scriptsize}]
+  % center node and neighbors
+  \node[asset, fill=defblue!25] (spx) at (0,0) {SPX};
+  \node[asset, fill=warnred!20] (oil) at (-2.6,1.5) {Oil};
+  \node[asset, fill=defblue!12] (ndx) at (2.6,1.5) {NDX};
+  \node[asset, fill=memgold!20] (gld) at (0,2.6) {Gold};
+  % attention arrows, thickness = weight
+  \draw[arrow, line width=2.6pt, keyorange] (oil) -- node[below left, font=\scriptsize, text=keyorange] {$\alpha = 0.79$} (spx);
+  \draw[arrow, line width=1.1pt, orange!70] (ndx) -- node[below right, font=\scriptsize, text=orange!80!black] {$\alpha = 0.18$} (spx);
+  \draw[arrow, line width=0.5pt, gray!60] (gld) -- node[right, font=\scriptsize, text=gray] {$\alpha = 0.04$} (spx);
+  % score computation box
+  \node[draw, rounded corners, fill=gray!6, font=\scriptsize, align=left, anchor=west] (box) at (4.2,0.2)
+    {per neighbor $j$:\\[2pt]
+     $e_{ij} = \operatorname{LeakyReLU}(\mathbf{a}^\top[\bW\bh_i \Vert \bW\bh_j])$\\[2pt]
+     $\alpha_{ij} = \softmax_j(e_{ij})$ over $\mathcal{N}(i)$};
+  \draw[arrow, dashed, gray] (box.west) -- (spx.east);
+  \node[font=\scriptsize, gray, align=center] at (0,-1.35) {arrow thickness $=$ attention weight};
+\end{tikzpicture}
+\caption{One GAT aggregation at the SPX node, using the worked example's numbers. Each incoming neighbor is scored against SPX's own state, scores are softmax-normalized over the neighborhood, and SPX's new embedding is the weighted average. Compare \Cref{fig:gnn:market-graph}: the wiring is the same; the weights are now learned and state-dependent.}
+\label{fig:gnn:gat}
+\end{figure}
+
+% ──────────────────────────────────────────────────────────────
+\section{Design Lessons: Depth, Aggregation, and Tiny Graphs}\label{sec:gnn:design}
+% ──────────────────────────────────────────────────────────────
+
+You now hold every architectural ingredient. Before the volatility literature, three design questions need answers, because the defaults from mainstream GNN practice are calibrated to graphs a million times larger than ours: how deep, which aggregator, and what actually drives performance.
+
+\subsection{What the Empirical Design Space Says}\label{sec:gnn:playground}
+
+\citet{SanchezLengeling2021} sweep architectures on a molecular benchmark and distill (their word) lessons that hold up remarkably well across the GNN literature. More parameters do correlate with better performance, but strong models already exist at very small sizes (a few thousand parameters): GNNs are parameter-efficient. Mean performance rises with embedding dimension and with depth, \emph{but} the best individual models are often small and shallow; in their sweep the top performers have two layers, not three or four, and the performance floor drops as depth grows. The clearest trend is not architectural at all: the more attribute types that exchange information (nodes, edges, global), the better the average model. Wiring beats size.
+
+\subsection{Aggregation Is Not a Detail}\label{sec:gnn:aggregation}
+
+Sum, mean, or max over the neighborhood messages? No aggregation is uniformly best: mean suits highly variable neighborhood sizes, max highlights single salient neighbors, sum preserves ``how many'' \citep{SanchezLengeling2021}. But there is a sharp theoretical ranking, and it needs three terms. A \textbf{multiset} is a collection where repeats count (three stressed neighbors is a different multiset from one, even if the values are identical); a function is \textbf{injective} if different inputs never produce the same output, so nothing gets squashed together; and the \textbf{Weisfeiler--Lehman (WL) test} is a classic pencil-and-paper procedure for telling two graphs apart by repeatedly relabeling nodes with summaries of their neighborhoods. \citet{XuHuLeskovecJegelka2019} prove that message-passing GNNs are at most as powerful as the WL test at distinguishing structures (their Lemma~2), that this ceiling is reached when aggregation and update are injective on the multiset of neighbor states (Theorem~3), and that among the standard choices only the \textbf{sum} is injective: mean recovers only the \emph{distribution} of neighbor states, forgetting how many there were (their Corollary~8), and max only the \emph{set} of distinct values, forgetting repeats entirely (Corollary~9). Their expressiveness ranking, sum $>$ mean $>$ max (their Fig.~2), comes with a constructive layer that attains the ceiling, the \textbf{graph isomorphism network (GIN)}:
+\begin{equation}\label{eq:gnn:gin}
+  \bh_v^{(k)} \;=\; \operatorname{MLP}^{(k)}\!\Bigl( \bigl(1 + \epsilon^{(k)}\bigr)\, \bh_v^{(k-1)} \;+\; \sum_{u \in \mathcal{N}(v)} \bh_u^{(k-1)} \Bigr)
+\end{equation}
+where \citep[eq.~4.1, p.~5]{XuHuLeskovecJegelka2019}:
+\begin{itemize}[nosep]
+  \item the plain (unnormalized) sum over neighbors preserves the full multiset of neighbor states;
+  \item $\epsilon^{(k)}$ is a small learned or fixed scalar keeping the node's own state distinguishable from its neighborhood;
+  \item the MLP (not a single linear-plus-ReLU layer, which Lemma~7 of the paper shows is insufficient) makes the update injective.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+If three of your neighbors are stressed, a sum knows it is three; a mean only knows ``stressed on average''; a max only knows ``at least one.'' For contagion-flavored questions, the count is information. GIN is the layer built so that no two genuinely different neighborhoods ever produce the same message.
+\end{intuition}
+
+\begin{projectconnection}
+For volatility the ranking is a prior, not a rule: when a crisis hits, the \emph{number} of stressed neighbors plausibly matters (sum), but degree-normalized means (GCN) have carried every published vol-GNN result so far, including GNNHAR. The practical lesson is cheaper: aggregation is a one-line hyperparameter, so ablate sum against mean on our data rather than assuming either.
+\end{projectconnection}
+
+\subsection{Over-Smoothing: Why Depth Backfires}\label{sec:gnn:oversmoothing}
+
+In most of deep learning, depth buys expressiveness. In GNNs it buys a specific failure. \citet{LiHanWu2018} show that the GCN's propagation step is a form of \textbf{Laplacian smoothing}: each layer replaces every node's features with a (degree-weighted) average over its neighborhood, which is why one or two layers \emph{help}, since nodes in the same cluster become similar and easier to model jointly. Their Theorem~1 gives the limit: on a connected, non-bipartite graph (and adding self-loops guarantees non-bipartite), repeatedly applying the smoothing operator drives \emph{all} node features to a common value, up to degree scaling; with $k$ connected components, features converge within each component. Stack enough graph layers and every asset's embedding becomes the same market-wide average. The differences between assets, which are the entire point of a cross-sectional model, are smoothed away. This is \textbf{over-smoothing}.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth,
+  nd/.style={circle, draw, thick, minimum size=0.62cm, inner sep=0pt, font=\tiny}]
+  % layer rows: colors converge
+  \foreach \l/\ya/\ca/\cb/\cc/\cd/\ce in {%
+    0/0/defblue!70/warnred!70/memgold!80/intgreen!70/prereqpurple!60,
+    1/-1.15/defblue!50/warnred!45/memgold!55/intgreen!45/prereqpurple!40,
+    2/-2.3/defblue!32/warnred!28/memgold!32/intgreen!28/prereqpurple!26,
+    3/-3.45/gray!30/gray!30/gray!32/gray!30/gray!28}{
+    \node[font=\small, anchor=east] at (-0.6,\ya) {layer $\l$:};
+    \node[nd, fill=\ca] at (0.6,\ya) {};
+    \node[nd, fill=\cb] at (1.7,\ya) {};
+    \node[nd, fill=\cc] at (2.8,\ya) {};
+    \node[nd, fill=\cd] at (3.9,\ya) {};
+    \node[nd, fill=\ce] at (5.0,\ya) {};
+  }
+  \draw[arrow, gray] (6.0,-0.1) -- node[right, font=\scriptsize, align=left] {each layer averages\\ neighborhoods:\\ embeddings converge\\ within the connected\\ component} (6.0,-3.35);
+  \node[font=\scriptsize, gray, align=center] at (2.8,-4.25) {five assets' embeddings (color $=$ state); by layer 3 the\\ cross-sectional differences that carry the forecast signal are gone};
+\end{tikzpicture}
+\caption{Over-smoothing. Message passing is Laplacian smoothing \citep{LiHanWu2018}: each layer pulls every node's embedding toward its neighborhood average, so with depth all nodes in a connected component converge to a common (degree-scaled) value. On small, well-connected asset graphs the collapse arrives within a handful of layers.}
+\label{fig:gnn:oversmoothing}
+\end{figure}
+
+How fast is ``enough''? On small graphs, very fast. \citet{LiHanWu2018} demonstrate the collapse on Zachary's karate club, 34 vertices, the same $N$ as our universe (\Cref{sec:gnn:tasks}), where node embeddings become indistinguishable by four to five layers (their Fig.~2). Estimated financial graphs are also dense, with diameters of 3 to 5 (GNNHAR reports diameter 3 for its 27-stock DJIA graph; \Cref{sec:gnn:gnnhar}): two hops already connect nearly everything to nearly everything, and a third mostly recirculates the same information.
+
+\begin{keyidea}[Your Graph Is Tiny, and That Changes the Defaults]
+Mainstream GNN engineering (neighbor sampling, minibatch subgraph partitioning, 64--256-dimensional embeddings, 4+ layers) is calibrated to graphs with $10^5$--$10^8$ nodes. Financial vol graphs have $10$--$500$. Consequences: full-batch training is free, sampling is unnecessary noise, parameter budgets must be small because the cross-section supplies only $N \times T$ observations, over-smoothing arrives at depth 2--3 rather than 10, and a single fully-connected layer is not obviously worse than a clever sparse one (\Cref{sec:gnn:graph-construction} shows this is an empirical fight). When you read GNN advice, first ask what $N$ it was written for.
+\end{keyidea}
+
+For completeness: the Distill article's remaining topics, sampling and batching schemes, hypergraphs and multigraphs, graph duals, and generative graph models, are useful elsewhere but have no volatility payoff at our scale; \citet{SanchezLengeling2021} covers them well if you are curious. The rest of the chapter is what happens when this machinery meets real markets, honest baselines, and $\QLIKE$.
+
+% ──────────────────────────────────────────────────────────────
+\section{GHAR and GNNHAR: The Canonical Volatility Result}\label{sec:gnn:gnnhar}
+% ──────────────────────────────────────────────────────────────
+
+Chapter~\ref{ch:spillovers} closed by compressing the volatility network into a handful of hand-crafted features. The alternative this chapter has been building toward, learning on the network directly, has exactly one lineage in the literature that plays by this book's evaluation rules ($\QLIKE$, Diebold--Mariano, Model Confidence Set): the GHAR/GNNHAR work of Zhang, Pu, Cucuringu, and Dong \citep{ZhangCucuringuDong2023, ZhangPuCucuringuDong2024}. We give it a full treatment, both because it is the strongest evidence graphs help volatility forecasting, and because its headline is a useful vaccine: the best rigorously evaluated GNN improves on a rolling OLS-HAR by about 13\% in MSE and \emph{4\% in $\QLIKE$} at the daily horizon, more at weekly, nothing by monthly. Real, repeatable, and modest. Calibrate here before reading any braver claim in \Cref{sec:gnn:frontiers}.
+
+Throughout this section the setting is 27 DJIA stocks (those trading continuously July 2007--June 2021), 5-minute subsampled $\RV$, all models re-estimated monthly on a rolling 1000-day window, with a 10-year out-of-sample span (July 2011--June 2021) \citep[pp.~13--14]{ZhangCucuringuDong2023}. Note one convention before the equations: this paper's HAR uses \emph{non-overlapping} lag components, the weekly term averaging lags 2--5 and the monthly term lags 6--22, so the three regressors partition the past rather than nesting as in Corsi's original (Chapter~\ref{ch:har}).
+
+\subsection{GHAR: The Linear Graph Baseline}\label{sec:gnn:ghar}
+
+Stack the cross-section into vectors: $\boldsymbol{RV}_t \in \R^N$ holds all $N$ assets' realized variances on day $t$, and $\mathbf{V}_{:t-1} = [\boldsymbol{RV}_{t-1},\, \boldsymbol{RV}_{t-5:t-2},\, \boldsymbol{RV}_{t-22:t-6}] \in \R^{N \times 3}$ collects the three HAR lag components for every asset. GHAR asks the smallest possible graph question: what if each asset's regression also sees its \emph{neighbors'} HAR lags, averaged over the graph?
+
+\begin{equation}\label{eq:gnn:ghar}
+  \boldsymbol{RV}_t \;=\; \boldsymbol{\alpha}
+  \;+\; \underbrace{\mathbf{V}_{:t-1}\,\bm{\beta}}_{\text{own lags (HAR)}}
+  \;+\; \underbrace{\mathbf{W}\,\mathbf{V}_{:t-1}\,\bm{\gamma}}_{\text{neighbors' lags}}
+  \;+\; \boldsymbol{u}_t,
+  \qquad
+  \mathbf{W} = \mathbf{O}^{-\frac{1}{2}} \mathbf{A}\, \mathbf{O}^{-\frac{1}{2}}
+\end{equation}
+where \citep[eq.~6, p.~8]{ZhangCucuringuDong2023}:
+\begin{itemize}[nosep]
+  \item $\mathbf{A}$: a binary, undirected adjacency matrix with zero diagonal (no self-loops); $\mathbf{O} = \diag(n_1,\dots,n_N)$ its degree matrix, so $\mathbf{W}$ is the degree-normalized adjacency and $\mathbf{W}\mathbf{V}_{:t-1}$ is \Cref{eq:gnn:ax} applied to the HAR lags: each row is the average of that asset's neighbors' daily, weekly, and monthly components.
+  \item $\bm{\beta}, \bm{\gamma} \in \R^3$: \emph{pooled} coefficients, shared by every asset; only the intercept $\boldsymbol{\alpha} \in \R^N$ is asset-specific. Six pooled slopes total, whether $N$ is 27 or 500, the same weight-sharing that makes graph convolutions tractable, executed in OLS.
+  \item Setting $\mathbf{A} = \mathbf{0}$ recovers plain HAR; setting $\mathbf{A}$ to the complete graph makes the graph term the cross-sectional average, the ``market volatility'' regressor of earlier panel-HAR work.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+GHAR gives every asset's HAR regression three extra columns: what my neighbors' vol did yesterday, last week, last month, averaged over whoever the graph says my neighbors are. It is one step of message passing with no neural network attached, estimable by OLS in milliseconds.
+\end{intuition}
+
+\begin{projectconnection}
+GHAR is the project's mandatory cheap baseline, and \Cref{sec:gnn:blueprint} builds its first experiment around it. If three OLS coefficients on neighborhood averages capture most of the spillover value on our universe, no GNN that fails to beat GHAR deserves GPU time. In the univariate special case, this is simply three extra SPX regressors: graph-weighted averages of the other 33 symbols' lagged $\RV$s.
+\end{projectconnection}
+
+\subsection{The Graph: GLASSO Conditional-Independence Networks}\label{sec:gnn:glasso}
+
+Where does $\mathbf{A}$ come from? The lineage's answer is the \textbf{graphical LASSO (GLASSO)}: estimate which asset pairs are \emph{conditionally} dependent, and wire an edge exactly there.
+
+The estimator penalizes the inverse covariance so that weak conditional links are pushed to exact zero:
+\begin{equation}\label{eq:gnn:glasso}
+  \hat{\bm{\Theta}} \;=\; \operatorname*{argmin}_{\bm{\Theta} \succeq 0}\;
+  \Bigl( \tr(\mathbf{S}\bm{\Theta}) \;-\; \log\det(\bm{\Theta}) \;+\; \lambda \sum_{j \neq k} \lvert \Theta_{jk} \rvert \Bigr),
+  \qquad
+  A_{ij} = \mathbb{1}\{\hat{\Theta}_{ij} \neq 0\}
+\end{equation}
+where \citep[p.~8]{ZhangPuCucuringuDong2024}:
+\begin{itemize}[nosep]
+  \item $\mathbf{S}$: the sample covariance of (de-meaned) returns over the estimation window; $\bm{\Theta} = \bm{\Sigma}^{-1}$ is the \textbf{precision matrix}, whose zero entries mark pairs that are conditionally independent given all other assets.
+  \item $\lambda$: the sparsity penalty, chosen by five-fold cross-validation on the training window; larger $\lambda$, sparser graph.
+  \item The adjacency keeps only the \emph{support} of $\hat{\bm{\Theta}}$: binary, undirected, no self-loops.
+  \item Operationally, the first two terms are the (negative log-) likelihood of the data under a Gaussian model, so minimizing them finds the dependence structure that best explains the returns, and the $\lambda$ penalty charges rent for every nonzero entry, so weak links are evicted. You never need to solve this by hand: read it as ``best-fit network, made as sparse as the data allows.''
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+Raw correlation connects nearly everything to everything, because all risk assets share the market factor. The precision matrix asks a sharper question: after accounting for every other asset, do these two still move together? An edge survives GLASSO only if the pair has a \emph{direct} relationship that the rest of the universe cannot explain away, which is much closer to what ``spillover channel'' should mean.
+\end{intuition}
+
+Crucially, the graph is \emph{re-estimated inside each rolling window}, monthly, from historical returns only \citep[pp.~9, 14]{ZhangCucuringuDong2023}. No future data touches the adjacency. This point-in-time discipline looks pedantic until \Cref{sec:gnn:graph-construction}, where we meet papers that cannot demonstrate it.
+
+\subsection{GNNHAR: One Nonlinear Hop}\label{sec:gnn:gnnhar-model}
+
+GNNHAR upgrades GHAR's linear neighborhood average to a learned, nonlinear graph layer, while deliberately keeping the asset's \emph{own} lags in the linear HAR channel. The graph models only the spillovers.
+
+The layer is a GCN-style propagation without self-loops, and the model reads the final layer out through pooled coefficients:
+\begin{align}
+  \mathbf{H}^{(l+1)} &= \relu\!\left( \mathbf{O}^{-\frac{1}{2}} \mathbf{A}\, \mathbf{O}^{-\frac{1}{2}}\, \mathbf{H}^{(l)}\, \bm{\Theta}^{(l)} \right),
+  \qquad \mathbf{H}^{(0)} = \mathbf{V}_{:t-1} \label{eq:gnn:gnnhar-layer}\\[2pt]
+  \text{GNNHAR1L:}\quad \boldsymbol{RV}_t &= \boldsymbol{\alpha} + \mathbf{V}_{:t-1}\,\bm{\beta} + \mathbf{H}^{(1)}\bm{\gamma} + \boldsymbol{u}_t \label{eq:gnn:gnnhar1l}
+\end{align}
+where \citep[eqs.~7--8, pp.~9--10]{ZhangCucuringuDong2023}:
+\begin{itemize}[nosep]
+  \item $\mathbf{H}^{(l)} \in \R^{N \times D^{(l)}}$: node embeddings; the input is each asset's three HAR lags; $\bm{\Theta}^{(l)}$: the layer's trainable weights (their notation for our $\bW^{(l)}$; not the GLASSO precision matrix, an unfortunate but standard clash).
+  \item Unlike the GCN of \Cref{eq:gnn:gcn}, the diagonal of $\mathbf{A}$ stays \emph{zero}: the layer aggregates neighbors only, because the own-lag channel already enters linearly and the authors found nonlinearity in the own channel unhelpful \citep[footnote~8, p.~10]{ZhangCucuringuDong2023}.
+  \item GNNHAR2L and 3L stack a second and third layer (\Cref{eq:gnn:gnnhar-layer} applied again) before the same readout. Since GNNHAR1L differs from GHAR only by the ReLU layer, the 1L-vs-GHAR gap isolates \emph{nonlinearity}; the 2L-vs-1L gap isolates \emph{multi-hop reach}.
+  \item Practical scale, worth internalizing: the tuned hidden dimension is $D^{(l)} = 9$, the optimizer plain Adam with early stopping, and outputs are averaged over several random seeds \citep[p.~14, App.~B p.~34]{ZhangCucuringuDong2023}. This ``GNN'' is thousands of parameters, not millions, exactly as \Cref{sec:gnn:design} predicted for $N = 27$.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+GNNHAR is HAR plus a small trained gadget that looks at your neighbors' recent volatility profile and reports a nonlinear summary of it. One hop means the gadget hears only direct neighbors; two hops, neighbors of neighbors. The architecture is arranged so you can bill each ingredient separately: how much did the graph buy, how much the nonlinearity, how much the extra hops.
+\end{intuition}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth,
+  blk/.style={draw, rounded corners, minimum width=2.5cm, minimum height=0.9cm, align=center, font=\small}]
+  \node[blk, fill=defblue!10] (lags) at (0,0) {HAR lags per asset\\ $\mathbf{V}_{:t-1} \in \R^{N\times 3}$};
+  \node[blk, fill=intgreen!10] (glasso) at (0,-2.0) {GLASSO on returns\\ (rolling window) $\to \mathbf{A}$};
+  \node[blk, fill=keyorange!15] (gnn) at (4.4,-1.0) {graph layer\\ $\relu(\mathbf{W}\mathbf{H}\bm{\Theta})$};
+  \node[blk, fill=gray!8] (lin) at (4.4,1.3) {linear own-lag channel\\ $\mathbf{V}_{:t-1}\bm{\beta}$};
+  \node[blk, fill=defblue!15] (out) at (8.6,0) {per-asset forecasts\\ $\widehat{\boldsymbol{RV}}_t \in \R^N$};
+  \draw[arrow] (lags) -- (lin.west);
+  \draw[arrow] (lags) -- (gnn.west);
+  \draw[arrow] (glasso) -- node[below, font=\scriptsize, sloped] {wiring} (gnn.south west);
+  \draw[arrow] (lin.east) -- node[above, font=\scriptsize, sloped] {$+$} (out.north west);
+  \draw[arrow] (gnn.east) -- node[below, font=\scriptsize, sloped] {$+\,\mathbf{H}^{(1)}\bm{\gamma}$} (out.south west);
+  \node[font=\scriptsize, gray, align=center] at (4.4,-3.0) {HAR $=$ this diagram with the graph branch deleted;\\ GHAR $=$ this diagram with the ReLU layer replaced by the plain average};
+\end{tikzpicture}
+\caption{GNNHAR's architecture \citep{ZhangCucuringuDong2023}. Each asset's own HAR lags pass through an untouched linear channel; the same lags, aggregated over the GLASSO graph, pass through one small nonlinear graph layer; the forecast sums the two. The nesting (HAR $\subset$ GHAR $\subset$ GNNHAR1L $\subset$ 2L) is what makes the results attributable ingredient by ingredient.}
+\label{fig:gnn:gnnhar-arch}
+\end{figure}
+
+\subsection{The Loss Function Is a Model Choice}\label{sec:gnn:qlike-training}
+
+Here is the paper's most transferable idea, and it has nothing to do with graphs. Every model, including plain HAR, is trained twice: once minimizing MSE and once minimizing $\QLIKE$,
+\begin{equation}\label{eq:gnn:qlike-loss}
+  \loss_{\QLIKE} \;=\; \frac{1}{N}\sum_{i=1}^{N} \frac{1}{\#\mathcal{T}}\sum_{t \in \mathcal{T}}
+  \left[ \frac{\RV_{i,t}}{\widehat{\RV}_{i,t}} \;-\; \log\!\frac{\RV_{i,t}}{\widehat{\RV}_{i,t}} \;-\; 1 \right]
+\end{equation}
+where \citep[eq.~12, p.~12]{ZhangCucuringuDong2023} the sum runs over training days $\mathcal{T}$ and assets, and $\widehat{\RV}_{i,t}$ is the model's fitted value. This is the same $\QLIKE$ the guide uses for \emph{evaluation}, now driving \emph{estimation}: for neural models the gradient descends on it directly, and even ``HAR trained by $\QLIKE$'' is a distinct model from OLS-HAR (no closed form; fitted by Adam too).
+
+\begin{intuition}[In Plain English]
+MSE punishes a forecast miss the same whether you over- or under-shot. $\QLIKE$ is asymmetric: under-predicting volatility, being caught short in a spike, hurts far more than over-predicting by the same distance. Training on $\QLIKE$ therefore teaches every coefficient to fear the crash days, which is precisely the fear the evaluation metric will later test for.
+\end{intuition}
+
+The effect is large and systematic: $\QLIKE$-trained twins beat MSE-trained twins on out-of-sample $\QLIKE$ almost everywhere (the sole reversal is the three-layer model at the monthly horizon), and even on \emph{MSE}, uniformly at the daily horizon and for all but that same three-layer model at the weekly one; on turbulent days (top-decile market $\RV$) GNNHAR1L$_Q$ has roughly 13\% lower MSE and 2\% lower $\QLIKE$ than GNNHAR1L$_M$ \citep[Tables~1--2, pp.~15--17]{ZhangCucuringuDong2023}. Mechanically, MSE-trained HAR coefficients lurch when crises enter the estimation window, while $\QLIKE$-trained ones adapt earlier and more smoothly \citep[Fig.~6, p.~20]{ZhangCucuringuDong2023}.
+
+\begin{warning}[``Always Train With QLIKE'' Has a Scope]
+At the monthly horizon the advice inverts on the other metric: $\QLIKE$-trained models pay 44--53\% \emph{worse MSE} than their MSE twins (GNNHAR2L: 1.736 vs.\ 1.134; 3L: 1.502 vs.\ 1.046, Table~1), while mostly still winning on $\QLIKE$. The clean rule is alignment: train on the loss you will be judged by, at the horizon you will be judged at. For this project, judged on $\QLIKE$ at $h \in \{1,5,22\}$, $\QLIKE$ training is right; but quote the scope, not the slogan.
+\end{warning}
+
+\subsection{The Result Grid}\label{sec:gnn:gnnhar-results}
+
+\begin{table}[ht]
+\centering
+\caption{Out-of-sample loss ratios relative to OLS-HAR (HAR$_M$ $= 1.000$; lower is better), 27 DJIA stocks, July 2011--June 2021. Subscript $M$/$Q$ marks the training loss. $^{*}$ marks the column's lowest ratio; $^{\dagger}$ membership of the 5\% Model Confidence Set. Source: \citet[Table~1, p.~15]{ZhangCucuringuDong2023}.}
+\label{tab:gnn:gnnhar}
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+ & \multicolumn{2}{c}{1-day} & \multicolumn{2}{c}{1-week} & \multicolumn{2}{c}{1-month} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Model & MSE & QLIKE & MSE & QLIKE & MSE & QLIKE \\
+\midrule
+HAR$_M$        & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\
+GHAR$_M$       & 0.927 & 0.983 & 0.904 & 0.987 & 0.975$^{*}$ & 1.036 \\
+GNNHAR1L$_M$   & 0.907 & 0.979 & 0.940 & 0.943 & 1.021 & 0.968 \\
+GNNHAR2L$_M$   & 0.967 & 0.977 & 1.034 & 0.953 & 1.134 & 1.032 \\
+GNNHAR3L$_M$   & 1.210 & 0.982 & 1.014 & 0.961 & 1.046 & 0.958 \\
+\addlinespace
+HAR$_Q$        & 0.927 & 0.981 & 0.939 & 0.945 & 1.069 & 0.986 \\
+GHAR$_Q$       & 0.886 & 0.983 & 0.842$^{*}$ & 0.936 & 1.151 & 0.954$^{\dagger}$ \\
+GNNHAR1L$_Q$   & 0.867$^{*}$ & 0.961$^{\dagger}$ & 0.855 & 0.913$^{*}$ & 1.179 & 0.965 \\
+GNNHAR2L$_Q$   & 0.879 & 0.959$^{*}$ & 0.873 & 0.920 & 1.736 & 0.947$^{*}$ \\
+GNNHAR3L$_Q$   & 0.894 & 0.963 & 1.185 & 0.942 & 1.502 & 0.971 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\Cref{tab:gnn:gnnhar} repays slow reading; five findings do the work of the whole lineage.
+
+\begin{keyresult}[What the Canonical Grid Says]
+\begin{enumerate}[nosep]
+  \item \textbf{The graph helps at short horizons.} GHAR$_M$ vs.\ HAR$_M$: 7.3\% MSE and 1.7\% QLIKE at 1 day, before any neural network; a linear neighborhood average earns roughly half the total gain.
+  \item \textbf{Nonlinearity adds a real but smaller slice.} GNNHAR1L$_Q$ reaches 0.867 MSE / 0.961 QLIKE at 1 day and the lineage's best weekly QLIKE, 0.913.
+  \item \textbf{Training loss moves the needle as much as architecture.} Read down any column: the $_Q$ block dominates the $_M$ block almost everywhere; even HAR$_Q$ beats HAR$_M$ by 7.3\% MSE at 1 day.
+  \item \textbf{Depth hurts.} GNNHAR3L$_M$ is 21\% \emph{worse} than plain HAR on daily MSE; the monthly MSE column is a graveyard (up to 1.736).
+  \item \textbf{Gains die at the monthly horizon.} Every \emph{neural} graph model's monthly MSE ratio sits above 1 (linear GHAR$_M$, at 0.975, is the one exception, and its monthly QLIKE is unfavorable at 1.036); only the QLIKE-trained models' QLIKE ratios stay slightly favorable. Spillover information diffuses into prices within days, a finding the covariance paper repeats.
+\end{enumerate}
+\end{keyresult}
+
+Two follow-up analyses turn findings 4 and 5 into mechanisms. On \emph{depth}: a Diebold--Mariano test of GNNHAR2L against 1L rejects equality for exactly one stock in 27 (AXP), with cross-sectional $p$-values around 0.40--0.75, so two-hop information is statistically indistinguishable from noise once own and one-hop channels are in \citep[Fig.~7, pp.~22--23]{ZhangCucuringuDong2023}; a linear two-hop GHAR variant agrees, its second-hop coefficients decaying to about an eighth of the first-hop ones \citep[App.~C, pp.~35--37]{ZhangCucuringuDong2023}. And the three-layer failure is \Cref{sec:gnn:oversmoothing} made empirical: the authors compute the mean average cosine distance (MAD) between connected nodes' final-layer embeddings and find it falls monotonically with depth, with the 3-layer embeddings ``too similar to provide any node specific predictive information'' \citep[Fig.~8, p.~24]{ZhangCucuringuDong2023}. The DJIA GLASSO graph has diameter 3 (their S\&P~100 graph, diameter 5), so by three hops the receptive field is the whole graph and smoothing is all that is left \citep[Table~A.2, p.~34]{ZhangCucuringuDong2023}.
+
+\begin{warning}[What This Evidence Does \emph{Not} Say]
+The comparison set is HAR, GHAR, and GNNHAR variants only: no HARQ or SHAR, no LSTM, no gradient-boosted trees, so ``beats HAR by 13\% MSE'' is not ``beats the best non-graph model.'' There is no economic-value test. The universe is 27 surviving mega-caps, one asset class. And the turbulent/calm diagnostic split uses a full-sample quantile, fine as a diagnostic, but not a real-time regime signal. The result is a careful, narrow win, which is exactly why it is credible.
+\end{warning}
+
+\subsection{The Covariance Extension: Graphs Where They Pay Most}\label{sec:gnn:ghar-cov}
+
+The same authors' \emph{Journal of Financial Econometrics} paper applies the GHAR idea to full realized covariance matrices \citep{ZhangPuCucuringuDong2024}, and the repo's standing verdict comes from it: graphs currently earn their clearest, MCS-backed keep on the \emph{covariance} problem. The model rides on the HAR-DRD decomposition from Chapter~\ref{ch:multivariate} ($\mathbf{H}_t = \mathbf{D}_t \mathbf{R}_t \mathbf{D}_t$, volatilities and correlations forecast separately): the volatility equations get the GHAR graph term of \Cref{eq:gnn:ghar}, and the correlation equations get a graph of their own, built by a trick worth knowing. Correlations are \emph{pairs}, so the paper forms the \textbf{line graph}: every correlation pair becomes a node, and two pairs are connected exactly when they share an asset \citep[Def.~3.3, pp.~8--9]{ZhangPuCucuringuDong2024}. The pair (JPM,~GS) neighbors every other pair containing JPM or GS; news about one bank relationship propagates to all relationships that bank participates in.
+
+The headline: GHAR with a GLASSO volatility graph and a line correlation graph beats HAR-DRD by 2.5\% (Euclidean), 2.5\% (Frobenius), and 1.8\% (multivariate QLIKE) at one day, ranks first under the Euclidean and QLIKE losses with MCS $p = 1.000$ (a rounding-margin second under Frobenius, $p = 0.768$), and stays in the MCS best set under all three while HAR-DRD itself is ejected ($p \le 0.003$) \citep[Table~4, p.~15]{ZhangPuCucuringuDong2024}. The gain survives a HARQ-style measurement-error correction (GHARQ, ratios $\approx 0.983$ against an HARQ-DRD baseline), so it is not an artifact of attenuation \citep[Table~8, p.~24]{ZhangPuCucuringuDong2024}, and it converts into economics: global-minimum-variance portfolios built from the graph forecasts have the lowest out-of-sample variance in the comparison (9.799 vs.\ 9.918 annualized for HAR-DRD) \citep[Table~5, p.~20]{ZhangPuCucuringuDong2024}.
+
+Two fine-print items sharpen the picture. Under QLIKE, the gain comes from the \emph{correlation line graph}, not the volatility graph: variants with only a volatility graph land at QLIKE ratio 1.001, no better than the baseline \citep[Table~4]{ZhangPuCucuringuDong2024}. And at the one-month horizon the flagship's QLIKE slips to 1.001, the paper's own honestly-reported single loss \citep[Table~6, pp.~20--21]{ZhangPuCucuringuDong2024}: the short-horizon-only nature of graph information, again.
+
+\begin{projectconnection}
+Strategic fork for the project, flagged since the 2026-05-31 research sweep: if the deliverable stays univariate SPX $\RV$, graphs offer the modest, single-digit QLIKE gains of \Cref{tab:gnn:gnnhar}; if the problem is ever recast as covariance forecasting (portfolio risk), graphs have MCS-grade evidence and a ready GMVP test. Either way, the public GNNHAR codebase (\texttt{github.com/chaozhang-ox/GNNHAR}, with QLIKE training and MCS evaluation built in; the covariance code at \texttt{chaozhang-ox/Graph-based-HAR}) is the harness to port rather than rebuild.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{Graph Construction: The Contested Design Choice}\label{sec:gnn:graph-construction}
+% ──────────────────────────────────────────────────────────────
+
+Here is the uncomfortable secret of the field: the architecture debates of \Cref{sec:gnn:building,sec:gnn:attention} are largely settled for volatility (one hop, shallow, small), while the question that actually moves results, \emph{where does the adjacency matrix come from?}, is genuinely contested. Different papers, on different universes, reach opposite conclusions with straight faces. This section lays out the menu, then the contradiction, then the one discipline everyone should agree on.
+
+\subsection{The Menu}\label{sec:gnn:graph-menu}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth,
+  src/.style={draw, rounded corners, minimum width=2.6cm, minimum height=0.85cm, align=center, font=\small, fill=defblue!8},
+  route/.style={draw, rounded corners, minimum width=3.2cm, minimum height=0.62cm, align=center, font=\scriptsize},
+  dst/.style={draw, rounded corners, minimum width=2.3cm, minimum height=0.85cm, align=center, font=\small, fill=keyorange!12}]
+  \node[src] (data) at (0,0) {returns / RV panel\\ (training window only)};
+  \node[route, fill=gray!8]      (corr) at (5.6,2.5)  {thresholded correlation (dynamic)};
+  \node[route, fill=gray!8]      (gl)   at (5.6,1.5)  {GLASSO partial correlation};
+  \node[route, fill=intgreen!10] (dy)   at (5.6,0.5)  {DY spillover matrix (directed, weighted)};
+  \node[route, fill=intgreen!10] (gc)   at (5.6,-0.5) {Granger / transfer entropy (directed)};
+  \node[route, fill=gray!8]      (sec)  at (5.6,-1.5) {sector / economic priors (static)};
+  \node[route, fill=warnred!8]   (fc)   at (5.6,-2.5) {fully connected (no estimation)};
+  \node[route, fill=prereqpurple!10] (lrn) at (5.6,-3.5) {learned / evolving (part of the model)};
+  \node[dst] (adj) at (10.6,0) {$\mathbf{A}$ (or $\mathbf{A}_t$)\\ $\to$ GNN};
+  \foreach \n in {corr,gl,dy,gc,sec,fc,lrn} { \draw[arrow, gray] (data.east) -- (\n.west); \draw[arrow, gray] (\n.east) -- (adj.west); }
+  \node[font=\scriptsize, gray, align=center] at (5.6,-4.35) {every route except ``fully connected'' and ``sector'' is an \emph{estimation} step\\ with its own error, instability, and look-ahead rules};
+\end{tikzpicture}
+\caption{Seven routes from data to adjacency. The routes differ in directedness, sparsity, stability, and how much estimation error they inject; the literature disagrees about which is best, and the disagreement is informative (\Cref{sec:gnn:graph-contradiction}).}
+\label{fig:gnn:graph-menu}
+\end{figure}
+
+\begin{description}[nosep]
+  \item[Thresholded correlation.] Edge iff $|\rho_{ij}| \ge \theta$ over a rolling window; cheap, dynamic, undirected. Its failure mode is instructive: at a fixed threshold the graph's density is violently regime-dependent. In the 465-stock study of \citet{Wade2026GNNPortfolios}, $|\rho| \ge 0.3$ gives density 0.092 in a calm 2018 week and \textbf{0.933} in the COVID week of March 2020, mean degree 433 of a possible 464 \citep[Table~2, p.~4]{Wade2026GNNPortfolios}: in a crisis the ``graph'' becomes the market average, and aggregation compresses the cross-section exactly when differentiation matters most.
+  \item[GLASSO partial correlation.] \Cref{sec:gnn:glasso}. Sparse, undirected, conditional-independence semantics; the GNNHAR lineage's choice.
+  \item[Diebold--Yilmaz spillover matrix.] Recycle Chapter~\ref{ch:spillovers}: the GFEVD share $d_{j \leftarrow i}(h)$ is a directed, weighted edge from $i$ to $j$. \citet{BoettiNunes2026} operationalize it cleanly: build the connectedness table at horizon $h = 22$, drop edges below 0.05, re-estimate every rolling window. Their linear GNHAR on this graph is the best model in their comparison, and weighted DY graphs beat binary Granger graphs at long horizons \citep[Tables~2--3, pp.~14--15]{BoettiNunes2026}. DCRNN-HAR (\Cref{sec:gnn:frontiers}) uses the same object made day-by-day dynamic.
+  \item[Granger causality / transfer entropy.] Directed edges from pairwise predictability tests (with multiple-testing correction) or from information-theoretic transfer entropy (the H-ETE-GNN of \Cref{sec:gnn:hybrids}). Honest but noisy: at the 5\% level over all ordered pairs, Granger graphs come out so dense they approach fully connected \citep[Fig.~1, p.~11]{BoettiNunes2026}, and a Granger graph estimated once and frozen \emph{underperformed HAR} in \citet{Wade2026GNNPortfolios}.
+  \item[Sector and economic priors.] GICS membership, supply chains, listed competitors. Free, static, interpretable; in the covariance study the sector graph lost to GLASSO \citep[Table~4]{ZhangPuCucuringuDong2024}, and in \citet{Wade2026GNNPortfolios} the static sector graph beat HAR only after macro features were added.
+  \item[Fully connected.] No estimation at all; with uniform weights the neighborhood aggregate collapses to the cross-sectional average of everyone else, a ``market factor'' regressor. Deliberately dumb, surprisingly strong (next subsection).
+  \item[Learned and evolving.] Let the model treat $\mathbf{A}$ as parameters: MTGNN learns one static adjacency end to end; EMGNN \citep{ZhouXieWangGongZhu2025} learns an evolving \emph{sequence} of them (\Cref{sec:gnn:emgnn}).
+  \item[Factor-residual (idiosyncratic) networks.] The 2026 frontier idea from \citet{CarteaCucuringuFang2026}: strip the common factor first (factor regressions on returns), estimate sparse dependency networks on the \emph{residuals}, and let jump measures spill over that idiosyncratic graph. Per the abstract, this cuts one-day-ahead MSE by around 30\% versus HAR on S\&P~100 names, ``while jump models on raw or market-based networks deliver little benefit.'' The full text sits behind a paywall, so treat the number as unverified and adopt only the design idea: \emph{edges should encode relationships the market factor cannot explain}, which is also GLASSO's logic taken one step further.
+\end{description}
+
+\subsection{The Contradiction}\label{sec:gnn:graph-contradiction}
+
+Now the fight. Three credible studies, three winners:
+
+\begin{itemize}[nosep]
+  \item \textbf{GLASSO beats no-graph} on 27 DJIA stocks: GHAR(GLASSO) at 0.927 MSE / 0.983 QLIKE vs.\ HAR (\Cref{tab:gnn:gnnhar}), and GLASSO was the best of the graph types tried in the covariance companion \citep{ZhangCucuringuDong2023, ZhangPuCucuringuDong2024}.
+  \item \textbf{Fully connected beats GLASSO} on 10 international indices: in the GNAR-HARX study the top of the pooled-QLIKE ranking is occupied entirely by fully-connected configurations, and each GLASSO configuration ranks below its like-for-like FC counterpart (best FC $-8.5891$ vs.\ best GL $-8.5867$, with HARX+IV at $-8.5831$ and plain HAR at $-8.5785$); GL sits 1.02--1.03 on relative MSE \citep[Table~4, p.~22]{ONuallain2025}. The diagnosis is estimation instability: GLASSO edge counts lurch after 2016 and the Jaccard similarity of consecutive monthly graphs (the fraction of edges the two graphs share) dips below 0.8, so the model keeps being handed a different network \citep[\S5.5, pp.~28--31]{ONuallain2025}. Two honesty flags: this is an MSc thesis with \emph{no} DM or MCS testing, and its QLIKE gaps sit in the third decimal.
+  \item \textbf{Learned-evolving beats learned-static} on Bitcoin futures RV: EMGNN's relative MSFE 0.6527 vs.\ MTGNN's 0.7809 against an AR benchmark, and EMGNN is the only model with MCS $p = 1.000$ across settings \citep[Table~5, p.~23]{ZhouXieWangGongZhu2025} --- with a significance caveat unpacked in \Cref{sec:gnn:emgnn}.
+\end{itemize}
+
+Can these coexist? Plausibly, yes. Sparsification pays when the universe is large and heterogeneous enough that conditional-independence structure is real and estimable (27--100 single names); it costs when the universe is 10 highly integrated aggregate indices whose true network is close to complete, so GLASSO's estimation error buys nothing, and a fully-connected average, which at $N = 10$ with uniform weights is just the cross-sectional mean, is unbeatable for robustness. Learned adjacency sits at the far end of the flexibility spectrum and shines where relationships genuinely rewire (crypto). But this reconciliation is a hypothesis, not a finding. No published study runs the ablation on a mid-sized cross-\emph{asset-class} universe like ours.
+
+\begin{keyidea}[The Cheapest High-Value Experiment in This Chapter]
+Because GHAR is linear and OLS-estimable, the contested question costs almost nothing to answer on our own data: run GHAR with identity (no graph), fully-connected, GLASSO, and rolling-DY adjacency on the 34-symbol universe, at $h \in \{1, 5, 22\}$, under $\QLIKE$ with DM tests against rolling HAR and an MCS over the four graphs. One afternoon of compute resolves, for our universe, what the literature cannot resolve in general. This is Step~1 of the blueprint in \Cref{sec:gnn:blueprint}.
+\end{keyidea}
+
+\subsection{Leakage Rules for Graphs}\label{sec:gnn:graph-leakage}
+
+Every estimated graph is a fitted object, so it inherits the look-ahead rules of any feature. The clean template is GNNHAR's: estimate the graph on the rolling training window, freeze it, forecast the next month, slide, re-estimate \citep[p.~14]{ZhangCucuringuDong2023}. \Cref{fig:gnn:leakage-timeline} draws the timeline.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth]
+  % timeline
+  \draw[thick, -{Stealth[length=3mm]}] (-0.3,0) -- (11.6,0) node[below right=2pt, font=\small] {$t$};
+  % estimation window
+  \draw[|-|, thick, defblue] (0.3,0.55) -- node[above, font=\scriptsize, defblue] {estimation window (1000 days)} (6.3,0.55);
+  % forecast month
+  \draw[|-|, thick, keyorange] (6.3,0.55) -- (7.6,0.55);
+  \node[font=\scriptsize, keyorange] at (7.05,0.28) {forecast month};
+  \node[font=\scriptsize, defblue] at (3.3,1.15) {$\mathbf{A}$ estimated here, then \emph{frozen}};
+  % slide
+  \draw[|-|, thick, defblue!50] (1.6,-0.75) -- (7.6,-0.75);
+  \draw[|-|, thick, keyorange!70] (7.6,-0.75) -- (8.9,-0.75);
+  \node[font=\scriptsize, gray] at (4.6,-1.2) {next re-estimation: window slides one month, graph re-fit};
+  % forbidden arrow
+  \draw[arrow, warnred, thick, dashed] (9.4,1.75) .. controls (7.4,1.95) .. (5.85,0.66);
+  \node[font=\scriptsize, warnred, align=center, anchor=west] at (9.6,1.75) {future returns $\to$ today's\\ graph: forbidden};
+\end{tikzpicture}
+\caption{Point-in-time graph estimation. Estimating a single graph on the full sample quietly hands the model future correlation structure.}
+\label{fig:gnn:leakage-timeline}
+\end{figure}
+
+How bad is it if you slip? Usefully, someone measured. The one-switch leakage benchmark of \citet{ZhangLiPengChen2026} toggles individual evaluation conventions while holding everything else fixed, and finds leakage is \emph{selective}. Centered temporal features and same-day-open execution produce enormous, stable inflation (Sharpe increases of roughly 4 to 26 for the trainable models), while \textbf{future-informed graph structure is a weak leak in most settings}, moving Sharpe by only about $-0.2$ to $+0.4$ across model-market cells and averaging near $+0.1$ \citep[Table~1, p.~6]{ZhangLiPengChen2026}. The reading for us: keep graphs point-in-time (the cost of doing so is trivial), but spend your paranoia budget where the benchmark says the money is, on temporal feature construction and execution timing. A subtler grade of sin appears even in good papers: the covariance paper tunes GLASSO's $\lambda$ by standard five-fold cross-validation \emph{inside} the training window \citep[p.~8]{ZhangPuCucuringuDong2024}, unordered folds on time-series data. That is harmless for the graph's support in practice, but not the purged protocol this book recommends for anything closer to the forecast target.
+
+\begin{projectconnection}
+Our universe adds a leak the equity-panel papers never face: 34 symbols across asset classes close at different times, so a ``daily'' correlation or DY graph built on naively aligned closes can encode same-day information flow that was not observable at any single decision time. Estimate graphs on synchronized (refresh-time or lagged) data, cross-reference the asynchronicity treatment in Chapter~\ref{ch:multivariate}, and when in doubt, lag the foreign legs by one day. This costs a little signal and buys causal defensibility.
+\end{projectconnection}
+
+% ──────────────────────────────────────────────────────────────
+\section{Dynamic, Spectral, and Intraday Frontiers}\label{sec:gnn:frontiers}
+% ──────────────────────────────────────────────────────────────
+
+Beyond the GNNHAR lineage, the 2022--2026 literature has pushed in four directions: adjacency that changes daily, graphs entering through their spectrum instead of message passing, attention at intraday frequency, and graph transformers at full index scale. The architecture ideas are genuinely useful. The evidence discipline mostly is not: as you read, keep one question running, \emph{would this survive $\QLIKE$ with a Diebold--Mariano test?}, because with one partial exception none of these papers asks it. The section-closing audit table keeps score.
+
+\subsection{DCRNN-HAR: Dynamic Spillover Graphs}\label{sec:gnn:dcrnn}
+
+\citet{ChiGaoWang2026DCRNN} make the Diebold--Yilmaz bridge fully dynamic. For every 22-day look-back window they re-estimate the DY variance-decomposition table, row-standardize it, and transpose it into a directed, weighted adjacency, so $A_{ij}$ measures the spillover transmitted from market $i$ to $j$, refreshed daily as the window slides. A second, cheaper device handles the fact that their 8 global equity indices trade on different calendars: a per-day \textbf{graph mask} zeroes the outgoing edges of any market closed that day ($\tilde{\mathbf{A}}_t = \mathbf{E}^{A_t} \odot \mathbf{A}$), so closed markets can receive state updates but cannot transmit, and a masked loss keeps inactive days out of the gradient \citep[\S3.2--3.3]{ChiGaoWang2026DCRNN}. The forecasting body is a DCRNN: a GRU whose matrix multiplications are replaced by \textbf{diffusion convolutions} over the directed graph, $\sum_{k=0}^{K-1} \zeta_k (\mathbf{D}^{-1}\mathbf{A})^k \bX$. Read this against \Cref{eq:gnn:ax}: each power $(\mathbf{D}^{-1}\mathbf{A})^k$ spreads every asset's information $k$ hops along the directed spillover edges, like a rumor passed on $k$ times, and the learned weights $\zeta_k$ decide how much each distance matters. And, in the paper's best design decision, a plain HAR regression rides along as a jointly-trained \emph{skip connection}, its forecast added to the network output at every step \citep[eq.~25]{ChiGaoWang2026DCRNN}.
+
+The results sweep: lowest MSE and MAE in every market at every horizon, and membership of the 75\% Model Confidence Set in 48 of 48 cells, against 17 for the best baseline (a static-GLASSO GNN-HAR). For SPX at $h=1$, MSE falls from 0.144 (HAR) and 0.136 (GNN-HAR) to 0.125; at $h=22$, from 0.428 to 0.195 \citep[Tables~2--8]{ChiGaoWang2026DCRNN}. Now the discount rate: no $\QLIKE$, no DM tests, a permissive 75\% MCS, a single fixed 70/30 split with no retraining across a test window that contains COVID, and, most frustratingly, \emph{no ablation}: the dynamic graph, the union calendar, the HAR skip, and the architecture all change together, so we cannot say which ingredient earns the win over the static-graph baseline that shares its backbone.
+
+\subsection{GSP-HAR: The Spectral Route}\label{sec:gnn:gsp}
+
+The same authors' GSP-HAR \citep{ChiGaoWang2024GSP} takes the road not taken in \Cref{sec:gnn:gcn}: instead of truncating spectral convolutions into local message passing, keep the spectrum. The obstacle is that spillover graphs are \emph{directed}, and spectral analysis needs a symmetric (here, Hermitian) operator. The fix is elegant:
+
+For a directed weighted graph, we want a Laplacian that keeps the direction information but still has an orthonormal eigenbasis and real, non-negative frequencies:
+\begin{equation}\label{eq:gnn:magnetic}
+  \mathbf{L}^{(q)}_{m} \;=\; \mathbf{I} \;-\; \Bigl( (\mathbf{D}^{s})^{-\frac{1}{2}}\, \mathbf{W}^{s}\, (\mathbf{D}^{s})^{-\frac{1}{2}} \Bigr) \odot \exp\!\bigl( \mathrm{i}\, 2\pi q\, (\mathbf{W} - \mathbf{W}^{\top}) \bigr)
+\end{equation}
+where \citep[eqs.~6--9, pp.~11--12]{ChiGaoWang2024GSP}:
+\begin{itemize}[nosep]
+  \item $\mathbf{W}$: the directed DY spillover weight matrix; $\mathbf{W}^{s} = \tfrac{1}{2}(\mathbf{W} + \mathbf{W}^{\top})$ its symmetric part, with degree matrix $\mathbf{D}^{s}$.
+  \item The magnitude of each entry comes from the symmetrized graph; the \emph{direction} is stored as a complex phase via the element-wise $\exp(\mathrm{i}\,\cdot)$, with $q \ge 0$ a tuning knob ($q = 0$ throws the direction away).
+  \item This \textbf{magnetic Laplacian} is Hermitian and positive semi-definite (the complex-matrix analogues of ``symmetric'' and ``never negative''), which is exactly what guarantees it decomposes into a well-behaved frequency basis with real, non-negative eigenvalues: graph frequencies for a directed graph. You do not need to compute any of this; the takeaway is that the construction lets direction-aware graphs use the same frequency-analysis machinery as undirected ones.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+You cannot diagonalize an asymmetric matrix into a clean frequency basis, so the magnetic Laplacian splits the job: how \emph{strongly} two markets are coupled goes into the magnitude, and \emph{who leads whom} goes into a complex phase, like encoding wind speed and wind direction as one complex number. The result behaves like an ordinary Laplacian for all the spectral machinery while quietly remembering the arrows.
+\end{intuition}
+
+GSP-HAR then graph-Fourier-transforms the cross-section of HAR features, fits HAR-style linear filters on the real and imaginary spectral parts, transforms back, and merges with a small network. Two exports matter beyond the model. First, the paper's \textbf{graph signal energy} diagnostic, $E(\bx) = \bx^\top \mathbf{L}\, \bx$, measures how \emph{rough} the RV cross-section is over a candidate graph: the quadratic form sums the squared RV differences across every edge, so if connected assets have similar volatility, $E$ is small (smooth), and if neighbors disagree violently, $E$ is large (rough). An informative spillover network should show energy spiking in crises and quiet in calm markets, and the DY-magnetic construction passes this test where Pearson-correlation graphs fail \citep[Figs.~1--2, \S3.1]{ChiGaoWang2024GSP}. Diagnose the graph before you model on it: this costs one matrix multiplication. Second, calibration: for SPX at $h=1$ the MSE gain over plain HAR is 0.113 to 0.110, under 3\%, with MCS at a lenient 25\% level, no $\QLIKE$, no DM, reimplemented baselines, and a graph-estimation window the paper never pins down \citep[Tables~1--3, p.~18--19]{ChiGaoWang2024GSP}.
+
+\subsection{EMGNN: Learned, Evolving Adjacency}\label{sec:gnn:emgnn}
+
+The evolving multiscale GNN applied by \citet{ZhouXieWangGongZhu2025} to Bitcoin futures RV abandons pre-specified graphs entirely: the adjacency is a \emph{state}, updated recursively from the previous adjacency and current node features ($\mathbf{A}^{(m,t)} = \mathcal{H}_s(\mathbf{A}^{(m,t-1)}, \psi^{(m,t)})$, with $\mathcal{H}_s$ a learned update network and $\psi^{(m,t)}$ the current node representations) and held piecewise-constant over short intervals. In plain terms: the graph itself has memory, yesterday's wiring nudged by what just happened in the market. The distinctive touch: the graph is learned \emph{separately at five time scales} (intervals of 31, 21, 14, 5, and 1 days), so the slow dependence structure and the fast one need not agree \citep[eqs.~10--14, pp.~17--18, 20]{ZhouXieWangGongZhu2025}. The node set will look familiar: seven futures RVs (Bitcoin, S\&P~500, dollar, T-bonds, gold, oil, gas) plus four uncertainty indices (EPU, GPR, VIX, OVX), a miniature of our own cross-asset universe. Against nine baselines, EMGNN posts relative MSFE 0.6527 versus the static-learned MTGNN's 0.7809 and is the only model with MCS $p = 1.000$ under both losses \citep[Table~5, p.~23]{ZhouXieWangGongZhu2025}. Three discounts: the pairwise DM test against MTGNN is \emph{insignificant} at $h=1$ (DM $= 1.0076$) on a $\sim$200-observation test set, so ``sole MCS survivor'' should not be read as ``proven better than the runner-up''; the setting is crypto with a single chronological split and unpurged cross-validation; and the paper's ``QLIKE'' robustness metric squares the whole Gaussian quasi-likelihood term, a nonstandard definition whose numbers cannot be compared with anything else in this book. Check loss formulas before comparing papers; it is not pedantry.
+
+\subsection{SpotV2Net: Attention Intraday, and Features as the Model}\label{sec:gnn:spotv2net}
+
+SpotV2Net \citep{BriniToscano2024} is the GAT of \Cref{sec:gnn:attention} deployed at 30-minute frequency on the 30 DJIA names, and its real lesson is that \emph{the graph topology can be trivial when the features are rich}. The graph is fully connected and static. Everything interesting sits on the attributes: node features are Fourier-estimator spot volatilities plus co-volatilities with every other stock (42 lags), and \textbf{edge features} are the two endpoints' \emph{volatilities-of-volatility} and their co-vol-of-vol, second-order quantities that inform the attention scores through the edge-feature extension of GAT. On the fixed test split it beats panel ARFIMA, XGBoost, and an LSTM on MSE (4.885e-08 vs.\ 5.487e-08 for ARFIMA, an 11\% gap), but its QLIKE is within rounding of the baselines (0.999 vs.\ 1.000) and nothing is significance-tested; notably, there is \emph{no HAR baseline at all}, and no ablation isolating whether the headline vol-of-vol edge features actually earn their name \citep[Table~2, p.~16]{BriniToscano2024}. One finding deserves retelling: interpreting the trained model with GNNExplainer, the three most influential nodes are AMGN, CRM, and HON, precisely the three stocks that \emph{joined the DJIA} near the start of the training sample \citep[\S7.3]{BriniToscano2024}. GNN interpretability output reflects the training period's idiosyncrasies, index recomposition and pandemic sector dynamics here, not timeless economic structure.
+
+\subsection{GTN-VF: The Graph Transformer at Index Scale}\label{sec:gnn:gtnvf}
+
+Finally, the paper Chapter~\ref{ch:deeplearning} previewed. \citet{ChenRobert2022} forecast 10--30-minute realized volatility for 494 S\&P~500 stocks with a graph transformer (the UniMP operator: essentially the GAT of \Cref{sec:gnn:attention} with scaled dot-product attention scores plus a linear self-term that lets each node weigh its own previous state directly). Its construction generalizes everything in this chapter: each \emph{(stock, timestamp)} pair is a node, so the graph spans the panel in both dimensions, and edges come from four relation sources at once, top-$K$ feature-similarity edges across time (``days that looked like today''), across stocks, shared GICS industry, and Factset supplier-customer links. Two findings transfer directly. First, \textbf{relational information, not deep-learning machinery, earns the win}: the relation-free ``Vanilla'' variant of the same architecture \emph{loses to HAR} at the two longer horizons (test RMSPE 0.2251 vs.\ HAR's 0.2061 at 20 minutes; 0.2160 vs.\ 0.1939 at 30), and only the graph-equipped variants pull ahead \citep[Table~4, p.~9]{ChenRobert2022}. Second, \textbf{edge quality beats edge quantity}: 8.4M carefully-selected top-2 similarity edges contribute a 1.2\% RMSPE gain while 47.9M dense same-sector edges contribute 0.7\% \citep[\S5.4, Table~3]{ChenRobert2022}. The caveats are by now a familiar chorus: RMSPE is both training loss and sole metric, no $\QLIKE$/DM/MCS, a single split whose validation year is 2020, and the similarity-edge construction is never explicitly restricted to the training window, so graph look-ahead cannot be ruled out from the text.
+
+\subsection{The Audit Table and the Horizon Conflict}\label{sec:gnn:audit}
+
+\begin{keyresult}[Does It Survive QLIKE? The Frontier, Audited]
+\begin{center}
+\small
+\begin{tabular}{@{}llllll@{}}
+\toprule
+Model & Universe & Losses used & DM? & MCS? & QLIKE verdict \\
+\midrule
+GNNHAR$_Q$ & 27 DJIA stocks & MSE, QLIKE & yes & 5\% & $-4\%$ at $h{=}1$, real \\
+GHAR (cov.) & 27 DJIA stocks & $\mathcal{L}^E$, $\mathcal{L}^F$, QLIKE & no & yes & $-1.8\%$, MCS-backed \\
+DCRNN-HAR & 8 global indices & MSE, MAE & no & 75\% & unknown \\
+GSP-HAR & 24 global indices & MSE, MAE & no & 25\% & unknown \\
+EMGNN & BTC + cross-asset & MSFE, MAFE & yes$^{a}$ & 90\% & nonstandard defn. \\
+SpotV2Net & 30 DJIA, intraday & MSE, QLIKE$^{b}$ & no & no & within rounding \\
+GTN-VF & 494 S\&P stocks & RMSPE & no & no & unknown \\
+GNHAR & 10 indices & MAFE, MSFE (log) & yes & 20\% & unknown \\
+\bottomrule
+\end{tabular}
+\end{center}
+\footnotesize $^{a}$DM vs.\ runner-up insignificant at $h=1$. $^{b}$Reported but untested; gap within rounding.\\[2pt]
+\normalsize The pattern: the further a paper's headline gain is from the GNNHAR lineage's careful single digits, the thinner its evaluation. Default prior for any new graph-vol paper: halve the headline, then ask for the DM test.
+\end{keyresult}
+
+The audit also surfaces an open conflict worth watching. GNNHAR's gains \emph{fade} with horizon (gone by $h=22$, \Cref{tab:gnn:gnnhar}); DCRNN-HAR's MSE gains \emph{grow} with horizon ($-13\%$ at $h=1$ to $-54\%$ at $h=22$ for SPX); and the linear GNHAR's long-horizon MAFE gains are its largest \citep{BoettiNunes2026}. Different universes (single names versus country indices), different targets, different metric discipline; no clean adjudication exists. The cheapest arbiter is to regenerate the open-source DCRNN-HAR and GSP-HAR forecasts and re-score them under Patton-robust $\QLIKE$ with DM tests, which is precisely the kind of afternoon experiment the project can run (\Cref{sec:gnn:blueprint}).
+
+% ──────────────────────────────────────────────────────────────
+\section{Hybrids and the Regime Frontier}\label{sec:gnn:hybrids}
+% ──────────────────────────────────────────────────────────────
+
+Nothing in this book suggests a GNN should \emph{replace} the models that already work: rolling HAR, gradient-boosted trees (Chapter~\ref{ch:trees}), the ensembles of Chapter~\ref{ch:hybrid}. The practical question is how to \emph{wire} a graph component into that stack, and, one level up, whether market regimes should condition the graph. On the first question the literature offers three wirings with sharply different evidence; on the second it offers, so far, a cautionary museum.
+
+\subsection{Three Wirings}\label{sec:gnn:wirings}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth, scale=0.92, transform shape,
+  box/.style={draw, rounded corners, minimum width=1.95cm, minimum height=0.62cm, align=center, font=\scriptsize},
+  lab/.style={font=\small\bfseries, align=center}]
+  % (a) blending
+  \begin{scope}
+    \node[lab] at (1.0,2.15) {(a) prediction blending};
+    \node[box, fill=defblue!10] (g1) at (0,1.2) {GNN $\to \widehat{\RV}$};
+    \node[box, fill=gray!10]  (h1) at (0,0.35) {HAR / GBM $\to \widehat{\RV}$};
+    \node[box, fill=keyorange!15] (c1) at (2.6,0.78) {combine\\ forecasts};
+    \draw[arrow] (g1) -- (c1); \draw[arrow] (h1) -- (c1);
+  \end{scope}
+  % (b) stacking
+  \begin{scope}[xshift=5.3cm]
+    \node[lab] at (1.2,2.15) {(b) embedding stacking};
+    \node[box, fill=defblue!10] (g2) at (0,1.2) {GNN embeddings\\ $\bh_i^{(L)}$};
+    \node[box, fill=gray!10]  (f2) at (0,0.35) {tabular features};
+    \node[box, fill=keyorange!15] (c2) at (2.7,0.78) {LightGBM};
+    \draw[arrow] (g2) -- (c2); \draw[arrow] (f2) -- (c2);
+  \end{scope}
+  % (c) joint
+  \begin{scope}[xshift=10.7cm]
+    \node[lab] at (1.2,2.15) {(c) joint training};
+    \node[box, fill=gray!10] (t3) at (0,1.2) {GBDT / LSTM};
+    \node[box, fill=defblue!10] (g3) at (2.9,1.2) {GNN};
+    \node[box, fill=keyorange!15] (c3) at (1.45,0.1) {one loss};
+    \draw[arrow] (t3) -- (g3);
+    \draw[arrow, dashed, warnred] (g3.south) .. controls (2.4,0.5) .. (t3.south east);
+    \node[font=\tiny, warnred] at (3.35,0.55) {gradients};
+    \draw[arrow] (g3.south west) -- (c3.north east);
+  \end{scope}
+\end{tikzpicture}
+\caption{Three ways to couple a GNN with the models the project already trusts. Blending combines finished forecasts; stacking feeds the GNN's learned node embeddings to a tree model as features; joint training lets gradients flow between the stages (in BGNN's case, by fitting new trees to the GNN's gradient signal, dashed arrow).}
+\label{fig:gnn:hybrid-wiring}
+\end{figure}
+
+\textbf{(a) Prediction blending} treats the GNN as one more forecaster whose output joins an ensemble, exactly the machinery of Section~\ref{sec:hybrid:ensemble}. It needs no new theory, adds one column to the combiner, and every leakage property is inherited from components you already control. Keep this as the default; the burden of proof lies on anything fancier.
+
+\textbf{(b) Embedding stacking} extracts the GNN's final-layer node embeddings and hands them to a gradient-boosted tree as extra features. It sounds strictly stronger than blending (the trees see the GNN's internal representation, not just its scalar opinion), but the published finance evidence is a negative exemplar. \citet{ChoiKim2024} build information-theoretic graphs over nine sector ETFs (normalized mutual information and transfer-entropy edges, permutation-tested), extract centralities plus 1024-dimensional node embeddings compressed to 32 dimensions (via Role2vec, FEATHER, and UMAP, off-the-shelf techniques for turning graph structure into feature vectors; the details do not matter for the argument), and feed XGBoost/LightGBM/CatBoost. Accuracy on direction-of-return classification moves from roughly 0.52 to 0.55 (e.g., XLE 0.5238 to 0.5651), with enormous $t$-statistics, but the $t$-tests are over 100 random seeds of the same split (simulation noise, not forecast superiority), Cohen's kappa barely exceeds 0.12, and, decisively for us, \emph{the paper never states that the networks, embeddings, or UMAP were fitted on training data only} \citep[Table~8; \S3--4]{ChoiKim2024}. Every step of a graph-feature pipeline is a model-fitting step; silence about its estimation window is a defect, not a detail. Note also what this paper is not: there is no message passing, no learned graph model, just hand-extracted graph features, the cheap first road from graphs to forecasts.
+
+\textbf{(c) Joint training} is where the strongest non-finance evidence lives. The obstacle is that gradient-boosted trees are not differentiable, so you cannot simply backpropagate a GNN's loss into them. BGNN \citep{IvanovProkhorenkova2021} dissolves the obstacle with one idea worth memorizing:
+
+We want the tree ensemble to improve in the direction the GNN's loss says its \emph{inputs} should move. After each epoch's GNN update, the change in the GNN's input features (for one gradient step) is exactly the negative feature-gradient, and new trees are fitted to \emph{that} as a regression target:
+\begin{equation}\label{eq:gnn:bgnn}
+  \bX'_{\text{new}} \;=\; \bX' \;-\; \eta\, \frac{\partial\, \loss_{\text{GNN}}\bigl(g_\theta(G, \bX'),\, Y\bigr)}{\partial\, \bX'},
+  \qquad
+  \text{next trees fit } \bX'_{\text{new}} - \bX'.
+\end{equation}
+where \citep[Alg.~1, \S3, pp.~3--4]{IvanovProkhorenkova2021}:
+\begin{itemize}[nosep]
+  \item $\bX' = f(\bX)$: the current GBDT ensemble's outputs, used as the GNN's input node features; $g_\theta$: the GNN; $\eta$: a learning rate.
+  \item The GNN optimizes both its parameters $\theta$ \emph{and} its inputs $\bX'$; the induced input change becomes the boosting target, so the error signal from the graph reaches the trees without differentiating a single tree.
+  \item Interpretations: the GBDT is a learned embedding layer for the GNN, or the GNN is a topology-aware loss function for the GBDT.
+\end{itemize}
+
+\begin{intuition}[In Plain English]
+The trees cannot hear the GNN's gradient directly, so the GNN writes it down as homework: ``here is how I wish your outputs had been different.'' Each round, fresh trees are grown to produce exactly that wished-for adjustment. Boosting already works by fitting residuals; BGNN merely redefines the residual as ``what the graph model wants,'' which is why the trick costs nothing structurally.
+\end{intuition}
+
+The payoff: on four node-regression datasets with heterogeneous tabular features, end-to-end BGNN cuts RMSE by 8, 14, 4, and 4\% versus the strongest GNN baseline (GAT), and consistently beats the two-stage variant (Res-GNN, a pretrained GBDT feeding a GNN) \citep[Table~2, p.~6]{IvanovProkhorenkova2021}. How the stages are coupled matters as much as which stages you pick. Three sharp caveats travel with the result: it is entirely non-financial (census blocks, elections, social networks), it evaporates when node features are homogeneous (on bag-of-words and embedding features the GBDT stage \emph{hurts}), and its evaluation is RMSE on random node splits, a protocol that would be leakage in any time-series panel. A vol panel of raw $\RV$ lags is fairly homogeneous; BGNN's edge would need the project's genuinely mixed feature set (IV, quarticity, calendar, asset-class dummies) to plausibly appear.
+
+A fourth wiring, really the simplest form of (c), is \textbf{parallel fusion}: run an LSTM on the target's own history and a GCN on the cross-asset graph, concatenate the two embeddings, and regress through dense layers, trained jointly \citep{SonaniBadiiMoin2025}. On 10 large-cap US stocks it trims MSE 10.6\% versus a standalone LSTM (0.00144 vs.\ 0.00161), but the target is next-day \emph{price}, the test window is 50 days, there is no significance testing and no HAR or even random-walk baseline, the paper's own per-stock heatmap contradicts its ``improves all stocks'' claim, and the correlation graph's estimation window is never stated \citep[\S4.5--4.6, Figs.~4--6]{SonaniBadiiMoin2025}. Keep the wiring diagram; discount the evidence to near zero.
+
+\begin{projectconnection}[The Standing Verdict]
+No finance paper demonstrates embedding stacking or joint training beating simple prediction blending for volatility under honest evaluation; Choi--Kim brackets the stacking road from below and BGNN brackets joint training from outside finance. The project's standing verdict (unchanged since the 2026-05 research sweeps) is therefore: \emph{blend forecasts by default; test stacking as an experiment, not a plan} (arm A vs.\ arm B in \Cref{sec:gnn:blueprint}); attempt joint training only if stacking shows signs of life and the feature set is heterogeneous.
+\end{projectconnection}
+
+\subsection{The Regime Frontier: An Honest Museum}\label{sec:gnn:regime}
+
+Chapter~\ref{ch:hybrid} taught regime identification; \Cref{sec:gnn:gnblock} showed the global attribute $\mathbf{u}$ as the natural port for regime information. So it is striking that the published intersection of regime detection and graph learning, as of mid-2026, consists of exactly two exhibits, and neither survives inspection.
+
+\textbf{Exhibit one: the label without the mechanism.} \citet{KumarUmeorahAlochukwu2024} run a GCN-plus-GAT stack (``Temporal GAT'') over 8 global indices with Diebold--Yilmaz spillover adjacency, and its one solid finding is useful: the directed spillover graph beats the symmetric correlation graph on nearly every index \citep[Table~2, p.~15]{KumarUmeorahAlochukwu2024}. But the graphs are estimated \emph{once per train/validation/test split} and frozen, so the ``dynamic'' machinery is three static graphs, with no detector, no gating, and, worse, the test-period graph is estimated from the whole test window, a plain look-ahead. There is no HAR or standalone GARCH baseline, no $\QLIKE$, no significance test, and the volatility target is built from daily closes despite the paper defining intraday RV \citep[pp.~10--13]{KumarUmeorahAlochukwu2024}. (A later journal version of this paper exists under a ``regime-dependent'' title; we could not verify its numbers and cite only the preprint on disk.) The lesson is the reading skill: when a title says dynamic or regime-dependent, ask \emph{what updates, when, using which data}.
+
+\textbf{Exhibit two: the honest failure.} H-ETE-GNN \citep{LeeCho2025} is causally clean and still instructive in defeat. Edges come from \textbf{effective transfer entropy}: raw transfer entropy minus its mean over shuffled surrogates, keeping only edges with $Z > 1.96$, a clean recipe for sparse, directed, nonlinearity-aware graphs (their Eqs.~4--5). The regime layer monitors a 250-day rolling \textbf{Hurst exponent} of world-equity returns, a statistic measuring whether a series is trending (above 0.5: moves tend to continue) or mean-reverting (below 0.5: moves tend to reverse); when it crosses 0.5 persistently, the model declares a regime change, rebuilds the graph, and fine-tunes the GNN. Over 19 calm-tilted years this beats fixed-schedule retraining on average, but in the two crises the trigger barely fires (two regime changes across 2007--08, one across 2021--23, of 47 total), the stale graph stays in place, and the Hurst-triggered model loses to \emph{naive periodic retraining} by 32\% RMSE in 2008 (0.5287 vs.\ 0.4000) and 40\% in 2020 (0.3291 vs.\ 0.2356) \citep[Table~10, p.~22; \S3.1, p.~18]{LeeCho2025}. Add the familiar deflators, a smooth 20-day rolling-std target (not intraday RV), no HAR or persistence baseline, seed-level $t$-tests instead of DM, and the exhibit is complete: an event-triggered graph adaptation is only as good as its trigger's hit rate \emph{in turbulence}, and this trigger is quietest exactly then.
+
+\begin{keyidea}[What the Empty Frontier Means for the Project]
+Regime-conditioning the \emph{graph} is the least-supported component in this entire chapter: one impostor, one honest failure, no credible incumbent. Meanwhile the best-evidenced way to inject regime information into a vol forecaster is far cheaper: a filtered (real-time) regime probability from a Markov-switching model added as a \emph{feature}, which improved HARQ's $\QLIKE$ by about 5\% on CSI~300 intraday RV with DM significance in the cleanest 2026 exemplar \citep[Tables~2--4]{FangSlepaczuk2026}. The evidence-ranked order is: regime probability as a HAR feature first, regime-gated ensembles second, regime-conditioned graphs a distant third. Inverting that order is how projects burn a summer. The flip side: because the fusion layer has no incumbent, a \emph{careful} regime$\times$graph experiment, run after the boring layers work, is genuine thesis material rather than replication.
+\end{keyidea}
+
+% ──────────────────────────────────────────────────────────────
+\section{The Skeptic's Checklist}\label{sec:gnn:skeptic}
+% ──────────────────────────────────────────────────────────────
+
+Before the blueprint, the case for the prosecution. Everything below is published evidence that graphs buy \emph{less} than this chapter's enthusiasm might suggest, and each item converts into a concrete check the project must pass before believing its own GNN results.
+
+\textbf{Deflation 1: node embeddings can buy what graphs buy.} The most unsettling result comes from outside finance. STID \citep{ShaoZhangWang2022} takes the standard spatio-temporal benchmarks that motivated a generation of graph architectures (traffic sensors, electricity meters) and beats essentially all of them, DCRNN, Graph WaveNet, MTGNN, GMAN, with \emph{no graph at all}: a per-node trainable \textbf{identity embedding}, two calendar embeddings, and a three-layer MLP, roughly 2--4\% better average MAE than the best graph model at 5--20$\times$ less training cost per epoch \citep[Tables~2--3]{ShaoZhangWang2022}. The mechanism diagnosis is the valuable part: what graph convolutions mostly fix is \textbf{sample indistinguishability}, two nodes with near-identical input windows needing different forecasts, and a free learned per-node vector breaks that tie just as well. Their ablation makes the point quantitatively: removing the spatial identity costs about 18\% MAE, dwarfing everything else \citep[Fig.~3]{ShaoZhangWang2022}. In our world: does SPX need messages from oil, or does a pooled model simply need to know which asset it is looking at? That is an empirical question with a cheap answer, and no vol-GNN paper has run it.
+
+\textbf{Deflation 2: linear network models set the bar, and it is high.} GHAR already claims roughly half of GNNHAR's gain (\Cref{tab:gnn:gnnhar}). The GNAR lineage pushes further: \citet{BoettiNunes2026}'s GNHAR, a purely \emph{linear} HAR whose coefficient matrices are ``diagonal plus $\beta\,\mathbf{W}$'' on a Diebold--Yilmaz connectedness graph, beats univariate HAR at every horizon on 10 indices, with the largest gains at long horizons ($\sim$40\% MAFE at $h=44$). Read its headline adversarially, though: the advertised ``38\% at $h=1$'' is against JC-HAR, the \emph{weaker} of its two benchmarks; against plain HAR the one-day gain is about 14\% (0.432 vs.\ 0.504), and all of it is MAFE on log-RV with no $\QLIKE$ \citep[Table~2, p.~14]{BoettiNunes2026}. Two durable lessons ride along: pooled (global) coefficients beat node-specific ones so decisively that the node-specific variants are ejected from every MCS, parsimony over flexibility at small $N$; and a model with five interpretable coefficients gives you a rolling contagion dashboard (its daily spillover coefficient spikes at Volmageddon and COVID) that no GNN can match.
+
+\textbf{Deflation 3: cross-asset terms can be worth exactly zero.} \citet{Mallory2026} models six futures markets (grains, oil, equities, Treasuries) with a clever two-step: OLS for each market's own HAR lags, then ElasticNet only on the \emph{cross}-market terms, protecting the 0.99 own-persistence that naive shrinkage destroys (a pilot with ElasticNet on everything collapsed persistence to 0.08--0.18; remember that failure mode before you regularize any HAR system). The result: 7 of 90 cross-market coefficients survive, and out-of-sample RMSE is \emph{identical to four decimals} to univariate HAR for every asset \citep[Table~3, p.~17; Fig.~3, p.~20]{Mallory2026}. Before generalizing the null, read the target: the ``volatility'' is a 30-day rolling Yang--Zhang estimate, so consecutive observations share 29 days of data, and one-step forecasting of that object is almost pure persistence (plain HAR gets 1.5\% MAPE). Cross-asset signal lives in daily innovations and is diluted 30-to-1 in such a target. The transferable lesson is not ``spillovers never help'' but \emph{read what a paper's RV actually is before importing its conclusion}, and expect own-lags to do most of the work everywhere.
+
+\textbf{Deflation 4: accuracy, ranking, and money are three different contests.} In the 465-stock GraphSAGE study of \citet{Wade2026GNNPortfolios}, the best point-forecast model (dynamic-correlation GNN with macro features), the best cross-sectional ranker (the GNN ensemble), and the best portfolio (sector GNN with macro, minimum-variance Sharpe 0.984 vs.\ HAR's 0.635) are \emph{three different models}, while the MSE gap between the graph models and HAR is a few percent and untested \citep[Tables~3--5, \S5.5]{Wade2026GNNPortfolios}. Nothing about a $\QLIKE$ ranking guarantees the economic ranking. The project's evaluation plan (statistical loss \emph{plus} economic-value test) exists precisely because of this decoupling.
+
+\textbf{Deflation 5: the QLIKE survival question.} The audit table of \Cref{sec:gnn:audit} carries this one. The additional prior it licenses: history in this exact literature says MSE-flavored wins shrink, sometimes to zero, when re-scored under $\QLIKE$ against a properly re-estimated HAR.
+
+\begin{keyidea}[The Checklist]
+Before believing any graph-model result, ours included, demand:
+\begin{enumerate}[nosep]
+  \item \textbf{The HAR bar}: compared against a rolling, re-estimated HAR (and GHAR), not a stale or per-asset-only one.
+  \item \textbf{The STID control}: per-asset identity embeddings + MLP in the same harness; the graph must beat the embedding.
+  \item \textbf{The loss}: Patton-robust $\QLIKE$ computed and reported, with DM tests and an MCS at a conventional level; MSE-only wins are provisional.
+  \item \textbf{The target}: an unsmoothed intraday-based RV, not rolling-window standard deviations or squared daily returns.
+  \item \textbf{The graph's information set}: adjacency, embeddings, scalers all estimated on training windows only, stated explicitly.
+  \item \textbf{The economics}: if a portfolio claim is made, a cost-aware rule plus the accuracy/economics decoupling check.
+\end{enumerate}
+This list doubles as a referee report for any paper and as the acceptance gate for the project's own experiments.
+\end{keyidea}
+
+% ──────────────────────────────────────────────────────────────
+\section{Project Blueprint: What to Actually Build}\label{sec:gnn:blueprint}
+% ──────────────────────────────────────────────────────────────
+
+Everything above compresses into a build order, sequenced so that each step is cheap, answers one question, and gates the next. The ordering is the evidence ranking of the 2026-07 research sweeps: linear graphs before neural ones, blending before stacking, regime features before regime graphs.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Stealth,
+  bstep/.style={draw, rounded corners, minimum width=3.3cm, minimum height=0.95cm, align=center, font=\small},
+  gate/.style={diamond, draw, aspect=2.2, align=center, font=\scriptsize, fill=orange!6, inner sep=1pt}]
+  \node[bstep, fill=gray!10]    (s0) at (0,0)     {\textbf{0.} rolling HAR-WLS harness\\ \scriptsize QLIKE + DM + MCS, purged CV};
+  \node[bstep, fill=defblue!10] (s1) at (0,-1.9)  {\textbf{1.} GHAR graph ablation\\ \scriptsize identity vs FC vs GLASSO vs DY};
+  \node[gate] (g1) at (4.6,-1.9) {best graph beats\\ identity, DM-sig.?};
+  \node[bstep, fill=defblue!14] (s2) at (4.6,-3.9) {\textbf{2.} GNNHAR1L, QLIKE loss\\ \scriptsize one hop, dim $\approx$ 9, monthly re-est.};
+  \node[bstep, fill=warnred!8]  (s3) at (0,-3.9)  {\textbf{3.} STID control\\ \scriptsize symbol embeddings + MLP};
+  \node[gate] (g2) at (4.6,-5.9) {GNN beats GHAR\\ \emph{and} STID?};
+  \node[bstep, fill=intgreen!10](s4) at (4.6,-7.8) {\textbf{4.} hybrid arms\\ \scriptsize blend vs embed-stack into LightGBM};
+  \node[bstep, fill=prereqpurple!10](s5) at (9.2,-7.8) {\textbf{5.} regime fusion\\ \scriptsize novelty tier; expectations low};
+  \draw[arrow] (s0) -- (s1);
+  \draw[arrow] (s1) -- (g1);
+  \draw[arrow] (g1) -- node[right, font=\scriptsize] {yes} (s2);
+  \draw[arrow, gray, dashed] (g1) .. controls (7.6,-0.9) .. node[above, font=\scriptsize, gray] {no: stop at GHAR / features} (9.2,-1.9);
+  \node[font=\scriptsize, gray, align=center] at (9.2,-2.35) {ship spillover features,\\ skip the GNN};
+  \draw[arrow] (s1) -- (s3);
+  \draw[arrow] (s2) -- (g2); \draw[arrow] (s3.east) .. controls (2.4,-5.4) .. (g2.west);
+  \draw[arrow] (g2) -- node[right, font=\scriptsize] {yes} (s4);
+  \draw[arrow] (s4) -- (s5);
+\end{tikzpicture}
+\caption{The build order, with go/no-go gates. The dashed exit is a legitimate outcome: if linear graph aggregation captures everything, the deliverable is three extra HAR regressors, not a neural network.}
+\label{fig:gnn:build-order}
+\end{figure}
+
+\begin{description}[nosep]
+  \item[Step 0: the harness.] Rolling HAR-WLS baseline re-estimated walk-forward, $\QLIKE$ primary with DM tests and MCS, purged CV for any tuned component. Nothing else starts until this exists, because every later number is a ratio to it. The GNNHAR repository's evaluation code (QLIKE training loop, MCS testing) is worth porting wholesale.
+  \item[Step 1: the graph ablation (the chapter's single best experiment).] The four-adjacency GHAR run specified in \Cref{sec:gnn:graph-contradiction}'s keyidea box. Beyond settling the graph question, it yields the spillover features that are useful regardless of what happens next. Expected outcome, from \Cref{tab:gnn:gnnhar} after the audit-table discount: one to two percent $\QLIKE$ at $h=1$ if graphs help at all.
+  \item[Step 2: one nonlinear hop.] Only if a graph beat identity with DM significance: GNNHAR1L trained under $\QLIKE$, hidden dimension near 9, seed-ensembled, monthly re-estimation, per \Cref{sec:gnn:gnnhar-model}. Do not stack a second layer until a DM test asks for it; our universe's graphs will have diameters like GNNHAR's.
+  \item[Step 3: the STID control.] Per-symbol identity embeddings plus a small MLP in the same harness. If it matches the GNN, the graph is not earning its complexity, and the honest conclusion is ``pooling plus asset identity,'' which is still a publishable internal finding.
+  \item[Step 4: the hybrid arms.] Arm A: LightGBM on the Chapter~\ref{ch:features} feature set plus the GNN's scalar forecast (blending). Arm B: the same plus 8/16/32-dimensional final-layer node embeddings (stacking). Purged $k$-fold with embargo, $\QLIKE$, DM. Prior from \Cref{sec:gnn:wirings}: A $\approx$ B at far lower complexity; arm B must win clearly to displace the blending default.
+  \item[Step 5: regime fusion (novelty tier).] Filtered regime probability entering as a global attribute or node feature versus regime-blended graphs, attempted last, with H-ETE-GNN's crisis failure as the cautionary prior and a periodic-retrain fallback always in the comparison set.
+\end{description}
+
+\begin{keyresult}[Honest Expected Gains]
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Step & Realistic win (vs.\ rolling HAR, $\QLIKE$, $h{=}1$) & Source of the prior \\
+\midrule
+QLIKE-trained HAR & $\sim$1--2\% & HAR$_Q$ row, \Cref{tab:gnn:gnnhar} \\
+GHAR spillover terms & $\sim$1--2\% & GHAR rows, \Cref{tab:gnn:gnnhar} \\
+GNNHAR1L$_Q$ & $\sim$3--4\% total & \citet{ZhangCucuringuDong2023} \\
+Hybrid stacking over blending & $\approx$0 until proven & \Cref{sec:gnn:wirings} \\
+Regime-conditioned graphs & unknown; incumbent-free & \Cref{sec:gnn:regime} \\
+\bottomrule
+\end{tabular}
+\end{center}
+Single digits, concentrated at short horizons, larger in turbulence. If a run of ours shows 20\%, the first hypothesis is a bug or a leak, not brilliance.
+\end{keyresult}
+
+Two project-specific warnings close the section. First, \textbf{asynchronicity}: none of the papers in this chapter faces a universe whose nodes close at different times of day; our cross-asset book does, and \Cref{sec:gnn:graph-leakage}'s synchronization discipline is not optional. Second, \textbf{sample size}: 34 nodes and a few thousand days is tiny for anything with parameters; every design choice in this chapter that pointed small (one hop, dimension 9, pooled coefficients, sum-versus-mean as a one-line ablation) points smaller still on our data.
+
+% ──────────────────────────────────────────────────────────────
+\section{Summary}\label{sec:gnn:summary}
+% ──────────────────────────────────────────────────────────────
+
+\begin{itemize}[nosep]
+  \item A graph is nodes, edges, and a global attribute, each carrying features; CNNs, RNNs, and transformers are GNNs with frozen wiring, and the market is a graph whose wiring we must estimate (\Cref{sec:gnn:market-graph}).
+  \item The project's task is node-level regression; regime detection is graph-level; the same GNN body serves both with different heads (\Cref{sec:gnn:tasks}).
+  \item Permutation invariance is the defining constraint, and $\mathbf{A}\bX$ is already message passing: one matrix multiply aggregates every asset's neighborhood, $\mathbf{A}^k$ reaches $k$ hops (\Cref{sec:gnn:representation}).
+  \item All architectures are choices of message, update, and readout functions (MPNN); the GCN fixes them to a normalized neighborhood average, GraphSAGE adds a concatenation skip, the GN block adds edge and global lanes (\Cref{sec:gnn:building}).
+  \item GAT is ch.~\ref{ch:deeplearning}'s attention masked to the graph; a transformer is a GAT on a complete graph; attention weights form a learned, state-dependent spillover matrix, interpretable but not causal (\Cref{sec:gnn:attention}).
+  \item Sum aggregation is maximally expressive (GIN); depth backfires via over-smoothing, provably and fast on small dense graphs; vol graphs are tiny, so almost all web-scale GNN engineering advice does not apply (\Cref{sec:gnn:design}).
+  \item The canonical result: GHAR's three linear spillover terms earn roughly half the total gain; one QLIKE-trained nonlinear hop earns the rest, about 13\% MSE and 4\% $\QLIKE$ over rolling HAR at one day, fading by one month; multi-hop is dead weight; training loss matters as much as architecture (\Cref{sec:gnn:gnnhar}).
+  \item Graph construction is the contested choice: GLASSO wins on 27 stocks, fully-connected wins on 10 indices, learned-evolving wins on crypto; the resolution for our universe is a cheap OLS ablation, and graphs must always be estimated point-in-time, though graph look-ahead is a measurably second-order sin (\Cref{sec:gnn:graph-construction}).
+  \item The frontier offers dynamic DY graphs (DCRNN-HAR), spectral filtering on directed graphs via the magnetic Laplacian (GSP-HAR), learned evolving adjacency (EMGNN), vol-of-vol-informed intraday attention (SpotV2Net), and multi-relation graph transformers (GTN-VF), almost all evaluated without $\QLIKE$ or significance tests (\Cref{sec:gnn:frontiers}).
+  \item Wire GNNs into the existing stack by blending forecasts first; embedding stacking has only a negative finance exemplar; joint GBDT-GNN training (BGNN) is the strongest idea but non-financial; regime-conditioned graphs have no credible incumbent, which makes them last to build and interesting to try (\Cref{sec:gnn:hybrids}).
+  \item The skeptic's checklist, HAR bar, STID control, QLIKE with DM/MCS, honest target, point-in-time graph, economics check, is the acceptance gate for every experiment; expected gains are single digits, and that is fine, because the harness that proves them is the deliverable (\Cref{sec:gnn:skeptic}, \Cref{sec:gnn:blueprint}).
+\end{itemize}
