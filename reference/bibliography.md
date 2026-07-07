@@ -133,7 +133,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: J. Financial Econometrics 7:174-196
 - **Quality**: essential
 - **Topics**: har, long-memory, foundational
-- **PDF**: reference/project-papers/corsi-2009-har-realized-volatility.pdf
+- **PDF**: reference/project-papers/a-har-baselines/corsi-2009-har-realized-volatility.pdf
 - **Key finding**: The HAR model -- a three-component OLS regression of next-day RV on daily, weekly, and monthly RV averages -- captures the long-memory property of volatility with a simple, interpretable specification.
 - **Relevance**: The benchmark every ML model must beat; 2,100+ citations as of 2021.
 
@@ -155,7 +155,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: J. Econometrics 192:1-18
 - **Quality**: essential
 - **Topics**: har, harq, har-extensions, rv-estimators
-- **PDF**: reference/project-papers/bollerslev-patton-quaedvlieg-2016-harq.pdf
+- **PDF**: reference/project-papers/a-har-baselines/bollerslev-patton-quaedvlieg-2016-harq.pdf
 - **Key finding**: HARQ exploits time-varying measurement error in realized volatility by interacting HAR regressors with realized quarticity (RQ), delivering ~8% MSE / ~6% QLIKE improvement over HAR on S&P 500.
 - **Relevance**: The most reliable single-feature HAR improvement; a must-have baseline and feature source.
 
@@ -166,7 +166,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: RES 97:683-697
 - **Quality**: essential
 - **Topics**: har, har-extensions, jump-detection, leverage-effect
-- **PDF**: reference/project-papers/patton-sheppard-2015-good-bad-volatility-shar.pdf
+- **PDF**: reference/project-papers/a-har-baselines/patton-sheppard-2015-good-bad-volatility-shar.pdf
 - **Key finding**: Signed semi-variances (SHAR) decompose RV into positive and negative components, capturing the leverage effect and improving forecasts by 2-4% QLIKE.
 - **Relevance**: Signed decomposition features are cheap to compute and reliably improve HAR; essential baseline.
 
@@ -210,7 +210,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: arXiv 2406.08041
 - **Quality**: recommended
 - **Topics**: har, har-extensions, ml-vol, evaluation
-- **PDF**: reference/project-papers/hard-to-beat-2024-ml-vs-linear-rv.pdf
+- **PDF**: reference/project-papers/b-ml-rv-core/hard-to-beat-2024-ml-vs-linear-rv.pdf
 - **Key finding**: Fitting choices (rolling window length, log transform, lag structure) matter more than the choice between linear and ML models. A well-tuned HAR beats naively-applied ML.
 - **Relevance**: Crucial methodological warning: must control for fitting choices before claiming ML superiority.
 
@@ -221,7 +221,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: J. Econometrics 207:71-91
 - **Quality**: essential
 - **Topics**: harq, har-extensions, rv-estimators
-- **PDF**: reference/project-papers/bollerslev-patton-quaedvlieg-2018-unreliable-realized-covariances.pdf
+- **PDF**: reference/project-papers/a-har-baselines/bollerslev-patton-quaedvlieg-2018-unreliable-realized-covariances.pdf
 - **Key finding**: Extends HARQ to multivariate setting, modeling time-varying reliability of realized covariance matrices and improving portfolio allocation decisions.
 - **Relevance**: Extends the measurement-error correction idea to covariances; relevant for multi-asset forecasting.
 
@@ -236,7 +236,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: Quantitative Finance 18:933-949 (arXiv 1410.3394)
 - **Quality**: essential
 - **Topics**: rough-vol, long-memory, foundational
-- **PDF**: reference/project-papers/gatheral-jaisson-rosenbaum-2018-volatility-is-rough.pdf
+- **PDF**: reference/project-papers/e-rough-vol/gatheral-jaisson-rosenbaum-2018-volatility-is-rough.pdf
 - **Key finding**: Log-volatility of equity indices behaves as fractional Brownian motion with Hurst parameter H ~ 0.1, much rougher than standard diffusion models predict.
 - **Relevance**: Motivates roughness-aware feature engineering; the H estimate is a testable hypothesis on our data.
 
@@ -258,7 +258,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: Sankhya B 86:191-223 (arXiv 2203.13820)
 - **Quality**: essential
 - **Topics**: rough-vol, microstructure-noise, rv-estimators
-- **PDF**: reference/project-papers/cont-das-2024-rough-volatility-fact-or-artefact.pdf
+- **PDF**: reference/project-papers/e-rough-vol/cont-das-2024-rough-volatility-fact-or-artefact.pdf
 - **Key finding**: Critical re-examination arguing that the apparent roughness (H ~ 0.1) may be an artefact of microstructure noise in the estimation procedure rather than a genuine feature of the volatility process.
 - **Relevance**: Directly challenges rough-vol features; must test whether roughness measures add forecasting value or just capture noise.
 
@@ -291,7 +291,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: arXiv 2206.14114
 - **Quality**: recommended
 - **Topics**: rough-vol, ml-vol, deep-learning
-- **PDF**: reference/project-papers/rosenbaum-zhang-2022-universality-volatility-formation.pdf
+- **PDF**: reference/project-papers/e-rough-vol/rosenbaum-zhang-2022-universality-volatility-formation.pdf
 - **Key finding**: Demonstrates that machine learning models and rough volatility theory converge on similar volatility dynamics, suggesting universal features in the volatility formation process.
 - **Relevance**: Bridges the rough-vol and ML-vol literatures; supports using roughness-related features in ML pipelines.
 
@@ -306,7 +306,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: J. Financial Econometrics 21:1680-1727 (arXiv 2601.13014)
 - **Quality**: essential
 - **Topics**: ml-vol, gradient-boosting, neural-nets, har, evaluation, qlike
-- **PDF**: reference/project-papers/christensen-siggaard-veliyev-2023-ml-volatility-forecasting.pdf
+- **PDF**: reference/project-papers/b-ml-rv-core/christensen-siggaard-veliyev-2023-ml-volatility-forecasting.pdf
 - **Key finding**: Cleanest demonstration that ML (random forests, gradient boosting, neural nets) beats HAR on DJIA constituents; gains rise with forecast horizon because ML better approximates long memory.
 - **Relevance**: The primary reference for "ML beats HAR" claims; defines the empirical benchmark we target.
 
@@ -328,7 +328,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: SSRN 3707796
 - **Quality**: essential
 - **Topics**: ml-vol, lob, gradient-boosting, feature-engineering
-- **PDF**: reference/project-papers/rahimikia-poon-2020-ml-rv-forecasting.pdf
+- **PDF**: reference/project-papers/b-ml-rv-core/rahimikia-poon-2020-ml-rv-forecasting.pdf
 - **Key finding**: ML with LOB features (mid prices, bid/ask means) beats HAR in 90% of out-of-sample days for 23 NASDAQ tickers. LOB features are the dominant information source.
 - **Relevance**: Strongest evidence that richer information sets (not just better models) drive ML gains over HAR.
 
@@ -361,7 +361,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: Quantitative Finance (arXiv 2210.04797)
 - **Quality**: recommended
 - **Topics**: ml-vol, cnn-tcn, deep-learning
-- **PDF**: reference/project-papers/moreno-pino-zohren-2022-deepvol.pdf
+- **PDF**: reference/project-papers/c-deep-learning-rv/moreno-pino-zohren-2022-deepvol.pdf
 - **Key finding**: DeepVol uses dilated causal convolutions on raw intraday returns, bypassing handcrafted realized measures entirely to forecast daily RV.
 - **Relevance**: Demonstrates the "raw data in, forecast out" approach; relevant if exploring end-to-end deep learning.
 
@@ -405,7 +405,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: Int. J. Forecasting 41:1093-1111
 - **Quality**: recommended
 - **Topics**: ml-vol, gnn, cross-asset, spillovers, deep-learning
-- **PDF**: reference/project-papers/spotv2net-2024-intraday-vol-gat.pdf
+- **PDF**: reference/project-papers/d-graph-gnn/spotv2net-2024-intraday-vol-gat.pdf
 - **Key finding**: SpotV2Net uses vol-of-vol informed graph attention networks for multivariate intraday spot volatility forecasting, capturing dynamic cross-asset relationships.
 - **Relevance**: Complementary to Zhang et al. GNN; focuses on intraday time scale and attention-based graph learning.
 
@@ -427,7 +427,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: J. Financial Econometrics
 - **Quality**: essential
 - **Topics**: ml-vol, neural-nets, deep-learning, har
-- **PDF**: reference/project-papers/bucci-2020-rv-forecasting-neural-networks.pdf
+- **PDF**: reference/project-papers/b-ml-rv-core/bucci-2020-rv-forecasting-neural-networks.pdf
 - **Key finding**: Systematic evaluation of neural network architectures for RV forecasting, showing that feed-forward and recurrent networks can improve on HAR but gains are sensitive to architecture choices.
 - **Relevance**: Early comprehensive neural net benchmark for RV; provides architectural lessons for deep learning approaches.
 
@@ -438,7 +438,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: FEDS Working Paper
 - **Quality**: essential
 - **Topics**: ml-vol, har, evaluation, qlike
-- **PDF**: reference/project-papers/fed-2025-linear-nonlinear-rv-forecasting.pdf
+- **PDF**: reference/project-papers/b-ml-rv-core/fed-2025-linear-nonlinear-rv-forecasting.pdf
 - **Key finding**: Fed staff comparison of econometric and ML models for RV forecasting, providing institutional perspective on the relative merits of each approach.
 - **Relevance**: Authoritative institutional benchmark; useful for framing results in policy-relevant terms.
 
@@ -449,7 +449,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: arXiv 2505.11163
 - **Quality**: essential
 - **Topics**: ml-vol, transformers, deep-learning
-- **PDF**: reference/project-papers/foundation-model-rv-forecasting-2025.pdf
+- **PDF**: reference/project-papers/c-deep-learning-rv/foundation-model-rv-forecasting-2025.pdf
 - **Key finding**: Applies pre-trained time-series foundation models to RV forecasting, testing whether general-purpose temporal representations transfer to financial volatility.
 - **Relevance**: Tests the frontier question of whether foundation models can replace domain-specific feature engineering.
 
@@ -460,7 +460,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: arXiv 2511.03046
 - **Quality**: recommended
 - **Topics**: ml-vol, transformers, deep-learning
-- **PDF**: reference/project-papers/vision-transformer-rv-2025.pdf
+- **PDF**: reference/project-papers/c-deep-learning-rv/vision-transformer-rv-2025.pdf
 - **Key finding**: Encodes time-series data as images and applies vision transformers for data-efficient RV forecasting, showing competitive performance with less training data.
 - **Relevance**: Novel input representation approach; potentially useful for limited-data regimes.
 
@@ -471,7 +471,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: arXiv 2410.11773
 - **Quality**: recommended
 - **Topics**: ml-vol, transformers, deep-learning
-- **PDF**: reference/project-papers/time-series-foundation-model-var-2024.pdf
+- **PDF**: reference/project-papers/c-deep-learning-rv/time-series-foundation-model-var-2024.pdf
 - **Key finding**: Foundation time-series models applied to VaR estimation, demonstrating cross-task transfer from general forecasting to risk measurement.
 - **Relevance**: VaR is a downstream application of RV forecasts; shows how vol models feed into risk management.
 
@@ -482,7 +482,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: arXiv 2503.12648
 - **Quality**: recommended
 - **Topics**: ml-vol, deep-learning
-- **PDF**: reference/project-papers/transfer-learning-rv-new-issues-2025.pdf
+- **PDF**: reference/project-papers/c-deep-learning-rv/transfer-learning-rv-new-issues-2025.pdf
 - **Key finding**: Transfer learning enables RV forecasting for newly listed securities with limited history by leveraging patterns learned from mature assets.
 - **Relevance**: Addresses the cold-start problem in vol forecasting; relevant for IPOs and spin-offs.
 
@@ -493,7 +493,7 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **Venue**: ACM ICAIF
 - **Quality**: essential
 - **Topics**: ml-vol, gnn, cross-asset, spillovers
-- **PDF**: reference/project-papers/chen-robert-2022-gnn-multivariate-rv.pdf
+- **PDF**: reference/project-papers/d-graph-gnn/chen-robert-2022-gnn-multivariate-rv.pdf
 - **Key finding**: Early application of GNNs to multivariate RV forecasting, demonstrating that graph-based representations of cross-asset relationships improve forecast accuracy.
 - **Relevance**: Precursor to Zhang et al. (2025); establishes the GNN-for-RV approach.
 
@@ -1657,6 +1657,94 @@ This bibliography contains ~80 entries relevant to the GS internship project on 
 - **PDF**: none
 - **Key finding**: Graduate textbook unifying microstructure, execution, and market making under a single stochastic control framework. Covers optimal execution, VWAP/POV targeting, and order imbalance with rigorous HJB derivations.
 - **Relevance**: Essential framework for understanding microstructure features and execution context in which vol forecasts are consumed.
+
+### kipf-welling-2017
+- **Title**: Semi-Supervised Classification with Graph Convolutional Networks
+- **Authors**: Kipf, Welling
+- **Year**: 2017
+- **Venue**: ICLR (arXiv 1609.02907)
+- **Quality**: essential
+- **Topics**: gnn, foundational
+- **PDF**: `reference/papers/Kipf_Welling_2017_GCN.pdf`
+- **Key finding**: The canonical GCN layer $H^{(l+1)} = \sigma(D^{-1/2}\tilde{A}D^{-1/2}H^{(l)}W^{(l)})$ with the renormalization trick, derived as a first-order truncation of spectral graph convolutions.
+- **Relevance**: The propagation rule GNNHAR and every vol-GNN builds on; fundamentals source for the guide's GNN chapter.
+
+### velickovic-2018-gat
+- **Title**: Graph Attention Networks
+- **Authors**: Velickovic, Cucurull, Casanova, Romero, Lio, Bengio
+- **Year**: 2018
+- **Venue**: ICLR (arXiv 1710.10903)
+- **Quality**: essential
+- **Topics**: gnn, transformers, foundational
+- **PDF**: `reference/papers/Velickovic_et_al_2018_GAT.pdf`
+- **Key finding**: Masked attention over graph neighborhoods with learned, input-dependent neighbor weights; multi-head concat/average; supports directed graphs at GCN-level cost.
+- **Relevance**: The architecture behind SpotV2Net and the attention-as-learned-spillover interpretation in the GNN chapter.
+
+### gilmer-2017-mpnn
+- **Title**: Neural Message Passing for Quantum Chemistry
+- **Authors**: Gilmer, Schoenholz, Riley, Vinyals, Dahl
+- **Year**: 2017
+- **Venue**: ICML, PMLR 70 (arXiv 1704.01212)
+- **Quality**: recommended
+- **Topics**: gnn, foundational
+- **PDF**: `reference/papers/Gilmer_et_al_2017_MPNN.pdf`
+- **Key finding**: Unifies GNN architectures as choices of message, update, and readout functions (the MPNN framework).
+- **Relevance**: The template the GNN chapter uses to classify every vol-GNN architecture.
+
+### battaglia-2018-graph-networks
+- **Title**: Relational Inductive Biases, Deep Learning, and Graph Networks
+- **Authors**: Battaglia et al. (DeepMind/Google Brain/MIT/Edinburgh)
+- **Year**: 2018
+- **Venue**: arXiv 1806.01261 (position paper)
+- **Quality**: recommended
+- **Topics**: gnn, foundational
+- **PDF**: `reference/papers/Battaglia_et_al_2018_GraphNetworks.pdf`
+- **Key finding**: The graph networks block (edge/node/global updates with permutation-invariant aggregations) and the relational-inductive-bias taxonomy; the framing the distill.pub GNN tutorial adopts.
+- **Relevance**: Source of the node/edge/global-attribute market-graph framing and the global-attribute regime port in the GNN chapter.
+
+### hamilton-2017-graphsage
+- **Title**: Inductive Representation Learning on Large Graphs
+- **Authors**: Hamilton, Ying, Leskovec
+- **Year**: 2017
+- **Venue**: NIPS (arXiv 1706.02216)
+- **Quality**: recommended
+- **Topics**: gnn, foundational
+- **PDF**: `reference/papers/Hamilton_et_al_2017_GraphSAGE.pdf`
+- **Key finding**: Sample-and-aggregate GNN with concatenation skip connection; inductive vs transductive distinction; neighborhood sampling for web-scale graphs.
+- **Relevance**: Backbone of Wade (2026)'s vol-GNN study; its sampling machinery is explicitly moot at 34-node scale, a point the GNN chapter teaches.
+
+### xu-2019-gin
+- **Title**: How Powerful are Graph Neural Networks?
+- **Authors**: Xu, Hu, Leskovec, Jegelka
+- **Year**: 2019
+- **Venue**: ICLR (arXiv 1810.00826)
+- **Quality**: recommended
+- **Topics**: gnn, foundational
+- **PDF**: `reference/papers/Xu_et_al_2019_GIN.pdf`
+- **Key finding**: Message-passing GNNs are bounded by the Weisfeiler-Lehman test; sum aggregation is maximally expressive (sum > mean > max); GIN attains the bound.
+- **Relevance**: Theoretical anchor for the aggregation-choice discussion in the GNN chapter.
+
+### li-han-wu-2018-oversmoothing
+- **Title**: Deeper Insights into Graph Convolutional Networks for Semi-Supervised Learning
+- **Authors**: Li, Han, Wu
+- **Year**: 2018
+- **Venue**: AAAI (arXiv 1801.07606)
+- **Quality**: recommended
+- **Topics**: gnn, foundational
+- **PDF**: `reference/papers/Li_Han_Wu_2018_DeeperInsightsGCN.pdf`
+- **Key finding**: Graph convolution is Laplacian smoothing; repeated application converges node features within connected components (over-smoothing), demonstrated on the 34-node karate club by 4-5 layers.
+- **Relevance**: Why vol GNNs must stay shallow; the 34-node demonstration matches the project universe size exactly.
+
+### omi-newsletter-2026-03
+- **Title**: OMI Research Newsletter, March 2026
+- **Authors**: Oxford-Man Institute
+- **Year**: 2026
+- **Venue**: oxford-man.ox.ac.uk
+- **Quality**: supplementary
+- **Topics**: gnn, spillovers, vrp
+- **PDF**: `reference/papers/OMI_Newsletter_2026-03.pdf`
+- **Key finding**: Holds the verbatim abstracts of Cartea-Cucuringu-Fang (idiosyncratic jump-spillover networks, ~30% one-day MSE vs HAR, SSRN 6333798, full text paywalled) and Hizmeri-Bevilacqua (morning VVIX predictability).
+- **Relevance**: The only local verifiable source for the two paywalled 2026 abstracts cited (abstract-only, flagged) in the GNN chapter.
 
 ---
 
