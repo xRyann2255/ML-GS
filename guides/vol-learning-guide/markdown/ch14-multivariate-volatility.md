@@ -226,7 +226,7 @@ flowchart TD
 
 ## Graph-Based Methods
 
-**Where we are.** All methods so far treat each element (or factor) of the covariance matrix independently. Graph-based methods exploit the fact that assets are *connected*: if asset A's volatility spills over to asset B ([Chapter 15](ch15-spillovers-connectedness.md) formalizes this), modeling them jointly through a graph should help.
+**Where we are.** All methods so far treat each element (or factor) of the covariance matrix independently. Graph-based methods exploit the fact that assets are *connected*: if asset A's volatility spills over to asset B ([Chapter 15](ch15-spillovers-connectedness.md) formalizes this), modeling them jointly through a graph should help. This section is a preview; [Chapter 17](ch16-graph-neural-networks.md) is the full treatment, from graph fundamentals to the state of the art.
 
 ```mermaid
 flowchart TD

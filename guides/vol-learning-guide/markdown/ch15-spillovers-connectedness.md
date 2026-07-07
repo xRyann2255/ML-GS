@@ -455,6 +455,8 @@ A practical recipe for incorporating spillover features:
 4. Include as additional columns in the feature matrix from [Chapter 10](ch10-feature-engineering.md), alongside HAR lags, VRP, and other predictors.
 5. Check $\operatorname{SHAP}$ importance: if spillover features rank below the top 10 in a LightGBM model, they likely add noise rather than signal for your target horizon.
 
+Hand-crafting spillover features is one way to let the network speak. The alternative, keeping the network intact and learning on it directly with a graph neural network, is the subject of [Chapter 17](ch16-graph-neural-networks.md).
+
 ## Summary
 
 - The Diebold-Yilmaz framework measures volatility spillovers using a VAR on realized volatilities and generalized forecast error variance decomposition (GFEVD).

@@ -2,6 +2,8 @@
 
 What we've learned about volatility spillovers and correlations.
 
+> **Full treatment:** the vol-learning-guide now has a dedicated GNN chapter (`guides/vol-learning-guide/chapters/16-graph-neural-networks.tex`, printed ch. 17) covering graph fundamentals through GHAR/GNNHAR, graph construction, the frontier survey with a QLIKE audit table, hybrids/regime fusion, and the project build order (graph ablation → GNNHAR1L → STID control → hybrid arms → regime fusion). Written 2026-07-06 from the two deep-research briefs plus page-anchored extractions of all 17 `d-graph-gnn` papers.
+
 ## Findings
 
 (To be filled as we explore data)
