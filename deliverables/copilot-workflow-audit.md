@@ -33,17 +33,14 @@ The workflow is **ambitious and largely well-structured on paper** — a clean f
 
 The number that compounds is the always-on budget — paid on every Copilot request. It is not just the two always-on files: `AGENTS.md`'s Boot Protocol unconditionally instructs three more reads every session.
 
-.github/copilot-instructions.md1,011 t
-
-AGENTS.md3,269 t
-
-+ boot read: memory/person/user.md859 t
-
-+ boot read: memory/research/project-state.md2,510 t
-
-+ boot read: memory/INDEX.md2,586 t
-
-Always-on per session~10,235 t
+| Item | Tokens |
+|---|---|
+| .github/copilot-instructions.md | 1,011 t |
+| AGENTS.md | 3,269 t |
+| + boot read: memory/person/user.md | 859 t |
+| + boot read: memory/research/project-state.md | 2,510 t |
+| + boot read: memory/INDEX.md | 2,586 t |
+| **Always-on per session** | **~10,235 t** |
 
 **Worst-case single edit.** Editing one `src/**/*.py` file adds `python.instructions.md` (3,083 t) — and because its `applyTo` is `**/*.{py,ipynb}`, that same 3,083 t attaches when editing a `skills/` or `workspace/lint/` helper where it can't apply (AW-19), ~21% of tracked `.py`.
 
@@ -152,7 +149,7 @@ Clean, non-overlapping byte sums measured directly from `git ls-files`. Always-o
 | `workspace/lint/lint_doc_safety.py` | lint (Python) | on-demand | 5,893 | 1,473 | G3/G4: no hardcoded GS DB names ('!NYC_CoreData', 'SPGProdNYC RO') or 'secexpr --full' examples in .md docs, with whitelists. PASSES. |
 | `workspace/lint/lint_secexpr_safety.py` | lint (Python) | on-demand | 5,036 | 1,259 | Enforces secexpr safe-by-default in skills/*.py: no '--full' or safe=False outside whitelist, no unsafe default in secexpr_util.py. PASSES (39 files). |
 | `workspace/lint/lint_registry_drift.py` | lint (Python) | on-demand | 5,001 | 1,250 | Skill/persona counts+lists in policy/implementation_boundary.md must match skills/ and personas/ on disk. PASSES. |
-| `workspace/lint/lint_memory_index_completeness.py` | lint (Python) | on-demand | 4,299 | 1,075 | memory/<domain>/*.md all listed in INDEX.md, lowercase names, no phantom INDEX entries. PASSES. Duplicates design_lint check 10. |
+| `workspace/lint/lint_memory_index_completeness.py` | lint (Python) | on-demand | 4,299 | 1,075 | `memory/<domain>/*.md` all listed in INDEX.md, lowercase names, no phantom INDEX entries. PASSES. Duplicates design_lint check 10. |
 | `workspace/lint/lint_all.py` | lint-runner (Python) | on-demand | 9,615 | 2,404 | Orchestrates 14 lints in parallel (4 workers), --args-file JSON + --out-file tee for task-based invocation. --quick is a no-op (all 14 entries is_slow=False). subprocess timeout=12 |
 | `memory/INDEX.md` | memory index | always-on (AGENTS.md:57 boot step 3) — but only on surfaces that inject AGENTS.md; invisible to plain copilot-instructions.md-only chat | 10,343 | 2,586 | Master lookup table, P0-P3 tiers. Missing entry for research/README.md; lists 2 nonexistent workspace files; token estimates off by up to 10x vs measured sizes. |
 | `memory/design.md` | memory primitive design doc | on-demand (INDEX:17 'Writing/validating memory files') | 4,758 | 1,190 | Holds the actual hard rules: size caps (slang<=400, ref<=250, person<=100 lines), budgets (P0+P1<=50k tok), no-append-growth. Cap table omits the 'research' domain entirely. |
@@ -319,7 +316,7 @@ Each finding was raised by a dimension auditor, merged to remove duplicates, the
 
 **Location:** `workspace/config/.env:1` · `skills/NDS_INFRA/SKILL.md:76` · `memory/_dormant/ref/gssso-auth.md:87`
 
-**Evidence:** Tracked tree contains 34 unique https://*.gs.com endpoints (54 hostname mentions incl. placeholders), 2 distinct hardcoded Confluence PAT literals (workspace/config/.env:1 "CONFLUENCE_PAT=[REDACTED-PAT]"; memory/_dormant/ref/gssso-auth.md:87 "$pat = \"[REDACTED-PAT]\""), and employee PII in skills/NDS_INFRA/SKILL.md:76/91/93 (jane.doe@example.gs.com, Serial:{serial}, lastIP 10.0.0.1). .gitignore has no .env entry, so the secret file is git-tracked. Liveness of the PATs is unverifiable from this machine (HYPOTHESIS; confluence-auth.md:65 notes expiry) but committed tokens must be treated as compromised. Ironically the repo's own guidance forbids this: confluence-auth.md:78 "Hardcoding Bearer <token> ... leaks in logs".
+**Evidence:** Tracked tree contains 34 unique https://*.gs.com endpoints (54 hostname mentions incl. placeholders), 2 distinct hardcoded Confluence PAT literals (workspace/config/.env:1 "CONFLUENCE_PAT=[REDACTED-PAT]"; memory/_dormant/ref/gssso-auth.md:87 "$pat = \"[REDACTED-PAT]\""), and employee PII in skills/NDS_INFRA/SKILL.md:76/91/93 (jane.doe@example.gs.com, Serial:{serial}, lastIP 10.0.0.1). .gitignore has no .env entry, so the secret file is git-tracked. Liveness of the PATs is unverifiable from this machine (HYPOTHESIS; confluence-auth.md:65 notes expiry) but committed tokens must be treated as compromised. Ironically the repo's own guidance forbids this: confluence-auth.md:78 "Hardcoding Bearer `<token>` ... leaks in logs".
 
 **Why it matters:** Aggregate is a reportable data-exfiltration/insider-risk event: internal SDLC tooling, network topology, auth mechanisms and live tokens have crossed the corporate boundary onto an unmanaged endpoint.
 
@@ -347,7 +344,7 @@ Each finding was raised by a dimension auditor, merged to remove duplicates, the
 
 **Why it matters:** run_task can't override args, so following the docs makes it read an absent file (task errors but _run exits 0 → agent polls a {run_id} out_file that never appears) or a STALE file from a prior session — silently re-running an old commit/push or linting the wrong scripts; slang-review's fabricated 'Lint pass' auto-fill is built on it. No lint cross-checks SKILL.md filenames against task defs.
 
-**Recommended fix:** Fix stands with two additions. Making fixed workspace/tmp/<name>_args.json the single contract and keeping run_id as a JSON field is safe: lint.py:498 reads run_id from the args body and lint.py:514-517 still derives slang_lint_results_{run_id}.json, preserving concurrent-session-unique results. But (a) also update SLANG_LINT/SKILL.md:107-131, which currently mandates create_and_run_task with {run_id} args filenames — otherwise it contradicts both the new contract and lint-workspace.prompt.md:56; (b) in slang-review.prompt.md, fix line 29 to slang_lint_args.json AND line 31's poll target, which must match lint.py's derived slang_lint_results_{run_id}.json when a run_id is supplied (or omit run_id there); (c) the proposed lint check belongs in the workspace/lint suite that lint-workspace.prompt.md:45 already advertises as "vscode tasks — tasks.json validity", cross-checking each task's --args-file against the filename strings in its SKILL.md/prompt. Note the args-file fixed names reintroduce last-writer-wins contention between concurrent agents on the args file itself (only results files stay unique) — acceptable, but state it in the SKILL.mds since GIT/SKILL.md:29 currently promises collision avoidance.
+**Recommended fix:** Fix stands with two additions. Making fixed `workspace/tmp/<name>_args.json` the single contract and keeping run_id as a JSON field is safe: lint.py:498 reads run_id from the args body and lint.py:514-517 still derives slang_lint_results_{run_id}.json, preserving concurrent-session-unique results. But (a) also update SLANG_LINT/SKILL.md:107-131, which currently mandates create_and_run_task with {run_id} args filenames — otherwise it contradicts both the new contract and lint-workspace.prompt.md:56; (b) in slang-review.prompt.md, fix line 29 to slang_lint_args.json AND line 31's poll target, which must match lint.py's derived slang_lint_results_{run_id}.json when a run_id is supplied (or omit run_id there); (c) the proposed lint check belongs in the workspace/lint suite that lint-workspace.prompt.md:45 already advertises as "vscode tasks — tasks.json validity", cross-checking each task's --args-file against the filename strings in its SKILL.md/prompt. Note the args-file fixed names reintroduce last-writer-wins contention between concurrent agents on the args file itself (only results files stay unique) — acceptable, but state it in the SKILL.mds since GIT/SKILL.md:29 currently promises collision avoidance.
 
 ### AW-05 — MODEL_TRAIN / NOTEBOOK / RESEARCH task wrappers invoke nonexistent Python modules — core skills dead end-to-end
 
@@ -385,7 +382,7 @@ Each finding was raised by a dimension auditor, merged to remove duplicates, the
 
 **Why it matters:** The mandate is textual guidance to a model/human, not an enforced constraint. If the selector lacks 'Opus 4.6' the instruction is inoperative and NO alternate model is designated anywhere, so behavior is undefined — the agent proceeds on whatever is selected. 7 always-on/workflow lines assert a guarantee the platform cannot uphold.
 
-**Recommended fix:** Replace the absolute mandate with a graceful policy: name a verified primary AND an explicit fallback (e.g. 'prefer <verified-id>; if unavailable use the current flagship and note it'). subagent_protocol.md:14 already has a degradation clause — propagate that pattern to copilot-instructions.md:72 and AGENTS.md:23 instead of 'No exceptions'.
+**Recommended fix:** Replace the absolute mandate with a graceful policy: name a verified primary AND an explicit fallback (e.g. 'prefer `<verified-id>`; if unavailable use the current flagship and note it'). subagent_protocol.md:14 already has a degradation clause — propagate that pattern to copilot-instructions.md:72 and AGENTS.md:23 instead of 'No exceptions'.
 
 ### AW-G3 — Model pinned as a hardcoded display-name literal in 76 places — fragile against documented Copilot catalog churn; a version bump is a 34-file edit
 
@@ -720,7 +717,7 @@ Each finding was raised by a dimension auditor, merged to remove duplicates, the
 
 **Location:** `skills/quiz.md:1` · `skills/teach.md:1` · `skills/study.md:1` · `skills/learning-status.md:1` · `skills/expand-learning-graph.md:1` · `skills/weekly-learning-goals.md:1` · `skills/ssp_helpers.py:1` · `skills/design.md:35` · `workspace/lint/lint_skills_structure.py:89`
 
-**Evidence:** design.md:35 "One directory per skill. Name: UPPER_SNAKE_CASE" vs 6 lowercase flat files at skills/ root (quiz.md 6483, teach.md 6491, study.md 5475, learning-status.md 3603, expand-learning-graph.md 5759, weekly-learning-goals.md 4591 = 32,402B). INDEX.md = 48 skill rows (all 48 UPPER_SNAKE dirs; zero flat files). policy/implementation_boundary.md:24 "Skill system (54 skills)" roster = 48 dirs + the 6 lowercase files → three authorities disagree. Both linters exclude the flat files: lint_skills_structure.py:89 `if not skill_path.is_dir(): continue` (ROOT_ONLY_FILES={"INDEX.md"} only, so quiz.md passes _is_skill_folder then is skipped at is_dir); validate_skills.py:240 iterates `entry.is_dir() and (entry/"SKILL.md").is_file()` → 32KB skips 100% of structure/content validation. skills/ssp_helpers.py = 5,200B, 0 tracked references (design.md anti-pattern #5 "Script without SKILL.md"). NUANCE the finding omits: the 6 flat files ARE wired to .github/prompts/{quiz,teach,study,learning-status,expand-learning-graph,weekly-learning-goals}.prompt.md, each referencing skills/<name>.md and loading on-demand — so they are reachable via slash commands, just missing from the skills registry and unlinted; ssp_helpers.py has no such wiring.
+**Evidence:** design.md:35 "One directory per skill. Name: UPPER_SNAKE_CASE" vs 6 lowercase flat files at skills/ root (quiz.md 6483, teach.md 6491, study.md 5475, learning-status.md 3603, expand-learning-graph.md 5759, weekly-learning-goals.md 4591 = 32,402B). INDEX.md = 48 skill rows (all 48 UPPER_SNAKE dirs; zero flat files). policy/implementation_boundary.md:24 "Skill system (54 skills)" roster = 48 dirs + the 6 lowercase files → three authorities disagree. Both linters exclude the flat files: lint_skills_structure.py:89 `if not skill_path.is_dir(): continue` (ROOT_ONLY_FILES={"INDEX.md"} only, so quiz.md passes _is_skill_folder then is skipped at is_dir); validate_skills.py:240 iterates `entry.is_dir() and (entry/"SKILL.md").is_file()` → 32KB skips 100% of structure/content validation. skills/ssp_helpers.py = 5,200B, 0 tracked references (design.md anti-pattern #5 "Script without SKILL.md"). NUANCE the finding omits: the 6 flat files ARE wired to .github/prompts/{quiz,teach,study,learning-status,expand-learning-graph,weekly-learning-goals}.prompt.md, each referencing `skills/<name>.md` and loading on-demand — so they are reachable via slash commands, just missing from the skills registry and unlinted; ssp_helpers.py has no such wiring.
 
 **Why it matters:** Three authorities disagree on the skill roster (INDEX 48, boundary 54, contract dirs-only). The flat skills are undiscoverable in the registry and unlinted; ssp_helpers.py is the design.md 'script without SKILL.md' anti-pattern.
 
@@ -844,7 +841,7 @@ Each finding was raised by a dimension auditor, merged to remove duplicates, the
 
 **Why it matters:** An agent needing a helper script (gsvivs-audit's whole premise is parsing a 73k-line JSON) has no instruction-compliant path — one file bans scripts in tmp, the other mandates them there, and rule 2 restricts running them. It picks one to violate at random.
 
-**Recommended fix:** Single policy in copilot-instructions.md: 'workspace/tmp/ is the only writable scratch area; prefer inline/one-liners; delete anything created; persisted outputs go to workspace/<area>/.' Delete AGENTS.md:154-155 in favor of the cross-ref.
+**Recommended fix:** Single policy in copilot-instructions.md: 'workspace/tmp/ is the only writable scratch area; prefer inline/one-liners; delete anything created; persisted outputs go to `workspace/<area>/`.' Delete AGENTS.md:154-155 in favor of the cross-ref.
 
 ### AW-29 — Mandated market-data refs are 2x over the ref line cap and use Brazil-desk examples for a US-equity project
 
@@ -936,7 +933,7 @@ Each finding was raised by a dimension auditor, merged to remove duplicates, the
 
 **Location:** `memory/INDEX.md:9` · `memory/slang/best-practices.md:15` · `workspace/lint/lint_broken_refs.py:68` · `workspace/lint/validate_memory.py:217` · `memory/meta/guide.md:83`
 
-**Evidence:** INDEX.md:9 "Dormant files: 37 files in memory/_dormant/ ... Restore if Slang work resumes" is the entire spec; guide.md:82-85 status enum (draft/active/stale/archived) has no 'dormant' value and 36/37 dormant files carry status:active. Yet 10 skills (AI_SLOP_CLEANER, CANVAS, CONFLUENCE, ETASK, GITLAB_PIPELINES, GSSSO_AUTH, OUTLOOK, SLANG_EDIT/GLIMPSE/REVIEW) plus 2 active P1 memory files (slang/best-practices.md:15, slang/lint-edit.md:256) reference _dormant paths in-place as the authoritative content source, while all 4 linters (design_lint.py:588, lint_broken_refs.py:68, lint_memory_index_completeness.py:37, validate_memory.py:217) SKIP _dormant. The blind spot lets malformed YAML frontmatter go undetected (memory/_dormant/sys/secdb.md has a dangling ' - sys/enghub.md' sequence item under scalar 'source:'). NOTE: the original 'committed PAT' claim is unsupported — confluence-auth.md contains only placeholder tokens (<your-token-here>), no real secret.
+**Evidence:** INDEX.md:9 "Dormant files: 37 files in memory/_dormant/ ... Restore if Slang work resumes" is the entire spec; guide.md:82-85 status enum (draft/active/stale/archived) has no 'dormant' value and 36/37 dormant files carry status:active. Yet 10 skills (AI_SLOP_CLEANER, CANVAS, CONFLUENCE, ETASK, GITLAB_PIPELINES, GSSSO_AUTH, OUTLOOK, SLANG_EDIT/GLIMPSE/REVIEW) plus 2 active P1 memory files (slang/best-practices.md:15, slang/lint-edit.md:256) reference _dormant paths in-place as the authoritative content source, while all 4 linters (design_lint.py:588, lint_broken_refs.py:68, lint_memory_index_completeness.py:37, validate_memory.py:217) SKIP _dormant. The blind spot lets malformed YAML frontmatter go undetected (memory/_dormant/sys/secdb.md has a dangling ' - sys/enghub.md' sequence item under scalar 'source:'). NOTE: the original 'committed PAT' claim is unsupported — confluence-auth.md contains only placeholder tokens (`<your-token-here>`), no real secret.
 
 **Why it matters:** 'Dormant' is fiction: the content is load-bearing yet has no INDEX rows (undiscoverable), no restore procedure, and sits in a lint blind spot where broken links, malformed frontmatter (secdb.md), and the committed PAT go undetected.
 
@@ -969,7 +966,7 @@ Each finding was raised by a dimension auditor, merged to remove duplicates, the
 
 ### AW-37 — 'fix it.prompt.md' filename contains a space with no name: override and /housekeep has no prompt file — flagship entry points are unreachable
 
-**MEDIUM · broken · effort: trivial · ADJUSTED-CONFIRMED**
+**MEDIUM · broken · effort: trivial · ADJUSTED-CONFIRMED · hypothesis**
 
 **Location:** `.github/prompts/fix it.prompt.md:1` · `workflows/fix.md:10` · `workflows/housekeep.md:11`
 
