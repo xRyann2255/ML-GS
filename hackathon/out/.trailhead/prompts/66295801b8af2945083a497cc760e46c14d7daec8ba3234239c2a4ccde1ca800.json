@@ -1,0 +1,219 @@
+{
+  "unit": "green",
+  "kind": "green",
+  "title": "It runs",
+  "max_claims": 2,
+  "key": "66295801b8af2945083a497cc760e46c14d7daec8ba3234239c2a4ccde1ca800",
+  "system": "You are the narration stage of Trailhead, a tool that generates a walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Every\nquote you return is searched for verbatim in the file on disk; anything that is\nnot found exactly is deleted and counted on screen. You cannot talk your way\npast the checker, so do not try: an honest \"inferred\" sentence survives, an\ninvented quote does not.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. `cite.quote` is a VERBATIM, CONTIGUOUS copy of 3-24 lines from ONE file,\n   lines joined with newlines. Copy the leading indentation exactly, character\n   for character. Do not reflow, re-indent, elide, or add an ellipsis.\n4. Quote only code you were shown below. Quoting something you inferred exists\n   is the single most expensive thing you can do here.\n5. `cite.focus` is an array of exact substrings of your own `cite.quote` — the\n   one or two lines that actually carry the point.\n6. If you cannot support a sentence with a quote, set `\"status\": \"inferred\"` and\n   omit `cite` entirely. That is a legitimate, visible answer, not a failure.\n7. `text` is one plain sentence, at most 280 characters. No backticks, no\n   newlines, no markdown links, no `<`.\n8. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"this codebase appears to\" — say what it does.\n",
+  "user": "FACTS — from survey.json, deterministic. Rely on these; never quote them.\nrepo: volforecast @ nogit-1c4f5dc3\nsize: 1063 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit — 158 files, 44871 loc, fan-in 0\n  volforecast.models — 22 files, 9802 loc, fan-in 6\n  volforecast.data — 21 files, 9195 loc, fan-in 8\n  volforecast.cli — 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation — 14 files, 7031 loc, fan-in 8\n  tests.integration — 20 files, 5283 loc, fan-in 0\n  volforecast.features — 18 files, 3110 loc, fan-in 5\n  volforecast.utils — 7 files, 1552 loc, fan-in 10\n  tests — 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas — 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements — volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: unavailable (target path has no tracked history in the enclosing repository (0 tracked files)) — files are ranked by fan_in instead\n\nSOURCE — line numbers are a gutter, not part of any line. Never quote them.\n\n--- src/pyproject.toml ---\n    1| [build-system]\n    2| requires = [\"hatchling\"]\n    3| build-backend = \"hatchling.build\"\n    4| \n    5| [project]\n    6| name = \"volforecast\"\n    7| version = \"0.2.0\"\n    8| description = \"ML realized volatility forecasting — signal discovery\"\n    9| requires-python = \">=3.10,<3.13\"\n   10| dependencies = [\n   11|     \"numpy>=1.21\",\n   12|     \"pandas>=1.4\",\n   13|     \"scipy>=1.7\",\n   14|     \"statsmodels>=0.13\",\n   15|     \"scikit-learn>=1.0\",\n   16|     \"pypdf>=6.10.2\",\n   17|     \"pytz>=2026.2\",\n   18|     \"matplotlib>=3.5\",\n   19|     \"pyyaml>=6.0\",\n   20|     \"pyarrow>=24.0.0\",\n   21|     \"tqdm>=4.60\",\n   22|     \"rich>=13.0\",\n   23|     \"simple-term-menu>=1.6\",\n   24|     \"plotly>=5.18\",\n   25|     \"jinja2>=3.1\",\n   26| ]\n   27| \n   28| [project.optional-dependencies]\n   29| gs = [\n   30|     \"gs-quant-internal>=1.7\",\n   31| ]\n   32| ml = [\n   33|     \"lightgbm>=3.3\",\n   34|     \"xgboost>=1.7\",\n   35|     \"optuna>=3.5\",\n   36|     \"shap>=0.43\",\n   37| ]\n   38| gpu = [\n   39|     \"lightgbm>=3.3\",\n   40|     \"xgboost>=1.7\",\n   41|     \"torch>=1.12\",\n   42|     \"optuna>=3.5\",\n   43| ]\n   44| graph = [\n   45|     \"torch>=1.12\",\n   46|     \"torch-geometric>=2.4\",\n   47| ]\n   48| \n   49| [tool.hatch.build.targets.wheel]\n   50| packages = [\"volforecast\"]\n   51| \n   52| [project.scripts]\n   53| volforecast = \"volforecast.__main__:main\"\n   54| \n   55| [dependency-groups]\n   56| dev = [\n   57|     \"pytest>=8.0\",\n   58|     \"pytest-cov>=4.0\",\n   59|     \"pytest-xdist>=3.5\",\n   60|     \"mypy>=1.5\",\n\n--- src/volforecast/__main__.py ---\n    1| \"\"\"CLI entry point for volforecast.\n    2| \n    3| Primary usage:\n    4|     vol run --config workspace/configs/tournament_multi21.yaml\n    5| \n    6| Every `vol run --config` invocation uses the tournament code path and\n    7| produces an interactive Plotly HTML dashboard. Works with 1 or N models.\n    8| \n    9|     mode: ingest      — Data ingestion only (early exit, no training)\n   10| \n   11| Optional overrides:\n   12|     vol run --config <yaml> --symbols SPY,AAPL   # override universe\n   ...\n   31| def _today_str() -> str:\n   32|     \"\"\"Return today's date as YYYY-MM-DD string (used as CLI default).\"\"\"\n   33|     return _today_date.today().isoformat()\n   34| \n   35| \n   36| def _print_output_summary(output_dir: str, extra_files: dict[str, str] | None = None) -> None:\n   37|     \"\"\"Print a clear output summary with file paths.\"\"\"\n   38|     from pathlib import Path\n   39| \n   40|     from volforecast.cli.console import console\n   41| \n   42|     out = Path(output_dir)\n   43|     lines: list[tuple[str, str]] = []\n   44| \n   ...\n   75| def _build_parser() -> argparse.ArgumentParser:\n   76|     parser = argparse.ArgumentParser(\n   77|         prog=\"vol\",\n   78|         description=(\n   79|             \"ML Realized Volatility Forecasting — Signal Discovery\\n\\n\"\n   80|             \"Primary command: vol run --config <yaml>\\n\"\n   81|             \"Runs tournament (1 or N models) and produces an interactive dashboard.\"\n   82|         ),\n   83|         formatter_class=argparse.RawDescriptionHelpFormatter,\n   ...\n  255| def _estimate_total_folds(\n  256|     symbols: list[str],\n  257|     horizons: list[int],\n  258|     cv_cfg,\n  259| ) -> int:\n  260|     \"\"\"Estimate total CV folds per model for progress bar display.\n  261| \n  262|     Filters out stub parquet files (fewer rows than train+test minimum),\n  263|     uses the longest qualifying symbol as the representative date count.\n   ...\n  296| def _run_tournament(\n  297|     config,\n  298|     symbols_override: list[str] | None = None,\n  299|     config_path: str | None = None,\n  300|     parallel_models: int = 4,\n  301| ) -> int:\n  302|     \"\"\"Execute tournament mode from ExperimentConfig.\"\"\"\n  303|     from pathlib import Path\n  304| \n   ...\n  785| def _run_ingest(config, symbols_override: list[str] | None = None, workers: int = 4) -> int:\n  786|     \"\"\"Execute ingest-only mode.\"\"\"\n  787|     from volforecast.cli.console import setup_logging\n  788|     from volforecast.cli.ingest import run as ingest_run\n  789|     from volforecast.cli.progress import ExperimentProgress\n  790| \n  791|     setup_logging()\n  792|     symbols = symbols_override\n  793|     universe = symbols or config.universe\n   ...\n  799|         except ConnectionError as e:\n  800|             pp.fail_stage(\"INGEST\")\n  801|             pp.log(\"INGEST\", f\"ERROR: {e}\")\n  802|             return 1\n  803|         pp.finish_stage(\"INGEST\")\n  804| \n  805|     _print_output_summary(str(config.output_dir))\n  806|     return 0\n  807| \n  808| \n  809| def main(argv: list[str] | None = None) -> int:\n  810|     parser = _build_parser()\n  811|     args = parser.parse_args(argv)\n  812| \n  813|     if args.command is None:\n  814|         parser.print_help()\n  815|         return 0\n  816| \n  817|     # ─── PRIMARY: vol run --config ───\n  818|     if args.command == \"run\":\n  819|         if args.config is None:\n  820|             from volforecast.cli.config_picker import pick_config\n  821| \n  822|             selected = pick_config()\n  823|             if selected is None:\n  824|                 return 0\n  825|             args.config = str(selected)\n  826| \n  827|         from volforecast.config import ExperimentConfig\n  828| \n  829|         config = ExperimentConfig.from_yaml(args.config)\n  830|         symbols = args.symbols.split(\",\") if args.symbols else None\n  831|         workers = args.workers or config.ingest.workers\n  832| \n  833|         # Apply tuning CLI overrides\n  834|         if getattr(args, \"tune\", None):\n  835|             config.tuning.enabled = True\n  836|         if getattr(args, \"no_tune\", None):\n  837|             config.tuning.enabled = False\n  838|         if getattr(args, \"n_trials\", None) is not None:\n  839|             config.tuning.n_trials = args.n_trials\n  840| \n  841|         # Ingest-only early exit\n  842|         if config.mode == \"ingest\":\n  843|             return _run_ingest(config, symbols_override=symbols, workers=workers)\n  844| \n  845|         # Ingest gate: run ingest for missing symbols unless --skip-ingest\n  846|         if not args.skip_ingest:\n  847|             from volforecast.utils.paths import rv_cache_path\n  848| \n  849|             universe = symbols or config.universe\n  850|             missing = [s for s in universe if not rv_cache_path(s).exists()]\n  851|             if missing:\n  852|                 from volforecast.cli.ingest import run as ingest_run\n  853|                 from volforecast.cli.progress import ExperimentProgress\n  854| \n  855|                 with ExperimentProgress(config.name, missing, [\"INGEST\"]) as pp:\n  856|                     pp.start_stage(\"INGEST\")\n  857|                     try:\n  858|                         ingest_run(config, missing, progress=pp, max_workers=workers)\n\n--- src/volforecast/evaluation/economic_value.py ---\n    1| \"\"\"Economic value testing of volatility signals.\n    2| \n    3| Translates statistical forecasting improvements into economic metrics:\n    4| - Delta-hedged straddle P&L (trading the IV-RV gap)\n    5| - Vol-targeting portfolio (scaling exposure by inverse predicted vol)\n    6| - Sharpe ratio comparison vs buy-and-hold\n    7| - Maximum drawdown and VaR statistics\n    8| \n    9| Key functions:\n   10|     iv_rv_gap_signal           — Generate IV-RV gap trading signal\n   11|     delta_hedged_straddle_pnl  — Backtest straddle P&L\n   12|     vol_targeting_pnl          — Backtest vol-targeting portfolio\n   ...\n   28| def iv_tenor_for_horizon(horizon: int) -> tuple[str, int]:\n   29|     \"\"\"Map forecast horizon to the appropriate IV column and tenor days.\n   30| \n   31|     Uses the closest available tenor to match the forecast window:\n   32|       - h == 1:  iv_vs_0dte with tenor_days=1 (prev-close 1-DTE varswap\n   33|                  from EDRVS_EXPIRY_INTRADAY — correct measure for GSVIVS\n   34|                  signal. Captured at 16:00 ET day before, no lookahead.)\n   35|       - h <= 5:  iv_1w_atm with tenor_days=5 (weekly straddle)\n   36|       - h > 5:   iv_1m_atm with tenor_days=22 (monthly straddle)\n   ...\n   47| def normalize_exec_kvar_for_horizon(kvar: np.ndarray, tenor_days: int) -> np.ndarray:\n   48|     \"\"\"No-op — Kvar is already in annualized vol and needs no horizon scaling.\n   49| \n   50|     Previously this divided by sqrt(h) to convert the 24h-tenor Kvar into a\n   51|     multi-day proxy.  That was incorrect: both the Kvar (annualized from T=24h)\n   52|     and the RV forecast (annualized via sqrt(252 * daily_var)) are already in\n   53|     the same units regardless of forecast horizon h.  The sqrt(h) deflation\n   54|     artificially suppressed the implied-vol side of the IV-RV gap at h>1.\n   55| \n   ...\n   63| def iv_rv_gap_signal(\n   64|     iv_forecast: np.ndarray,\n   65|     rv_forecast: np.ndarray,\n   66|     threshold: float = 0.0,\n   67|     short_threshold: float | None = None,\n   68|     default_long: bool = False,\n   69| ) -> np.ndarray:\n   70|     \"\"\"Generate trading signal from IV-RV gap.\n   71| \n   ...\n  116| def kvar_rv_gap_signal(\n  117|     kvar: np.ndarray,\n  118|     rv_forecast: np.ndarray,\n  119|     space: str = \"vol\",\n  120|     threshold: float = 0.0,\n  121|     is_calendar_ann: bool = True,\n  122| ) -> np.ndarray:\n  123|     \"\"\"Generate trading signal from prev-close 1-DTE varswap fair vol vs RV forecast.\n  124| \n   ...\n  196| @dataclass(frozen=True)\n  197| class GsvivsSizingSpec:\n  198|     \"\"\"A single GSVIVS signal-sizing configuration.\n  199| \n  200|     One spec drives one variant of the trading signal in the dashboard. The\n  201|     default 4-element list (:data:`DEFAULT_GSVIVS_SIZING_SPECS`) is the\n  202|     four-option toggle exposed on the GSVIVS table: ``binary``,\n  203|     ``asym_long`` (L=2), ``zscore`` (L=1), ``long_flat``.\n  204| \n   ...\n  275| def parse_gsvivs_sizing_specs(raw: Any) -> tuple[GsvivsSizingSpec, ...]:\n  276|     \"\"\"Parse a YAML list-of-specs into a tuple of GsvivsSizingSpec.\n  277| \n  278|     ``None`` (key absent) returns the project default 3-mode list. An empty\n  279|     list is an explicit \"no sizing variants\" — returns an empty tuple.\n  280|     \"\"\"\n  281|     if raw is None:\n  282|         return DEFAULT_GSVIVS_SIZING_SPECS\n  283|     if not isinstance(raw, list):\n   ...\n  291| def _kvar_gap_for_sized(\n  292|     kvar: np.ndarray,\n  293|     rv_forecast: np.ndarray,\n  294|     *,\n  295|     space: str,\n  296|     is_calendar_ann: bool,\n  297| ) -> np.ndarray:\n  298|     \"\"\"Shared gap computation for sized signals (mirrors kvar_rv_gap_signal).\"\"\"\n  299|     kvar = np.asarray(kvar, dtype=np.float64)\n   ...\n  313| def _rolling_std_expanding(gap: np.ndarray, lookback: int) -> np.ndarray:\n  314|     \"\"\"Rolling std (ddof=1) over prior `lookback` observations, expanding when\n  315|     history is shorter. NaN values in the window are dropped before std.\n  316|     Std is returned as 1.0 for indices with <2 valid prior observations\n  317|     (avoids divide-by-zero and keeps the gap on its original scale).\"\"\"\n  318|     n = len(gap)\n  319|     out = np.full(n, 1.0)\n  320|     for i in range(1, n):\n  321|         lo = max(0, i - lookback)\n   ...\n  331| def kvar_rv_sized_signal(\n  332|     kvar: np.ndarray,\n  333|     rv_forecast: np.ndarray,\n  334|     *,\n  335|     sizing_mode: str = DEFAULT_GSVIVS_SIZING_MODE,\n  336|     space: str = \"vol\",\n  337|     threshold: float = 0.0,\n  338|     is_calendar_ann: bool = True,\n  339|     max_leverage: float = 2.0,\n   ...\n  443|     nan_mask = np.isnan(z)\n  444|     long_mask = (~nan_mask) & (z > 0)\n  445|     short_mask = (~nan_mask) & (z <= 0)\n  446|     # Default-long contract for NaN kvar matches kvar_rv_gap_signal.\n  447|     out[nan_mask] = 1.0\n  448|     out[long_mask] = np.clip(z[long_mask], 1.0, max_leverage)\n  449|     out[short_mask] = -1.0\n  450|     return out\n  451| \n  452| \n  453| def delta_hedged_straddle_pnl(\n  454|     signal: np.ndarray,\n  455|     realized_var: np.ndarray,\n  456|     implied_vol: np.ndarray,\n  457|     spot_prices: np.ndarray,\n  458|     tenor_days: int = 30,\n  459|     cost_vol_points: float = 0.5,\n  460|     holding_period: int = 22,\n  461| ) -> np.ndarray:\n  462|     \"\"\"Compute daily P&L of delta-hedged straddle strategy.\n  463| \n  464|     Uses the gamma P&L formula from Black-Scholes:\n  465|         PnL_t = direction_t * 0.5 * Gamma_t * S_t^2 * (RV_t - IV^2) * dt\n  466| \n  467|     ATM straddle gamma (call + put):\n  468|         Gamma_t = 2 / (S_t * IV_t * sqrt(T))\n  469| \n  470|     Transaction cost: `cost_vol_points` per leg (2 legs for straddle),\n  471|     amortized over the holding period.\n  472| \n  473|     Parameters\n  474|     ----------\n  475|     signal : np.ndarray\n  476|         Trading signals: +1 (sell vol), -1 (buy vol), 0 (flat).\n  477|     realized_var : np.ndarray\n  478|         Daily realized variance (not annualized). E.g. sum of squared\n  479|         5-min returns for the day.\n  480|     implied_vol : np.ndarray\n  481|         ATM implied volatility (annualized decimal, e.g. 0.18 for 18%).\n  482|     spot_prices : np.ndarray\n  483|         Underlying spot prices.\n  484|     tenor_days : int\n  485|         Option tenor in trading days (default: 30, matching 1m ATM IV).\n  486|     cost_vol_points : float\n  487|         Transaction cost per option leg in vol points (default: 0.5).\n  488|     holding_period : int\n  489|         Days to amortize entry cost (default: 22 trading days).\n  490| \n  491|     Returns\n  492|     -------\n  493|     np.ndarray\n  494|         Daily P&L as fraction of notional (spot^2 normalized out).\n  495|     \"\"\"\n  496|     signal = np.asarray(signal, dtype=np.float64)\n  497|     realized_var = np.asarray(realized_var, dtype=np.float64)\n  498|     implied_vol = np.asarray(implied_vol, dtype=np.float64)\n  499|     spot_prices = np.asarray(spot_prices, dtype=np.float64)\n  500| \n  501|     dt = 1.0 / 252.0\n  502|     T = tenor_days / 252.0\n   ...\n  533| def vol_targeting_pnl(\n  534|     returns: np.ndarray,\n  535|     vol_forecast: np.ndarray,\n  536|     target_vol: float = 0.10,\n  537|     max_leverage: float = 2.0,\n  538| ) -> np.ndarray:\n  539|     \"\"\"Compute P&L of vol-targeting portfolio.\n  540| \n  541|     Scales position size inversely with predicted volatility:\n   ...\n  569| def compute_sharpe(\n  570|     returns: np.ndarray,\n  571|     risk_free_rate: float = 0.0,\n  572|     annualization: int = 252,\n  573| ) -> float:\n  574|     \"\"\"Compute annualized Sharpe ratio.\n  575| \n  576|     Parameters\n  577|     ----------\n   ...\n  606| def compute_max_drawdown(cumulative_returns: np.ndarray) -> float:\n  607|     \"\"\"Compute maximum drawdown from cumulative returns.\n  608| \n  609|     Parameters\n  610|     ----------\n  611|     cumulative_returns : np.ndarray\n  612|         Cumulative wealth series (1 + r_1)(1 + r_2)...\n  613| \n  614|     Returns\n   ...\n  627| def vol_targeting_sharpe(\n  628|     log_rv_predictions: np.ndarray,\n  629|     daily_returns: np.ndarray,\n  630|     target_vol: float = 0.10,\n  631|     max_leverage: float = 2.0,\n  632| ) -> float:\n  633|     \"\"\"Compute vol-targeting Sharpe from log-RV predictions and daily returns.\n  634| \n  635|     Converts log-RV forecast to annualized vol, computes position weights,\n   ...\n  667| def delta_hedged_sharpe(\n  668|     log_rv_predictions: np.ndarray,\n  669|     implied_vol: np.ndarray,\n  670|     realized_var: np.ndarray,\n  671|     spot_prices: np.ndarray,\n  672|     threshold: float = 0.0,\n  673|     tenor_days: int = 30,\n  674|     cost_vol_points: float = 0.5,\n  675|     holding_period: int = 22,\n   ...\n  763| def discrete_delta_hedged_sharpe(\n  764|     log_rv_predictions: np.ndarray,\n  765|     implied_vol: np.ndarray,\n  766|     realized_var: np.ndarray,\n  767|     spot_prices: np.ndarray,\n  768|     threshold: float = 0.0,\n  769|     tenor_days: int = 30,\n  770|     cost_vol_points: float = 0.5,\n  771|     holding_period: int = 22,\n   ...\n  878| def economic_value_summary(\n  879|     signal: np.ndarray,\n  880|     realized_vol: np.ndarray,\n  881|     implied_vol: np.ndarray,\n  882|     spot_prices: np.ndarray,\n  883|     daily_returns: np.ndarray,\n  884|     vol_forecast: np.ndarray,\n  885|     model_name: str = \"\",\n  886| ) -> dict[str, float]:\n   ...\n  954| def naive_dh_baselines(\n  955|     realized_var: np.ndarray,\n  956|     implied_vol: np.ndarray,\n  957|     spot_prices: np.ndarray,\n  958|     dh_mode: str = \"simple\",\n  959|     seed: int = 42,\n  960| ) -> dict[str, dict[str, float]]:\n  961|     \"\"\"Compute delta-hedged straddle metrics for naive signal baselines.\n  962| \n   ...\n 1021| def _compute_naive_pnl(\n 1022|     signal: np.ndarray,\n 1023|     realized_var: np.ndarray,\n 1024|     implied_vol: np.ndarray,\n 1025|     spot_prices: np.ndarray,\n 1026|     dh_mode: str,\n 1027|     tenor_days: int = 30,\n 1028| ) -> tuple[np.ndarray, np.ndarray | None]:\n 1029|     \"\"\"Compute daily PnL for a fixed signal vector using the specified DH mode.\n   ...\n 1118| def _pnl_to_metrics(\n 1119|     pnl_clean: np.ndarray,\n 1120|     signal: np.ndarray,\n 1121|     hedge_error_var: np.ndarray | None = None,\n 1122|     per_symbol_pnl_parts: list[np.ndarray] | None = None,\n 1123| ) -> dict[str, float]:\n 1124|     \"\"\"Convert a daily PnL series + signal into the standard DH metrics dict.\n 1125| \n 1126|     If hedge_error_var is provided, dh_sharpe uses the adjusted denominator\n   ...\n 1184| def gsvivs_signal_pnl(\n 1185|     index_levels: np.ndarray,\n 1186|     signal: np.ndarray,\n 1187| ) -> dict[str, float | str]:\n 1188|     \"\"\"Compute performance metrics for signal applied to GSVIVS01 index returns.\n 1189| \n 1190|     Daily PnL = signal_t * (Index_{t+1} / Index_t - 1).\n 1191| \n 1192|     Parameters\n   ...\n 1325| def gsvivs_baseline_signals(n: int, seed: int = 42) -> dict[str, np.ndarray]:\n 1326|     \"\"\"Build the canonical set of GSVIVS01 baseline signal arrays of length n.\n 1327| \n 1328|     Returns a mapping {baseline_name: signal_array}. Keeping signal generation\n 1329|     in one place lets callers (metrics, equity curves, dashboards) share the\n 1330|     same seed and definitions.\n 1331|     \"\"\"\n 1332|     rng_random = np.random.default_rng(seed)\n 1333|     rng_65 = np.random.default_rng(seed)\n   ...\n 1342| def gsvivs_baselines(\n 1343|     index_levels: np.ndarray,\n 1344|     seed: int = 42,\n 1345| ) -> dict[str, dict[str, float | str]]:\n 1346|     \"\"\"Compute GSVIVS01 metrics for passive baselines (always-long/short/random).\n 1347| \n 1348|     Parameters\n 1349|     ----------\n 1350|     index_levels : np.ndarray\n   ...\n 1375| def _cli_series(df: Any, columns: dict[str, str], key: str) -> np.ndarray | None:\n 1376|     \"\"\"Pull one mapped column as float64, or None if unmapped.\"\"\"\n 1377|     name = columns.get(key)\n 1378|     if name is None:\n 1379|         return None\n 1380|     if name not in df.columns:\n 1381|         raise KeyError(f\"columns.{key} -> {name!r} not found in CSV\")\n 1382|     return df[name].to_numpy(dtype=np.float64)\n 1383| \n 1384| \n 1385| def main(argv: list[str] | None = None) -> int:\n 1386|     \"\"\"Args-file CLI entry point (see module docstring of the companion test).\"\"\"\n 1387|     import argparse\n 1388|     import json\n 1389|     import sys\n 1390|     from pathlib import Path\n 1391| \n 1392|     import pandas as pd\n 1393| \n\nTASK — It runs\nWrite exactly 2 sentences about what the command below actually\nproves about this repo, and what it does not prove. Be precise about the\ndifference between 'it imports' and 'it is tested'.\n\nCOMMAND THAT PASSED (real capture — exit code and output are not simulated)\n  cmd: python -c \"import volforecast\"\n  cwd: src\n  kind: run\n  exit: 0\n  output:\n    (no output)",
+  "windows": [
+    {
+      "file": "src/pyproject.toml",
+      "start": 13,
+      "end": 60
+    },
+    {
+      "file": "src/volforecast/__main__.py",
+      "start": 31,
+      "end": 44
+    },
+    {
+      "file": "src/volforecast/__main__.py",
+      "start": 75,
+      "end": 83
+    },
+    {
+      "file": "src/volforecast/__main__.py",
+      "start": 255,
+      "end": 263
+    },
+    {
+      "file": "src/volforecast/__main__.py",
+      "start": 296,
+      "end": 304
+    },
+    {
+      "file": "src/volforecast/__main__.py",
+      "start": 785,
+      "end": 793
+    },
+    {
+      "file": "src/volforecast/__main__.py",
+      "start": 799,
+      "end": 858
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 28,
+      "end": 36
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 47,
+      "end": 55
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 63,
+      "end": 71
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 116,
+      "end": 124
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 196,
+      "end": 204
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 275,
+      "end": 283
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 291,
+      "end": 299
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 313,
+      "end": 321
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 331,
+      "end": 339
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 443,
+      "end": 502
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 533,
+      "end": 541
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 569,
+      "end": 577
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 606,
+      "end": 614
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 627,
+      "end": 635
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 667,
+      "end": 675
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 763,
+      "end": 771
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 878,
+      "end": 886
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 954,
+      "end": 962
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 1021,
+      "end": 1029
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 1118,
+      "end": 1126
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 1184,
+      "end": 1192
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 1325,
+      "end": 1333
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 1342,
+      "end": 1350
+    },
+    {
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 1375,
+      "end": 1393
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "claims"
+    ],
+    "properties": {
+      "claims": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "status",
+            "cite"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "inferred"
+              ]
+            },
+            "cite": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "focus": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\66295801b8af2945083a497cc760e46c14d7daec8ba3234239c2a4ccde1ca800.json",
+  "pack": "C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\66295801b8af2945083a497cc760e46c14d7daec8ba3234239c2a4ccde1ca800.json"
+}

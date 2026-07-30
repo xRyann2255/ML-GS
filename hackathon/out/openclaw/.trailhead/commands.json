@@ -1,0 +1,61 @@
+{
+  "contract": "trailhead/commands@1",
+  "env": "captured 2026-07-30, Windows 10, python 3.11.1",
+  "limits": {
+    "per_command_s": 60.0,
+    "budget_s": 120.0,
+    "policy": "safe"
+  },
+  "runs": [],
+  "skipped": [
+    {
+      "cmd": "python -m pytest --collect-only -q test",
+      "cwd": "skills",
+      "kind": "test",
+      "source": "skills/pyproject.toml:9",
+      "reason": "pytest not importable under the resolved interpreter"
+    },
+    {
+      "cmd": "pytest -q -c skills/pyproject.toml skills",
+      "cwd": ".",
+      "kind": "lint",
+      "source": ".pre-commit-config.yaml:65 hook skills-python-tests entry",
+      "reason": "not on the execution allowlist: the four admitted shapes are `python -c \"import <pkg>\"`, `python -m <pkg> --help`, `python -m pytest --collect-only -q <paths>` and `python <script.py>` inside the repo"
+    },
+    {
+      "cmd": "node scripts/pre-commit/pnpm-audit-prod.mjs --audit-level=high",
+      "cwd": ".",
+      "kind": "lint",
+      "source": ".pre-commit-config.yaml:77 hook pnpm-audit-prod entry",
+      "reason": "not on the execution allowlist: the four admitted shapes are `python -c \"import <pkg>\"`, `python -m <pkg> --help`, `python -m pytest --collect-only -q <paths>` and `python <script.py>` inside the repo"
+    },
+    {
+      "cmd": "scripts/pre-commit/run-node-tool.sh oxlint --type-aware src test",
+      "cwd": ".",
+      "kind": "lint",
+      "source": ".pre-commit-config.yaml:84 hook oxlint entry",
+      "reason": "could not resolve scripts/pre-commit/run-node-tool.sh to an executable"
+    },
+    {
+      "cmd": "scripts/pre-commit/run-node-tool.sh oxfmt --check src test",
+      "cwd": ".",
+      "kind": "lint",
+      "source": ".pre-commit-config.yaml:92 hook oxfmt entry",
+      "reason": "could not resolve scripts/pre-commit/run-node-tool.sh to an executable"
+    },
+    {
+      "cmd": "swiftlint lint --config config/swiftlint.yml",
+      "cwd": ".",
+      "kind": "lint",
+      "source": ".pre-commit-config.yaml:100 hook swiftlint entry",
+      "reason": "could not resolve swiftlint to an executable"
+    },
+    {
+      "cmd": "swiftformat --lint apps/macos/Sources --config config/swiftformat --exclude '**/OpenClawProtocol,**/HostEnvSecurityPolicy.generated.swift'",
+      "cwd": ".",
+      "kind": "lint",
+      "source": ".pre-commit-config.yaml:108 hook swiftformat entry",
+      "reason": "could not resolve swiftformat to an executable"
+    }
+  ]
+}

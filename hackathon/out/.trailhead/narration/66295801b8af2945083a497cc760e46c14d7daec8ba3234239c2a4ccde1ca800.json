@@ -1,0 +1,19 @@
+{
+ "claims": [
+  {
+   "text": "Importing the package is cheap and side effect free because the argument parser is constructed inside main rather than at module import time.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/__main__.py",
+    "quote": "def main(argv: list[str] | None = None) -> int:\n    parser = _build_parser()\n    args = parser.parse_args(argv)\n\n    if args.command is None:\n        parser.print_help()\n        return 0",
+    "focus": [
+     "    parser = _build_parser()"
+    ]
+   }
+  },
+  {
+   "text": "A passing import proves the source root resolves and the package is well formed, but it exercises none of the data pipeline, which needs credentials and a TSDB connection this machine does not have.",
+   "status": "inferred"
+  }
+ ]
+}

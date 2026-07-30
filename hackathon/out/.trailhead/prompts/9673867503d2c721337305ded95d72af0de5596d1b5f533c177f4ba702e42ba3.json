@@ -1,0 +1,219 @@
+{
+  "unit": "conv",
+  "kind": "conventions",
+  "title": "How this codebase is written",
+  "max_claims": 4,
+  "key": "9673867503d2c721337305ded95d72af0de5596d1b5f533c177f4ba702e42ba3",
+  "system": "You are the narration stage of Trailhead, a tool that generates a walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Every\nquote you return is searched for verbatim in the file on disk; anything that is\nnot found exactly is deleted and counted on screen. You cannot talk your way\npast the checker, so do not try: an honest \"inferred\" sentence survives, an\ninvented quote does not.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. `cite.quote` is a VERBATIM, CONTIGUOUS copy of 3-24 lines from ONE file,\n   lines joined with newlines. Copy the leading indentation exactly, character\n   for character. Do not reflow, re-indent, elide, or add an ellipsis.\n4. Quote only code you were shown below. Quoting something you inferred exists\n   is the single most expensive thing you can do here.\n5. `cite.focus` is an array of exact substrings of your own `cite.quote` — the\n   one or two lines that actually carry the point.\n6. If you cannot support a sentence with a quote, set `\"status\": \"inferred\"` and\n   omit `cite` entirely. That is a legitimate, visible answer, not a failure.\n7. `text` is one plain sentence, at most 280 characters. No backticks, no\n   newlines, no markdown links, no `<`.\n8. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"this codebase appears to\" — say what it does.\n",
+  "user": "FACTS — from survey.json, deterministic. Rely on these; never quote them.\nrepo: volforecast @ nogit-1c4f5dc3\nsize: 1063 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit — 158 files, 44871 loc, fan-in 0\n  volforecast.models — 22 files, 9802 loc, fan-in 6\n  volforecast.data — 21 files, 9195 loc, fan-in 8\n  volforecast.cli — 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation — 14 files, 7031 loc, fan-in 8\n  tests.integration — 20 files, 5283 loc, fan-in 0\n  volforecast.features — 18 files, 3110 loc, fan-in 5\n  volforecast.utils — 7 files, 1552 loc, fan-in 10\n  tests — 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas — 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements — volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: unavailable (target path has no tracked history in the enclosing repository (0 tracked files)) — files are ranked by fan_in instead\n\nSOURCE — line numbers are a gutter, not part of any line. Never quote them.\n\n--- src/tests/unit/test_models.py ---\n    1| \"\"\"Tests for model implementations.\n    2| \n    3| Validates:\n    4| 1. HAR-family har_family: fit/predict round-trip on synthetic data\n    5| 2. Model coefficients have correct dimensions\n    6| 3. LightGBM QLIKE gradient/hessian correctness (numerical check)\n    7| 4. Ridge/Lasso regularization affects coefficients as expected\n    8| \"\"\"\n    9| \n   10| import numpy as np\n   11| import pandas as pd\n   12| import pytest\n   ...\n   23| class TestHARModelFitPredict:\n   24|     \"\"\"Basic fit/predict round-trip for HAR model.\"\"\"\n   25| \n   26|     def test_fit_sets_coefficients(self, sample_feature_df, sample_target):\n   27|         X = sample_feature_df[[\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"]]\n   28|         model = HARModel().fit(X, sample_target)\n   29|         assert model.coefficients_ is not None\n   30|         assert len(model.coefficients_) == 3\n   31|         assert model.intercept_ is not None\n   ...\n   63| class TestHARQModel:\n   64|     def test_fit_with_rq_features(self, sample_feature_df, sample_target):\n   65|         X = sample_feature_df.rename(\n   66|             columns={\n   67|                 \"rq_rv_interaction\": \"rq_rv_interaction_d\",\n   68|             }\n   69|         )[[\"log_rv_d\", \"log_rv_w\", \"log_rv_m\", \"rq_rv_interaction_d\"]]\n   70|         model = HARQModel().fit(X, sample_target)\n   71|         assert model.coefficients_ is not None\n   ...\n   75| class TestSHARModel:\n   76|     def test_fit_predict(self, sample_feature_df, sample_target):\n   77|         rng = np.random.default_rng(55)\n   78|         n = len(sample_feature_df)\n   79|         X = pd.DataFrame(\n   80|             {\n   81|                 \"log_rs_positive_d\": -10 + 0.5 * rng.standard_normal(n),\n   82|                 \"log_rs_positive_w\": -10 + 0.4 * rng.standard_normal(n),\n   83|                 \"log_rs_positive_m\": -10 + 0.3 * rng.standard_normal(n),\n   ...\n   95| class TestRidgeHAR:\n   96|     def test_ridge_shrinks_coefficients(self, sample_feature_df, sample_target):\n   97|         \"\"\"Ridge with high alpha should shrink coefficients toward zero.\"\"\"\n   98|         X = sample_feature_df[[\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"]]\n   99|         ols_model = HARModel().fit(X, sample_target)\n  100|         ridge_model = RidgeHARModel(alpha=100.0).fit(X, sample_target)\n  101| \n  102|         ols_norm = np.linalg.norm(ols_model.coefficients_)\n  103|         ridge_norm = np.linalg.norm(ridge_model.coefficients_)\n   ...\n  113| class TestLassoHAR:\n  114|     def test_lasso_can_zero_coefficients(self, sample_feature_df, sample_target):\n  115|         \"\"\"Lasso with high alpha may zero out some coefficients.\"\"\"\n  116|         X = sample_feature_df[[\"log_rv_d\", \"log_rv_w\", \"log_rv_m\", \"rq\", \"rq_rv_interaction\"]]\n  117|         model = LassoHARModel(alpha=1.0).fit(X, sample_target)\n  118|         # At least one coefficient should be zero (or near-zero) with high alpha\n  119|         assert np.any(np.abs(model.coefficients_) < 0.01)\n  120| \n  121|     def test_lasso_predicts(self, sample_feature_df, sample_target):\n   ...\n  128| class TestFeatureSelection:\n  129|     \"\"\"Verify each model selects only its theoretical features from a full matrix.\"\"\"\n  130| \n  131|     @pytest.fixture\n  132|     def full_feature_df(self):\n  133|         \"\"\"DataFrame with ALL possible feature columns (har_core + asymmetry).\"\"\"\n  134|         rng = np.random.default_rng(42)\n  135|         n = 200\n  136|         dates = pd.bdate_range(\"2020-01-02\", periods=n)\n   ...\n  451| class TestNaiveModels:\n  452|     \"\"\"Verify naive baseline models implement the pipeline interface correctly.\"\"\"\n  453| \n  454|     @pytest.fixture\n  455|     def feature_df(self):\n  456|         rng = np.random.default_rng(42)\n  457|         n = 100\n  458|         return pd.DataFrame(\n  459|             {\n   ...\n  580| class TestQLIKEObjectiveGradients:\n  581|     \"\"\"Verify custom QLIKE objective gradient/hessian via numerical differentiation.\"\"\"\n  582| \n  583|     def test_gradient_direction(self):\n  584|         \"\"\"Gradient of QLIKE w.r.t. y_pred.\n  585| \n  586|         d/dy_pred [exp(y_true - y_pred) - (y_true - y_pred) - 1]\n  587|         = -exp(y_true - y_pred) + 1\n  588| \n   ...\n  650|         np.testing.assert_allclose(grad, numerical_grad, atol=1e-4)\n  651| \n  652| \n  653| # ---------------------------------------------------------------------------\n  654| # Composite model regression tests\n  655| # ---------------------------------------------------------------------------\n  656| \n  657| lgb = pytest.importorskip(\"lightgbm\")\n  658| \n  659| \n  660| @pytest.fixture\n  661| def composite_data():\n  662|     \"\"\"Synthetic tabular data suitable for composite models (HAR + LightGBM).\n  663| \n  664|     Uses HAR features (log_rv_d/w/m) with a linear + nonlinear DGP so both\n  665|     sub-models have signal. 2000 rows ensures enough data for holdout splits.\n  666|     \"\"\"\n  667|     rng = np.random.default_rng(42)\n  668|     n = 2000\n  669|     log_rv_d = rng.normal(-8, 1, n)\n  670|     log_rv_w = rng.normal(-8, 0.5, n)\n  671|     log_rv_m = rng.normal(-8, 0.3, n)\n  672| \n  673|     y = (\n  674|         0.4 * log_rv_d\n  675|         + 0.2 * log_rv_w\n  676|         + 0.1 * log_rv_m\n  677|         + 0.05 * np.abs(log_rv_d - log_rv_w)\n  678|         + rng.normal(0, 0.2, n)\n  679|     )\n  680| \n  681|     X = pd.DataFrame(\n  682|         {\"log_rv_d\": log_rv_d, \"log_rv_w\": log_rv_w, \"log_rv_m\": log_rv_m},\n  683|         index=pd.bdate_range(\"2016-01-04\", periods=n),\n  684|     )\n  685|     return X, pd.Series(y, index=X.index, name=\"target\")\n  686| \n  687| \n  688| @pytest.fixture(autouse=True)\n  689| def _register():\n  690|     from volforecast.registry import ensure_registered\n  691| \n  692|     ensure_registered()\n  693| \n  694| \n  695| class TestStackingHARLightGBM:\n  696|     def test_fit_predict_roundtrip(self, composite_data):\n  697|         from volforecast.models.stacking import StackingHARLightGBM\n  698| \n  699|         X, y = composite_data\n  700|         model = StackingHARLightGBM(\n  701|             blend_fraction=0.20,\n  702|             blend_purge_gap=5,\n  703|             n_estimators=20,\n   ...\n  729| class TestCalibratedLightGBM:\n  730|     def test_fit_predict_roundtrip(self, composite_data):\n  731|         from volforecast.models.calibrated import CalibratedLightGBM\n  732| \n  733|         X, y = composite_data\n  734|         model = CalibratedLightGBM(\n  735|             cal_fraction=0.15,\n  736|             cal_purge_gap=5,\n  737|             n_estimators=20,\n   ...\n  760| class TestRegimeBlendModel:\n  761|     def test_fit_predict_roundtrip(self, composite_data):\n  762|         from volforecast.models.regime_blend import RegimeBlendModel\n  763| \n  764|         X, y = composite_data\n  765|         model = RegimeBlendModel(\n  766|             blend_strategy=\"fixed_regime\",\n  767|             n_estimators=20,\n  768|             val_fraction=0.0,\n   ...\n  798| class TestHARIVXAssetModels:\n  799|     \"\"\"Test har_iv_xasset and ridge_har_iv_xasset models.\"\"\"\n  800| \n  801|     @pytest.fixture\n  802|     def xasset_df(self):\n  803|         \"\"\"DataFrame with HAR core + IV + cross-asset columns.\"\"\"\n  804|         rng = np.random.default_rng(42)\n  805|         n = 500\n  806|         dates = pd.bdate_range(\"2018-01-02\", periods=n)\n   ...\n  891| class TestRegularizedHARIV:\n  892|     \"\"\"Tests for Ridge/Lasso/ElasticNet HAR-IV models.\"\"\"\n  893| \n  894|     @pytest.fixture\n  895|     def iv_feature_df(self):\n  896|         \"\"\"Feature DataFrame with HAR core + IV columns.\"\"\"\n  897|         rng = np.random.default_rng(42)\n  898|         n = 500\n  899|         dates = pd.bdate_range(\"2019-01-02\", periods=n)\n   ...\n 1091| class TestHARXIvRich:\n 1092|     \"\"\"Tests for HAR-X IV Rich models (tenor-matched, trial-035).\"\"\"\n 1093| \n 1094|     @pytest.fixture\n 1095|     def harx_feature_df(self):\n 1096|         \"\"\"DataFrame with all features needed by HAR-X IV Rich models.\"\"\"\n 1097|         rng = np.random.default_rng(42)\n 1098|         n = 500\n 1099|         dates = pd.bdate_range(\"2019-01-02\", periods=n)\n   ...\n 1187| class TestHARIVRateVolModels:\n 1188|     \"\"\"Test har_iv_ratevol, ridge_har_iv_ratevol, and lasso_har_iv_ratevol.\"\"\"\n 1189| \n 1190|     @pytest.fixture\n 1191|     def ratevol_df(self):\n 1192|         \"\"\"DataFrame with HAR core + IV + xasset_rate_vol.\"\"\"\n 1193|         rng = np.random.default_rng(42)\n 1194|         n = 500\n 1195|         dates = pd.bdate_range(\"2018-01-02\", periods=n)\n\n--- src/volforecast/models/_base.py ---\n    1| \"\"\"Unified base classes for all volforecast models.\n    2| \n    3| _BaseModel  — root base: save/load/summary interface shared by ALL models.\n    4| _BaseOLS    — OLS/regularized regression models (HAR family): feature selection + fit logic.\n    5| \"\"\"\n    6| \n    7| from __future__ import annotations\n    8| \n    9| import logging\n   10| from pathlib import Path\n   11| \n   12| import numpy as np\n   ...\n   18| class _BaseModel:\n   19|     \"\"\"Shared interface for all volforecast models.\"\"\"\n   20| \n   21|     REQUIRED_LAYERS: list[str] = [\"har_core\"]\n   22|     supports_tuning: bool = False\n   23|     family: str = \"unknown\"\n   24|     description: str = \"\"\n   25|     # Sequence-first models (LSTM/TCN) set this True so the Pipeline runner\n   26|     # dispatches to the sequence path, feeding a SequenceTensor instead of a\n   ...\n  101| class _BaseOLS(_BaseModel):\n  102|     \"\"\"OLS/regularized regression models (HAR family).\"\"\"\n  103| \n  104|     family: str = \"har\"\n  105|     description: str = \"HAR-family linear model\"\n  106| \n  107|     # Subclasses override to restrict features. None means use all columns.\n  108|     _FEATURES: list[str] | None = None\n  109| \n   ...\n  232|                 \"%s: tuned %s (inner QLIKE %.5f over %d combos)\",\n  233|                 cls.__name__,\n  234|                 result.best_params,\n  235|                 result.best_inner_qlike,\n  236|                 len(result.grid_results),\n  237|             )\n  238|         model.fit(X_train, y_train)\n  239|         return model\n  240| \n  241| \n  242| def temporal_holdout_split(\n  243|     n: int,\n  244|     fraction: float,\n  245|     purge_gap: int,\n  246|     min_holdout: int = 20,\n  247| ) -> tuple[int, int] | None:\n  248|     \"\"\"Compute split indices for a temporal holdout with purge gap.\n  249| \n  250|     Returns ``(train_end, holdout_start)`` or ``None`` if the holdout\n  251|     set would be smaller than *min_holdout* rows.\n  252|     \"\"\"\n  253|     train_end = int(n * (1.0 - fraction))\n  254|     holdout_start = train_end + purge_gap\n  255|     if holdout_start >= n - min_holdout:\n  256|         return None\n  257|     return train_end, holdout_start\n\n--- src/volforecast/data/sequence_cache.py ---\n    1| \"\"\"Sequence tensor cache for LSTM/TCN models.\n    2| \n    3| Pre-stacks the per-symbol 10s bar parquets under ``data/raw/micro/sequences/``\n    4| into a single padded tensor of shape ``(n_dates, max_bars, n_features)`` so\n    5| the training loop is pure GPU tensor ops with no pandas / parquet overhead.\n    6| \n    7| Cached tensors live under ``data/processed/sequences/{SYMBOL}_{hash}.pt`` and\n    8| are keyed on the ``SequenceSpec`` (features tuple + max_bars). Changing either\n    9| field invalidates the cache automatically.\n   10| \n   11| Public API:\n   12|     SequenceSpec          — frozen dataclass describing tensor layout\n   ...\n   43| @dataclass(frozen=True)\n   44| class SequenceSpec:\n   45|     \"\"\"Cache key describing the desired tensor layout.\n   46| \n   47|     Two specs with identical fields produce the same cache hash and therefore\n   48|     share the same on-disk ``.pt`` file. Any change (features tuple, ordering,\n   49|     max_bars) yields a new cache entry — no manual invalidation needed.\n   50| \n   51|     Parameters\n   ...\n   71|             raise ValueError(\"features must be non-empty\")\n   72|         if self.max_bars <= 0:\n   73|             raise ValueError(f\"max_bars must be positive, got {self.max_bars}\")\n   74| \n   75|     @property\n   76|     def hash(self) -> str:\n   77|         payload = \";\" .join(self.features) + f\"|max_bars={self.max_bars}|bar_interval={self.bar_interval}\"\n   78|         return hashlib.sha1(payload.encode(\"utf-8\")).hexdigest()[:10]\n   79| \n   80| \n   81| @dataclass\n   82| class SequenceTensor:\n   83|     \"\"\"Per-symbol padded sequence tensor with valid-length info.\n   84| \n   85|     Attributes\n   86|     ----------\n   87|     symbol : str\n   88|     tensor : torch.Tensor\n   89|         Shape ``(n_dates, max_bars, n_features)``, dtype ``float32``.\n   90|         Padded positions (beyond ``lengths[i]``) are zero.\n   91|     lengths : torch.Tensor\n   92|         Shape ``(n_dates,)``, dtype ``int64``. Number of valid bars per day.\n   93|     dates : pd.DatetimeIndex\n   94|         Length ``n_dates``. One date per outer-axis row.\n   95|     feature_names : tuple[str, ...]\n   96|         Names of the last axis, in order.\n   97|     \"\"\"\n   98| \n   99|     symbol: str\n  100|     tensor: torch.Tensor\n  101|     lengths: torch.Tensor\n  102|     dates: pd.DatetimeIndex\n  103|     feature_names: tuple[str, ...] = field(default_factory=tuple)\n  104| \n  105|     def __len__(self) -> int:\n  106|         return int(self.tensor.shape[0])\n  107| \n  108|     @property\n  109|     def n_features(self) -> int:\n  110|         return int(self.tensor.shape[2])\n  111| \n  112|     @property\n  113|     def max_bars(self) -> int:\n  114|         return int(self.tensor.shape[1])\n  115| \n  116|     def subset_by_dates(self, dates: pd.DatetimeIndex) -> SequenceTensor:\n  117|         \"\"\"Return a new SequenceTensor containing only ``dates`` in order.\n  118| \n  119|         Raises ``KeyError`` if any requested date is absent from the cached\n  120|         index — the caller is expected to align beforehand.\n  121|         \"\"\"\n  122|         date_to_pos: dict[pd.Timestamp, int] = {d: i for i, d in enumerate(self.dates)}\n  123|         try:\n  124|             positions = [date_to_pos[d] for d in dates]\n  125|         except KeyError as exc:\n  126|             missing = [d for d in dates if d not in date_to_pos]\n  127|             raise KeyError(\n  128|                 f\"{self.symbol}: {len(missing)} requested date(s) missing from cache, \"\n  129|                 f\"first={missing[0]}\"\n  130|             ) from exc\n   ...\n  146| def build_daily_lookback_tensor(\n  147|     symbol: str,\n  148|     daily_data: pd.DataFrame,\n  149|     features: tuple[str, ...],\n  150|     lookback: int,\n  151| ) -> SequenceTensor:\n  152|     \"\"\"Build a SequenceTensor from daily panel data using rolling lookback windows.\n  153| \n  154|     Each row of the output corresponds to one target date. Its tensor row\n   ...\n  225| def build_sequence_tensor(\n  226|     symbol: str,\n  227|     spec: SequenceSpec,\n  228|     *,\n  229|     sequences_dir: Path | None = None,\n  230| ) -> SequenceTensor:\n  231|     \"\"\"Build a ``SequenceTensor`` for ``symbol`` from its source parquet.\n  232| \n  233|     No caching — always reads from disk and computes the tensor. Use\n   ...\n  319| def build_5min_sequence_tensor(\n  320|     symbol: str,\n  321|     spec: SequenceSpec,\n  322|     *,\n  323|     sequences_dir: Path | None = None,\n  324|     bar_interval_s: int = 10,\n  325|     target_interval_s: int = 300,\n  326| ) -> SequenceTensor:\n  327|     \"\"\"Build a ``SequenceTensor`` from 10s bar parquets aggregated to 5-min bars.\n   ...\n  413| def build_multiday_5min_sequence_tensor(\n  414|     symbol: str,\n  415|     spec: SequenceSpec,\n  416|     *,\n  417|     lookback_days: int = 20,\n  418|     sequences_dir: Path | None = None,\n  419|     bar_interval_s: int = 10,\n  420|     target_interval_s: int = 300,\n  421| ) -> SequenceTensor:\n   ...\n  533| def _cache_path(symbol: str, spec: SequenceSpec, cache_dir: Path) -> Path:\n  534|     return cache_dir / f\"{symbol}_{spec.hash}.pt\"\n  535| \n  536| \n  537| def _atomic_torch_save(obj: dict, target: Path) -> None:\n  538|     target.parent.mkdir(parents=True, exist_ok=True)\n  539|     fd, tmp_path = tempfile.mkstemp(suffix=\".pt\", dir=str(target.parent))\n  540|     try:\n  541|         os.close(fd)\n  542|         torch.save(obj, tmp_path)\n  543|         os.replace(tmp_path, target)\n  544|     except BaseException:\n  545|         if os.path.exists(tmp_path):\n   ...\n  550| def _save_sequence_tensor(seq: SequenceTensor, path: Path) -> None:\n  551|     # Persist dates as ISO strings so we are immune to pandas' DatetimeIndex\n  552|     # precision (ns/us/ms/s — varies across pandas versions and constructors).\n  553|     payload = {\n  554|         \"symbol\": seq.symbol,\n  555|         \"tensor\": seq.tensor,\n  556|         \"lengths\": seq.lengths,\n  557|         \"dates_iso\": [d.isoformat() for d in seq.dates],\n  558|         \"feature_names\": list(seq.feature_names),\n   ...\n  564| def _load_sequence_tensor_from_disk(path: Path) -> SequenceTensor:\n  565|     # weights_only=False because we deserialise a small Python dict; the cache\n  566|     # is owned by the workspace so this is not a trust boundary.\n  567|     payload = torch.load(path, map_location=\"cpu\", weights_only=False)\n  568|     if \"dates_iso\" in payload:\n  569|         dates = pd.DatetimeIndex(pd.to_datetime(payload[\"dates_iso\"]))\n  570|     else:  # schema_version == 1 (legacy: ns ints, precision-dependent)\n  571|         dates_ns = payload[\"dates_ns\"].numpy()\n  572|         dates = pd.DatetimeIndex(pd.to_datetime(dates_ns, unit=\"ns\"))\n   ...\n  582| def load_sequence_tensor(\n  583|     symbol: str,\n  584|     spec: SequenceSpec,\n  585|     *,\n  586|     sequences_dir: Path | None = None,\n  587|     cache_dir: Path | None = None,\n  588|     force_rebuild: bool = False,\n  589| ) -> SequenceTensor:\n  590|     \"\"\"Return a SequenceTensor, building from parquet only if cache miss.\n   ...\n  644| def fit_seq_normaliser(\n  645|     seq: SequenceTensor,\n  646|     train_dates: pd.DatetimeIndex,\n  647|     *,\n  648|     eps: float = 1e-6,\n  649| ) -> tuple[torch.Tensor, torch.Tensor]:\n  650|     \"\"\"Compute per-feature mean/std using ONLY ``train_dates`` valid bars.\n  651| \n  652|     Pad rows (beyond ``lengths[i]``) and non-training dates are excluded so\n   ...\n  696| def apply_normaliser(\n  697|     seq: SequenceTensor,\n  698|     mean: torch.Tensor,\n  699|     std: torch.Tensor,\n  700| ) -> SequenceTensor:\n  701|     \"\"\"Return a new SequenceTensor with z-score normalised features.\n  702| \n  703|     Padded positions (beyond ``lengths[i]``) are re-zeroed after normalisation\n  704|     so downstream masking still sees zeros and the LSTM's packed sequence\n\n--- src/volforecast/cli/console.py ---\n    1| \"\"\"Shared Rich console singleton.\n    2| \n    3| All CLI modules import `console` from here to avoid multiple Console\n    4| instances conflicting with stderr/live displays.\n    5| \"\"\"\n    6| \n    7| from __future__ import annotations\n    8| \n    9| import logging\n   10| \n   11| from rich.console import Console\n   12| from rich.logging import RichHandler\n   13| \n   14| #: Global console instance. All CLI output goes through this.\n   15| console = Console(stderr=True)\n   16| \n   17| #: Panel width for consistent right-edge alignment.\n   18| PANEL_WIDTH = 78\n   19| \n   20| \n   21| def setup_logging(level: int = logging.WARNING) -> None:\n   22|     \"\"\"Configure root logger with RichHandler for inline log display.\"\"\"\n   23|     logging.basicConfig(\n   24|         level=level,\n   25|         format=\"%(message)s\",\n   26|         datefmt=\"[%X]\",\n   27|         handlers=[RichHandler(console=console, show_path=False, markup=True)],\n   28|         force=True,\n   29|     )\n   30|     # Suppress pyslang's own INFO handler which writes raw stderr during\n   31|     # Rich live progress rendering, causing the progress bars to redraw.\n   32|     logging.getLogger(\"goldmansachs.pyslang\").setLevel(logging.WARNING)\n   33| \n   34| \n   35| def print_output_summary(output_dir: str, extra_files: dict[str, str] | None = None) -> None:\n   36|     \"\"\"Print a clear output summary with file paths.\"\"\"\n   37|     from pathlib import Path\n   38| \n   39|     out = Path(output_dir)\n   40|     lines: list[tuple[str, str]] = []\n   41| \n   42|     # Check for dashboard\n   43|     dashboard = out / \"plots\" / \"tournament_dashboard.html\"\n\nTASK — How this codebase is written\nWrite exactly 4 sentences about the conventions and habits of\nthis codebase — how errors are handled, how modules are laid out, what the\nauthors clearly cared about.\nThese are readings, not facts. Every one of them will be marked inferred and\nshown as such; do not stretch for a quote to make one look verified.",
+  "windows": [
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 23,
+      "end": 31
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 63,
+      "end": 71
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 75,
+      "end": 83
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 95,
+      "end": 103
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 113,
+      "end": 121
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 128,
+      "end": 136
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 451,
+      "end": 459
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 580,
+      "end": 588
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 650,
+      "end": 703
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 729,
+      "end": 737
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 760,
+      "end": 768
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 798,
+      "end": 806
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 891,
+      "end": 899
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 1091,
+      "end": 1099
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 1187,
+      "end": 1195
+    },
+    {
+      "file": "src/volforecast/models/_base.py",
+      "start": 18,
+      "end": 26
+    },
+    {
+      "file": "src/volforecast/models/_base.py",
+      "start": 101,
+      "end": 109
+    },
+    {
+      "file": "src/volforecast/models/_base.py",
+      "start": 232,
+      "end": 257
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 43,
+      "end": 51
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 71,
+      "end": 130
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 146,
+      "end": 154
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 225,
+      "end": 233
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 319,
+      "end": 327
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 413,
+      "end": 421
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 533,
+      "end": 545
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 550,
+      "end": 558
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 564,
+      "end": 572
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 582,
+      "end": 590
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 644,
+      "end": 652
+    },
+    {
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 696,
+      "end": 704
+    },
+    {
+      "file": "src/volforecast/cli/console.py",
+      "start": 13,
+      "end": 43
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "claims"
+    ],
+    "properties": {
+      "claims": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "status",
+            "cite"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "inferred"
+              ]
+            },
+            "cite": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "focus": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\9673867503d2c721337305ded95d72af0de5596d1b5f533c177f4ba702e42ba3.json",
+  "pack": "C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\9673867503d2c721337305ded95d72af0de5596d1b5f533c177f4ba702e42ba3.json"
+}

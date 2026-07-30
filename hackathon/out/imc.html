@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trailhead</title>
+<style>
+/* ============================================================
+   TRAILHEAD — generated codebase walkthrough
+   Aesthetic: GS institutional workstation
+     · cool navy-slate surfaces; sky blue is the one interactive accent
+     · workflow status (verified / inferred / broken) is kept strictly
+       separate from brand colour — action hierarchy vs status, per GS
+     · sans for interface text; mono confined to code, commands, paths,
+       identifiers and figures; serif reserved for display headings
+     · tabular numerals wherever a number appears
+   Self-contained: no external requests, no fonts, no scripts.
+   Goldman Sans / GS Sans cannot ship in this file — embedded font at-rules
+   are barred by tools/check-bundle.js — so --sans approximates it from
+   system faces. Do not try to base64 the real face in; the gate greps for it.
+   ============================================================ */
+
+:root{
+  /* surfaces */
+  --ink:#0a0e14; --ink2:#111722; --ink3:#18202d; --ink4:#212b3a;
+  /* text */
+  --bone:#e8ecf2; --dim:#9ba8ba; --faint:#8494a8;
+  /* structure */
+  --rule:#1e2735; --rule2:#2c3849;
+  /* brand / interactive — GS sky blue */
+  --brand:#7399c6; --brand2:#acd4f1; --brandd:#12243a;
+  /* workflow status */
+  --ok:#4fa97a; --inf:#d8a23c; --bad:#e06c5b;
+  --okd:#0f2a20; --infd:#2a2210; --badd:#2e1614;
+  /* type */
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --serif:Charter,"Bitstream Charter","Sitka Text",Cambria,"Times New Roman",Times,serif;
+  --mono:"Cascadia Code","JetBrains Mono","SF Mono","Berkeley Mono","IBM Plex Mono",ui-monospace,monospace;
+  /* shape + elevation — nothing rounder than 4px */
+  --r1:2px; --r2:4px;
+  --e1:0 1px 2px rgba(4,8,14,.28);
+  --e2:0 8px 24px rgba(4,8,14,.40);
+  --base:16px; --rail:270px; --bar:52px;
+}
+/* Sky blue is the dark-theme interactive colour; on white it fails 4.5:1 as
+   text, so light drops to deep navy with Mariner for hover. */
+:root[data-theme="light"]{
+  --ink:#ffffff; --ink2:#f5f7fa; --ink3:#eaeef4; --ink4:#dde4ed;
+  --bone:#14181f; --dim:#4a5464; --faint:#5c6775;
+  --rule:#e3e8ef; --rule2:#c2ccd9;
+  --brand:#00355f; --brand2:#2178c4; --brandd:#e8f1fa;
+  --ok:#1a6b43; --inf:#8a5c10; --bad:#b3261e;
+  --okd:#e4f2ea; --infd:#fbf0da; --badd:#fbe9e7;
+  --e1:0 1px 2px rgba(20,24,31,.10);
+  --e2:0 8px 24px rgba(20,24,31,.16);
+}
+/* Duplicated deliberately: the light set again for anyone arriving without an
+   explicit data-theme. Keep in sync with the block above. */
+@media (prefers-color-scheme:light){
+  :root:not([data-theme]){
+    --ink:#ffffff; --ink2:#f5f7fa; --ink3:#eaeef4; --ink4:#dde4ed;
+    --bone:#14181f; --dim:#4a5464; --faint:#5c6775;
+    --rule:#e3e8ef; --rule2:#c2ccd9;
+    --brand:#00355f; --brand2:#2178c4; --brandd:#e8f1fa;
+    --ok:#1a6b43; --inf:#8a5c10; --bad:#b3261e;
+    --okd:#e4f2ea; --infd:#fbf0da; --badd:#fbe9e7;
+    --e1:0 1px 2px rgba(20,24,31,.10);
+    --e2:0 8px 24px rgba(20,24,31,.16);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--ink); color:var(--bone);
+  font:var(--base)/1.6 var(--sans);
+  overflow-x:hidden;
+}
+/* mono is opt-in now that body is sans — every code-ish element declares it */
+code,pre,samp,kbd{font-family:var(--mono)}
+/* numerals align across weights: a stated Goldman Sans design goal */
+.badge,.dur,.stop .num,.prog .lab,.code .ln,.sumgrid .v,.tbl .r,
+.drawer .sub,.opt .i,.hop>.dot,.meta{font-variant-numeric:tabular-nums}
+::selection{background:var(--brand);color:var(--ink)}
+
+/* ---------- top bar ---------- */
+.bar{
+  position:fixed; top:0; left:0; right:0; height:var(--bar); z-index:60;
+  display:flex; align-items:center; gap:16px; padding:0 16px;
+  background:var(--ink2); border-bottom:1px solid var(--rule2); box-shadow:var(--e1);
+}
+.brand{display:flex;align-items:baseline;gap:12px;min-width:0}
+.brand b{font:600 15px var(--sans);letter-spacing:-.01em}
+/* the SHA and tool version are identifiers — mono earns its place here */
+.meta{font:11.5px var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* demo-only: this bundle carries more than one repo, a real artifact does not */
+.rsel{
+  background:var(--ink3);color:var(--bone);border:1px solid var(--rule2);border-radius:var(--r1);
+  font:600 11.5px var(--sans);padding:3px 6px;cursor:pointer;flex:none;max-width:170px
+}
+.rsel:hover{border-color:var(--brand)}
+.badge{
+  margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid var(--rule2);
+  border-radius:var(--r1);background:var(--ink3);cursor:pointer;flex:none;
+  font:11.5px var(--sans);overflow:hidden
+}
+.badge:hover{border-color:var(--brand)}
+.badge span{padding:5px 10px;border-right:1px solid var(--rule);color:var(--dim)}
+.badge span:last-child{border-right:0}
+.badge .n{color:var(--bone);font-weight:600;font-style:normal}
+.badge .d{color:var(--inf)} .badge .f{color:var(--bad)}
+/* >40% of claims dropped turns the badge itself amber. This is the badge state a
+   judge looks at hardest, because it only shows up when the drop rate is bad, so
+   it is a border change plus a labelled span and never a quietly hidden number
+   (non-negotiable #3). --inf on --ink3 is the pairing .d already uses. */
+.badge.lowconf{border-color:var(--inf)} .badge .lo{color:var(--inf);font-weight:600}
+.tools{display:flex;gap:4px;flex:none}
+.tbtn{
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);
+  color:var(--dim);cursor:pointer;font:600 11px var(--sans);letter-spacing:.04em;padding:5px 8px
+}
+.tbtn:hover{color:var(--bone);border-color:var(--brand)}
+.tbtn[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--ink)}
+.tbtn:focus-visible,a:focus-visible,button:focus-visible,li:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* ---------- rail ---------- */
+.rail{
+  position:fixed;top:var(--bar);bottom:0;left:0;width:var(--rail);z-index:50;
+  overflow-y:auto;border-right:1px solid var(--rule2);
+  background:var(--ink2);padding:8px 0 88px
+}
+.rail::-webkit-scrollbar{width:8px}
+.rail::-webkit-scrollbar-thumb{background:var(--rule2);border-radius:var(--r1)}
+.track{margin-bottom:4px}
+.track h3{
+  font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
+  padding:16px 16px 8px;display:flex;justify-content:space-between
+}
+.track h3 i{font-style:normal;font-weight:400}
+.stop{
+  display:flex;gap:12px;align-items:baseline;padding:6px 16px 6px 14px;cursor:pointer;
+  border-left:2px solid transparent;color:var(--dim);font-size:13px;line-height:1.45
+}
+.stop:hover{background:var(--ink3);color:var(--bone)}
+.stop .num{font-size:11px;color:var(--faint);flex:none;width:16px;position:relative;text-align:right}
+.stop.on{border-left-color:var(--brand);background:var(--ink3);color:var(--bone);font-weight:600}
+.stop.on .num{color:var(--brand)}
+.stop.done .num{color:transparent}
+.stop.done .num::after{content:"✓";position:absolute;left:0;right:0;text-align:right;color:var(--ok);font-weight:600}
+.stop.cp{font-style:italic}
+.prog{
+  position:fixed;bottom:0;left:0;width:var(--rail);z-index:51;
+  background:var(--ink2);border-top:1px solid var(--rule2);border-right:1px solid var(--rule2);
+  padding:12px 16px
+}
+.prog .lab{display:flex;justify-content:space-between;font:600 11px var(--sans);letter-spacing:.04em;color:var(--faint);margin-bottom:8px}
+/* segmented progress: one segment per stop, flush — a readout, not a sprocket */
+.sprocket{display:flex;gap:1px;border-radius:var(--r1);overflow:hidden}
+.sprocket i{flex:1;height:4px;background:var(--rule2)}
+.sprocket i.f{background:var(--brand)}
+
+/* ---------- main ---------- */
+main{margin-left:var(--rail);padding:calc(var(--bar) + 48px) 0 120px;position:relative;z-index:1}
+.wrap{max-width:1010px;padding:0 clamp(16px,4vw,56px)}
+.plate{
+  display:flex;align-items:center;gap:12px;font:600 11px var(--sans);letter-spacing:.06em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:16px
+}
+.plate hr{flex:1;border:0;border-top:1px solid var(--rule2)}
+h1{
+  font:400 clamp(30px,4.6vw,44px)/1.12 var(--serif);letter-spacing:-.015em;
+  margin-bottom:16px;max-width:24ch
+}
+h1 em{font-style:italic;color:var(--brand)}
+.lede{color:var(--dim);font-size:14.5px;max-width:70ch;margin-bottom:40px}
+.blocks>*{margin-bottom:32px;animation:fade .15s both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+/* prose + claims */
+.prose{font-size:15px}
+.prose p{margin-bottom:12px;max-width:72ch}
+.claim{border-bottom:1px solid var(--rule2);padding-bottom:1px}
+/* the claim marker means VERIFIED — it stays green, never brand blue */
+.mark{
+  font:600 10px var(--mono);color:var(--ok);background:var(--okd);border:1px solid var(--ok);
+  border-radius:var(--r1);cursor:pointer;padding:1px 4px;margin-left:4px;vertical-align:1.5px
+}
+.mark:hover{background:var(--ok);color:var(--ink)}
+.mark[aria-expanded="true"]{background:var(--ok);color:var(--ink)}
+.claim.inf{border-bottom:1px dotted var(--inf)}
+.tag{
+  font:600 10px var(--sans);letter-spacing:.06em;color:var(--inf);background:var(--infd);
+  border-radius:var(--r1);padding:1px 6px;margin-left:6px;vertical-align:1px;white-space:nowrap
+}
+.pop{margin:12px 0 24px;border-left:2px solid var(--ok);animation:fade .15s both}
+
+/* excerpt */
+.ex{border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);overflow:hidden}
+.ex>header{
+  display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid var(--rule);
+  font:11.5px var(--mono);color:var(--dim);background:var(--ink3)
+}
+.ex>header b{color:var(--bone);font-weight:600}
+.ex>header .sp{flex:1}
+.cp-btn{
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);color:var(--faint);
+  cursor:pointer;font:600 10px var(--sans);letter-spacing:.06em;padding:3px 8px
+}
+.cp-btn:hover{color:var(--brand);border-color:var(--brand)}
+.code{overflow:auto;max-height:430px}
+.code table{border-collapse:collapse;width:100%;font:12.8px/1.62 var(--mono)}
+.code td{padding:0;white-space:pre;vertical-align:top}
+.code .ln{
+  width:1%;text-align:right;padding:0 12px;color:var(--faint);
+  user-select:none;font-size:11.5px;position:relative;border-right:1px solid var(--rule)
+}
+.code .src{padding:0 16px 0 12px;color:var(--bone)}
+.code tr.hl{background:var(--okd)}
+.code tr.hl .ln{color:var(--ok);font-weight:600}
+.code tr.hl .ln::before{content:"▸";position:absolute;left:3px}
+.code tr.el td{color:var(--faint);font:italic 11px var(--sans);padding:2px 0 2px 12px}
+.ex figcaption{padding:8px 12px;border-top:1px solid var(--rule);font-size:11.5px;color:var(--faint);background:var(--ink3)}
+
+/* command */
+.cmd{border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);overflow:hidden}
+.cmd.fail{border-color:var(--bad)}
+.cmd>header{display:flex;align-items:center;gap:12px;padding:8px 12px;font-size:13px}
+.cmd>header .pr{color:var(--dim);flex:none;font:600 13px var(--mono)}
+.cmd>header code{flex:1;font:13px var(--mono);color:var(--bone);overflow:auto;white-space:nowrap}
+.pill{font:600 10.5px var(--sans);letter-spacing:.05em;padding:2px 8px;flex:none;border:1px solid;border-radius:var(--r1)}
+.pill.ok{color:var(--ok);border-color:var(--ok);background:var(--okd)}
+.pill.bad{color:var(--bad);border-color:var(--bad);background:var(--badd)}
+.dur{color:var(--faint);font-size:11.5px;flex:none}
+/* flat danger surface — status by label plus colour, never hazard stripes */
+.brk{
+  display:flex;gap:12px;align-items:flex-start;padding:12px;font-size:13px;
+  border-top:1px solid var(--bad);border-left:2px solid var(--bad);background:var(--badd)
+}
+.brk b{color:var(--bad);font:600 10px var(--sans);letter-spacing:.08em;flex:none;margin-top:3px}
+.out{border-top:1px solid var(--rule)}
+.out summary{padding:8px 12px;cursor:pointer;font-size:11.5px;color:var(--dim);list-style:none}
+.out summary::before{content:"▸ ";color:var(--faint)}
+.out[open] summary::before{content:"▾ "}
+.out summary:hover{color:var(--bone)}
+.out pre{padding:12px;font-size:12px;line-height:1.6;color:var(--dim);overflow:auto;max-height:290px;border-top:1px solid var(--rule);white-space:pre}
+.envnote{padding:8px 12px;border-top:1px solid var(--rule);font-size:11px;color:var(--faint)}
+
+/* map — this is navigation, so it reads brand blue, not status green */
+.mapbox{border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);position:relative;overflow:hidden}
+.mapbox svg{display:block;width:100%;height:auto;touch-action:none}
+/* footer strip, not an overlay — absolute positioning collided with the axis ticks */
+.mapbox .hint{
+  padding:8px 12px;border-top:1px solid var(--rule);background:var(--ink3);
+  font:600 10px var(--sans);letter-spacing:.06em;color:var(--faint)
+}
+.n-body{fill:var(--ink3);stroke:var(--rule2);transition:stroke .15s,fill .15s}
+.n-lab{fill:var(--bone);font:600 11.5px var(--mono)}
+.n-loc{fill:var(--faint);font:10px var(--mono)}
+.node{cursor:pointer}
+.node:hover .n-body,.node.sel .n-body{fill:var(--brandd);stroke:var(--brand)}
+.node.dim{opacity:.24}
+/* --dim rather than --rule2: a hairline border colour is too weak for a
+   full-width curve, and it disappeared entirely on the light background */
+.edge{stroke:var(--dim);opacity:.45;fill:none;transition:stroke .15s,opacity .15s}
+.edge.lit{stroke:var(--brand);opacity:1}
+.edge.dim{opacity:.13}
+.tick{stroke:var(--rule2)} .ticklab{fill:var(--faint);font:9px var(--mono)}
+.fallback summary{cursor:pointer;font-size:11.5px;color:var(--dim);padding:8px 0;list-style:none}
+.fallback summary::before{content:"▸ ";color:var(--faint)}
+.fallback[open] summary::before{content:"▾ "}
+.fallback ul{margin-left:20px;font-size:13px;color:var(--dim)}
+.fallback li{margin:4px 0;list-style:"· "}
+
+/* drawer */
+.drawer{
+  position:fixed;top:var(--bar);right:0;bottom:0;width:min(430px,92vw);z-index:70;
+  background:var(--ink2);border-left:1px solid var(--rule2);box-shadow:var(--e2);
+  overflow-y:auto;padding:24px;
+  transform:translateX(101%);transition:transform .15s cubic-bezier(.3,.8,.3,1)
+}
+.drawer.open{transform:none}
+.drawer h4{font:400 24px var(--serif);margin-bottom:4px}
+.drawer .sub{font:600 11px var(--sans);letter-spacing:.06em;color:var(--faint);margin-bottom:20px}
+.drawer .x{position:absolute;top:16px;right:16px}
+.dl{border-top:1px solid var(--rule);padding:8px 0;display:flex;gap:16px;font-size:12.5px}
+.dl b{color:var(--faint);font:600 11px var(--sans);width:88px;flex:none;padding-top:1px}
+.dl span{color:var(--bone)}
+.drawer h5{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:24px 0 8px}
+
+/* table */
+.tbl{border:1px solid var(--rule2);border-radius:var(--r2);overflow:auto;background:var(--ink2)}
+/* a table followed by its caption is one card, not two — square the seam */
+.tbl:has(+ .envnote){border-radius:var(--r2) var(--r2) 0 0}
+.tbl+.envnote{border-radius:0 0 var(--r2) var(--r2)}
+.tbl table{border-collapse:collapse;width:100%;font-size:12.8px;min-width:660px}
+.tbl th{
+  text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule2);background:var(--ink3);
+  font:600 11px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--faint);
+  cursor:pointer;white-space:nowrap;position:sticky;top:0;z-index:1
+}
+.tbl th:hover{color:var(--brand)}
+.tbl th[data-dir]::after{content:" ▲";color:var(--brand)}
+.tbl th[data-dir="-1"]::after{content:" ▼"}
+.tbl td{padding:8px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr:hover td{background:var(--ink3)}
+.tbl .r{text-align:right;color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tbl code{font-size:12.3px;color:var(--bone);white-space:nowrap}
+/* inline-block so a long reason wraps inside the chip instead of splitting its border */
+.tbl .st{
+  display:inline-block;font:600 10px var(--sans);letter-spacing:.04em;padding:2px 6px;
+  border-radius:var(--r1);border:1px solid
+}
+.st.v{color:var(--ok);border-color:var(--ok);background:var(--okd)}
+.st.i{color:var(--inf);border-color:var(--inf);background:var(--infd)}
+.st.x{color:var(--bad);border-color:var(--bad);background:var(--badd)}
+
+/* trace */
+.trace{position:relative;padding-left:40px;max-width:86ch}
+.trace::before{content:"";position:absolute;left:14px;top:8px;bottom:32px;border-left:1px solid var(--rule2)}
+.hop{margin-bottom:24px;position:relative}
+.hop>.dot{
+  position:absolute;left:-40px;top:0;width:28px;height:28px;border:1px solid var(--brand);
+  background:var(--ink);color:var(--brand);display:grid;place-items:center;font:600 12px var(--sans);
+  border-radius:50%
+}
+.hop h4{font:600 13.5px var(--mono);margin-bottom:4px}
+.hop .an{font:11px var(--mono);color:var(--faint);margin-bottom:8px}
+.hop .nx{font-size:11.5px;color:var(--dim);margin-top:8px}
+.hop .nx b{color:var(--brand);font-weight:600}
+
+/* checkpoint */
+.cpx{border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);padding:20px;max-width:78ch}
+.cpx>.k{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-bottom:12px}
+.cpx h4{font:400 20px var(--serif);margin-bottom:16px;letter-spacing:-.01em}
+.opt{
+  display:flex;gap:12px;align-items:flex-start;padding:8px 12px;border:1px solid var(--rule2);
+  border-radius:var(--r1);margin-bottom:4px;cursor:pointer;font-size:13.5px;background:var(--ink)
+}
+.opt:hover{border-color:var(--brand)}
+.opt.pick{border-color:var(--brand);background:var(--brandd)}
+.opt.right{border-color:var(--ok);background:var(--okd)}
+.opt.wrong{border-color:var(--bad);background:var(--badd)}
+.opt .i{color:var(--faint);flex:none;font-size:11.5px;width:16px;padding-top:2px;font-weight:600}
+.opt.right .i{color:var(--ok)} .opt.wrong .i{color:var(--bad)}
+.cpx .act{display:flex;gap:12px;align-items:center;margin-top:16px}
+.sub{
+  background:var(--brand);border:1px solid var(--brand);border-radius:var(--r1);color:var(--ink);
+  font:600 11.5px var(--sans);letter-spacing:.05em;padding:7px 16px;cursor:pointer
+}
+.sub:hover{background:var(--brand2);border-color:var(--brand2)}
+.sub:disabled{background:var(--ink3);color:var(--faint);border-color:var(--rule2);cursor:not-allowed}
+.verdict{font:600 12px var(--sans);letter-spacing:.04em}
+.verdict.y{color:var(--ok)} .verdict.n{color:var(--bad)}
+.expl{margin-top:16px;border-top:1px solid var(--rule);padding-top:12px;font-size:13px;color:var(--dim);max-width:66ch}
+.prov{margin-top:8px;font-size:11px;color:var(--faint)}
+/* green: the answer key comes from survey.json, not from the model */
+.prov b{color:var(--ok);font:600 11px var(--sans);letter-spacing:.06em}
+.ordr{
+  display:flex;gap:12px;align-items:center;padding:8px 12px;border:1px solid var(--rule2);
+  border-radius:var(--r1);margin-bottom:4px;background:var(--ink);font-size:13px
+}
+.ordr select{
+  background:var(--ink3);color:var(--bone);border:1px solid var(--rule2);border-radius:var(--r1);
+  font:12px var(--sans);padding:3px 6px
+}
+
+/* predict-then-reveal: brand blue, because it is an interaction, not a status */
+.pred{
+  border:1px solid var(--brand);border-left-width:2px;border-radius:var(--r1);
+  background:var(--brandd);padding:12px;margin:0
+}
+.cmd .pred,.hop .pred{margin:0;border-radius:0;border-left:2px solid var(--brand);border-right:0;border-top:0}
+.hop .pred{margin-top:12px;border:1px solid var(--brand);border-left-width:2px;border-radius:var(--r1)}
+.pred.done{background:transparent;border-color:var(--rule2);border-left-color:var(--rule2)}
+.pred.done.ok{border-left-color:var(--ok)} .pred.done.no{border-left-color:var(--bad)}
+.pred .q{font-size:13.5px;margin-bottom:10px;color:var(--bone)}
+.pred .q b{
+  display:inline-block;font:600 10px var(--sans);letter-spacing:.08em;color:var(--brand);
+  border:1px solid var(--brand);border-radius:var(--r1);padding:1px 6px;margin-right:8px;vertical-align:1px
+}
+.pred.done .q b{color:var(--faint);border-color:var(--rule2)}
+.popts{display:flex;flex-wrap:wrap;gap:6px}
+.popt{
+  display:flex;gap:8px;align-items:baseline;padding:6px 10px;border:1px solid var(--rule2);
+  border-radius:var(--r1);background:var(--ink);font-size:13px;cursor:pointer
+}
+.popt:hover{border-color:var(--brand)}
+.pred.done .popt{cursor:default}
+.popt.right{border-color:var(--ok);background:var(--okd)}
+.popt.wrong{border-color:var(--bad);background:var(--badd)}
+.popt .i{color:var(--faint);font-size:11px;font-weight:600}
+.popt.right .i{color:var(--ok)} .popt.wrong .i{color:var(--bad)}
+.pfoot{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-top:10px}
+.pfoot .prov{margin-top:0}
+.pill.wait{color:var(--brand);border-color:var(--brand);background:var(--brandd)}
+
+/* veiled content is in the DOM but not on screen: nothing is silently omitted,
+   and print un-veils it so the paper copy is still complete */
+.veil{display:none}
+/* the result wrapper must not become a flex item, or the header loses its gap */
+.res{display:contents}
+.res.veil{display:none}
+.veilnote{
+  border:1px dashed var(--rule2);border-radius:var(--r2);padding:12px 16px;
+  font-size:12.5px;color:var(--faint)
+}
+
+/* confidence, captured before the answer so it measures calibration */
+.conf{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
+  font-size:12.5px;color:var(--dim)
+}
+.conf.said{color:var(--faint);font-size:11.5px}
+.conf.said b{color:var(--dim);font-weight:600}
+.cbtn{
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);color:var(--dim);
+  cursor:pointer;font:600 10.5px var(--sans);letter-spacing:.05em;padding:4px 10px
+}
+.cbtn:hover{border-color:var(--brand);color:var(--brand)}
+.opt.gated{opacity:.45;cursor:not-allowed}
+
+/* your own record, in the audit panel beside the tool's */
+.yh{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:4px 0 8px}
+.sumgrid.you{margin-bottom:8px}
+.sumgrid .of{font-size:15px;color:var(--faint);font-weight:400}
+.envnote.yn{border:1px solid var(--rule2);border-radius:var(--r2);margin-bottom:24px}
+
+/* callout */
+.call{border-left:2px solid var(--rule2);padding:12px 0 12px 16px;font-size:14px;color:var(--dim);max-width:72ch}
+.call b{display:block;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;color:var(--faint)}
+.call.inferred{border-color:var(--inf)} .call.inferred b{color:var(--inf)}
+.call.broken{border-color:var(--bad)} .call.broken b{color:var(--bad)}
+
+/* footer nav */
+.fnav{display:flex;gap:8px;margin-top:56px;border-top:1px solid var(--rule2);padding-top:16px}
+.fnav button{
+  flex:1;background:var(--ink2);border:1px solid var(--rule2);border-radius:var(--r2);
+  color:var(--dim);cursor:pointer;padding:16px;text-align:left;font:12px var(--sans)
+}
+.fnav button:hover:not(:disabled){border-color:var(--brand);color:var(--bone)}
+.fnav button:disabled{opacity:.32;cursor:not-allowed}
+.fnav .k{display:block;font:600 11px var(--sans);letter-spacing:.06em;color:var(--faint);margin-bottom:4px}
+.fnav .nxt{text-align:right}
+
+/* audit modal — the verification ledger, and the centre of the pitch */
+.scrim{position:fixed;inset:0;z-index:80;background:rgba(4,8,14,.72);backdrop-filter:blur(3px);display:none}
+.scrim.open{display:block}
+.modal{
+  position:fixed;z-index:81;inset:6vh 5vw;background:var(--ink);
+  border:1px solid var(--rule2);border-radius:var(--r2);box-shadow:var(--e2);
+  display:none;flex-direction:column;overflow:hidden
+}
+.modal.open{display:flex}
+.modal>header{display:flex;align-items:center;gap:16px;padding:16px 20px;border-bottom:1px solid var(--rule2);background:var(--ink2)}
+.modal>header h3{font:400 22px var(--serif)}
+.modal .body{overflow:auto;padding:20px}
+/* reads as a risk-report header: large tabular figures, quiet labels */
+/* hairlines drawn per cell rather than as grid gaps: with gaps, a wrapped grid
+   paints its container colour through the empty cells (very visible in print) */
+.sumgrid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));
+  background:var(--ink2);border:1px solid var(--rule2);border-radius:var(--r2);
+  overflow:hidden;margin-bottom:24px
+}
+.sumgrid div{padding:12px 16px;box-shadow:1px 0 0 var(--rule2),0 1px 0 var(--rule2)}
+.sumgrid .v{font:600 26px var(--sans);letter-spacing:-.02em}
+.sumgrid .l{font:600 11px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+.filt{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.filt button{
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);color:var(--dim);
+  cursor:pointer;font:600 11px var(--sans);letter-spacing:.04em;padding:5px 10px
+}
+.filt button[aria-pressed="true"]{border-color:var(--brand);color:var(--brand);background:var(--brandd)}
+
+/* projector */
+:root[data-proj="1"]{--base:20px;--rail:0px}
+:root[data-proj="1"] .rail,:root[data-proj="1"] .prog{display:none}
+:root[data-proj="1"] .wrap{max-width:1180px}
+:root[data-proj="1"] .code table{font-size:16px}
+:root[data-proj="1"] .code{max-height:340px}
+
+/* ---------- lineage ----------
+   A flow record, not a diagram. Values move left to right through fixed stages;
+   the connector is a hairline with an arrowhead, never a pipe or a bubble.
+   Evidence status is carried by a text label first and colour second, so the
+   three states stay distinguishable without relying on hue (spec §8). */
+.linsum{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;
+  background:var(--rule2);border:1px solid var(--rule2);margin-bottom:18px
+}
+.linsum>div{background:var(--ink2);padding:12px 14px}
+.linsum .v{font:600 22px var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.linsum .l{font:600 10px var(--sans);letter-spacing:.07em;color:var(--faint);margin-top:3px}
+
+.ent{border:1px solid var(--rule2);margin-bottom:16px;background:var(--ink2)}
+.ent>header{
+  display:flex;align-items:baseline;gap:10px;padding:12px 14px;
+  border-bottom:1px solid var(--rule);flex-wrap:wrap
+}
+.ent>header .k{font:600 10px var(--sans);letter-spacing:.07em;color:var(--faint)}
+.ent>header h4{font:600 15px var(--sans);letter-spacing:-.01em;margin:0;flex:1 0 auto}
+.ent .mean{padding:10px 14px 14px;color:var(--dim);font-size:13.5px;border-bottom:1px solid var(--rule)}
+
+/* status chip — text label always present, colour is the secondary cue */
+.est{
+  display:inline-flex;align-items:center;gap:5px;border:1px solid;border-radius:var(--r1);
+  font:600 9.5px var(--sans);letter-spacing:.07em;padding:2px 6px;white-space:nowrap
+}
+.est.v{color:var(--ok);border-color:var(--ok);background:var(--okd)}
+.est.d{color:var(--brand2);border-color:var(--brand);background:var(--brandd)}
+.est.i{color:var(--inf);border-color:var(--inf);background:var(--infd)}
+.est.x{color:var(--bad);border-color:var(--bad);background:var(--badd)}
+.etype{font:600 9.5px var(--mono);letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
+
+.flow{display:flex;align-items:stretch;padding:14px;gap:0;overflow-x:auto}
+.lstage{
+  flex:1 1 0;min-width:150px;display:flex;flex-direction:column;gap:6px;
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);
+  padding:10px 11px;text-align:left;color:inherit;font:inherit;cursor:default
+}
+button.lstage{cursor:pointer}
+button.lstage:hover{border-color:var(--brand);background:var(--ink3)}
+button.lstage:focus-visible{outline:2px solid var(--brand2);outline-offset:2px}
+.lstage .sk{font:600 9.5px var(--sans);letter-spacing:.08em;color:var(--faint)}
+.lstage .sl{font:600 12.5px var(--mono);color:var(--bone);overflow-wrap:anywhere}
+.lstage .sd{font-size:12px;color:var(--dim);line-height:1.5}
+.lstage .sm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:6px}
+.lstage .ln{font:11px var(--mono);color:var(--faint);overflow-wrap:anywhere}
+
+/* connector: hairline + arrowhead, slate by default */
+.conn{flex:0 0 26px;position:relative;align-self:center;height:1px;background:var(--rule2)}
+.conn::after{
+  content:"";position:absolute;right:0;top:-3px;
+  border-left:6px solid var(--rule2);border-top:3.5px solid transparent;border-bottom:3.5px solid transparent
+}
+.conn.inf{background:var(--inf)} .conn.inf::after{border-left-color:var(--inf)}
+.conn.bad{background:var(--bad)} .conn.bad::after{border-left-color:var(--bad)}
+.flow:hover .conn,.flow:focus-within .conn{background:var(--brand)}
+.flow:hover .conn::after,.flow:focus-within .conn::after{border-left-color:var(--brand)}
+.flow:hover .conn.inf,.flow:focus-within .conn.inf{background:var(--inf)}
+.flow:hover .conn.inf::after,.flow:focus-within .conn.inf::after{border-left-color:var(--inf)}
+
+.erow{
+  display:flex;gap:12px;align-items:baseline;padding:10px 14px;
+  border-top:1px solid var(--rule);font-size:12.5px;color:var(--dim)
+}
+.erow .rk{font:600 9.5px var(--sans);letter-spacing:.07em;color:var(--faint);flex:0 0 132px}
+.erow.fail .rk{color:var(--bad)}
+.erow.bound .rk{color:var(--inf)}
+.erow code{font-size:11.5px}
+
+/* Vertical below 760px: the connector rotates rather than disappearing, so the
+   direction of flow survives the reflow (spec §8). */
+@media (max-width:760px){
+  .flow{flex-direction:column;padding:12px}
+  .lstage{min-width:0}
+  .conn{width:1px;height:16px;align-self:flex-start;margin-left:18px;flex:0 0 16px}
+  .conn::after{right:-3px;top:auto;bottom:0;
+    border-left:3.5px solid transparent;border-right:3.5px solid transparent;
+    border-top:6px solid var(--rule2);border-bottom:0}
+  .conn.inf::after{border-top-color:var(--inf)} .conn.bad::after{border-top-color:var(--bad)}
+  .linsum{grid-template-columns:repeat(2,1fr)}
+  .erow{flex-direction:column;gap:4px}
+  .erow .rk{flex:none}
+}
+
+/* responsive */
+@media (max-width:900px){
+  :root{--rail:0px}
+  .rail{
+    top:var(--bar);width:100%;height:auto;max-height:58vh;border-right:0;
+    border-bottom:1px solid var(--rule2);transform:translateY(-101%);transition:transform .15s;
+    padding-bottom:16px
+  }
+  .rail.open{transform:none}
+  .prog{width:100%}
+  main{margin-left:0}
+  .meta{display:none}
+}
+/* Below ~700px the top bar cannot fit on one row and the verification badge
+   was being clipped by body{overflow-x:hidden}. The dropped-claim count is a
+   non-negotiable, so the bar wraps to two rows and --bar grows to match — every
+   fixed offset (rail, drawer, main) is derived from that token. */
+@media (max-width:700px){
+  :root{--bar:92px}
+  .bar{flex-wrap:wrap;align-content:center;height:var(--bar);padding:8px;gap:8px}
+  .brand{order:1;flex:1}
+  .tools{order:2}
+  .badge{order:4;margin-left:auto}
+  .badge span{padding:5px 8px}
+}
+/* phone widths: the badge gets a row of its own rather than being clipped.
+   Nothing is hidden — the dropped count is a non-negotiable. */
+@media (max-width:480px){
+  :root{--bar:126px}
+  .badge{order:4;margin-left:0;width:100%}
+  .badge span{flex:1;text-align:center;padding:5px 4px}
+}
+@media (min-width:901px){.menu{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* print */
+@media print{
+  .bar,.rail,.prog,.fnav,.tools,.drawer,.scrim{display:none!important}
+  /* the status tints must be overridden too — several components now paint a
+     tinted background, and the dark-theme values print as ink-heavy blocks */
+  :root{
+    --ink:#fff;--ink2:#fff;--ink3:#f2f5f8;--ink4:#e8edf3;
+    --bone:#111;--dim:#333;--faint:#555;--rule:#ccc;--rule2:#999;
+    --brand:#00355f;--brand2:#2178c4;--brandd:#eef4fa;
+    --ok:#1a6b43;--inf:#8a5c10;--bad:#b3261e;
+    --okd:#e4f2ea;--infd:#fbf0da;--badd:#fbe9e7;
+    --e1:none;--e2:none
+  }
+  main{margin:0;padding:0}
+  .ex,.cmd,.tbl,.cpx,.mapbox,.modal{box-shadow:none}
+  /* acceptance test 11: every collapsed block expands in print. display:block on
+     the children is no longer enough — current Chrome hides <details> content via
+     ::details-content, so that has to be unhidden too. Both forms kept: older
+     engines honour the first, newer ones need the second. */
+  details:not([open])>*{display:block!important}
+  details::details-content{content-visibility:visible!important;display:block!important;block-size:auto!important}
+  /* revert, not block: .veil wraps spans as well as divs */
+  .veil{display:revert!important}
+  .res.veil{display:contents!important}
+  /* acceptance: every lineage stage prints. Horizontal scroll hides stages on
+     paper, so the flow goes vertical and the connector rotates with it. */
+  .flow{flex-direction:column!important;overflow:visible!important}
+  .lstage{min-width:0!important;break-inside:avoid}
+  .conn{width:1px!important;height:14px!important;align-self:flex-start!important;
+    margin-left:18px;flex:0 0 14px!important}
+  .conn::after{right:-3px!important;top:auto!important;bottom:0;
+    border-left:3.5px solid transparent!important;border-right:3.5px solid transparent;
+    border-top:6px solid var(--rule2);border-bottom:0}
+  .ent{break-inside:avoid}
+  .veilnote,.pill.wait{display:none!important}
+  .out{display:block!important} .out pre{max-height:none;display:block!important}
+  .fallback summary::before,.out summary::before{content:""}
+  .code{max-height:none}
+  .stopwrap{break-after:page}
+  .blocks>*{animation:none!important}
+  a::after{content:" (" attr(href) ")";font-size:10px;color:#666}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <button class="tbtn menu" id="menu" aria-label="Toggle outline">☰</button>
+  <div class="brand">
+    <b id="rname"></b>
+    <select class="rsel" id="rsel" aria-label="Switch repository" title="Switch repository"></select>
+    <span class="meta" id="rmeta"></span>
+  </div>
+  <button class="badge" id="badge" title="Open verification ledger"></button>
+  <div class="tools">
+    <button class="tbtn" id="proj" aria-pressed="false" title="Projector mode">PROJ</button>
+    <button class="tbtn" id="theme" title="Toggle theme">◐</button>
+    <button class="tbtn" id="reset" title="Reset progress">RESET</button>
+  </div>
+</header>
+
+<nav class="rail" id="rail"></nav>
+<div class="prog">
+  <div class="lab"><span id="plab">PROGRESS</span><span id="ppct">0%</span></div>
+  <div class="sprocket" id="sprocket"></div>
+</div>
+
+<main><div class="wrap" id="stage"></div></main>
+
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <button class="tbtn x" id="dx">ESC</button>
+  <div id="dbody"></div>
+</aside>
+
+<div class="scrim" id="scrim"></div>
+<div class="modal" id="modal" role="dialog" aria-label="Verification ledger">
+  <header>
+    <h3>Verification ledger</h3>
+    <button class="tbtn" style="margin-left:auto" id="mx">CLOSE</button>
+  </header>
+  <div class="body" id="mbody"></div>
+</div>
+
+<script>
+/* ============================================================
+   DATA — one `verified.json` per repo, spliced in verbatim by
+   render.py between the two markers below. The renderer knows
+   nothing about any particular repo; it knows the nine block
+   types and nothing else.
+   ============================================================ */
+/* ==== TRAILHEAD-DATA-START ==== */
+const BUNDLES = {"IMC-Prosperity-4":{"contract":"trailhead\u002fverified\u00402","repo":{"name":"IMC-Prosperity-4","commit":"115edef","generated_at":"2026-07-30T19:16:00Z"},"report":{"claims":1,"verified":0,"dropped":0,"inferred":1,"commands":0,"failed":0,"tool_version":"0.4.0","duration_s":2},"map":{"nodes":[{"id":"n-src-prosperity4-backtest","label":"backtest","loc":10622,"files":16,"x":376,"y":64,"w":148,"why":"16 files, 10,622 loc. Imports 0 of these; imported by 0. Busiest file: dashboard.py (commits 33).","top":["dashboard.py \u2014 commits 33","submission_log.py \u2014 commits 10","lab.py \u2014 commits 9"]},{"id":"n-tests","label":"tests","loc":6466,"files":36,"x":379,"y":138,"w":142,"why":"36 files, 6,466 loc. Imports 0 of these; imported by 0. Busiest file: test_dashboard.py (commits 15).","top":["test_dashboard.py \u2014 commits 15","test_submission_log.py \u2014 commits 9","test_pepper_pin.py \u2014 commits 9"]},{"id":"n-src-prosperity4-bots","label":"bots","loc":511,"files":5,"x":388,"y":209,"w":124,"why":"5 files, 511 loc. Imports 0 of these; imported by 0. Busiest file: discovery.py (commits 4).","top":["discovery.py \u2014 commits 4","catalog_loader.py \u2014 commits 1","detectors.py \u2014 commits 1"]},{"id":"n-src","label":"src","loc":3,"files":1,"x":394,"y":270,"w":112,"why":"1 files, 3 loc. Imports 0 of these; imported by 0. Busiest file: __init__.py (commits 1).","top":["__init__.py \u2014 commits 1"]}],"edges":[]},"files":{},"tracks":[{"title":"ORIENT","minutes":15,"stops":[{"id":"cover","title":"What you are looking at","kind":"stop","minutes":2,"lede":"A generated walkthrough of IMC-Prosperity-4 at 115edef. Every factual sentence below is anchored to a line range in this repo and re-checked after it was written. Claims whose anchors failed were deleted, not softened, and the count is in the top bar.","blocks":[{"type":"callout","level":"info","title":"BEFORE YOU START","text":"This walkthrough was generated from 161 Python files and 503 other text files. Anchors resolve into those files and nowhere else \u2014 anything outside that scope is out of scope for this page, not absent from the repo. No command was executed during generation, so nothing below claims to have been run."},{"type":"table","caption":"Generation record","sortable":false,"columns":["FIELD","VALUE"],"rows":[["commit","\u003ccode>115edef\u003c\u002fcode>"],["surveyed","2026-07-30T19:15:58Z"],["tool","trailhead 0.4.0"],["python files","161 of 1991 files"],["modules","159 in 4 groups on the map"],["entry point","\u003ccode>prosperity4.backtest.cli:main\u003c\u002fcode>"],["commands executed","0 (0 failing)"],["est. reading time","74 minutes"]]}]},{"id":"five","title":"Five sentences","kind":"stop","minutes":4,"lede":"This stop had no narration in this run, so it renders from templates and carries no claims. The callout says so.","blocks":[{"type":"callout","level":"info","title":"NARRATION BUDGET REACHED","text":"0 of 3 units narrated. The rest render from templates and carry no claims."}]},{"id":"map","title":"The map","kind":"stop","minutes":5,"lede":"Derived from the real import graph, not from a description of it. Node area is lines of code and edge weight is import count; every edge found is drawn. Click any module.","blocks":[{"type":"graph"},{"type":"prose","claims":[{"id":"c-011","text":"159 modules collapse into 4 groups on this map; the largest is backtest at 10,622 lines across 16 files.","status":"inferred"}]}]},{"id":"where","title":"Where the code lives","kind":"stop","minutes":4,"lede":"The same information as the map, as a list, for the people who prefer lists. Ranked by commits, and the purpose column is each package's own __init__ docstring.","blocks":[{"type":"table","caption":"Sortable. Purpose is each package's __init__ docstring, not a description of it.","sortable":true,"columns":["PATH","PURPOSE","FILES","LOC","COMMITS","RECENT COMMITTERS"],"rows":[["\u003ccode>src\u002fprosperity4\u002fbacktest\u002f\u003c\u002fcode>","Backtesting framework: runner, artifact schema, report, replay app","16","10,622","1","n\u002fa"],["\u003ccode>src\u002fprosperity4\u002fbots\u002f\u003c\u002fcode>","\u2014","5","511","2","n\u002fa"],["\u003ccode>tests\u002f\u003c\u002fcode>","\u2014","1","6,466","3","n\u002fa"],["\u003ccode>src\u002f\u003c\u002fcode>","\u2014","1","3","4","n\u002fa"]]}]},{"id":"cp-a","title":"Checkpoint A","kind":"cp","minutes":3,"blocks":[{"kind":"single","prompt":"Which module does the rest of this repo import the most?","options":["\u003ccode>tools.prosperity_client.download\u003c\u002fcode>","\u003ccode>prosperity4.backtest.dashboard\u003c\u002fcode>","\u003ccode>prosperity4.backtest.artifact\u003c\u002fcode>","\u003ccode>tools.prosperity_client.auth\u003c\u002fcode>"],"answer":2,"provenance":"survey.json → per-file fan-in over the import graph: prosperity4.backtest.artifact is imported by 7 modules, the most in the repo; package __init__.py files under 20 loc excluded; options ordered by seed repo.commit.","explanation":"prosperity4.backtest.artifact is imported by 7 modules. The next highest is tools.prosperity_client.auth at 4. Whatever the rest of the repo points at is where its assumptions live \u2014 it is the thing you cannot change quietly.","type":"checkpoint","id":"cp-a1"},{"kind":"single","prompt":"prosperity4 is this repo's declared entry point. Which file does it start in?","options":["\u003ccode>scripts\u002fanalyze_bots.py\u003c\u002fcode>","\u003ccode>src\u002fprosperity4\u002fbacktest\u002fcli.py\u003c\u002fcode>","\u003ccode>tools\u002fbacktester\u002fprosperity3bt\u002f__main__.py\u003c\u002fcode>","\u003ccode>scripts\u002fscrape_wiki.py\u003c\u002fcode>"],"answer":1,"provenance":"survey.json → entry_points[console_script]: prosperity4 → prosperity4.backtest.cli:main, declared at pyproject.toml:26; the distractors are other real files from this repo; options ordered by seed repo.commit.","explanation":"pyproject.toml:26 declares it and it starts in src\u002fprosperity4\u002fbacktest\u002fcli.py. The other three are real files from this repo, not invented distractors \u2014 they are the files a reader lands in first if they follow the wrong entry point.","type":"checkpoint","id":"cp-a2"}]}]},{"title":"GET IT RUNNING","minutes":20,"stops":[{"id":"setup","title":"Prerequisites and setup","kind":"stop","minutes":8,"lede":"Nothing in this repo was executed during generation, so this stop makes no claim about what runs. The callout says which candidates were considered.","blocks":[{"type":"callout","level":"info","title":"NOT EXECUTED","text":"These candidates were found but never executed: python -c \"import prosperity4\" (from pyproject.toml:6) \u2014 command execution disabled (--run-commands none); python -m prosperity4 --help (from pyproject.toml:26) \u2014 command execution disabled (--run-commands none); python -m pytest --collect-only -q tests (from pyproject.toml:36) \u2014 command execution disabled (--run-commands none)."},{"type":"callout","level":"info","title":"NO COMMANDS WERE EXECUTED","text":"The allowlist admitted nothing from this repo. Candidates considered: python -c \"import prosperity4\" (pyproject.toml:6); python -m prosperity4 --help (pyproject.toml:26); python -m pytest --collect-only -q tests (pyproject.toml:36)."}]},{"id":"green","title":"Your first green test","kind":"stop","minutes":4,"lede":"Nothing this tool was allowed to run passed, so there is no green command to show you. That is the repo's current state, not an omission.","blocks":[{"type":"callout","level":"info","title":"NO TEST COMMAND DETECTED","text":"Candidates considered: python -m pytest --collect-only -q tests \u2014 command execution disabled (--run-commands none)."}]}]},{"title":"FOLLOW ONE PATH","minutes":25,"stops":[{"id":"trace","title":"One path, end to end","kind":"stop","minutes":12,"lede":"This repo has no traceable entry point, so there is no chain to follow. The callout below names what was considered.","blocks":[{"type":"callout","level":"broken","title":"NO TRACEABLE ENTRY POINT FOUND","text":"Nothing in this repo declares a console script, a __main__.py, or a resolvable if __name__ guard inside an import root. Candidates considered: console_script prosperity4, http_route app = Typer(), main_guard scripts\u002fanalyze_bots.py, main_guard scripts\u002fscrape_wiki.py."}]}]},{"title":"CONVENTIONS","minutes":8,"stops":[{"id":"conv","title":"Conventions and gotchas","kind":"stop","minutes":8,"lede":"Everything on this page is inferred from patterns in the code. None of it is verified against a written standard, because this repo does not have one. Treat it as a strong hint, not a rule.","blocks":[{"type":"callout","level":"inferred","title":"THIS ENTIRE STOP IS UNVERIFIED","text":"Nothing below could be anchored to a line. It is a read of the codebase, quarantined here and marked once rather than mixed into the verified material and diluting it."},{"type":"callout","level":"info","title":"NARRATION BUDGET REACHED","text":"0 of 3 units narrated. The rest render from templates and carry no claims."}]}]},{"title":"CLOSE","minutes":6,"stops":[{"id":"audit","title":"The ledger","kind":"stop","minutes":6,"lede":"What the tool claimed, what survived, and what it deleted. The deleted rows are the interesting ones.","blocks":[{"type":"callout","level":"info","title":"WHY THIS PAGE EXISTS","text":"Anyone can generate confident documentation. The only useful question is which parts to trust. The claims below were written by a model and then deleted by ordinary code because their anchors did not resolve. They are shown, not swept up."},{"type":"callout","level":"info","title":"WHAT THIS PAGE DID NOT READ","text":"This tool reads Python with the standard library's ast, and anchors into any UTF-8 text file the survey listed. Nothing else was read. Files that failed to parse: 0. Files skipped as not text or outside the repo root: 0. Directories excluded by name: 8."},{"type":"callout","level":"info","title":"STOPS NOT GENERATED","text":"cp-c \u2014 no traceable entry point, so the trace stop was not generated"},{"type":"ledger"}]}]}],"dropped":[]}};
+/* ==== TRAILHEAD-DATA-END ==== */
+
+/* ============================================================
+   RENDER — knows only the nine block types
+   ============================================================ */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* This demo bundle carries one payload per repo so the two walkthroughs can
+   share a renderer instead of shipping as two near-identical files. A real
+   generated artifact carries exactly one. Everything below `D` is unchanged by
+   that: the renderer still sees a single verified.json and knows nothing else. */
+let D, KEY, STOPS, S;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+
+function loadRepo(name){
+  D=BUNDLES[name]||BUNDLES[Object.keys(BUNDLES)[0]];
+  /* progress is keyed per repo AND per commit, so switching never mixes two
+     walkthroughs and a regenerated commit starts clean (spec §2) */
+  KEY="trailhead:"+D.repo.name+":"+D.repo.commit;
+  STOPS=D.tracks.flatMap((t,ti)=>t.stops.map(s=>({...s,ti,track:t.title})));
+  S={cur:0,done:{},ans:{},pred:{},conf:{}};
+  try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
+  S.pred=S.pred||{}; S.conf=S.conf||{};
+  try{localStorage.setItem("trailhead:repo",D.repo.name)}catch(e){}
+  shell();
+}
+
+/* The top bar used to be hand-written HTML whose numbers happened to match the
+   payload. Generating it means the badge cannot drift from the report, which is
+   the one number the pitch rests on (non-negotiable #3).
+
+   The ||{} guards are belt-and-braces on top of render.py's self-police: a
+   payload missing repo.generated_at throws here, before the first stop is drawn,
+   and a blank page passes BOTH gates because neither one executes this file. Six
+   characters against the worst outcome in the project is a trade worth making
+   twice. */
+function shell(){
+  const r=D.repo||{}, p=D.report||{}, names=Object.keys(BUNDLES);
+  document.title="Trailhead · "+r.name;
+  $(".brand b").textContent=r.name;
+  $(".meta").textContent=[r.commit,
+      "generated "+(r.generated_at||"").replace("T"," ").replace("Z"," UTC"),
+      "trailhead "+p.tool_version].join(" · ");
+  /* Spec §6's amber flag, impossible while the badge was static HTML. All four
+     counts are integers straight off `report`, so there is no escaping question
+     here — and the percentage is recomputed from them rather than carried, so it
+     cannot disagree with the two numbers printed beside it. */
+  const lo=p.claims>0&&p.dropped/p.claims>0.40;
+  $("#badge").innerHTML=
+     `<span><i class="n">${p.claims}</i> claims</span>`
+    +`<span class="d">${p.dropped} dropped</span>`
+    +`<span><i class="n">${p.commands}</i> cmds</span>`
+    +`<span class="f">${p.failed} failing</span>`
+    +(lo?`<span class="lo">low confidence — ${Math.round(100*p.dropped/p.claims)}% dropped</span>`:"");
+  $("#badge").classList.toggle("lowconf",lo);
+  /* A generated artifact carries exactly one payload and the selector hides
+     itself. It stays because the same template also has to render a bundle
+     carrying two, and a hidden select costs nothing. */
+  const sel=$("#rsel");
+  sel.hidden=names.length<2;
+  sel.innerHTML=names.map(n=>`<option value="${esc(n)}"${n===r.name?" selected":""}>${esc(n)}</option>`).join("");
+}
+
+/* ---- predict-then-reveal ----------------------------------------------
+   Retrieval practice: commit to an answer before the artifact shows you
+   the real one. The key is never authored — it is derived from data that
+   was already verified (a captured exit code, the next resolved anchor),
+   so a prediction question cannot disagree with what the page then shows.
+   ---------------------------------------------------------------------- */
+function predict(id,question,options,key,prov){
+  const a=S.pred[id];
+  const opts=options.map((o,i)=>{
+    let cls="popt";
+    if(a){ if(i===key)cls+=" right"; else if(a.pick===i)cls+=" wrong"; }
+    return `<div class="${cls}" ${a?"":`data-pi="${i}"`} ${a?"":'tabindex="0" role="button"'}>
+      <span class="i">${a?(i===key?"✓":(a.pick===i?"✕":String.fromCharCode(65+i))):String.fromCharCode(65+i)}</span><span>${o}</span></div>`;
+  }).join("");
+  return `<div class="pred${a?(a.ok?" done ok":" done no"):""}" data-pred="${id}" data-key="${key}">
+    <div class="q"><b>PREDICT</b>${esc(question)}</div>
+    <div class="popts">${opts}</div>
+    ${a?`<div class="pfoot"><span class="verdict ${a.ok?"y":"n"}">${a.ok?"CORRECT":"NOT QUITE"}</span>
+         <span class="prov"><b>ANSWER KEY</b> ${esc(prov)}</span></div>`:""}
+  </div>`;
+}
+
+/* ---- excerpt ---- */
+function excerpt(a,cap){
+  const f=D.files[a.file]||{}, focus=new Set(a.focus||[]);
+  let rows="",prev=null;
+  for(let n=a.start;n<=a.end;n++){
+    if(!(n in f)){ if(prev!==null){rows+=`<tr class="el"><td colspan="2">… elided</td></tr>`;prev=null;} continue; }
+    rows+=`<tr class="${focus.has(n)?"hl":""}"><td class="ln">${n}</td><td class="src">${esc(f[n])}</td></tr>`;
+    prev=n;
+  }
+  const raw=Object.keys(f).filter(n=>+n>=a.start&&+n<=a.end).map(n=>f[n]).join("\n");
+  return `<figure class="ex">
+    <header><b>${esc(a.file)}</b><span>: ${a.start}–${a.end}</span><span class="sp"></span>
+      <button class="cp-btn" data-copy="${esc(raw).replace(/"/g,"&quot;")}">COPY</button></header>
+    <div class="code"><table>${rows}</table></div>
+    ${cap?`<figcaption>${cap}</figcaption>`:""}
+  </figure>`;
+}
+
+/* A prediction is worthless if the answer is further down the same screen, and
+   on this stop the summary callout gave away both failures. Everything after an
+   open prediction is rendered into the DOM but veiled, so nothing is silently
+   omitted (spec §6) and print still shows the whole stop (acceptance test 11). */
+const openPred=b=>b.type==="command"&&b.predict&&!S.pred["pc:"+b.cmd];
+function veil(blocks){
+  const cut=blocks.findIndex(openPred);
+  const html=blocks.map((b,i)=>
+    (cut>=0&&i>cut)?`<div class="veil">${B[b.type](b)}</div>`:B[b.type](b)).join("");
+  return html+((cut>=0&&cut<blocks.length-1)
+    ?`<div class="veilnote">The rest of this stop stays hidden until you answer the prediction above.</div>`:"");
+}
+
+/* ---- blocks ---- */
+const B={
+ prose:b=>`<div class="prose">${b.claims.map(c=>
+   c.status==="inferred"
+    ? `<p><span class="claim inf">${esc(c.text)}</span><span class="tag">INFERRED</span></p>`
+    : `<p><span class="claim">${esc(c.text)}</span><button class="mark" aria-expanded="false" data-claim="${c.id}">${c.id.slice(-3)}</button></p>
+       <div class="pop" data-pop="${c.id}" hidden>${excerpt(c.anchor,"Anchor for claim "+c.id+": re-read and hash-matched at generation time.")}</div>`
+  ).join("")}</div>`,
+
+ excerpt:b=>excerpt(b.anchor,b.caption),
+
+ command:b=>{
+   /* Answer key is the captured exit code itself, so it cannot drift from the
+      run shown directly below it. While a prediction is outstanding the verdict,
+      the timing, the BROKEN banner, the output and the fail border are all
+      withheld — otherwise there is nothing to predict. */
+   const pid="pc:"+b.cmd, a=b.predict?S.pred[pid]:1, shut=b.predict&&!S.pred[pid];
+   /* The result is veiled rather than omitted, so print still shows it. */
+   return `<div class="cmd ${b.exit&&!shut?"fail":""}">
+   <header><span class="pr">$</span><code>${esc(b.cmd)}</code>
+     ${shut?`<span class="pill wait">RESULT HIDDEN</span>`:""}
+     <span class="res${shut?" veil":""}"><span class="pill ${b.exit?"bad":"ok"}">exit ${b.exit}</span><span class="dur">${b.dur}</span></span></header>
+   ${b.predict?predict(pid,b.predict,["It passes (exit 0)","It fails (non-zero exit)"],b.exit?1:0,
+       "the exit code captured by the command runner: "+esc(b.env)):""}
+   <div class="${shut?"veil":""}">${b.broken?`<div class="brk"><b>BROKEN</b><div>${esc(b.broken)}
+     ${b.hypothesis?`<div style="margin-top:8px;font-size:12.5px;color:var(--dim)"><span class="tag" style="margin:0 6px 0 0">INFERRED</span>${esc(b.hypothesis)}</div>`:""}</div></div>`:""}
+   <details class="out"><summary>output (${b.out.split("\n").length} lines)</summary><pre>${esc(b.out)}</pre></details>
+   <div class="envnote">${esc(b.env)}</div></div></div>`;
+ },
+
+ callout:b=>`<div class="call ${b.level}"><b>${esc(b.title)}</b>${esc(b.text)}</div>`,
+
+ table:b=>`<div class="tbl"><table>
+   <thead><tr>${b.columns.map((c,i)=>`<th ${b.sortable?`data-sort="${i}"`:""}>${c}</th>`).join("")}</tr></thead>
+   <tbody>${b.rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${i>1&&/^[\d,]+$|^n\/a$/.test(c)?"r":""}">${c}</td>`).join("")}</tr>`).join("")}</tbody>
+   </table></div>${b.caption?`<div class="envnote" style="border:1px solid var(--rule2);border-top:0">${esc(b.caption)}</div>`:""}`,
+
+ graph:()=>graph(),
+
+ /* Worked-example fading: the first hops are narrated in full, later ones ask
+    where the call goes before revealing the pointer. Options are every file in
+    the trace, sorted so the index is stable across renders; the key is the next
+    hop's own anchor, so it is the resolved call graph, not an authored answer. */
+ trace:b=>{
+   const files=[...new Set(b.steps.map(s=>s.anchor.file))].sort();
+   /* the next hop's own heading is the answer, so veil from there down too */
+   const cut=b.steps.findIndex((s,i)=>s.predict&&b.steps[i+1]&&!S.pred["pt:"+s.anchor.file]);
+   return `<div class="trace">${b.steps.map((s,i)=>{
+     const nx=b.steps[i+1]&&b.steps[i+1].anchor.file;
+     const ask=s.predict&&nx, pid="pt:"+s.anchor.file, done=!ask||S.pred[pid];
+     return `<div class="hop${cut>=0&&i>cut?" veil":""}">
+   <div class="dot">${i+1}</div>
+   <h4>${esc(s.anchor.file.split("/").pop())}</h4>
+   <div class="an">${esc(s.anchor.file)} : ${s.anchor.start}–${s.anchor.end}</div>
+   <div class="prose" style="margin-bottom:10px"><span class="claim">${esc(s.claim)}</span></div>
+   ${excerpt(s.anchor,"")}
+   ${ask?predict(pid,s.predict,files.map(f=>"<code>"+f+"</code>"),files.indexOf(nx),
+       "the next hop's resolved anchor: "+esc(nx)):""}
+   <div class="${done?"":"veil"}">${s.next?`<div class="nx">next → <b>${esc(s.next)}</b></div>`:`<div class="nx">response leaves the process</div>`}</div>
+ </div>`;}).join("")}</div>`;
+ },
+
+ checkpoint:b=>{
+  const a=S.ans[b.id], k=S.conf[b.id];
+  /* Confidence is captured before the answer, never after, or it is hindsight
+     rather than calibration. The audit panel reports confident-and-wrong. */
+  const gate=!a&&!k;
+  const conf=(!a&&!k)
+    ? `<div class="conf"><span>Before you answer, how sure are you?</span>
+        <button class="cbtn" data-conf="${b.id}" data-c="sure">I'M SURE</button>
+        <button class="cbtn" data-conf="${b.id}" data-c="guess">I'M GUESSING</button></div>`
+    : (k?`<div class="conf said"><span>You said you were <b>${k==="sure"?"sure":"guessing"}</b>.</span></div>`:"");
+  if(b.kind==="order"){
+    const opts=b.options.map((o,i)=>`<div class="ordr"><select data-ord="${b.id}" data-i="${i}" ${a||gate?"disabled":""}>
+        <option value="">–</option>${b.options.map((_,k2)=>`<option value="${k2+1}" ${a&&a.pick[i]===k2+1?"selected":""}>${k2+1}</option>`).join("")}
+      </select><span>${o}</span>${a?(a.pick[i]===b.answer[i]?`<span class="verdict y" style="margin-left:auto">✓</span>`:`<span class="verdict n" style="margin-left:auto">✕ ${b.answer[i]}</span>`):""}</div>`).join("");
+    return `<div class="cpx" data-cp="${b.id}"><div class="k">CHECKPOINT · ORDER</div><h4>${esc(b.prompt)}</h4>
+      ${conf}${opts}
+      ${a?verdict(b,a):`<div class="act"><button class="sub" data-go="${b.id}" ${gate?"disabled":""}>CHECK</button></div>`}</div>`;
+  }
+  const opts=b.options.map((o,i)=>{
+    let cls="opt"; if(a){ if(i===b.answer)cls+=" right"; else if(a.pick===i)cls+=" wrong"; }
+    if(gate)cls+=" gated";
+    return `<div class="${cls}" ${gate?"":`data-pick="${b.id}" data-i="${i}" tabindex="0" role="button"`}>
+      <span class="i">${a?(i===b.answer?"✓":(a.pick===i?"✕":String.fromCharCode(65+i))):String.fromCharCode(65+i)}</span><span>${o}</span></div>`;
+  }).join("");
+  return `<div class="cpx" data-cp="${b.id}"><div class="k">CHECKPOINT · SINGLE ANSWER</div>
+    <h4>${esc(b.prompt)}</h4>${conf}${opts}${a?verdict(b,a):""}</div>`;
+ },
+
+ ledger:()=>ledgerTable(),
+
+ /* ---- lineage ----------------------------------------------------------
+    Execution flow says A calls B. Lineage says a value comes from Y, is
+    rewritten by B, and decides Z — so the unit is the value, not the call, and
+    the stages are fixed rather than discovered. Every stage carries its status
+    as a word before it carries it as a colour; a stage with an anchor is a
+    button and opens the same drawer the map uses. */
+ lineage:b=>{
+   const ents=b.entities||[];
+   const steps=ents.flatMap(e=>e.steps||[]);
+   const n=s=>steps.filter(x=>x.status===s).length;
+   const sum=`<div class="linsum">
+     <div><div class="v">${ents.length}</div><div class="l">DATA ENTITIES</div></div>
+     <div><div class="v" style="color:var(--ok)">${n("verified")}</div><div class="l">VERIFIED STEPS</div></div>
+     <div><div class="v" style="color:var(--brand2)">${n("derived")}</div><div class="l">DERIVED STEPS</div></div>
+     <div><div class="v" style="color:var(--inf)">${n("inferred")}</div><div class="l">INFERRED STEPS</div></div>
+     <div><div class="v" style="color:var(--bad)">${ents.filter(e=>e.failure_mode).length}</div><div class="l">FAILURE MODES</div></div>
+   </div>`;
+   return sum+ents.map((e,ei)=>{
+     const flow=(e.steps||[]).map((s,si)=>{
+       const id=`${e.id}:${si}`; LINSTEPS[id]={s,e};
+       const has=!!s.anchor;
+       const inner=`<span class="sk">${esc(s.stage)}</span>
+         <span class="sl">${esc(s.label)}</span>
+         <span class="sd">${esc(s.description)}</span>
+         <span class="sm">${estat(s.status)}<span class="etype">${esc(s.evidence_type||"")}</span>
+           ${has?`<span class="ln">${esc(s.anchor.file.split("/").pop())}:${s.anchor.start}–${s.anchor.end}</span>`:""}</span>`;
+       /* only an anchored stage is interactive — a button that opened an empty
+          drawer would be a lie about what evidence exists */
+       const cell=has
+         ?`<button class="lstage" data-lin="${id}" title="Open evidence">${inner}</button>`
+         :`<div class="lstage">${inner}</div>`;
+       const nx=(e.steps||[])[si+1];
+       const cc=nx?(nx.status==="inferred"?" inf":""):"";
+       return cell+(nx?`<span class="conn${cc}" aria-hidden="true"></span>`:"");
+     }).join("");
+     const rows=[];
+     if(e.failure_mode)rows.push(`<div class="erow fail"><span class="rk">FAILURE MODE</span>
+       <span>${esc(e.failure_mode.text)} ${estat(e.failure_mode.status)}</span></div>`);
+     if(e.boundary)rows.push(`<div class="erow bound"><span class="rk">REPOSITORY BOUNDARY</span>
+       <span>${esc(e.boundary.text)} ${estat(e.boundary.status==="verified"?"verified":"inferred")}</span></div>`);
+     rows.push(`<div class="erow"><span class="rk">TESTS</span><span>${
+       (e.tests&&e.tests.length)
+         ? e.tests.map(t=>`<code>${esc(t.label)}</code>${t.note?" — "+esc(t.note):""}`).join("<br>")
+         : "No direct test was found for this data flow."}</span></div>`);
+     return `<div class="ent">
+       <header><span class="k">DATA ENTITY ${String(ei+1).padStart(2,"0")}</span>
+         <h4>${esc(e.name)}</h4>${estat(e.status)}</header>
+       <div class="mean">${esc(e.meaning)}</div>
+       <div class="flow">${flow}</div>
+       ${rows.join("")}
+     </div>`;
+   }).join("");
+ }
+};
+
+/* Status is a word first and a colour second: the label is always rendered, so
+   the three states stay separable without relying on hue (spec §8). */
+const EST={verified:["v","VERIFIED"],derived:["d","DERIVED"],inferred:["i","INFERRED"],
+           unknown:["i","UNKNOWN"],broken:["x","BROKEN"]};
+const estat=s=>{const p=EST[s]||EST.inferred;return `<span class="est ${p[0]}">${p[1]}</span>`};
+/* Rebuilt on every render, like the checkpoint lookup — draw() replaces the
+   whole stage, so a stale registry would outlive the DOM it describes. */
+const LINSTEPS={};
+function verdict(b,a){
+  return `<div class="act"><span class="verdict ${a.ok?"y":"n"}">${a.ok?"CORRECT":"NOT QUITE"}</span></div>
+    <div class="expl">${esc(b.explanation)}<div class="prov"><b>ANSWER KEY</b> ${esc(b.provenance)}</div></div>`;
+}
+function ledgerTable(){
+  return `<div class="sumgrid">
+    <div><div class="v">${D.report.claims}</div><div class="l">CLAIMS MADE</div></div>
+    <div><div class="v" style="color:var(--ok)">${D.report.verified}</div><div class="l">VERIFIED</div></div>
+    <div><div class="v" style="color:var(--inf)">${D.report.inferred}</div><div class="l">INFERRED</div></div>
+    <div><div class="v" style="color:var(--bad)">${D.report.dropped}</div><div class="l">DELETED</div></div>
+    <div><div class="v">${D.report.commands}</div><div class="l">COMMANDS RUN</div></div>
+    <div><div class="v" style="color:var(--bad)">${D.report.failed}</div><div class="l">COMMANDS FAILED</div></div>
+  </div>
+  ${yourScore()}
+  <div class="tbl"><table><thead><tr><th>ID</th><th>DELETED CLAIM</th><th>TARGET</th><th>REASON</th></tr></thead>
+  <tbody>${D.dropped.map(d=>`<tr><td><code>${d.id}</code></td><td style="color:var(--dim)">${esc(d.text)}</td>
+    <td><code>${esc(d.file)}</code></td><td><span class="st x">${esc(d.reason)}</span></td></tr>`).join("")}</tbody></table></div>
+  <div class="envnote" style="border:1px solid var(--rule2);border-top:0">Regenerate: <code>trailhead build . --out trailhead.html</code></div>`;
+}
+
+/* Your own record, kept beside the tool's. Local only, resettable, and shown to
+   nobody else — spec §4.5: this is not a test. Calibration is the interesting
+   number: being wrong is fine, being confident and wrong is what to notice. */
+function yourScore(){
+  const ps=Object.values(S.pred), pOk=ps.filter(p=>p.ok).length;
+  const cs=allCP().map(c=>({a:S.ans[c.id],k:S.conf[c.id]})).filter(x=>x.a);
+  const cOk=cs.filter(x=>x.a.ok).length;
+  const sure=cs.filter(x=>x.k==="sure"), sureWrong=sure.filter(x=>!x.a.ok).length;
+  if(!ps.length&&!cs.length)return "";
+  const bits=[];
+  if(ps.length)bits.push(`<div><div class="v">${pOk}<span class="of"> / ${ps.length}</span></div><div class="l">PREDICTIONS RIGHT</div></div>`);
+  if(cs.length)bits.push(`<div><div class="v">${cOk}<span class="of"> / ${cs.length}</span></div><div class="l">CHECKPOINTS RIGHT</div></div>`);
+  if(sure.length)bits.push(`<div><div class="v" style="color:${sureWrong?"var(--bad)":"var(--ok)"}">${sureWrong}<span class="of"> / ${sure.length}</span></div><div class="l">CONFIDENT AND WRONG</div></div>`);
+  return `<h5 class="yh">YOUR RECORD</h5><div class="sumgrid you">${bits.join("")}</div>
+    <div class="envnote yn">Stored in this browser only, cleared by RESET, and never part of the generated artifact.</div>`;
+}
+
+/* ---- map ---- */
+function graph(){
+  const N=D.map.nodes, E=D.map.edges, W=900,H=400;
+  const at=id=>N.find(n=>n.id===id);
+  /* Node height must clear two stacked text lines: the label baseline sits at
+     y+20 and the loc/files line 13px off the bottom. The old 34+sqrt(loc)/9
+     bottomed out at 37px, which put the second line through the first on five
+     of six nodes. 44 is the floor; the sqrt term still carries the LOC signal. */
+  const h=n=>44+Math.sqrt(n.loc)/6;
+  const edges=E.map(e=>{
+    const a=at(e.a),b=at(e.b);
+    const x1=a.x+a.w,y1=a.y+h(a)/2, x2=b.x,y2=b.y+h(b)/2, mx=(x1+x2)/2;
+    return `<path class="edge" data-a="${e.a}" data-b="${e.b}" stroke-width="${.7+e.n/16}"
+      d="M${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}"/>`;
+  }).join("");
+  const ticks=[0,1,2,3,4,5,6,7,8].map(i=>`<line class="tick" x1="${i*100+20}" y1="${H-14}" x2="${i*100+20}" y2="${H-8}"/>
+    <text class="ticklab" x="${i*100+20}" y="${H-19}" text-anchor="middle">${String(i*100).padStart(3,"0")}</text>`).join("");
+  const nodes=N.map(n=>`<g class="node" data-id="${n.id}" tabindex="0" role="button">
+      <rect class="n-body" x="${n.x}" y="${n.y}" width="${n.w}" height="${h(n)}" rx="2"/>
+      <text class="n-lab" x="${n.x+10}" y="${n.y+20}">${n.label}</text>
+      <text class="n-loc" x="${n.x+10}" y="${n.y+h(n)-13}">${n.loc.toLocaleString()} loc · ${n.files} files</text>
+    </g>`).join("");
+  return `<div class="mapbox"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Module dependency graph">
+      <g>${ticks}</g><g id="edges">${edges}</g><g id="nodes">${nodes}</g></svg>
+      <div class="hint">HOVER TO ISOLATE · CLICK TO OPEN · ESC TO CLOSE</div></div>
+    <details class="fallback"><summary>Text equivalent (${N.length} modules, ${E.length} dependencies)</summary>
+      <ul>${N.map(n=>`<li><b>${n.label}</b>: ${n.loc.toLocaleString()} loc, ${n.files} files. Imports:
+        ${E.filter(e=>e.a===n.id).map(e=>at(e.b).label+" ×"+e.n).join(", ")||"none"}</li>`).join("")}</ul></details>`;
+}
+
+/* ---- rail ---- */
+function rail(){
+  $("#rail").innerHTML=D.tracks.map(t=>`<div class="track">
+    <h3>${t.title}<i>${t.minutes}m</i></h3>
+    ${t.stops.map(s=>{const i=STOPS.findIndex(x=>x.id===s.id);
+      return `<div class="stop ${i===S.cur?"on":""} ${S.done[s.id]?"done":""} ${s.kind==="cp"?"cp":""}"
+        data-go="${i}" tabindex="0" role="button"><span class="num">${String(i).padStart(2,"0")}</span><span>${s.title}</span></div>`;
+    }).join("")}</div>`).join("");
+  const n=STOPS.length, d=Object.keys(S.done).length;
+  $("#sprocket").innerHTML=STOPS.map((s,i)=>`<i class="${S.done[s.id]?"f":""}"></i>`).join("");
+  $("#ppct").textContent=Math.round(d/n*100)+"%";
+  $("#plab").textContent=d+" / "+n+" STOPS";
+}
+
+/* ---- stage ---- */
+function draw(i){
+  S.cur=Math.max(0,Math.min(STOPS.length-1,i)); save();
+  const s=STOPS[S.cur];
+  $("#stage").innerHTML=`<div class="stopwrap">
+    <div class="plate"><span>PLATE ${String(S.cur).padStart(2,"0")} / ${String(STOPS.length-1).padStart(2,"0")}</span>
+      <hr><span>${s.track}</span><hr><span>${s.minutes} MIN</span></div>
+    <h1>${s.title.replace(/^(\w+)/, m=>m)}</h1>
+    ${s.lede?`<p class="lede">${esc(s.lede)}</p>`:""}
+    <div class="blocks">${veil(s.blocks)}</div>
+    <div class="fnav">
+      <button ${S.cur===0?"disabled":""} data-nav="-1"><span class="k">← PREV</span>${S.cur>0?esc(STOPS[S.cur-1].title):""}</button>
+      <button class="nxt" ${S.cur===STOPS.length-1?"disabled":""} data-nav="1"><span class="k">NEXT →</span>${S.cur<STOPS.length-1?esc(STOPS[S.cur+1].title):""}</button>
+    </div></div>`;
+  if(s.kind!=="cp"){S.done[s.id]=1;save();}
+  location.hash="#"+s.id;
+  rail(); window.scrollTo({top:0,behavior:"instant"});
+  wireMap();
+}
+
+/* ---- map interactions ---- */
+function wireMap(){
+  const box=$(".mapbox"); if(!box)return;
+  const nodes=$$(".node",box), edges=$$(".edge",box);
+  const clear=()=>{nodes.forEach(n=>n.classList.remove("dim"));edges.forEach(e=>e.classList.remove("dim","lit"))};
+  nodes.forEach(g=>{
+    const id=g.dataset.id;
+    const lit=()=>{
+      const keep=new Set([id]);
+      edges.forEach(e=>{if(e.dataset.a===id||e.dataset.b===id){e.classList.add("lit");keep.add(e.dataset.a);keep.add(e.dataset.b)}else e.classList.add("dim")});
+      nodes.forEach(n=>{if(!keep.has(n.dataset.id))n.classList.add("dim")});
+    };
+    g.addEventListener("mouseenter",lit); g.addEventListener("focus",lit);
+    g.addEventListener("mouseleave",clear); g.addEventListener("blur",clear);
+    const open=()=>{
+      const n=D.map.nodes.find(x=>x.id===id);
+      nodes.forEach(x=>x.classList.toggle("sel",x.dataset.id===id));
+      const ins=D.map.edges.filter(e=>e.b===id), outs=D.map.edges.filter(e=>e.a===id);
+      const nm=k=>D.map.nodes.find(x=>x.id===k).label;
+      $("#dbody").innerHTML=`<h4>${n.label}</h4><div class="sub">${n.loc.toLocaleString()} LOC · ${n.files} FILES</div>
+        <div class="prose" style="font-size:14px"><span class="claim">${esc(n.why)}</span></div>
+        <h5>DEPENDS ON</h5>${outs.length?outs.map(e=>`<div class="dl"><b>×${e.n}</b><span>${nm(e.b)}</span></div>`).join(""):`<div class="dl"><span style="color:var(--faint)">nothing</span></div>`}
+        <h5>DEPENDED ON BY</h5>${ins.length?ins.map(e=>`<div class="dl"><b>×${e.n}</b><span>${nm(e.a)}</span></div>`).join(""):`<div class="dl"><span style="color:var(--faint)">nothing</span></div>`}
+        <h5>MOST-EDITED FILES</h5>${n.top.map(f=>`<div class="dl"><span><code>${esc(f)}</code></span></div>`).join("")}`;
+      $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden","false");
+    };
+    g.addEventListener("click",open);
+    g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}});
+  });
+}
+const shut=()=>{$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true");$$(".node").forEach(n=>n.classList.remove("sel"))};
+
+/* ---- events ---- */
+document.addEventListener("click",e=>{
+  const t=e.target;
+  const go=t.closest("[data-go]");
+  if(go&&go.dataset.go!==undefined&&!go.classList.contains("sub")){
+    if(go.hasAttribute("data-go")&&/^\d+$/.test(go.dataset.go)){draw(+go.dataset.go);$("#rail").classList.remove("open");return}
+  }
+  const nav=t.closest("[data-nav]"); if(nav){draw(S.cur+ +nav.dataset.nav);return}
+
+  const mk=t.closest(".mark");
+  if(mk){const p=$(`[data-pop="${mk.dataset.claim}"]`);const open=p.hidden;p.hidden=!open;mk.setAttribute("aria-expanded",open);return}
+
+  const cp=t.closest("[data-copy]");
+  if(cp){navigator.clipboard?.writeText(cp.dataset.copy.replace(/&quot;/g,'"'));cp.textContent="COPIED";setTimeout(()=>cp.textContent="COPY",1200);return}
+
+  /* A lineage stage opens the same drawer the map uses — one evidence surface,
+     not a second one that could drift from it. */
+  const ls=t.closest("[data-lin]");
+  if(ls){
+    const rec=LINSTEPS[ls.dataset.lin]; if(!rec||!rec.s.anchor)return;
+    const s=rec.s, st=(EST[s.status]||EST.inferred);
+    $("#dbody").innerHTML=`<h4>${esc(s.label)}</h4>
+      <div class="sub">${esc(rec.e.name)} · ${esc(s.stage)}</div>
+      <div class="prose" style="font-size:14px"><span class="claim">${esc(s.description)}</span></div>
+      <h5>EVIDENCE</h5>
+      <div class="dl"><b>${st[1]}</b><span class="etype">${esc(s.evidence_type||"")}</span></div>
+      <div class="dl"><span><code>${esc(s.anchor.file)}</code> : ${s.anchor.start}–${s.anchor.end}</span></div>
+      ${excerpt(s.anchor,"")}
+      <h5>WHY THIS SUPPORTS THE STEP</h5>
+      <div class="prose" style="font-size:13.5px"><span class="claim">${esc(s.why||
+        "The range above was located by searching the file for the quoted code, then hashed. The gate recomputes that hash from the bundled excerpt, so this stage cannot cite a line that has since changed without failing.")}</span></div>`;
+    $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden","false");
+    return}
+
+  const pi=t.closest("[data-pi]");
+  if(pi){const w=pi.closest("[data-pred]"), id=w.dataset.pred;
+    if(S.pred[id])return;
+    const pick=+pi.dataset.pi;
+    S.pred[id]={pick,ok:pick===+w.dataset.key};save();draw(S.cur);return}
+
+  const cf=t.closest("[data-conf]");
+  if(cf){const id=cf.dataset.conf; if(S.conf[id]||S.ans[id])return;
+    S.conf[id]=cf.dataset.c;save();draw(S.cur);return}
+
+  const pk=t.closest("[data-pick]");
+  if(pk){const id=pk.dataset.pick;if(S.ans[id])return;
+    const b=allCP().find(x=>x.id===id), i=+pk.dataset.i;
+    S.ans[id]={pick:i,ok:i===b.answer};S.done[STOPS[S.cur].id]=1;save();draw(S.cur);return}
+
+  const chk=t.closest("[data-go].sub, .sub[data-go]");
+  if(chk){const id=chk.dataset.go, b=allCP().find(x=>x.id===id);
+    const pick=$$(`[data-ord="${id}"]`).map(s=>s.value?+s.value:0);
+    if(pick.some(v=>!v))return;
+    S.ans[id]={pick,ok:pick.every((v,k)=>v===b.answer[k])};S.done[STOPS[S.cur].id]=1;save();draw(S.cur);return}
+
+  const th=t.closest("th[data-sort]");
+  if(th){const tb=th.closest("table").tBodies[0], i=+th.dataset.sort;
+    const dir=th.dataset.dir==="1"?-1:1;
+    $$("th",th.closest("thead")).forEach(x=>x.removeAttribute("data-dir")); th.dataset.dir=dir;
+    [...tb.rows].sort((a,b)=>{
+      const A=a.cells[i].textContent.trim(), B=b.cells[i].textContent.trim();
+      const na=parseFloat(A.replace(/,/g,"")), nb=parseFloat(B.replace(/,/g,""));
+      return (isNaN(na)||isNaN(nb)? A.localeCompare(B) : na-nb)*dir;
+    }).forEach(r=>tb.appendChild(r)); return}
+
+  if(t.closest("#badge")){modal(true);return}
+  if(t.closest("#mx")||t.id==="scrim"){modal(false);return}
+  if(t.closest("#dx")){shut();return}
+  if(t.closest("#menu")){$("#rail").classList.toggle("open");return}
+  if(t.closest("#theme")){
+    const d=document.documentElement.dataset.theme==="dark"?"light":"dark";
+    document.documentElement.dataset.theme=d;return}
+  if(t.closest("#proj")){
+    const on=document.documentElement.dataset.proj==="1";
+    document.documentElement.dataset.proj=on?"0":"1";
+    $("#proj").setAttribute("aria-pressed",!on);return}
+  if(t.closest("#reset")){S={cur:0,done:{},ans:{},pred:{},conf:{}};save();draw(0);return}
+});
+document.addEventListener("keydown",e=>{
+  if(e.target.matches("input,select,textarea"))return;
+  if(e.key==="Escape"){shut();modal(false);return}
+  if(e.key==="ArrowRight")draw(S.cur+1);
+  if(e.key==="ArrowLeft")draw(S.cur-1);
+});
+document.addEventListener("keydown",e=>{
+  const o=e.target.closest("[data-pick],[data-pi]");
+  if(o&&(e.key==="Enter"||e.key===" ")){e.preventDefault();o.click()}
+});
+function allCP(){return STOPS.flatMap(s=>s.blocks.filter(b=>b.type==="checkpoint"))}
+function modal(on){
+  if(on)$("#mbody").innerHTML=ledgerTable();
+  $("#modal").classList.toggle("open",on); $("#scrim").classList.toggle("open",on);
+}
+
+/* switching repo is a full reload of the walkthrough: new payload, new outline,
+   new progress key. The hash is dropped because stop ids are per-repo. */
+document.addEventListener("change",e=>{
+  if(e.target.id!=="rsel")return;
+  loadRepo(e.target.value);
+  history.replaceState(null,"",location.pathname+location.search);
+  draw(S.cur||0);
+});
+
+/* ---- boot ---- */
+let want=null;
+try{want=localStorage.getItem("trailhead:repo")}catch(e){}
+loadRepo(want&&BUNDLES[want]?want:Object.keys(BUNDLES)[0]);
+const h=location.hash.slice(1);
+const at=STOPS.findIndex(s=>s.id===h);
+draw(at>=0?at:(S.cur||0));
+</script>
+</body>
+</html>

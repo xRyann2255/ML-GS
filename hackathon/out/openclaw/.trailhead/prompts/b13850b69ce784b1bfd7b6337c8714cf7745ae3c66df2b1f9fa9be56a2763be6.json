@@ -1,0 +1,119 @@
+{
+  "unit": "five",
+  "kind": "five",
+  "title": "Five sentences",
+  "max_claims": 5,
+  "key": "b13850b69ce784b1bfd7b6337c8714cf7745ae3c66df2b1f9fa9be56a2763be6",
+  "system": "You are the narration stage of Trailhead, a tool that generates a walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Every\nquote you return is searched for verbatim in the file on disk; anything that is\nnot found exactly is deleted and counted on screen. You cannot talk your way\npast the checker, so do not try: an honest \"inferred\" sentence survives, an\ninvented quote does not.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. `cite.quote` is a VERBATIM, CONTIGUOUS copy of 3-24 lines from ONE file,\n   lines joined with newlines. Copy the leading indentation exactly, character\n   for character. Do not reflow, re-indent, elide, or add an ellipsis.\n4. Quote only code you were shown below. Quoting something you inferred exists\n   is the single most expensive thing you can do here.\n5. `cite.focus` is an array of exact substrings of your own `cite.quote` — the\n   one or two lines that actually carry the point.\n6. If you cannot support a sentence with a quote, set `\"status\": \"inferred\"` and\n   omit `cite` entirely. That is a legitimate, visible answer, not a failure.\n7. `text` is one plain sentence, at most 280 characters. No backticks, no\n   newlines, no markdown links, no `<`.\n8. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"this codebase appears to\" — say what it does.\n",
+  "user": "FACTS — from survey.json, deterministic. Rely on these; never quote them.\nrepo: openclaw @ 1bca61b\nsize: 29996 files, 13 python files, 10732 loc, 0 modules\nimport roots: ., src\ntest roots: test\nexternal dependencies: model_usage, package_skill, quick_validate, yaml\nmodules (largest first, fan-in = how many modules import it):\n  scripts — 3 files, 904 loc, fan-in 0\n  scripts.e2e — 1 files, 873 loc, fan-in 0\nentry points:\n  main_guard: .agents/skills/autoreview/scripts/autoreview_test.py -> .agents/skills/autoreview/scripts/autoreview_test.py (in .agents/skills/autoreview/scripts/autoreview_test.py)\n  main_guard: .agents/skills/autoreview/scripts/test-review-harness.py -> .agents/skills/autoreview/scripts/test-review-harness.py (in .agents/skills/autoreview/scripts/test-review-harness.py)\n  main_guard: .agents/skills/autoreview/tests/test_autoreview_hardening.py -> .agents/skills/autoreview/tests/test_autoreview_hardening.py (in .agents/skills/autoreview/tests/test_autoreview_hardening.py)\n  main_guard: scripts/check-composite-action-input-interpolation.py -> scripts/check-composite-action-input-interpolation.py (in scripts/check-composite-action-input-interpolation.py)\n  main_guard: scripts/compare-release-evidence-zip.py -> scripts/compare-release-evidence-zip.py (in scripts/compare-release-evidence-zip.py)\ngit history: unavailable (git log exited None for this path) — files are ranked by fan_in instead\n\nSOURCE — line numbers are a gutter, not part of any line. Never quote them.\n\n--- .agents/skills/autoreview/scripts/autoreview_test.py ---\n    1| #!/usr/bin/env python3\n    2| from __future__ import annotations\n    3| \n    4| import argparse\n    5| import importlib.util\n    6| import json\n    7| import os\n    8| import runpy\n    9| import subprocess\n   10| import sys\n   11| import tempfile\n   12| import unittest\n   ...\n   40|             \"category\": \"maintainability\",\n   41|             \"code_location\": {\"file_path\": \"draft.js\", \"line\": 1},\n   42|         }\n   43|     ],\n   44|     \"overall_correctness\": \"patch is incorrect\",\n   45|     \"overall_explanation\": \"draft\",\n   46|     \"overall_confidence\": 0.2,\n   47| }\n   48| \n   49| \n   50| class AutoreviewCursorTests(unittest.TestCase):\n   51|     def test_extract_json_prefers_terminal_result_event(self) -> None:\n   52|         stream = \"\\n\".join(\n   53|             [\n   54|                 json.dumps(\n   55|                     {\n   56|                         \"type\": \"assistant\",\n   57|                         \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"text\", \"text\": json.dumps(DRAFT_REPORT)}]},\n   58|                     }\n   59|                 ),\n   60|                 json.dumps(\n   61|                     {\n   62|                         \"type\": \"result\",\n   63|                         \"subtype\": \"success\",\n   64|                         \"result\": json.dumps(FINAL_REPORT),\n   65|                         \"session_id\": \"session-id\",\n   66|                         \"request_id\": \"request-id\",\n   67|                     }\n   68|                 ),\n   69|             ]\n   70|         )\n   71|         self.assertEqual(AUTOREVIEW.extract_json(stream), FINAL_REPORT)\n   72| \n   73|     def test_extract_json_can_fallback_to_assistant_message(self) -> None:\n   74|         stream = json.dumps(\n   75|             {\n   76|                 \"type\": \"assistant\",\n   77|                 \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"text\", \"text\": json.dumps(FINAL_REPORT)}]},\n   78|             }\n   79|         )\n   80|         self.assertEqual(AUTOREVIEW.extract_json(stream), FINAL_REPORT)\n   81| \n   82|     def test_extract_json_does_not_fallback_past_bad_terminal_result(self) -> None:\n   83|         stream = \"\\n\".join(\n   84|             [\n   85|                 json.dumps(\n   86|                     {\n   87|                         \"type\": \"assistant\",\n   88|                         \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"text\", \"text\": json.dumps(FINAL_REPORT)}]},\n   89|                     }\n   90|                 ),\n   91|                 json.dumps(\n   92|                     {\n   93|                         \"type\": \"result\",\n   94|                         \"subtype\": \"success\",\n   95|                         \"result\": \"not json\",\n   96|                     }\n   97|                 ),\n   98|             ]\n   99|         )\n   ...\n  105| class AutoreviewSecretScannerTests(unittest.TestCase):\n  106|     def test_boolean_declarations_are_not_credential_material(self) -> None:\n  107|         secret_field = \"is\" + \"Secret\"\n  108|         client_secret_field = \"hasClient\" + \"Secret\"\n  109|         cases = (\n  110|             (f\"val {secret_field}: Boolean? = null,\", None),\n  111|             (f\"var {client_secret_field}: Boolean = false\", None),\n  112|             (f\"abstract val {secret_field}: Boolean?\", None),\n  113|             (f\"val {secret_field}: Boolean?\", None),\n   ...\n  179| class AutoreviewCompatibilityTests(unittest.TestCase):\n  180|     @classmethod\n  181|     def setUpClass(cls) -> None:\n  182|         cls.home_dir = tempfile.TemporaryDirectory(prefix=\"autoreview-test-home.\")\n  183|         cls.home_patch = mock.patch.object(Path, \"home\", return_value=Path(cls.home_dir.name))\n  184|         cls.home_patch.start()\n  185|         cls.home_keys = (\"HOME\", \"USERPROFILE\", \"HOMEDRIVE\", \"HOMEPATH\")\n  186|         cls.old_home_env = {key: os.environ.get(key) for key in cls.home_keys}\n  187|         os.environ[\"HOME\"] = cls.home_dir.name\n\n--- .agents/skills/autoreview/scripts/test-review-harness.py ---\n    1| #!/usr/bin/env python3\n    2| from __future__ import annotations\n    3| \n    4| import argparse\n    5| import os\n    6| import runpy\n    7| import shutil\n    8| import stat\n    9| import subprocess\n   10| import sys\n   11| import tempfile\n   12| from collections.abc import Callable\n   ...\n  114| def parse_args(argv: list[str]) -> argparse.Namespace:\n  115|     parser = argparse.ArgumentParser(\n  116|         prog=\"test-review-harness\",\n  117|         description=(\n  118|             \"Creates a temporary git repo with either a deliberately unsafe patch \"\n  119|             \"or a security-sensitive-but-safe patch, then verifies each selected \"\n  120|             \"engine through autoreview.\"\n  121|         ),\n  122|         epilog=\"Default engines: codex, claude.\",\n  123|     )\n  124|     parser.add_argument(\"--fixture\", choices=(\"malicious\", \"benign\"), default=\"malicious\")\n  125|     parser.add_argument(\"--engine\", action=\"append\", choices=ENGINES, dest=\"engines\")\n  126|     return parser.parse_args(argv)\n  127| \n  128| \n  129| def write_fixture_file(repo: Path, content: str) -> None:\n  130|     with (repo / \"app.js\").open(\"w\", encoding=\"utf-8\", newline=\"\\n\") as handle:\n  131|         handle.write(content)\n  132| \n  133| \n  134| def run(command: list[str], cwd: Path) -> None:\n  135|     subprocess.run(command, cwd=cwd, check=True)\n  136| \n  137| \n  138| def create_fixture_repo(repo: Path, fixture: str) -> None:\n  139|     run([\"git\", \"init\", \"--quiet\"], repo)\n  140|     run([\"git\", \"config\", \"user.name\", \"Review Fixture\"], repo)\n  141|     run([\"git\", \"config\", \"user.email\", \"review-fixture@example.com\"], repo)\n  142| \n  143|     write_fixture_file(repo, MALICIOUS_INITIAL if fixture == \"malicious\" else BENIGN_INITIAL)\n  144|     run([\"git\", \"add\", \"app.js\"], repo)\n  145|     run([\"git\", \"commit\", \"--quiet\", \"-m\", \"initial safe version\"], repo)\n  146|     write_fixture_file(repo, MALICIOUS_CHANGED if fixture == \"malicious\" else BENIGN_CHANGED)\n  147| \n  148| \n  149| def validate_prompt_policy(repo: Path, autoreview: Path) -> None:\n  150|     namespace = runpy.run_path(str(autoreview))\n  151|     prompt = namespace[\"build_prompt\"](repo, \"local\", None, \"fixture diff\", \"\", \"\")\n  152|     required = (\n  153|         \"This helper is a closeout gate.\",\n  154|         \"Do not turn a narrow patch into a broad\",\n  155|         \"If this is release-branch or release-process work\",\n  156|         \"Non-blocking design,\",\n  157|     )\n   ...\n  163| def run_reviews(repo: Path, script_dir: Path, fixture: str, engines: list[str]) -> None:\n  164|     autoreview = script_dir / \"autoreview\"\n  165|     validate_prompt_policy(repo, autoreview)\n  166|     for engine in engines:\n  167|         print(f\"== {engine} ==\", flush=True)\n  168|         command = [\n  169|             sys.executable,\n  170|             str(autoreview),\n  171|             \"--mode\",\n   ...\n  183| def cleanup_repo(repo: Path) -> None:\n  184|     def make_writable_and_retry(function: Callable[[str], object], path: str, _exc_info: object) -> None:\n  185|         try:\n  186|             os.chmod(path, stat.S_IREAD | stat.S_IWRITE)\n  187|             function(path)\n  188|         except OSError as exc:\n  189|             print(f\"warning: unable to remove temp path {path}: {exc}\", file=sys.stderr)\n  190| \n  191|     if not repo.exists():\n   ...\n  199| def main(argv: list[str]) -> int:\n  200|     args = parse_args(argv)\n  201|     script_dir = Path(__file__).resolve().parent\n  202|     engines = args.engines or list(DEFAULT_ENGINES)\n  203|     repo = Path(tempfile.mkdtemp(prefix=\"autoreview-fixture.\"))\n  204|     try:\n  205|         create_fixture_repo(repo, args.fixture)\n  206|         run_reviews(repo, script_dir, args.fixture, engines)\n  207|     except subprocess.CalledProcessError as exc:\n\n--- .agents/skills/autoreview/tests/test_autoreview_hardening.py ---\n    1| #!/usr/bin/env python3\n    2| from __future__ import annotations\n    3| \n    4| import argparse\n    5| import contextlib\n    6| import io\n    7| import json\n    8| import os\n    9| import re\n   10| import runpy\n   11| import shutil\n   12| import stat\n   ...\n   23| SCRIPT = Path(__file__).resolve().parents[1] / \"scripts\" / \"autoreview\"\n   24| FIXTURES = Path(__file__).with_name(\"fixtures\")\n   25| PRIVATE_KEY_BEGIN_TEXT = \"BEGIN \" + \"PRIVATE KEY\"\n   26| RSA_PRIVATE_KEY_BEGIN_TEXT = \"BEGIN RSA \" + \"PRIVATE KEY\"\n   27| \n   28| \n   29| def load_helper() -> dict[str, object]:\n   30|     return runpy.run_path(str(SCRIPT), run_name=\"autoreview_under_test\")\n   31| \n   32| \n   33| def git(repo: Path, *args: str) -> str:\n   34|     env = os.environ.copy()\n   35|     env.update(\n   36|         {\n   37|             \"GIT_AUTHOR_NAME\": \"Autoreview Test\",\n   38|             \"GIT_AUTHOR_EMAIL\": \"autoreview@example.invalid\",\n   39|             \"GIT_COMMITTER_NAME\": \"Autoreview Test\",\n   40|             \"GIT_COMMITTER_EMAIL\": \"autoreview@example.invalid\",\n   41|         }\n   42|     )\n   43|     result = subprocess.run(\n   44|         [\"git\", *args],\n   45|         cwd=repo,\n   46|         env=env,\n   47|         check=True,\n   48|         text=True,\n   49|         stdout=subprocess.PIPE,\n   50|         stderr=subprocess.PIPE,\n   51|     )\n   52|     return result.stdout\n   53| \n   54| \n   55| def init_repo(tempdir: Path) -> Path:\n   56|     repo = tempdir / \"repo\"\n   57|     repo.mkdir()\n   58|     git(repo, \"init\", \"-q\")\n   59|     git(repo, \"config\", \"user.name\", \"Autoreview Test\")\n   60|     git(repo, \"config\", \"user.email\", \"autoreview@example.invalid\")\n   61|     return repo\n   62| \n   63| \n   64| def realistic_secret_value() -> str:\n   65|     return \"A7f9K2m4Q8v6\" + \"N3x5R1p0T9z8\"\n   66| \n   67| \n   68| def add_fake_trufflehog(\n   69|     helper: dict[str, object],\n   70|     root: Path,\n   71|     env: dict[str, str],\n   72| ) -> None:\n   73|     helper[\"write_executable\"](\n   74|         root / \"trufflehog\",\n   75|         \"#!/usr/bin/env python3\\nraise SystemExit(0)\\n\",\n   76|     )\n   ...\n   80| class AutoreviewHardeningTests(unittest.TestCase):\n   81|     def setUp(self) -> None:\n   82|         self.helper = load_helper()\n   83| \n   84|     def test_trufflehog_missing_binary_has_platform_neutral_guidance(self) -> None:\n   85|         with tempfile.TemporaryDirectory() as tempdir:\n   86|             repo = init_repo(Path(tempdir))\n   87|             with mock.patch.dict(\n   88|                 self.helper[\"run_trufflehog_preflight\"].__globals__,\n\n--- scripts/check-composite-action-input-interpolation.py ---\n    1| #!/usr/bin/env python3\n    2| from __future__ import annotations\n    3| \n    4| import pathlib\n    5| import re\n    6| import sys\n    7| \n    8| \n    9| INPUT_INTERPOLATION_RE = re.compile(r\"\\$\\{\\{\\s*inputs\\.\")\n   10| RUN_LINE_RE = re.compile(r\"^(\\s*)run:\\s*(.*)$\")\n   11| USING_COMPOSITE_RE = re.compile(r\"^\\s*using:\\s*composite\\s*$\", re.MULTILINE)\n   12| \n   13| \n   14| def indentation(line: str) -> int:\n   15|     return len(line) - len(line.lstrip(\" \"))\n   16| \n   17| \n   18| def scan_file(path: pathlib.Path) -> list[tuple[int, str]]:\n   19|     text = path.read_text(encoding=\"utf-8\")\n   20|     if not USING_COMPOSITE_RE.search(text):\n   21|         return []\n   22| \n   23|     lines = text.splitlines()\n   24|     violations: list[tuple[int, str]] = []\n   25|     line_count = len(lines)\n   26|     index = 0\n   ...\n   50|                 continue\n   51|             if indentation(script_line) <= run_indent:\n   52|                 break\n   53|             if INPUT_INTERPOLATION_RE.search(script_line):\n   54|                 violations.append((index + 1, script_line.strip()))\n   55|             index += 1\n   56| \n   57|     return violations\n   58| \n   59| \n   60| def main() -> int:\n   61|     root = pathlib.Path(\".github/actions\")\n   62|     files = sorted(root.rglob(\"action.y*ml\"))\n   63|     all_violations: list[tuple[pathlib.Path, int, str]] = []\n   64| \n   65|     for file_path in files:\n   66|         for line_no, line in scan_file(file_path):\n   67|             all_violations.append((file_path, line_no, line))\n   68| \n   69|     if all_violations:\n   70|         print(\"Disallowed direct inputs interpolation in composite run blocks:\")\n   71|         for file_path, line_no, line in all_violations:\n   72|             print(f\"- {file_path}:{line_no}: {line}\")\n   73|         print(\"Use env: and reference shell variables instead.\")\n   74|         return 1\n   75| \n   76|     print(\"No direct inputs interpolation found in composite run blocks.\")\n   77|     return 0\n   78| \n   79| \n\nTASK — Five sentences\nWrite exactly 5 sentences that tell a new joiner what this repo\nis, in the order they would want to hear them: what it does, what it produces,\nhow the pieces fit, and where the work actually happens.\nThe last sentence says what this repo is NOT — the thing a newcomer would\nreasonably assume and be wrong about. That one is normally 'inferred'.",
+  "windows": [
+    {
+      "file": ".agents/skills/autoreview/scripts/autoreview_test.py",
+      "start": 40,
+      "end": 99
+    },
+    {
+      "file": ".agents/skills/autoreview/scripts/autoreview_test.py",
+      "start": 105,
+      "end": 113
+    },
+    {
+      "file": ".agents/skills/autoreview/scripts/autoreview_test.py",
+      "start": 179,
+      "end": 187
+    },
+    {
+      "file": ".agents/skills/autoreview/scripts/test-review-harness.py",
+      "start": 114,
+      "end": 157
+    },
+    {
+      "file": ".agents/skills/autoreview/scripts/test-review-harness.py",
+      "start": 163,
+      "end": 171
+    },
+    {
+      "file": ".agents/skills/autoreview/scripts/test-review-harness.py",
+      "start": 183,
+      "end": 191
+    },
+    {
+      "file": ".agents/skills/autoreview/scripts/test-review-harness.py",
+      "start": 199,
+      "end": 207
+    },
+    {
+      "file": ".agents/skills/autoreview/tests/test_autoreview_hardening.py",
+      "start": 23,
+      "end": 76
+    },
+    {
+      "file": ".agents/skills/autoreview/tests/test_autoreview_hardening.py",
+      "start": 80,
+      "end": 88
+    },
+    {
+      "file": "scripts/check-composite-action-input-interpolation.py",
+      "start": 13,
+      "end": 26
+    },
+    {
+      "file": "scripts/check-composite-action-input-interpolation.py",
+      "start": 50,
+      "end": 79
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "claims"
+    ],
+    "properties": {
+      "claims": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "status",
+            "cite"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "inferred"
+              ]
+            },
+            "cite": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "focus": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\out\\openclaw\\.trailhead\\narration\\b13850b69ce784b1bfd7b6337c8714cf7745ae3c66df2b1f9fa9be56a2763be6.json",
+  "pack": "C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\out\\openclaw\\.trailhead\\prompts\\b13850b69ce784b1bfd7b6337c8714cf7745ae3c66df2b1f9fa9be56a2763be6.json"
+}

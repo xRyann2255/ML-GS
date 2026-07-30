@@ -1,0 +1,204 @@
+{
+  "unit": "conv",
+  "kind": "conventions",
+  "title": "How this codebase is written",
+  "max_claims": 4,
+  "key": "9a3e83c46b336d0155b119158921e028a0779cd467adf3c1dbaa6831224efb49",
+  "system": "You are the narration stage of Trailhead, a tool that generates a walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Every\nquote you return is searched for verbatim in the file on disk; anything that is\nnot found exactly is deleted and counted on screen. You cannot talk your way\npast the checker, so do not try: an honest \"inferred\" sentence survives, an\ninvented quote does not.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. `cite.quote` is a VERBATIM, CONTIGUOUS copy of 3-24 lines from ONE file,\n   lines joined with newlines. Copy the leading indentation exactly, character\n   for character. Do not reflow, re-indent, elide, or add an ellipsis.\n4. Quote only code you were shown below. Quoting something you inferred exists\n   is the single most expensive thing you can do here.\n5. `cite.focus` is an array of exact substrings of your own `cite.quote` — the\n   one or two lines that actually carry the point.\n6. If you cannot support a sentence with a quote, set `\"status\": \"inferred\"` and\n   omit `cite` entirely. That is a legitimate, visible answer, not a failure.\n7. `text` is one plain sentence, at most 280 characters. No backticks, no\n   newlines, no markdown links, no `<`.\n8. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"this codebase appears to\" — say what it does.\n",
+  "user": "FACTS — from survey.json, deterministic. Rely on these; never quote them.\nrepo: openclaw @ 1bca61b\nsize: 29996 files, 13 python files, 10732 loc, 0 modules\nimport roots: ., src\ntest roots: test\nexternal dependencies: model_usage, package_skill, quick_validate, yaml\nmodules (largest first, fan-in = how many modules import it):\n  scripts — 3 files, 904 loc, fan-in 0\n  scripts.e2e — 1 files, 873 loc, fan-in 0\nentry points:\n  main_guard: .agents/skills/autoreview/scripts/autoreview_test.py -> .agents/skills/autoreview/scripts/autoreview_test.py (in .agents/skills/autoreview/scripts/autoreview_test.py)\n  main_guard: .agents/skills/autoreview/scripts/test-review-harness.py -> .agents/skills/autoreview/scripts/test-review-harness.py (in .agents/skills/autoreview/scripts/test-review-harness.py)\n  main_guard: .agents/skills/autoreview/tests/test_autoreview_hardening.py -> .agents/skills/autoreview/tests/test_autoreview_hardening.py (in .agents/skills/autoreview/tests/test_autoreview_hardening.py)\n  main_guard: scripts/check-composite-action-input-interpolation.py -> scripts/check-composite-action-input-interpolation.py (in scripts/check-composite-action-input-interpolation.py)\n  main_guard: scripts/compare-release-evidence-zip.py -> scripts/compare-release-evidence-zip.py (in scripts/compare-release-evidence-zip.py)\ngit history: unavailable (git log exited None for this path) — files are ranked by fan_in instead\n\nSOURCE — line numbers are a gutter, not part of any line. Never quote them.\n\n--- scripts/release-telegram-candidate-archive.py ---\n    1| #!/usr/bin/env python3\n    2| \"\"\"Validate and extract bounded Telegram release candidate archives.\"\"\"\n    3| \n    4| from __future__ import annotations\n    5| \n    6| import argparse\n    7| import json\n    8| import os\n    9| from pathlib import Path, PurePosixPath\n   10| import shutil\n   11| import stat\n   12| import subprocess\n   ...\n   20| DEFAULT_MAX_STREAM_BYTES = 10 * 1024 * 1024 * 1024\n   21| DEFAULT_MAX_EXTENSION_BYTES = 1 * 1024 * 1024\n   22| DEFAULT_MAX_EXTENSION_TOTAL_BYTES = 1 * 1024 * 1024 * 1024\n   23| DEFAULT_MAX_PATH_BYTES = 256 * 1024 * 1024\n   24| MAX_ARCHIVE_PATH_BYTES = 4096\n   25| MAX_ARCHIVE_PATH_COMPONENTS = 256\n   26| MAX_EXTENSION_NESTING = 32\n   27| STREAM_TAIL_WINDOW_BYTES = 64 * 1024\n   28| \n   29| \n   30| class ArchiveGuardError(Exception):\n   31|     \"\"\"Raised when a candidate tree or archive violates a safety invariant.\"\"\"\n   32| \n   33| \n   34| class ArchiveMetadataBudget:\n   35|     def __init__(\n   36|         self,\n   37|         *,\n   38|         max_extension_bytes: int,\n   39|         max_extension_total_bytes: int,\n   40|         max_extension_headers: int,\n   41|     ) -> None:\n   42|         self.max_extension_bytes = max_extension_bytes\n   43|         self.max_extension_total_bytes = max_extension_total_bytes\n   44|         self.max_extension_headers = max_extension_headers\n   45|         self.extension_bytes = 0\n   46|         self.extension_depth = 0\n   47|         self.extension_headers = 0\n   48| \n   49|     def begin_extension(self, kind: str, size: int) -> None:\n   ...\n   84| class ArchivePathBudget:\n   85|     def __init__(self, limit: int) -> None:\n   86|         self.limit = limit\n   87|         self.bytes_used = 0\n   88| \n   89|     def consume(self, value: str, kind: str) -> bytes:\n   90|         try:\n   91|             encoded = value.encode(\"utf-8\")\n   92|         except UnicodeEncodeError as error:\n   ...\n  113| def _bounded_tarinfo_type(\n  114|     budget: ArchiveMetadataBudget,\n  115| ) -> type[tarfile.TarInfo]:\n  116|     class BoundedTarInfo(tarfile.TarInfo):\n  117|         def _proc_member(self, archive: tarfile.TarFile) -> tarfile.TarInfo:\n  118|             if self.type == tarfile.XGLTYPE:\n  119|                 raise ArchiveGuardError(\"archive has unsupported global PAX header\")\n  120|             if self.type in (tarfile.XHDTYPE, tarfile.SOLARIS_XHDTYPE):\n  121|                 kind = \"PAX\"\n   ...\n  147| class BoundedReader:\n  148|     def __init__(self, source: BinaryIO, limit: int) -> None:\n  149|         self.source = source\n  150|         self.limit = limit\n  151|         self.bytes_read = 0\n  152|         self.tail = bytearray()\n  153|         self.tail_start = 0\n  154|         self.zero_tail_offset: int | None = None\n  155|         self.zero_tail_bytes = 0\n   ...\n  189| def _limit(value: str) -> int:\n  190|     try:\n  191|         parsed = int(value)\n  192|     except ValueError as error:\n  193|         raise argparse.ArgumentTypeError(f\"expected an integer, got {value!r}\") from error\n  194|     if parsed < 0:\n  195|         raise argparse.ArgumentTypeError(\"limit must be non-negative\")\n  196|     return parsed\n  197| \n  198| \n  199| def _inside_root(path: Path, root: Path) -> bool:\n  200|     try:\n  201|         path.relative_to(root)\n  202|     except ValueError:\n  203|         return False\n  204|     return True\n  205| \n  206| \n  207| def validate_tree(\n  208|     root_value: str | os.PathLike[str],\n  209|     *,\n  210|     max_entries: int,\n  211|     max_apparent_bytes: int,\n  212| ) -> dict[str, int | str]:\n  213|     requested_root = Path(root_value)\n  214|     try:\n  215|         requested_stat = requested_root.lstat()\n   ...\n  322| def _canonical_member_name(name: str) -> str:\n  323|     trimmed = name.rstrip(\"/\")\n  324|     if not trimmed or \"\\\\\" in trimmed or \"\\0\" in trimmed:\n  325|         raise ArchiveGuardError(f\"archive has invalid path: {name!r}\")\n  326|     if PurePosixPath(trimmed).is_absolute():\n  327|         raise ArchiveGuardError(f\"archive has absolute path: {name}\")\n  328|     parts = trimmed.split(\"/\")\n  329|     if any(part in {\"\", \".\", \"..\"} for part in parts):\n  330|         raise ArchiveGuardError(f\"archive has non-canonical path: {name}\")\n   ...\n  334| def _validate_allowed_root(value: str) -> str:\n  335|     root = _canonical_member_name(value)\n  336|     if \"/\" in root or root == \"manifest.json\":\n  337|         raise ArchiveGuardError(\n  338|             \"allowed archive root must be one top-level directory other than manifest.json\"\n  339|         )\n  340|     return root\n  341| \n  342| \n  343| def _identity_filter(member: tarfile.TarInfo, _destination: str) -> tarfile.TarInfo:\n  344|     return member\n  345| \n  346| \n  347| def _next_stream_member(\n  348|     archive: tarfile.TarFile,\n  349| ) -> tuple[tarfile.TarInfo | None, int]:\n  350|     member = archive.next()\n  351|     cached_members = len(archive.members)\n  352|     archive.members.clear()\n  353|     if cached_members > 1:\n  354|         raise ArchiveGuardError(\n  355|             f\"tar metadata cache retained {cached_members} members\"\n   ...\n  360| def _destination_member_path(destination: Path, name: str) -> Path:\n  361|     return destination.joinpath(*PurePosixPath(name).parts)\n  362| \n  363| \n  364| def _validate_destination_paths(\n  365|     destination: Path,\n  366|     name: str,\n  367|     *,\n  368|     seen_names: set[str],\n  369| ) -> None:\n  370|     parent_name, separator, _member_name = name.rpartition(\"/\")\n  371|     if separator:\n  372|         if parent_name not in seen_names:\n   ...\n  404| def _extract_link_member(\n  405|     member: tarfile.TarInfo,\n  406|     *,\n  407|     destination: Path,\n  408|     name: str,\n  409|     hardlink_target: str | None,\n  410| ) -> None:\n  411|     target_path = _destination_member_path(destination, name)\n  412|     if os.path.lexists(target_path):\n   ...\n  430| def _read_process_error(process: subprocess.Popen[bytes]) -> str:\n  431|     if process.stderr is None:\n  432|         return \"\"\n  433|     return process.stderr.read().decode(\"utf-8\", errors=\"replace\").strip()\n  434| \n  435| \n  436| def extract_zstd(\n  437|     archive_value: str | os.PathLike[str],\n  438|     destination_value: str | os.PathLike[str],\n  439|     *,\n  440|     allowed_root_value: str,\n  441|     max_members: int,\n  442|     max_expanded_bytes: int,\n  443|     max_stream_bytes: int,\n  444|     max_extension_bytes: int,\n   ...\n  670| def _build_parser() -> argparse.ArgumentParser:\n  671|     parser = argparse.ArgumentParser(\n  672|         description=\"Validate or extract a bounded Telegram release candidate archive.\"\n  673|     )\n  674|     commands = parser.add_subparsers(dest=\"command\", required=True)\n  675| \n  676|     validate_parser = commands.add_parser(\n  677|         \"validate-tree\", help=\"validate an archive source tree\"\n  678|     )\n   ...\n  726| def main(argv: list[str] | None = None) -> int:\n  727|     args = _build_parser().parse_args(argv)\n  728|     try:\n  729|         if args.command == \"validate-tree\":\n  730|             result = validate_tree(\n  731|                 args.root,\n  732|                 max_entries=args.max_entries,\n  733|                 max_apparent_bytes=args.max_apparent_bytes,\n  734|             )\n\n--- scripts/e2e/telegram-user-driver.py ---\n    1| #!/usr/bin/env -S uv run --script\n    2| \n    3| import argparse\n    4| import atexit\n    5| import base64\n    6| import ctypes\n    7| import json\n    8| import os\n    9| import secrets\n   10| import shutil\n   11| import stat\n   12| import subprocess\n   13| import sys\n   14| import time\n   15| import urllib.request\n   16| from pathlib import Path\n   17| \n   18| \n   19| SKILL_DIR = Path(__file__).resolve().parents[1]\n   20| STATE_DIR = Path(os.environ.get(\"TELEGRAM_USER_DRIVER_STATE_DIR\") or (SKILL_DIR / \"user-driver\")).expanduser()\n   21| CONFIG_PATH = STATE_DIR / \"config.local.json\"\n   22| BOT_CREDENTIALS_PATH = SKILL_DIR / \"credentials.local.json\"\n   23| \n   24| \n   25| class DriverError(RuntimeError):\n   26|     pass\n   27| \n   28| \n   29| def read_json(path):\n   30|     try:\n   31|         return json.loads(path.read_text())\n   32|     except FileNotFoundError:\n   33|         return {}\n   34| \n   35| \n   36| def write_json_private(path, data):\n   37|     path.parent.mkdir(parents=True, exist_ok=True)\n   38|     path.parent.chmod(stat.S_IRWXU)\n   39|     path.write_text(json.dumps(data, indent=2, sort_keys=True) + \"\\n\")\n   40|     path.chmod(stat.S_IRUSR | stat.S_IWUSR)\n   41| \n   42| \n   43| def env_or_config(env_name, config, key, default=\"\"):\n   44|     value = os.environ.get(env_name)\n   45|     if value:\n   46|         return value\n   47|     value = config.get(key)\n   48|     if value is None:\n   49|         return default\n   50|     return str(value)\n   51| \n   52| \n   53| def load_config():\n   54|     STATE_DIR.mkdir(parents=True, exist_ok=True)\n   55|     STATE_DIR.chmod(stat.S_IRWXU)\n   56|     config = read_json(CONFIG_PATH)\n   57|     bot_config = read_json(BOT_CREDENTIALS_PATH)\n   58|     if not valid_base64(config.get(\"databaseEncryptionKey\", \"\")):\n   59|         config[\"databaseEncryptionKey\"] = base64.b64encode(secrets.token_bytes(32)).decode()\n   60|         write_json_private(CONFIG_PATH, config)\n   61|     return config, bot_config\n   62| \n   63| \n   64| def valid_base64(value):\n   65|     if not isinstance(value, str) or not value:\n   66|         return False\n   67|     try:\n   68|         base64.b64decode(value.encode(), validate=True)\n   69|         return True\n   70|     except ValueError:\n   71|         return False\n   72| \n   73| \n   74| def find_tdjson(config):\n   75|     explicit = env_or_config(\"TELEGRAM_USER_DRIVER_TDLIB_PATH\", config, \"tdlibPath\")\n   76|     candidates = []\n   77|     if explicit:\n   78|         candidates.append(Path(explicit).expanduser())\n   79|     candidates.extend(\n   80|         Path(path)\n   81|         for path in [\n   82|             \"/opt/homebrew/lib/libtdjson.dylib\",\n   ...\n   99| def telegram_bot(token, method, payload=None):\n  100|     data = json.dumps(payload or {}).encode()\n  101|     request = urllib.request.Request(\n  102|         f\"https://api.telegram.org/bot{token}/{method}\",\n  103|         data=data,\n  104|         headers={\"content-type\": \"application/json\"},\n  105|         method=\"POST\",\n  106|     )\n  107|     with urllib.request.urlopen(request, timeout=15) as response:\n   ...\n  114| def resolve_sut(config, bot_config):\n  115|     username = env_or_config(\"TELEGRAM_USER_DRIVER_SUT_USERNAME\", config, \"sutUsername\")\n  116|     user_id = env_or_config(\"TELEGRAM_USER_DRIVER_SUT_ID\", config, \"sutId\")\n  117|     if username and user_id:\n  118|         return {\"username\": username.lstrip(\"@\"), \"id\": int(user_id)}\n  119|     token = (\n  120|         os.environ.get(\"TELEGRAM_E2E_SUT_BOT_TOKEN\")\n  121|         or os.environ.get(\"OPENCLAW_QA_TELEGRAM_SUT_BOT_TOKEN\")\n  122|         or bot_config.get(\"sutBotToken\")\n   ...\n  134| def default_chat(config, bot_config):\n  135|     return (\n  136|         os.environ.get(\"TELEGRAM_USER_DRIVER_CHAT_ID\")\n  137|         or os.environ.get(\"TELEGRAM_E2E_GROUP_ID\")\n  138|         or os.environ.get(\"OPENCLAW_QA_TELEGRAM_GROUP_ID\")\n  139|         or str(config.get(\"defaultChatId\") or \"\")\n  140|         or str(bot_config.get(\"groupId\") or \"\")\n  141|     )\n  142| \n  143| \n  144| class TdClient:\n  145|     def __init__(self, config):\n  146|         lib_path = find_tdjson(config)\n  147|         if not lib_path:\n  148|             raise DriverError(\"Missing libtdjson. Install with: brew install tdlib\")\n  149|         self.lib_path = lib_path\n  150|         self.lib = ctypes.CDLL(str(lib_path))\n  151|         self.lib.td_execute.argtypes = [ctypes.c_char_p]\n  152|         self.lib.td_execute.restype = ctypes.c_char_p\n   ...\n  223| class UserDriver:\n  224|     def __init__(self, config, bot_config):\n  225|         self.config = config\n  226|         self.bot_config = bot_config\n  227|         self.client = TdClient(config)\n  228|         self.auth_state = None\n  229|         self.printed_qr_link = \"\"\n  230| \n  231|     def td_params(self):\n   ...\n  462| def prompt_secret(label):\n  463|     if not sys.stdin.isatty():\n  464|         raise DriverError(f\"{label.strip()} required; rerun with explicit flag in an interactive terminal.\")\n  465|     import getpass\n  466| \n  467|     return getpass.getpass(label)\n  468| \n  469| \n  470| def normalize_message(message, users=None):\n  471|     users = users or {}\n  472|     sender = message.get(\"sender_id\") or {}\n  473|     sender_id = sender.get(\"user_id\") or sender.get(\"chat_id\")\n  474|     sender_user = users.get(int(sender_id or 0), {}) if sender_id else {}\n  475|     content = message.get(\"content\") or {}\n  476|     text = \"\"\n  477|     if content.get(\"@type\") == \"messageText\":\n  478|         text = (content.get(\"text\") or {}).get(\"text\", \"\")\n   ...\n  496| def apply_template(text, sut):\n  497|     run = f\"USER-E2E-{int(time.time())}\"\n  498|     username = sut.get(\"username\", \"\")\n  499|     return text.replace(\"{run}\", run).replace(\"{sut}\", username), run\n  500| \n  501| \n  502| def print_result(payload, as_json=False, output=\"\"):\n  503|     if output:\n  504|         output_path = Path(output).expanduser()\n  505|         output_path.parent.mkdir(parents=True, exist_ok=True)\n  506|         output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + \"\\n\")\n  507|     if as_json:\n  508|         print(json.dumps(payload, indent=2, sort_keys=True))\n  509|     else:\n  510|         print(json.dumps(payload, indent=2, sort_keys=True))\n  511| \n  512| \n  513| def command_configure(args):\n  514|     config, _ = load_config()\n  515|     changed = False\n  516|     for arg_name, key in [\n  517|         (\"api_id\", \"apiId\"),\n  518|         (\"api_hash\", \"apiHash\"),\n  519|         (\"tdlib_path\", \"tdlibPath\"),\n  520|         (\"chat\", \"defaultChatId\"),\n  521|         (\"sut_username\", \"sutUsername\"),\n   ...\n  534| def command_doctor(args):\n  535|     config, bot_config = load_config()\n  536|     lib_path = find_tdjson(config)\n  537|     tdjson_loads = False\n  538|     tdjson_error = \"\"\n  539|     if lib_path:\n  540|         try:\n  541|             ctypes.CDLL(str(lib_path))\n  542|             tdjson_loads = True\n   ...\n  570| def command_login(args):\n  571|     config, bot_config = load_config()\n  572|     driver = UserDriver(config, bot_config)\n  573|     driver.authorize(args)\n  574|     me = driver.client.request({\"@type\": \"getMe\"})\n  575|     save_tester_identity(config, me)\n  576|     print_result({\"ok\": True, \"user\": public_user(me)}, args.json, getattr(args, \"output\", \"\"))\n  577| \n  578| \n  579| def command_status(args):\n  580|     config, bot_config = load_config()\n  581|     driver = UserDriver(config, bot_config)\n  582|     ready = driver.authorize(argparse.Namespace(timeout_ms=args.timeout_ms), need_ready=False)\n  583|     if not ready:\n  584|         print_result({\"ok\": False, \"authorized\": False, \"next\": \"login --qr\"}, args.json, getattr(args, \"output\", \"\"))\n  585|         sys.exit(1)\n  586|     me = driver.client.request({\"@type\": \"getMe\"})\n  587|     save_tester_identity(config, me)\n   ...\n  591| def command_confirm_qr(args):\n  592|     config, bot_config = load_config()\n  593|     driver = UserDriver(config, bot_config)\n  594|     driver.authorize(argparse.Namespace(timeout_ms=args.timeout_ms))\n  595|     result = driver.client.request({\"@type\": \"confirmQrCodeAuthentication\", \"link\": args.link}, timeout=30)\n  596|     print_result(\n  597|         {\n  598|             \"ok\": True,\n  599|             \"session\": {\n   ...\n  614| def command_terminate_session(args):\n  615|     config, bot_config = load_config()\n  616|     driver = UserDriver(config, bot_config)\n  617|     driver.authorize(argparse.Namespace(timeout_ms=args.timeout_ms))\n  618|     driver.client.request({\"@type\": \"terminateSession\", \"session_id\": int(args.session_id)}, timeout=30)\n  619|     print_result({\"ok\": True, \"sessionId\": args.session_id}, args.json, getattr(args, \"output\", \"\"))\n  620| \n  621| \n  622| def command_terminate_desktop_sessions(args):\n  623|     config, bot_config = load_config()\n  624|     driver = UserDriver(config, bot_config)\n  625|     driver.authorize(argparse.Namespace(timeout_ms=args.timeout_ms))\n  626|     result = driver.client.request({\"@type\": \"getActiveSessions\"}, timeout=30)\n  627|     terminated = []\n  628|     for session in result.get(\"sessions\", []):\n  629|         if session.get(\"is_current\"):\n  630|             continue\n   ...\n  641| def public_user(user):\n  642|     return {\n  643|         \"id\": user.get(\"id\"),\n  644|         \"firstName\": user.get(\"first_name\"),\n  645|         \"lastName\": user.get(\"last_name\"),\n  646|         \"username\": user.get(\"username\"),\n  647|         \"isBot\": user.get(\"type\", {}).get(\"@type\") == \"userTypeBot\",\n  648|     }\n  649| \n  650| \n  651| def save_tester_identity(config, user):\n  652|     config[\"testerUserId\"] = user.get(\"id\")\n  653|     config[\"testerUsername\"] = user.get(\"username\") or \"\"\n  654|     config[\"testerFirstName\"] = user.get(\"first_name\") or \"\"\n  655|     config[\"testerLastName\"] = user.get(\"last_name\") or \"\"\n  656|     write_json_private(CONFIG_PATH, config)\n  657| \n  658| \n  659| def command_send(args):\n  660|     config, bot_config = load_config()\n  661|     driver = UserDriver(config, bot_config)\n  662|     driver.authorize(argparse.Namespace(timeout_ms=args.timeout_ms))\n  663|     chat_id = driver.resolve_chat(args.chat)\n  664|     text, _run = apply_template(args.text, resolve_sut(config, bot_config))\n  665|     sent = driver.send_text(chat_id, text, args.reply_to, args.thread_id)\n  666|     print_result({\"ok\": True, \"sent\": normalize_message(sent)}, args.json, getattr(args, \"output\", \"\"))\n  667| \n  668| \n  669| def command_wait(args):\n  670|     config, bot_config = load_config()\n  671|     driver = UserDriver(config, bot_config)\n  672|     driver.authorize(argparse.Namespace(timeout_ms=args.timeout_ms))\n  673|     chat_id = driver.resolve_chat(args.chat)\n  674|     message, observed = driver.wait_for_message(chat_id, args, args.after_message_id)\n  675|     print_result(\n  676|         {\n  677|             \"ok\": bool(message),\n   ...\n  689| def command_probe(args):\n  690|     config, bot_config = load_config()\n  691|     driver = UserDriver(config, bot_config)\n  692|     driver.authorize(argparse.Namespace(timeout_ms=args.timeout_ms))\n  693|     sut = resolve_sut(config, bot_config)\n  694|     chat_id = driver.resolve_chat(args.chat)\n  695|     text, run = apply_template(args.text, sut)\n  696|     sent = driver.send_text(chat_id, text, args.reply_to)\n  697|     wait_args = argparse.Namespace(\n   ...\n  719| def command_transcript(args):\n  720|     config, bot_config = load_config()\n  721|     driver = UserDriver(config, bot_config)\n  722|     driver.authorize(argparse.Namespace(timeout_ms=args.timeout_ms))\n  723|     chat_id = driver.resolve_chat(args.chat)\n  724|     history = driver.client.request(\n  725|         {\n  726|             \"@type\": \"getChatHistory\",\n  727|             \"chat_id\": chat_id,\n   ...\n  738| def command_chats(args):\n  739|     config, bot_config = load_config()\n  740|     driver = UserDriver(config, bot_config)\n  741|     driver.authorize(argparse.Namespace(timeout_ms=args.timeout_ms))\n  742|     chats = driver.client.request(\n  743|         {\"@type\": \"getChats\", \"chat_list\": {\"@type\": \"chatListMain\"}, \"limit\": args.limit},\n  744|         timeout=20,\n  745|     )\n  746|     seen = set()\n   ...\n  763| def public_chat(chat, source):\n  764|     return {\n  765|         \"id\": chat.get(\"id\"),\n  766|         \"title\": chat.get(\"title\"),\n  767|         \"type\": (chat.get(\"type\") or {}).get(\"@type\"),\n  768|         \"unreadCount\": chat.get(\"unread_count\"),\n  769|         \"source\": source,\n  770|     }\n  771| \n  772| \n  773| def add_common(parser):\n  774|     parser.add_argument(\"--json\", action=\"store_true\")\n  775|     parser.add_argument(\"--output\", default=\"\")\n  776|     parser.add_argument(\"--timeout-ms\", type=int, default=120000)\n  777| \n  778| \n  779| def main():\n  780|     parser = argparse.ArgumentParser(description=\"Telegram real-user E2E driver backed by TDLib.\")\n  781|     sub = parser.add_subparsers(dest=\"command\", required=True)\n  782| \n  783|     configure = sub.add_parser(\"configure\")\n  784|     configure.add_argument(\"--api-id\")\n  785|     configure.add_argument(\"--api-hash\")\n  786|     configure.add_argument(\"--tdlib-path\")\n  787|     configure.add_argument(\"--chat\")\n\nTASK — How this codebase is written\nWrite exactly 4 sentences about the conventions and habits of\nthis codebase — how errors are handled, how modules are laid out, what the\nauthors clearly cared about.\nThese are readings, not facts. Every one of them will be marked inferred and\nshown as such; do not stretch for a quote to make one look verified.",
+  "windows": [
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 20,
+      "end": 49
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 84,
+      "end": 92
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 113,
+      "end": 121
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 147,
+      "end": 155
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 189,
+      "end": 215
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 322,
+      "end": 330
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 334,
+      "end": 355
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 360,
+      "end": 372
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 404,
+      "end": 412
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 430,
+      "end": 444
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 670,
+      "end": 678
+    },
+    {
+      "file": "scripts/release-telegram-candidate-archive.py",
+      "start": 726,
+      "end": 734
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 13,
+      "end": 82
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 99,
+      "end": 107
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 114,
+      "end": 122
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 134,
+      "end": 152
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 223,
+      "end": 231
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 462,
+      "end": 478
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 496,
+      "end": 521
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 534,
+      "end": 542
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 570,
+      "end": 587
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 591,
+      "end": 599
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 614,
+      "end": 630
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 641,
+      "end": 677
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 689,
+      "end": 697
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 719,
+      "end": 727
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 738,
+      "end": 746
+    },
+    {
+      "file": "scripts/e2e/telegram-user-driver.py",
+      "start": 763,
+      "end": 787
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "claims"
+    ],
+    "properties": {
+      "claims": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "status",
+            "cite"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "inferred"
+              ]
+            },
+            "cite": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "focus": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\out\\openclaw\\.trailhead\\narration\\9a3e83c46b336d0155b119158921e028a0779cd467adf3c1dbaa6831224efb49.json",
+  "pack": "C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\out\\openclaw\\.trailhead\\prompts\\9a3e83c46b336d0155b119158921e028a0779cd467adf3c1dbaa6831224efb49.json"
+}

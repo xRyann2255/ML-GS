@@ -1,0 +1,80 @@
+{
+  "contract": "trailhead/commands@1",
+  "env": "captured 2026-07-30, Windows 10, python 3.11.1",
+  "limits": {
+    "per_command_s": 60.0,
+    "budget_s": 120.0,
+    "policy": "safe"
+  },
+  "runs": [
+    {
+      "cmd": "python -c \"import volforecast\"",
+      "cwd": "src",
+      "exit": 0,
+      "dur_ms": 31,
+      "dur": "31 ms",
+      "started": "2026-07-30T20:25:09Z",
+      "timed_out": false,
+      "env": "captured 2026-07-30, Windows 10, python 3.11.1",
+      "out": "(no output)",
+      "argv": [
+        "C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "-c",
+        "import volforecast"
+      ],
+      "kind": "run",
+      "source": "src/pyproject.toml:50",
+      "truncated": false
+    },
+    {
+      "cmd": "python -m volforecast --help",
+      "cwd": "src",
+      "exit": 1,
+      "dur_ms": 62,
+      "dur": "62 ms",
+      "started": "2026-07-30T20:25:09Z",
+      "timed_out": false,
+      "env": "captured 2026-07-30, Windows 10, python 3.11.1",
+      "out": "Traceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\src\\volforecast\\__main__.py\", line 882, in <module>\n    sys.exit(main())\n             ^^^^^^\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\src\\volforecast\\__main__.py\", line 810, in main\n    parser = _build_parser()\n             ^^^^^^^^^^^^^^^\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\src\\volforecast\\__main__.py\", line 158, in _build_parser\n    from volforecast.cli.ingest_iv import register as _reg_ingest_iv\nModuleNotFoundError: No module named 'volforecast.cli.ingest_iv'",
+      "argv": [
+        "C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "-m",
+        "volforecast",
+        "--help"
+      ],
+      "kind": "run",
+      "source": "src/pyproject.toml:53",
+      "truncated": false,
+      "broken": "ModuleNotFoundError: No module named 'volforecast.cli.ingest_iv'",
+      "hypothesis": "An import of `volforecast.cli.ingest_iv` could not be resolved: either the module is missing from this environment or it does not exist in this repo."
+    },
+    {
+      "cmd": "python workspace/lint/lint_all.py",
+      "cwd": ".",
+      "exit": 1,
+      "dur_ms": 1250,
+      "dur": "1.2 s",
+      "started": "2026-07-30T20:25:09Z",
+      "timed_out": false,
+      "env": "captured 2026-07-30, Windows 10, python 3.11.1",
+      "out": "==================================================\nRunning all lint checks (max 4 parallel)\n==================================================\n  [....................] 1/21 skills structure\n  [#...................] 2/21 memory schema\n  [##..................] 3/21 secexpr safety\n  [###.................] 4/21 skills content\n  [####................] 5/21 memory priority\n  [#####...............] 6/21 hardcoded env\n  [######..............] 7/21 memory index completeness\n  [#######.............] 8/21 design rules\n  [########............] 9/21 registry drift\n  [#########...........] 10/21 forbidden patterns\n  [##########..........] 11/21 doc safety\n  [###########.........] 12/21 vscode tasks\n  [############........] 13/21 secrets\n  [#############.......] 14/21 args contract\n  [##############......] 15/21 model pins\n  [###############.....] 16/21 vscode md compat\n  [################....] 17/21 broken refs\n  [#################...] 18/21 vol parity\n  [##################..] 19/21 prompts\n  [###################.] 20/21 canonical schema\n  [####################] 21/21 wrapper targets\n  [####################] 21/21 done\n  PASS  secexpr safety  (0.1s)\n        Scanned 41 Python files under C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\skills\n        PASS: no secexpr safety violations.\n  PASS  hardcoded env  (0.3s)\n        Scanned 112 Python files\n        Kerberos IDs checked: ['piresm', 'ryanv']\n        PASS: no hardcoded environment values.\n  PASS  memory schema  (0.1s)\n        Validated 43 files in C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\memory\n        P0+P1 measured (bytes/4): ~48729 tokens; enforced (non-grandfathered): ~48729 (budget: 50000)\n        P2 measured (bytes/4): ~78222 tokens; enforced (non-grandfathered): ~78222 (budget: 100000)\n        P3 (memory-local .md only): 120 lines (no cap)\n        memory/**.md lines total: 5536\n        PASS: All files pass validation.\n  PASS  skills structure  (0.1s)\n        Scanned C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\skills\n        PASS: all skill folders follow the canonical structure.\n  PASS  forbidden patterns  (0.6s)\n        Scanned 365 files across ['skills', 'personas', 'workflows', 'policy', 'lint', 'memory', 'prompts', 'instructions']\n        PASS: no forbidden patterns.\n  PASS  skills content  (0.1s)\n          [WARN] advisory-section: BACKTEST\n                 Missing advisory section: ## Troubleshooting\n          [WARN] advisory-section: DATA_AUDIT\n                 Missing advisory section: ## Troubleshooting\n          [WARN] advisory-section: DATA_INGEST\n                 Missing advisory section: ## Troubleshooting\n          [WARN] advisory-section: EVALUATE\n                 Missing advisory section: ## Troubleshooting\n          [WARN] advisory-section: FEATURE_BUILD\n                 Missing advisory section: ## Troubleshooting\n          [WARN] advisory-section: GIT_COMMIT\n                 Missing advisory section: ## Troubleshooting\n          [WARN] advisory-section: MODEL_TRAIN\n                 Missing advisory section: ## Troubleshooting\n          [WARN] advisory-section: NOTEBOOK\n                 Missing advisory section: ## Troubleshooting\n          [WARN] advisory-section: RESEARCH\n                 Missing advisory section: ## Troubleshooting\n          [WARN] advisory-section: SLANG_TEST_COVERAGE\n                 Missing advisory section: ## Troubleshooting\n        Scanned 48 skill(s) in C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\skills\n        PASS (with 10 warning(s) — run --strict to treat as errors)\n  PASS  memory priority  (0.1s)\n        P0: 1 files, claimed ~734 tokens (cap: 800)\n        P1: 29 files | P2: 18 files (exempt) | P3: 27 files (exempt)\n          INFO  [p0-budget] P0 measured (bytes/4): ~734 tokens across 1 files; non-grandfathered ~734 vs cap 800.\n          INFO  [p1-budget] P1 measured (bytes/4): ~47995 tokens across 29 files; non-grandfathered ~47995.\n          WARN  [reachability] research/project-scope-and-data.md (P1) is orphaned — not referenced by any skill, persona, workflow, or prompt. Add a reference or downgrade/remove.\n          WARN  [reachability] research/qlike-defense.md (P1) is orphaned — not referenced by any skill, persona, workflow, or prompt. Add a reference or downgrade/remove.\n          WARN  [reachability] ref/terminal-commands.md (P1) is orphaned — not referenced by any skill, persona, workflow, or prompt. Add a reference or downgrade/remove.\n          WARN  [reachability] ref/skill-routing.md (P1) is orphaned — not referenced by any skill, persona, workflow, or prompt. Add a reference or downgrade/remove.\n        PASS (with 4 warning(s))\n  PASS  design rules  (0.3s)\n          [....................] 1/26 coala-sections\n          [#...................] 2/26 structural\n          [##..................] 3/26 persona-purity\n… 182 lines elided\n          [WARN] broken-link: workspace/research/INDEX.md:13\n                 Link [trials.yaml](trials.yaml) -- target not found: C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\workspace\\research\\trials.yaml\n          [WARN] broken-link: workspace/research/research-journal.md:113\n                 Link [trials.yaml#L2997-L3200](trials.yaml#L2997-L3200) -- target not found: C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\workspace\\research\\trials.yaml\n          [WARN] broken-link: workspace/research/research-journal.md:147\n                 Link [trials.yaml#L3329](trials.yaml#L3329) -- target not found: C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\workspace\\research\\trials.yaml\n          [WARN] broken-link: workspace/research/research-journal.md:424\n                 Link [workspace/research/trials.yaml](workspace/research/trials.yaml) -- target not found: C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\workspace\\research\\workspace\\research\\trials.yaml\n          [WARN] broken-link: workspace/research/research-journal.md:459\n                 Link [memory/research/project-state.md](memory/research/project-state.md) -- target not found: C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\workspace\\research\\memory\\research\\project-state.md\n          [WARN] broken-link: workspace/research/research-journal.md:459\n                 Link [workspace/research/trials.yaml](workspace/research/trials.yaml) -- target not found: C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\\workspace\\research\\workspace\\research\\trials.yaml\n        Scanned 276 .md file(s) in C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\restored\n        PASS (with 38 warning(s))\n  PASS  vscode tasks  (0.1s)\n        Scanned 45 task(s) in tasks.json\n        PASS: all 45 tasks comply with VS Code task policy.\n  PASS  secrets  (0.1s)\n        lint_secrets: OK (0 findings)\n  PASS  args contract  (0.1s)\n        PASS: 76 task args-file values and 83 docs honor the fixed args contract.\n  PASS  model pins  (0.2s)\n        PASS: model pin literals confined to prompt frontmatter (== 'Claude Opus 4.6') and 1 grandfathered files.\n  PASS  wrapper targets  (0.2s)\n        PASS: 41 wrapper targets across 78 wrappers exist and parse.\n  PASS  vol parity  (0.1s)\n        PASS: 37 vol commands in full parity with vol-cli.md and vol help.\n  PASS  prompts  (0.1s)\n          NOTICE [index] .github/prompts/INDEX.md absent — bijection check activates when Plan 07 lands it\n        PASS: 34 prompts hygienic (10 grandfathered until Plan 07).\n  FAIL  canonical schema  (0.1s)\n        [stderr]          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        [stderr]   File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\pathlib.py\", line 1044, in open\n        [stderr]     return io.open(self, mode, buffering, encoding, errors, newline)\n        [stderr]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        [stderr] FileNotFoundError: [Errno 2] No such file or directory: 'C:\\\\Users\\\\ryanv\\\\Documents\\\\Projects\\\\ML-GS\\\\hackathon\\\\restored\\\\src\\\\volforecast\\\\config.py'\n==================================================\nFAILED (2/21): broken refs, canonical schema\nTotal: 4.4s",
+      "argv": [
+        "C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "workspace/lint/lint_all.py"
+      ],
+      "kind": "lint",
+      "source": ".pre-commit-config.yaml:17 hook workspace-lint entry",
+      "truncated": true,
+      "broken": "FAILED (2/21): broken refs, canonical schema"
+    }
+  ],
+  "skipped": [
+    {
+      "cmd": "python -m pytest --collect-only -q tests",
+      "cwd": "src",
+      "kind": "test",
+      "source": "src/pyproject.toml:79",
+      "reason": "pytest not importable under the resolved interpreter"
+    }
+  ]
+}
