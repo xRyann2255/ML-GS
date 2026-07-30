@@ -29,11 +29,11 @@ hackathon/
 │   ├── walkthrough-spec.md      full spec for the generated HTML artifact
 │   └── verified-contract.md     FROZEN generator↔render contract — read first
 ├── demo/
-│   └── trailhead-demo.html      working front-end, synthetic repo, 65 KB
+│   └── trailhead-demo.html      working front-end, two repos, 125 KB
 ├── tools/
 │   ├── check-bundle.js          structural checks (spec §1, tests 1 + 12)
 │   ├── verify-contract.js       anchor + sha256 + contract checks (tests 3–6)
-│   └── inline-fixture.js        splice a verified.json into the demo bundle
+│   └── inline-fixture.js        splice verified.json payloads into the bundle
 ├── src/trailhead/               generator package — not started
 ├── tests/                       generator tests — not started
 └── fixtures/
@@ -62,6 +62,13 @@ node tools/inline-fixture.js
 `verify-contract.js` re-checks every anchor in the embedded data and asserts the
 top-bar report matches what the page actually shows. It has already caught one
 real inconsistency (badge said 2 failing commands, page displayed 1).
+
+**The demo bundle carries two payloads, one per repo**, with a switcher in the top
+bar, so the synthetic walkthrough and the real one share a renderer instead of
+shipping as two near-identical files (177 KB → 125 KB). That is a demo
+convenience only: a real generated artifact carries exactly one payload, and
+nothing below `D` in the renderer can tell the difference. The gate checks every
+payload in the bundle, so both are held to the same contract.
 
 ---
 
