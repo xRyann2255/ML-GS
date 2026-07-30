@@ -25,8 +25,41 @@ console.log(`\n${path.relative(process.cwd(), file)}  ${kb.toFixed(1)} KB\n`);
 // --- 1. no external requests -------------------------------------------------
 // Namespace URIs inside inline SVG (xmlns=) are declarations, not fetches, and
 // are deliberately excluded. Anything in src/href/fetch/import is a real load.
-const loaders = src.match(/(?:\bsrc|\bhref|\bfetch|\bimport)\s*[=(]\s*["']?\s*(?:https?:)?\/\//g) || [];
-check(loaders.length === 0, 'zero external loads (src/href/fetch/import)', loaders.join(' ') || 'none');
+//
+// `href` is the one attribute that is not inherently a load. On <link> it is —
+// and <link> is banned outright below. On <a> it is a click-time navigation that
+// costs nothing at page load, so prerequisite install links leave the offline
+// guarantee (spec §1) intact: the page still opens and renders complete with the
+// network off. Anchors are therefore excised before this grep and held to a
+// stricter rule of their own in 1b.
+const ANCHOR = /<a\b[^>]*>/gi;
+const loaders = src.replace(ANCHOR, '')
+  .match(/(?:\bsrc|\bhref|\bfetch|\bimport)\s*[=(]\s*["']?\s*(?:https?:)?\/\//g) || [];
+check(loaders.length === 0, 'zero external loads (src/href/fetch/import, <a> excluded)',
+  loaders.join(' ') || 'none');
+
+// --- 1b. anchors: navigation is allowed, unsafe navigation is not ------------
+// Every <a> the renderer can emit must be reachable-but-inert: a real scheme, and
+// noopener/noreferrer so a target=_blank tab cannot reach back through
+// window.opener. Checked against the literal tags in source, which is where the
+// renderer's templates live — so this proves the renderer *always* emits them.
+// Comments are stripped first: prose that merely *mentions* <a href> is not an
+// anchor, and a gate that fails on how a comment is worded is a gate people
+// route around. Block and HTML comments only — stripping // to end-of-line
+// would eat the "//" in every https:// URL in the payload.
+const anchors = (src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').match(ANCHOR)) || [];
+const hrefOf = a => (a.match(/href\s*=\s*"([^"]*)"/i) || [])[1];
+const badScheme = anchors.filter(a => {
+  const h = hrefOf(a);
+  // a templated href (href="${...}") is validated in the renderer and by
+  // verify-contract.js against the payload; only literals are judged here
+  return h !== undefined && !h.startsWith('${') && !/^(https?:\/\/|#|mailto:)/i.test(h);
+});
+check(badScheme.length === 0, 'anchor hrefs are http(s), # or mailto only', badScheme.join(' ') || 'none');
+const noRel = anchors.filter(a =>
+  !/rel\s*=\s*["'][^"']*\bnoopener\b/i.test(a) || !/rel\s*=\s*["'][^"']*\bnoreferrer\b/i.test(a));
+check(noRel.length === 0, 'every <a> carries rel="noopener noreferrer"', noRel.join(' ') || 'none');
+if (anchors.length) console.log(`  note  ${anchors.length} anchor template(s) — navigation only, nothing fetched at load`);
 
 const linkTags = src.match(/<link\b[^>]*>/gi) || [];
 check(linkTags.length === 0, 'no <link> tags', linkTags.join(' ') || 'none');

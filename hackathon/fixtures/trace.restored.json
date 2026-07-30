@@ -1,0 +1,143 @@
+{
+  "contract": "trailhead/trace@1",
+  "repo": "restored",
+  "note": "Hand-specified trace for hackathon/restored (plan decision 25, Appendix A.3). Read off disk, not transcribed. Each hop is ONE contiguous window of at most 24 lines with every focus line inside it, because an anchor is a single start..end range. `quote` and `focus` are the verbatim text VERIFY resolves; `start`, `end` and `focus_lines` are what that resolution should reproduce and exist so the test can catch the file moving underneath us.",
+  "provenance": "INPUT, NOT OUTPUT. `chain.py` — the generic call-chain walker that would have discovered these hops — was cut at hour 0 (decision 25), so these eight hops were located by a human reading the repo and are checked in as a per-repo input. The pipeline re-reads and sha256-matches every one of them against the working tree at build time, exactly as strictly as it does a model claim, and deletes any that no longer resolve — that part is real and deterministic. But it did not FIND them. Do not report the resulting anchor count as a genericity result: on a repo that ships no `fixtures/trace.<name>.json` the trace stop degrades to the §9 row 1 labelled callout with zero anchored hops, by design and visibly. `cli._hops_for` says exactly this under the claim counts on every run, and the rule for the pitch is the same — the trace stop is presented as hand-verified, never as generated.",
+  "lookup_key": "This file is found by FILENAME, not by content: `cli._hops_for` builds `fixtures/trace.{key}.json` and then additionally requires the `repo` field above to equal that same `{key}`. **The key is `survey.repo.dir`, the checkout directory — not `survey.repo.name`.** Survey resolves `name` to what the project calls ITSELF (`[project] name` in `restored/src/pyproject.toml`, i.e. `volforecast`) and carries the directory separately as `repo.dir`; a hand-specified trace is a property of this checkout on this disk, so `dir` is the key it is filed under. Both the filename and the `repo` field above are therefore `restored`, which is also what `compose.HOPS_FIXTURE` hard-codes and what `tests/test_compose.py`, `tests/test_checkpoints.py` and `tests/test_genericity.py` all key on. Keying on `name` instead builds `fixtures/trace.volforecast.json`, misses, and deletes all eight anchors and `cp-c2` in silence — \"no fixture\" and \"wrong filename\" degrade identically, so nothing says which one happened. Change the `repo` field here only in lockstep with the filename, those four consumers, and `cli._hops_for`'s key.",
+  "hops": [
+    {
+      "file": "vol",
+      "start": 308,
+      "end": 318,
+      "focus_lines": [
+        313,
+        314
+      ],
+      "symbol": "ingest-ohlcv",
+      "claim": "The vol wrapper dispatches on the subcommand name and re-enters the repo through python -m volforecast.",
+      "quote": "        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast refresh-ohlcv \"$@\"\n        ;;\n    ingest-edrvol)\n        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast ingest-edrvol \"$@\"\n        ;;\n    ingest-ohlcv)\n        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast ingest-ohlcv \"$@\"\n        ;;\n    ingest-ticks)\n        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast ingest-ticks \"$@\"\n        ;;",
+      "focus": [
+        "    ingest-ohlcv)",
+        "        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast ingest-ohlcv \"$@\""
+      ]
+    },
+    {
+      "file": "src/volforecast/__main__.py",
+      "start": 809,
+      "end": 815,
+      "focus_lines": [
+        809,
+        810
+      ],
+      "symbol": "main",
+      "claim": "python -m volforecast lands in main(), which builds the whole parser before it looks at a single argument.",
+      "quote": "def main(argv: list[str] | None = None) -> int:\n    parser = _build_parser()\n    args = parser.parse_args(argv)\n\n    if args.command is None:\n        parser.print_help()\n        return 0",
+      "focus": [
+        "def main(argv: list[str] | None = None) -> int:",
+        "    parser = _build_parser()"
+      ]
+    },
+    {
+      "file": "src/volforecast/__main__.py",
+      "start": 190,
+      "end": 195,
+      "focus_lines": [
+        193,
+        195
+      ],
+      "symbol": "_build_parser",
+      "claim": "The parser is assembled by importing one register function per subcommand and calling it with the shared subparsers object.",
+      "quote": "    _reg_ingest_vix_futures(subparsers)\n\n    # ─── UTILITY: vol ingest-ohlcv ───\n    from volforecast.cli.ingest_ohlcv import register as _reg_ingest_ohlcv\n\n    _reg_ingest_ohlcv(subparsers)",
+      "focus": [
+        "    from volforecast.cli.ingest_ohlcv import register as _reg_ingest_ohlcv",
+        "    _reg_ingest_ohlcv(subparsers)"
+      ]
+    },
+    {
+      "file": "src/volforecast/cli/ingest_ohlcv.py",
+      "start": 108,
+      "end": 116,
+      "focus_lines": [
+        108,
+        112,
+        113
+      ],
+      "symbol": "register",
+      "claim": "register() adds the ingest-ohlcv subparser; the literal string here is the subcommand name the wrapper matched.",
+      "quote": "def register(subparsers) -> None:\n    \"\"\"Register the ingest-ohlcv subcommand.\"\"\"\n    import argparse\n\n    parser = subparsers.add_parser(\n        \"ingest-ohlcv\",\n        help=\"Fetch split-adjusted daily OHLCV from TSDB eqpad_ for all symbols\",\n    )\n    parser.add_argument(",
+      "focus": [
+        "def register(subparsers) -> None:",
+        "    parser = subparsers.add_parser(",
+        "        \"ingest-ohlcv\","
+      ]
+    },
+    {
+      "file": "src/volforecast/cli/ingest_ohlcv.py",
+      "start": 133,
+      "end": 143,
+      "focus_lines": [
+        133,
+        136,
+        143
+      ],
+      "symbol": "handle",
+      "claim": "set_defaults binds handle() to that subparser, and handle() resolves the date range before calling run().",
+      "quote": "    parser.set_defaults(func=handle)\n\n\ndef handle(args) -> int:\n    \"\"\"Execute ingest-ohlcv command. Return exit code.\"\"\"\n    from datetime import timedelta\n\n    start = date.fromisoformat(args.start)\n    end = date.fromisoformat(args.end if args.end else (date.today() - timedelta(days=1)).isoformat())\n    symbols = args.symbols.split(\",\") if args.symbols else None\n    return run(start, end, symbols=symbols, force=args.force)",
+      "focus": [
+        "    parser.set_defaults(func=handle)",
+        "def handle(args) -> int:",
+        "    return run(start, end, symbols=symbols, force=args.force)"
+      ]
+    },
+    {
+      "file": "src/volforecast/cli/ingest_ohlcv.py",
+      "start": 74,
+      "end": 85,
+      "focus_lines": [
+        77,
+        82
+      ],
+      "symbol": "run",
+      "claim": "run() fetches one symbol at a time and hands each non-empty frame to the cache writer.",
+      "quote": "                    continue\n\n            try:\n                df = fetch_ohlcv(sym, start_date, end_date)\n                if df.empty:\n                    sp.log(f\"{sym}: no data returned\")\n                    failed.append(sym)\n                else:\n                    save_ohlcv_cache(sym, df)\n                    record_ingestion_yaml(\n                        \"ohlcv\",\n                        sym,",
+      "focus": [
+        "                df = fetch_ohlcv(sym, start_date, end_date)",
+        "                    save_ohlcv_cache(sym, df)"
+      ]
+    },
+    {
+      "file": "src/volforecast/data/ohlcv.py",
+      "start": 180,
+      "end": 193,
+      "focus_lines": [
+        184,
+        185,
+        193
+      ],
+      "symbol": "save_ohlcv_cache",
+      "claim": "The cache writer writes a temporary parquet file and renames it into place, so a reader never sees a half-written file.",
+      "quote": "    # Atomic write: write to temp file then rename\n    fd, tmp = tempfile.mkstemp(suffix=\".parquet\", dir=str(path.parent))\n    try:\n        os.close(fd)\n        df.to_parquet(tmp)\n        os.replace(tmp, str(path))\n    except BaseException:\n        try:\n            os.unlink(tmp)\n        except OSError:\n            pass\n        raise\n\n    return path",
+      "focus": [
+        "        df.to_parquet(tmp)",
+        "        os.replace(tmp, str(path))",
+        "    return path"
+      ]
+    },
+    {
+      "file": "src/volforecast/utils/paths.py",
+      "start": 84,
+      "end": 90,
+      "focus_lines": [
+        88,
+        90
+      ],
+      "symbol": "ohlcv_cache_path",
+      "claim": "The destination path is derived from the data root and the symbol name; nothing later in the chain decides where the file lands.",
+      "quote": "    \"\"\"Absolute path to data/raw/ohlcv/ (daily OHLCV from TSDB).\"\"\"\n    return data_path(\"raw/ohlcv\")\n\n\ndef ohlcv_cache_path(symbol: str) -> Path:\n    \"\"\"Parquet path for a symbol's daily OHLCV: data/raw/ohlcv/{SYMBOL}.parquet.\"\"\"\n    return data_path(\"raw/ohlcv\", f\"{symbol}.parquet\")",
+      "focus": [
+        "def ohlcv_cache_path(symbol: str) -> Path:",
+        "    return data_path(\"raw/ohlcv\", f\"{symbol}.parquet\")"
+      ]
+    }
+  ]
+}

@@ -117,7 +117,7 @@ function anchor(an, who) {
   else hashed++;
 }
 
-let claims = 0, inferred = 0, cps = 0, cmds = 0, preds = 0;
+let claims = 0, inferred = 0, cps = 0, cmds = 0, preds = 0, links = 0, lsteps = 0;
 for (const s of stops) for (const bl of s.blocks) {
   switch (bl.type) {
     case 'prose':
@@ -178,7 +178,68 @@ for (const s of stops) for (const bl of s.blocks) {
     case 'table':
       if (bl.rows.some(r => r.length !== bl.columns.length)) bad('table row/column mismatch');
       break;
-    case 'graph': case 'callout': case 'ledger': break;
+    case 'callout':
+      // @2: optional `links[]` pointing at where to install what `text` names.
+      // The renderer whitelists the scheme at paint time and shows a refusal chip
+      // for anything else; this asserts the payload never carries one that would
+      // be refused, so that chip appearing on screen can only mean a bug here.
+      for (const l of bl.links || []) {
+        links++;
+        if (!l.label || !String(l.label).trim()) bad(`callout "${bl.title}": link with no label`);
+        if (!/^https?:\/\//i.test(l.href || ''))
+          bad(`callout "${bl.title}": link href ${JSON.stringify(l.href)} is not http(s) — render would refuse it`);
+      }
+      if (bl.linknote !== undefined && !bl.links) bad(`callout "${bl.title}": linknote with no links`);
+      break;
+    case 'lineage': {
+      // A lineage step claiming VERIFIED must be able to prove it, exactly as a
+      // prose claim must. Two exemptions are deliberate: a RUNTIME step is
+      // evidenced by captured output rather than a line range, and a DERIVED
+      // step may or may not cite one. INFERRED must not — an anchor is what
+      // makes a step render as evidenced.
+      const STATUS = new Set(['verified', 'derived', 'inferred']);
+      const EVIDENCE = new Set(['source', 'runtime', 'test', 'config', 'graph', 'git', 'inference']);
+      const ents = bl.entities || [];
+      if (!ents.length) bad('lineage block carries no entities');
+      const seen = new Set();
+      for (const e of ents) {
+        const who = `lineage/${e.id || '(no id)'}`;
+        if (!e.id) bad(`${who}: entity has no id`);
+        if (seen.has(e.id)) bad(`${who}: duplicate entity id`);
+        seen.add(e.id);
+        if (!e.name) bad(`${who}: entity has no name`);
+        if (!e.meaning) bad(`${who}: entity has no business meaning`);
+        if (!Array.isArray(e.steps) || !e.steps.length) bad(`${who}: entity has no steps`);
+        for (const [i, s] of (e.steps || []).entries()) {
+          const sw = `${who}[${i}] ${s.stage || '?'}`;
+          lsteps++;
+          if (!s.stage) bad(`${sw}: step has no stage`);
+          if (!s.label) bad(`${sw}: step has no label`);
+          if (!s.description) bad(`${sw}: step has no description`);
+          if (!EVIDENCE.has(s.evidence_type)) bad(`${sw}: unknown evidence_type ${JSON.stringify(s.evidence_type)}`);
+          if (!STATUS.has(s.status)) bad(`${sw}: unknown status ${JSON.stringify(s.status)}`);
+          if (s.status === 'inferred' && s.anchor)
+            bad(`${sw}: inferred step carries an anchor — it would render as evidenced`);
+          if (s.status === 'verified' && s.evidence_type !== 'runtime' && !s.anchor)
+            bad(`${sw}: verified step carries no anchor`);
+          if (s.anchor) anchor(s.anchor, sw);
+        }
+        if (e.failure_mode) {
+          if (!e.failure_mode.text) bad(`${who}: failure_mode has no text`);
+          if (!STATUS.has(e.failure_mode.status)) bad(`${who}: failure_mode status ${JSON.stringify(e.failure_mode.status)}`);
+          if (e.failure_mode.anchor) anchor(e.failure_mode.anchor, `${who}/failure`);
+        }
+        if (e.boundary) {
+          if (!e.boundary.text) bad(`${who}: boundary has no text`);
+          // A boundary is by definition what could not be established here.
+          // Calling one verified would claim knowledge of what lies outside.
+          if (e.boundary.status === 'verified') bad(`${who}: a repository boundary cannot be verified`);
+        }
+        if (e.tests !== undefined && !Array.isArray(e.tests)) bad(`${who}: tests must be an array`);
+      }
+      break;
+    }
+    case 'graph': case 'ledger': break;
     default: bad(`unknown block type: ${bl.type}`);
   }
 }
@@ -203,6 +264,6 @@ for (const e of D.map.edges) {
   if (!nodeIds.has(e.b)) bad(`edge references unknown node ${e.b}`);
 }
 
-console.log(`rendered claims ${claims} (inferred ${inferred}) | checkpoints ${cps} | predictions ${preds} | commands ${cmds} | dropped ${D.dropped.length}`);
+console.log(`rendered claims ${claims} (inferred ${inferred}) | checkpoints ${cps} | predictions ${preds} | lineage steps ${lsteps} | commands ${cmds} | links ${links} | dropped ${D.dropped.length}`);
 console.log(`anchors sha256-verified ${hashed}`);
 }

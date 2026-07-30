@@ -1,0 +1,25 @@
+{
+  "repo": "flat_script",
+  "proves": "Root-cascade terminal fallback (no __init__.py, no pyproject), zero internal edges, fewer than three map nodes, and cp-a dropped because four real options cannot be assembled from three files.",
+  "plan": ["11.1", "3.2 rule 5", "4.1 rule 4", "4.4", "9 row 1", "9 row 2", "9 row 4", "9 row 8"],
+  "invocation": "--provider stub --run-commands none",
+  "degradation_rows": [1, 2, 4, 7, 8],
+  "degradations": ["no_trace", "no_test_command", "few_modules", "narration_budget", "no_commands", "stop_dropped"],
+  "degradations_if_no_churn": ["no_churn"],
+  "stop_drops": {
+    "cp-a": "no survey answer key for cp-a1, cp-a2",
+    "cp-c": "no traceable entry point, so the trace stop was not generated"
+  },
+  "map_nodes": 1,
+  "notes": [
+    "VOCABULARY IS MEASURED, NOT GUESSED -- see hazards/expect.json note 1 for the full reconciliation. no_entry_point -> no_trace, stops_dropped -> stop_dropped, and narration_budget + no_commands are genuinely emitted under the invocation above.",
+    "roots.rule must land on cascade step 5: every directory holding a .py is its own import root and module names are bare stems (main, stats, report).",
+    "edges is [] by construction -- no module here imports another. That is the C=1 layout guard of 4.2 step 5 and the ZeroDivisionError that qrt reproduces.",
+    "cp-a drops because BOTH questions refuse, and neither refuses on the directory count the plan's row 8 quotes. cp-a1 needs >=4 rankable files (checkpoints.MIN_OPTIONS) and there are three. cp-a2 needs an entry point -- which this repo HAS -- plus three distinct distractor files, and three files minus the answer's own leaves two. Never pad options with invented distractors: that is decision 15 and non-negotiable 6.",
+    "main.py carries an if __name__ guard, so entry_points is NOT empty -- row 1 fires on the fewer-than-two-hops half of its trigger, not the no-entry-point half. Every fixture repo hits that half regardless, because hops are hand-specified per decision 25 and only restored/ ships a fixtures/trace.*.json. no_entry/ covers the other half of the trigger on the survey side.",
+    "add_parser() supplies two literal subcommand names (3.5)."
+  ],
+  "gaps": [
+    "This run proves nothing about verify's drop path: with --provider stub and no narration store, 0 units narrate, report.dropped is [] and resolve-and-delete is never entered. See nested_root/expect.json gaps."
+  ]
+}

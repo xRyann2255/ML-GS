@@ -166,7 +166,7 @@ Both sides must compute it identically or every anchor drops:
 
 ## Block types — the complete set
 
-RENDER implements exactly these nine and nothing more.
+RENDER implements exactly these ten and nothing more.
 
 | `type` | Fields |
 |---|---|
@@ -179,6 +179,7 @@ RENDER implements exactly these nine and nothing more.
 | `checkpoint` | `id`, `kind`, `prompt`, `options[]`, `answer`, `provenance`, `explanation` |
 | `callout` | `level`, `title`, `text` |
 | `ledger` | *(none — renders `report` + `dropped`)* |
+| `lineage` | `title`, `entities[]` |
 
 Notes that the gate enforces:
 
@@ -206,6 +207,61 @@ Notes that the gate enforces:
   (spec §4.7).
 - **`excerpt`** is specified and supported by the gate but unused in the current
   fixture; the demo shows excerpts through claim markers and `trace` instead.
+
+### `lineage` — where values come from
+
+Execution flow says function A calls function B. Lineage says a value originates
+at Y, is rewritten by B, and decides Z. The unit is the value, not the call, so
+the stages are fixed rather than discovered and the block sits beside `trace`
+rather than replacing it.
+
+```jsonc
+{ "type": "lineage", "title": "Data Sources & Lineage",
+  "entities": [
+    { "id": "payload", "name": "The verified payload",
+      "meaning": "Why the repository needs this data.",
+      "status": "verified",
+      "steps": [
+        { "stage": "SOURCE", "label": "Fixture on disk",
+          "description": "One sentence on what happens here.",
+          "evidence_type": "config", "status": "verified",
+          "anchor": { "file": "…", "start": 25, "end": 28, "sha256": "…" } }
+      ],
+      "failure_mode": { "text": "What happens when it is missing or invalid.",
+                        "status": "verified", "anchor": { } },
+      "boundary":     { "text": "Where the visible lineage stops.", "status": "inferred" },
+      "tests":        [ { "label": "…", "kind": "runtime", "note": "…" } ] } ] }
+```
+
+`stage` is free text rendered as a small uppercase label — `SOURCE`, `INGESTION`,
+`VALIDATION`, `PARSE`, `TRANSFORM`, `CONSUMER`, `OUTCOME` are the ones in use.
+
+`evidence_type` is one of `source` · `runtime` · `test` · `config` · `graph` ·
+`git` · `inference`, shown as quiet uppercase text beside the status.
+
+**`status` on a step is `verified`, `derived` or `inferred`** — a third state the
+rest of the contract does not have, because a lineage edge is often computed from
+the call or import graph rather than read off one line. The gate enforces what
+each may carry:
+
+- `verified` **must** have an anchor, unless `evidence_type` is `runtime` — that
+  evidence is captured output, not a line range.
+- `derived` **may** have one. The anchor proves the code exists; the derivation is
+  the reasoning laid over it, and the status label says so on screen.
+- `inferred` **must not**. An anchor is what makes a step render as evidenced.
+
+**A `boundary` can never be `verified`.** It is by definition the thing that could
+not be established from this repository; calling it verified would claim knowledge
+of what lies outside. The gate fails a payload that tries.
+
+`tests` may be empty, and the renderer says *"No direct test was found for this
+data flow"* rather than omitting the row — an absent test is information.
+
+Unresolvable steps are **downgraded, not deleted**, unlike a trace hop. `SOURCE →
+… → OUTCOME` is a fixed shape and removing its middle would misrepresent the flow
+rather than shorten it: a reader would see INGESTION feeding CONSUMER and conclude
+no transform happened. The step keeps its place, loses its anchor, becomes
+`inferred`, and the drop is still recorded in the ledger.
 
 ## `dropped` — the ledger
 

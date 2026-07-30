@@ -18,7 +18,24 @@
 | Browser floor | Chrome/Edge 110+ | No build step, no framework, no polyfills |
 | Works offline after generation | Yes | Reviewers open it on a train |
 
-**Build-time invariant:** render fails if the output contains `http://` or `https://` in any `src`, `href`, `fetch`, or `import`. One grep, enforced in CI.
+**Build-time invariant:** render fails if the output contains `http://` or `https://` in any `src`, `fetch`, `import`, or in `href` on any element **other than `<a>`**. One grep, enforced in CI.
+
+**The `<a>` carve-out.** The constraint above exists because the page must load with
+the network off, not because URLs are forbidden ink. An `<a href>` issues no request
+at load — it is a click-time navigation — so it costs the offline guarantee nothing:
+the page still opens from `file://` and renders complete. Prerequisite install links
+are the one place this is worth spending, because a walkthrough that says "you need
+Poetry 1.7+" and then makes the reader go find it has stopped onboarding them at the
+first step. The carve-out is paid for with three rules, all gated:
+
+- anchors carry `rel="noopener noreferrer"`, always (`check-bundle.js`)
+- anchor `href` is `http(s)`, `#`, or `mailto:` and nothing else (`check-bundle.js`)
+- every `links[]` entry in the payload is `http(s)` with a non-empty label (`verify-contract.js`);
+  the renderer independently whitelists the scheme and paints a visible refusal chip
+  for anything else, so a bad URL in a data file can never become a live anchor
+
+Anchors remain banned everywhere except `callout.links[]`. Nothing in the artifact
+fetches anything, ever.
 
 **One artifact, one repo.** The checked-in demo bundle is the exception: it carries
 one payload per repo behind a top-bar switcher so two walkthroughs can share a
@@ -296,7 +313,7 @@ Block types — the complete set. Render implements exactly these and nothing mo
 | `table` | `columns[]`, `rows[]` (cells may be claims), `caption`, `sortable` |
 | `trace` | `steps[]` = `{ claim, anchor, next, predict? }` |
 | `checkpoint` | see 4.5 |
-| `callout` | `level`, `title`, `text` |
+| `callout` | `level`, `title`, `text`, `links?[]` = `{ label, href, note? }`, `linknote?` |
 | `ledger` | *(none — renders `report` + `dropped`)* |
 
 ---
@@ -341,7 +358,7 @@ Run against a generated file. All deterministic; no model needed.
 
 | # | Test |
 |---|---|
-| 1 | Output is a single file; zero external URLs in `src`/`href`/`fetch`/`import` |
+| 1 | Output is a single file; zero external URLs in `src`/`fetch`/`import`, and in `href` outside `<a>`. Every `<a>` is `http(s)`/`#`/`mailto:` and carries `rel="noopener noreferrer"` |
 | 2 | Opens from `file://` with the network disabled; graph, checkpoints, and toggles all work |
 | 3 | Every rendered claim marker resolves to an embedded excerpt; every excerpt's `sha256` matches the source file at the recorded commit |
 | 4 | No claim with `status: dropped` appears anywhere outside the audit ledger |

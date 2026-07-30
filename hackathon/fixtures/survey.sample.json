@@ -1,0 +1,142 @@
+{
+  "contract": "trailhead/survey@1",
+  "repo": {
+    "name": "payments-core",
+    "root": "/work/payments-core",
+    "commit": "a3f9c21",
+    "branch": "main",
+    "surveyed_at": "2026-07-30T13:58:04Z"
+  },
+  "stats": {
+    "files": 128,
+    "py_files": 68,
+    "loc": 11660,
+    "modules": 6,
+    "external_deps": ["fastapi", "pydantic", "numpy", "scipy", "httpx"]
+  },
+  "files": [
+    { "path": "src/api/app.py", "module": "src.api.app", "loc": 214, "commits": 41, "last_commit": "2026-07-02", "authors": ["r.vincent", "a.okafor"] },
+    { "path": "src/api/schemas.py", "module": "src.api.schemas", "loc": 168, "commits": 28, "last_commit": "2026-06-28", "authors": ["a.okafor"] },
+    { "path": "src/api/serializers.py", "module": "src.api.serializers", "loc": 94, "commits": 12, "last_commit": "2026-05-19", "authors": ["a.okafor", "d.mensah"] },
+    { "path": "src/instruments/factory.py", "module": "src.instruments.factory", "loc": 187, "commits": 33, "last_commit": "2026-07-11", "authors": ["d.mensah"] },
+    { "path": "src/calendars/roll.py", "module": "src.calendars.roll", "loc": 142, "commits": 19, "last_commit": "2026-04-30", "authors": ["k.zhou"] },
+    { "path": "src/pricing/engine.py", "module": "src.pricing.engine", "loc": 431, "commits": 57, "last_commit": "2026-07-14", "authors": ["d.mensah", "k.zhou", "r.vincent"] },
+    { "path": "src/pricing/curves.py", "module": "src.pricing.curves", "loc": 296, "commits": 24, "last_commit": "2026-07-29", "authors": ["k.zhou"] },
+    { "path": "src/risk/greeks.py", "module": "src.risk.greeks", "loc": 203, "commits": 16, "last_commit": "2026-06-02", "authors": ["k.zhou"] },
+    { "path": "src/io/market_store.py", "module": "src.io.market_store", "loc": 158, "commits": 22, "last_commit": "2026-07-08", "authors": ["r.vincent"] },
+    { "path": "src/cli.py", "module": "src.cli", "loc": 61, "commits": 7, "last_commit": "2026-03-14", "authors": ["r.vincent"] }
+  ],
+  "modules": {
+    "src.api": {
+      "path": "src/api", "files": 9, "loc": 1240, "commits": 74,
+      "top": [
+        { "path": "src/api/app.py", "commits": 41 },
+        { "path": "src/api/schemas.py", "commits": 28 },
+        { "path": "src/api/serializers.py", "commits": 12 }
+      ]
+    },
+    "src.instruments": {
+      "path": "src/instruments", "files": 14, "loc": 2180, "commits": 61,
+      "top": [
+        { "path": "src/instruments/factory.py", "commits": 33 },
+        { "path": "src/instruments/option.py", "commits": 18 }
+      ]
+    },
+    "src.pricing": {
+      "path": "src/pricing", "files": 21, "loc": 4860, "commits": 138,
+      "top": [
+        { "path": "src/pricing/engine.py", "commits": 57 },
+        { "path": "src/pricing/curves.py", "commits": 24 },
+        { "path": "src/pricing/black76.py", "commits": 21 }
+      ]
+    },
+    "src.calendars": {
+      "path": "src/calendars", "files": 6, "loc": 980, "commits": 34,
+      "top": [
+        { "path": "src/calendars/roll.py", "commits": 19 },
+        { "path": "src/calendars/holidays.py", "commits": 11 }
+      ]
+    },
+    "src.risk": {
+      "path": "src/risk", "files": 11, "loc": 1640, "commits": 45,
+      "top": [
+        { "path": "src/risk/greeks.py", "commits": 16 },
+        { "path": "src/risk/limits.py", "commits": 14 }
+      ]
+    },
+    "src.io": {
+      "path": "src/io", "files": 7, "loc": 760, "commits": 39,
+      "top": [
+        { "path": "src/io/market_store.py", "commits": 22 },
+        { "path": "src/io/config.py", "commits": 9 }
+      ]
+    }
+  },
+  "edges": [
+    { "a": "src.api", "b": "src.instruments", "n": 14 },
+    { "a": "src.api", "b": "src.pricing", "n": 23 },
+    { "a": "src.instruments", "b": "src.calendars", "n": 9 },
+    { "a": "src.pricing", "b": "src.calendars", "n": 31 },
+    { "a": "src.pricing", "b": "src.risk", "n": 12 },
+    { "a": "src.pricing", "b": "src.io", "n": 18 },
+    { "a": "src.risk", "b": "src.io", "n": 7 },
+    { "a": "src.instruments", "b": "src.io", "n": 5 }
+  ],
+  "entry_points": [
+    { "kind": "http_route", "name": "POST /v1/price", "file": "src/api/app.py", "line": 58, "target": "price_instrument" },
+    { "kind": "console_script", "name": "payments-core", "file": "pyproject.toml", "line": 34, "target": "src.cli:main" },
+    { "kind": "main_guard", "name": "src/cli.py", "file": "src/cli.py", "line": 57, "target": "main" }
+  ],
+  "command_candidates": [
+    { "cmd": "docker compose up -d timescale", "kind": "setup", "cwd": ".", "source": "README.md:41", "confidence": "high" },
+    { "cmd": "poetry install --with dev", "kind": "setup", "cwd": ".", "source": "pyproject.toml:1", "confidence": "high" },
+    { "cmd": "make lint", "kind": "lint", "cwd": ".", "source": "Makefile:18", "confidence": "high" },
+    { "cmd": "poetry run python -m payments_core.io.smoke", "kind": "run", "cwd": ".", "source": "README.md:58", "confidence": "medium" },
+    { "cmd": "poetry run pytest -q", "kind": "test", "cwd": ".", "source": "Makefile:12", "confidence": "high" }
+  ],
+  "checkpoints": {
+    "cp-a1": {
+      "kind": "single",
+      "prompt": "Which directory owns holiday-calendar logic?",
+      "options": ["<code>src/pricing/</code>", "<code>src/calendars/</code>", "<code>src/io/</code>", "<code>tests/fixtures/</code>"],
+      "answer": 1,
+      "provenance": "survey.json → imports → calendars.* is imported by 4 modules and imports none of them",
+      "explanation": "src/calendars/ defines Calendar and roll_forward. src/pricing/ is the heaviest consumer — 31 imports — which is why people guess it, but it only consumes."
+    },
+    "cp-a2": {
+      "kind": "single",
+      "prompt": "You need to add a new instrument type. Which file do you edit first?",
+      "options": ["<code>src/pricing/engine.py</code>", "<code>src/instruments/factory.py</code>", "<code>src/api/schemas.py</code>", "<code>src/api/app.py</code>"],
+      "answer": 1,
+      "provenance": "survey.json → symbols → _REGISTRY defined in factory.py:48, referenced by 6 instrument classes",
+      "explanation": "The registry pattern in factory.py means the engine dispatches on kind without knowing the classes. Editing engine.py to add an instrument is the mistake this design exists to prevent."
+    },
+    "cp-c1": {
+      "kind": "order",
+      "prompt": "Put these five hops in the order they actually execute.",
+      "options": [
+        "<code>ENGINE.price</code> — discount and branch",
+        "<code>roll_forward</code> — advance to a business day",
+        "<code>PriceRequest</code> validation — reject past dates",
+        "<code>serialize_price</code> — round and return",
+        "<code>build_instrument</code> — registry lookup"
+      ],
+      "answer": [4, 3, 1, 5, 2],
+      "provenance": "survey.json → call graph from src/api/app.py:63-66, resolved statically",
+      "explanation": "Validation runs before the handler body — that is the one most people get wrong, because the code that triggers it is not visible in app.py at all. It happens in the pydantic model bound to the parameter."
+    },
+    "cp-c2": {
+      "kind": "single",
+      "prompt": "A request returns RollOverflow. Which module do you investigate first?",
+      "options": [
+        "<code>src/calendars/</code> — it raised the error",
+        "<code>src/io/</code> — it loads the calendar",
+        "<code>src/api/</code> — it bound the calendar",
+        "<code>src/pricing/</code> — it called the roll"
+      ],
+      "answer": 1,
+      "provenance": "survey.json → call graph → Calendar instances constructed only in src/io/market_store.py",
+      "explanation": "calendars/ raises it, but the only place a Calendar is constructed is the market store. An empty calendar makes every day a holiday, so the roll walks past its ceiling. The error surfaces three modules away from its cause."
+    }
+  }
+}

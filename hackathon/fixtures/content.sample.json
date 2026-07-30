@@ -1,0 +1,372 @@
+{
+  "contract": "trailhead/content@1",
+  "repo": { "name": "payments-core", "commit": "a3f9c21" },
+  "model": { "provider": "stub", "model": "fixture", "calls": 0, "duration_s": 0 },
+
+  "_note": "Hand-written subset of a NARRATE run. Exercises every resolution path in VERIFY: multi-line quotes, non-contiguous focus, an inferred claim with no cite, a checkpoint reference, command stubs, and all eight doomed claims. It is NOT a byte-for-byte preimage of verified.sample.json — see briefs/C-verify.md.",
+
+  "tracks": [
+    {
+      "title": "ORIENT",
+      "stops": [
+        {
+          "id": "five",
+          "title": "Five sentences",
+          "minutes": 4,
+          "blocks": [
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-001",
+                  "text": "payments-core prices instruments behind a single HTTP endpoint.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/api/app.py",
+                    "quote": "@router.post(\"/v1/price\", response_model=PriceResponse)\nasync def price_instrument(\n    req: PriceRequest,\n    cal: Calendar = Depends(get_calendar),\n) -> PriceResponse:\n    instrument = build_instrument(req.instrument)\n    settle = roll_forward(req.settlement_date, cal)\n    result = ENGINE.price(instrument, settle, req.market)\n    return serialize_price(result)",
+                    "focus": [
+                      "    instrument = build_instrument(req.instrument)",
+                      "    result = ENGINE.price(instrument, settle, req.market)"
+                    ]
+                  }
+                },
+                {
+                  "id": "c-002",
+                  "text": "A settlement date in the past is rejected at the schema boundary, before any pricing code runs.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/api/schemas.py",
+                    "quote": "class PriceRequest(BaseModel):\n    instrument: InstrumentSpec\n    settlement_date: date\n    market: MarketSnapshot\n\n    @field_validator(\"settlement_date\")\n    @classmethod\n    def not_in_past(cls, v: date) -> date:\n        if v < date.today():\n            raise ValueError(\"settlement_date is in the past\")\n        return v",
+                    "focus": [
+                      "        if v < date.today():",
+                      "            raise ValueError(\"settlement_date is in the past\")"
+                    ]
+                  }
+                },
+                {
+                  "id": "c-003",
+                  "text": "What it produces is a rounded present value and discount factor, not a full risk report.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/api/serializers.py",
+                    "quote": "def serialize_price(p: Priced) -> PriceResponse:\n    return PriceResponse(\n        pv=round(p.pv, 6),\n        discount_factor=round(p.df, 8),\n        asof=p.asof.isoformat(),\n    )",
+                    "focus": [
+                      "        discount_factor=round(p.df, 8),",
+                      "        asof=p.asof.isoformat(),"
+                    ]
+                  }
+                },
+                {
+                  "id": "c-004",
+                  "text": "It depends on an external curve store and fails loudly rather than pricing off a gap.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/io/market_store.py",
+                    "quote": "def load_curves(cfg: StoreConfig) -> dict[str, Curve]:\n    \"\"\"Read every curve for cfg.asof. Fails loudly on a gap.\"\"\"\n    out: dict[str, Curve] = {}\n    for ccy in cfg.currencies:\n        raw = _fetch(cfg, f\"curve/{ccy}/{cfg.asof:%Y%m%d}\")\n        if raw is None:\n            raise MissingCurve(ccy, cfg.asof)\n        out[ccy] = Curve.parse(raw)\n    return out",
+                    "focus": [
+                      "        if raw is None:",
+                      "            raise MissingCurve(ccy, cfg.asof)"
+                    ]
+                  }
+                },
+                {
+                  "id": "c-005",
+                  "text": "It is not a booking system — nothing here persists a trade.",
+                  "status": "inferred"
+                },
+                {
+                  "id": "c-133",
+                  "text": "All endpoints require an OAuth bearer token.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/api/app.py",
+                    "quote": "@router.post(\"/v1/price\", dependencies=[Depends(require_bearer_token)])",
+                    "focus": []
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "where",
+          "title": "Where the code lives",
+          "minutes": 5,
+          "blocks": [
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-011",
+                  "text": "The engine looks the curve up by the instrument's currency and discounts to the settlement date.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/pricing/engine.py",
+                    "quote": "def price(self, inst: Instrument, settle: date, mkt: MarketSnapshot) -> Priced:\n    curve = self._curves[inst.currency]\n    df = curve.discount(settle)\n    if inst.kind is Kind.OPTION:\n        vol = self._surface(inst.currency).vol(inst.strike, settle)\n        pv = black76(inst, mkt.forward, vol, df)\n    else:\n        pv = df * inst.notional * (mkt.forward - inst.strike)\n    return Priced(pv=pv, df=df, asof=mkt.asof)",
+                    "focus": [
+                      "    curve = self._curves[inst.currency]",
+                      "    df = curve.discount(settle)"
+                    ]
+                  }
+                },
+                {
+                  "id": "c-012",
+                  "text": "Pricing is one method taking an instrument, a settlement date and a market snapshot.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/pricing/engine.py",
+                    "quote": "def price(self, inst: Instrument, settle: date, mkt: MarketSnapshot) -> Priced:",
+                    "focus": ["def price(self, inst: Instrument, settle: date, mkt: MarketSnapshot) -> Priced:"]
+                  }
+                },
+                {
+                  "id": "c-041",
+                  "text": "Curves are addressed by currency and as-of date in the store's key layout.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/io/market_store.py",
+                    "quote": "        raw = _fetch(cfg, f\"curve/{ccy}/{cfg.asof:%Y%m%d}\")",
+                    "focus": ["        raw = _fetch(cfg, f\"curve/{ccy}/{cfg.asof:%Y%m%d}\")"]
+                  }
+                },
+                {
+                  "id": "c-102",
+                  "text": "Curve interpolation is log-linear in discount factors.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/pricing/curves.py",
+                    "quote": "    return exp(log_linear(self._nodes, t))",
+                    "focus": []
+                  }
+                },
+                {
+                  "id": "c-081",
+                  "text": "Greeks are computed analytically for options.",
+                  "status": "verified",
+                  "cite": {
+                    "file": "src/risk/greeks.py",
+                    "quote": "def delta_analytic(inst: Instrument, mkt: MarketSnapshot) -> float:",
+                    "focus": []
+                  }
+                }
+              ]
+            },
+            { "type": "checkpoint", "id": "cp-a1" },
+            { "type": "checkpoint", "id": "cp-a2" },
+            { "type": "checkpoint", "id": "cp-a9-does-not-exist" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "GET IT RUNNING",
+      "stops": [
+        {
+          "id": "setup",
+          "title": "Prerequisites and setup",
+          "minutes": 6,
+          "blocks": [
+            { "type": "command", "cmd": "docker compose up -d timescale", "cwd": "." },
+            { "type": "command", "cmd": "poetry install --with dev", "cwd": "." },
+            {
+              "type": "command",
+              "cmd": "make lint",
+              "cwd": ".",
+              "hypothesis": "Two pre-existing lint findings that predate this commit; the repo lints dirty on a clean checkout."
+            },
+            {
+              "type": "command",
+              "cmd": "poetry run python -m payments_core.io.smoke",
+              "cwd": ".",
+              "hypothesis": "The smoke script wants a EUR curve for today, and the seeded fixture data stops at the previous business day."
+            },
+            { "type": "command", "cmd": "make coverage", "cwd": "." },
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-094",
+                  "text": "The Makefile exposes a fmt target that runs black.",
+                  "status": "verified",
+                  "cite": { "file": "Makefile", "quote": "fmt:\n\tblack src tests", "focus": [] }
+                },
+                {
+                  "id": "c-031",
+                  "text": "Prices are cached in Redis for 30 seconds to absorb blotter refreshes.",
+                  "status": "verified",
+                  "cite": { "file": "src/io/cache.py", "quote": "CACHE_TTL_SECONDS = 30", "focus": [] }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "green",
+          "title": "Your first green test",
+          "minutes": 4,
+          "blocks": [
+            { "type": "command", "cmd": "poetry run pytest -q", "cwd": "." }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "FOLLOW ONE REQUEST",
+      "stops": [
+        {
+          "id": "trace",
+          "title": "The trace",
+          "minutes": 12,
+          "blocks": [
+            {
+              "type": "trace",
+              "steps": [
+                {
+                  "claim": "The route binds a Calendar per request through a dependency, then does nothing but delegate three times.",
+                  "cite": {
+                    "file": "src/api/app.py",
+                    "quote": "@router.post(\"/v1/price\", response_model=PriceResponse)\nasync def price_instrument(\n    req: PriceRequest,\n    cal: Calendar = Depends(get_calendar),\n) -> PriceResponse:\n    instrument = build_instrument(req.instrument)\n    settle = roll_forward(req.settlement_date, cal)\n    result = ENGINE.price(instrument, settle, req.market)\n    return serialize_price(result)",
+                    "focus": [
+                      "    instrument = build_instrument(req.instrument)",
+                      "    settle = roll_forward(req.settlement_date, cal)",
+                      "    result = ENGINE.price(instrument, settle, req.market)"
+                    ]
+                  },
+                  "next": "build_instrument in src/instruments/factory.py"
+                },
+                {
+                  "claim": "Validation happens before any pricing code runs — a past settlement date is rejected at the schema boundary.",
+                  "cite": {
+                    "file": "src/api/schemas.py",
+                    "quote": "class PriceRequest(BaseModel):\n    instrument: InstrumentSpec\n    settlement_date: date\n    market: MarketSnapshot\n\n    @field_validator(\"settlement_date\")\n    @classmethod\n    def not_in_past(cls, v: date) -> date:\n        if v < date.today():\n            raise ValueError(\"settlement_date is in the past\")\n        return v",
+                    "focus": [
+                      "    def not_in_past(cls, v: date) -> date:",
+                      "        if v < date.today():",
+                      "            raise ValueError(\"settlement_date is in the past\")"
+                    ]
+                  },
+                  "next": "the registry lookup"
+                },
+                {
+                  "claim": "The factory maps a string kind to a registered class and raises rather than guessing when the kind is unknown.",
+                  "cite": {
+                    "file": "src/instruments/factory.py",
+                    "quote": "def build_instrument(spec: InstrumentSpec) -> Instrument:\n    kind = Kind(spec.kind)\n    cls = _REGISTRY.get(kind)\n    if cls is None:\n        raise UnknownInstrument(spec.kind)\n    return cls.from_spec(spec)",
+                    "focus": [
+                      "    cls = _REGISTRY.get(kind)",
+                      "    if cls is None:",
+                      "        raise UnknownInstrument(spec.kind)"
+                    ]
+                  },
+                  "next": "roll_forward in src/calendars/roll.py"
+                },
+                {
+                  "claim": "The settlement date is rolled forward to the next business day, with a hard ceiling that raises instead of looping forever.",
+                  "cite": {
+                    "file": "src/calendars/roll.py",
+                    "quote": "def roll_forward(d: date, cal: Calendar) -> date:\n    \"\"\"Advance d to the next business day on cal.\"\"\"\n    if cal is None:\n        raise CalendarMissing(\"no calendar bound to this request\")\n    moved = 0\n    while not cal.is_business_day(d):\n        d += timedelta(days=1)\n        moved += 1\n        if moved > MAX_ROLL_DAYS:\n            raise RollOverflow(d, moved)\n    return d",
+                    "focus": [
+                      "    while not cal.is_business_day(d):",
+                      "        d += timedelta(days=1)",
+                      "        if moved > MAX_ROLL_DAYS:",
+                      "            raise RollOverflow(d, moved)"
+                    ]
+                  },
+                  "next": "ENGINE.price"
+                },
+                {
+                  "claim": "The engine discounts off the currency curve, then branches: options go through Black-76 with a surface lookup, everything else is a forward difference.",
+                  "cite": {
+                    "file": "src/pricing/engine.py",
+                    "quote": "def price(self, inst: Instrument, settle: date, mkt: MarketSnapshot) -> Priced:\n    curve = self._curves[inst.currency]\n    df = curve.discount(settle)\n    if inst.kind is Kind.OPTION:\n        vol = self._surface(inst.currency).vol(inst.strike, settle)\n        pv = black76(inst, mkt.forward, vol, df)\n    else:\n        pv = df * inst.notional * (mkt.forward - inst.strike)\n    return Priced(pv=pv, df=df, asof=mkt.asof)",
+                    "focus": [
+                      "    if inst.kind is Kind.OPTION:",
+                      "        vol = self._surface(inst.currency).vol(inst.strike, settle)",
+                      "        pv = black76(inst, mkt.forward, vol, df)"
+                    ]
+                  },
+                  "next": "serialize_price"
+                },
+                {
+                  "claim": "Serialization rounds the present value to six decimals and the discount factor to eight before it leaves the process.",
+                  "cite": {
+                    "file": "src/api/serializers.py",
+                    "quote": "def serialize_price(p: Priced) -> PriceResponse:\n    return PriceResponse(\n        pv=round(p.pv, 6),\n        discount_factor=round(p.df, 8),\n        asof=p.asof.isoformat(),\n    )",
+                    "focus": [
+                      "        pv=round(p.pv, 6),",
+                      "        discount_factor=round(p.df, 8),"
+                    ]
+                  },
+                  "next": null
+                }
+              ]
+            },
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-052",
+                  "text": "The engine supports SABR calibration for the vol surface.",
+                  "status": "verified",
+                  "cite": { "file": "src/pricing/engine.py", "quote": "    def calibrate_sabr(self, ccy: str) -> SabrParams:", "focus": [] }
+                },
+                {
+                  "id": "c-058",
+                  "text": "Retries are attempted three times with exponential backoff.",
+                  "status": "verified",
+                  "cite": { "file": "src/io/market_store.py", "quote": "@retry(attempts=3, backoff=\"exponential\")", "focus": [] }
+                },
+                {
+                  "id": "c-067",
+                  "text": "A settlement date more than two years out is rejected.",
+                  "status": "verified",
+                  "cite": { "file": "src/api/schemas.py", "quote": "        if v > date.today() + timedelta(days=730):", "focus": [] }
+                }
+              ]
+            },
+            { "type": "checkpoint", "id": "cp-c1" },
+            { "type": "checkpoint", "id": "cp-c2" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "CONVENTIONS",
+      "stops": [
+        {
+          "id": "conv",
+          "title": "Conventions and gotchas",
+          "minutes": 6,
+          "blocks": [
+            {
+              "type": "callout",
+              "level": "inferred",
+              "title": "Everything on this stop is inferred",
+              "text": "None of the claims below could be anchored to a specific line. They are the model's read of the codebase, shown separately and marked, not mixed into the verified material."
+            },
+            {
+              "type": "prose",
+              "claims": [
+                { "id": "c-118", "text": "The house style favours raising a named exception over returning None.", "status": "inferred" },
+                { "id": "c-119", "text": "Modules are kept import-acyclic; nothing in io imports upward.", "status": "inferred" },
+                { "id": "c-120", "text": "New instrument types are expected to register themselves rather than be dispatched on.", "status": "inferred" },
+                { "id": "c-121", "text": "Test fixtures are seeded to the previous business day, which is why a today-dated smoke run fails on a clean checkout.", "status": "inferred" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "CLOSE",
+      "stops": [
+        {
+          "id": "audit",
+          "title": "Audit",
+          "minutes": 3,
+          "blocks": [{ "type": "ledger" }]
+        }
+      ]
+    }
+  ]
+}
