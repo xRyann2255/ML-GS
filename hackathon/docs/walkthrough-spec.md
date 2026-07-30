@@ -20,6 +20,12 @@
 
 **Build-time invariant:** render fails if the output contains `http://` or `https://` in any `src`, `href`, `fetch`, or `import`. One grep, enforced in CI.
 
+**One artifact, one repo.** The checked-in demo bundle is the exception: it carries
+one payload per repo behind a top-bar switcher so two walkthroughs can share a
+renderer rather than ship as two near-identical files. Nothing below `D` in the
+renderer knows about it, the gate validates every payload separately, and a real
+generated artifact carries exactly one. Do not let this leak into the product.
+
 ---
 
 ## 2. Page shell

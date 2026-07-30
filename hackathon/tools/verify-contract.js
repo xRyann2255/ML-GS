@@ -24,28 +24,61 @@ const file = process.argv[2] || path.join(__dirname, '..', 'demo', 'trailhead-de
 if (!fs.existsSync(file)) { console.error('not found:', file); process.exit(2); }
 const src = fs.readFileSync(file, 'utf8');
 
-let D;
+// A bare verified.json is one payload; a demo bundle may carry several, one per
+// repo, so every one of them is checked. Extraction keys off explicit markers —
+// it used to key off a prose comment, which made the gate hostage to its wording.
+let PAYLOADS;
 if (file.endsWith('.json')) {
-  D = JSON.parse(src);
+  PAYLOADS = [['(file)', JSON.parse(src)]];
 } else {
-  // Extract the inlined data object. Markers avoid literal newlines so the search
-  // is CRLF-agnostic.
-  const a = src.indexOf('const D = {');
-  const b = src.indexOf('RENDER — knows only');
-  if (a < 0 || b < 0) { console.error('data markers not found (a=%d b=%d)', a, b); process.exit(2); }
-  const raw = src.slice(src.indexOf('{', a), b).replace(/\/\*[\s\S]*$/, '').trim().replace(/;\s*$/, '');
-  D = eval('(' + raw + ')');
+  const START = '/* ==== TRAILHEAD-DATA-START ==== */';
+  const END = '/* ==== TRAILHEAD-DATA-END ==== */';
+  const a = src.indexOf(START), b = src.indexOf(END);
+  if (a < 0 || b < 0) { console.error('data markers not found (start=%d end=%d)', a, b); process.exit(2); }
+  const raw = src.slice(a + START.length, b);
+  const m = raw.indexOf('const BUNDLES =');
+  if (m < 0) { console.error('BUNDLES declaration not found between the data markers'); process.exit(2); }
+  // brace-match rather than search for '};' — the SYNTHETIC map that follows
+  // ends the same way, and a string search happily walks past the real close
+  const open = raw.indexOf('{', m);
+  let depth = 0, close = -1, inStr = false, q = '', esc = false;
+  for (let i = open; i < raw.length; i++) {
+    const c = raw[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === q) inStr = false;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') { inStr = true; q = c; continue; }
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 0) { close = i; break; } }
+  }
+  if (close < 0) { console.error('unbalanced braces in BUNDLES'); process.exit(2); }
+  PAYLOADS = Object.entries(eval('(' + raw.slice(open, close + 1) + ')'));
+  if (!PAYLOADS.length) { console.error('no payloads in BUNDLES'); process.exit(2); }
 }
 
 let fail = 0;
 const bad = m => { console.log('  FAIL  ' + m); fail++; };
+
+console.log(`\n${path.relative(process.cwd(), file)}`);
+if (PAYLOADS.length > 1) console.log(`${PAYLOADS.length} payloads: ${PAYLOADS.map(p => p[0]).join(', ')}`);
+
+for (const [label, payload] of PAYLOADS) check(label, payload);
+
+console.log(fail ? `\n${fail} FAILURE(S)\n` : '\nALL ANCHOR + CONTRACT CHECKS PASS\n');
+process.exit(fail ? 1 : 0);
+
+function check(LABEL, D) {
+if (PAYLOADS.length > 1) console.log(`\n--- ${LABEL} ---`);
+
 const stops = D.tracks.flatMap(t => t.stops);
 
 // The contract version was never asserted, which made a silent bump possible.
 const KNOWN = ['trailhead/verified@1', 'trailhead/verified@2'];
 if (!KNOWN.includes(D.contract)) bad(`unknown contract version: ${JSON.stringify(D.contract)}`);
 
-console.log(`\n${path.relative(process.cwd(), file)}`);
 console.log(`tracks ${D.tracks.length} | stops ${stops.length} | bundled files ${Object.keys(D.files).length}\n`);
 
 const ids = stops.map(s => s.id);
@@ -172,5 +205,4 @@ for (const e of D.map.edges) {
 
 console.log(`rendered claims ${claims} (inferred ${inferred}) | checkpoints ${cps} | predictions ${preds} | commands ${cmds} | dropped ${D.dropped.length}`);
 console.log(`anchors sha256-verified ${hashed}`);
-console.log(fail ? `\n${fail} FAILURE(S)\n` : '\nALL ANCHOR + CONTRACT CHECKS PASS\n');
-process.exit(fail ? 1 : 0);
+}

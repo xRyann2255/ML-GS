@@ -27,8 +27,18 @@ this and nothing else; VERIFY produces it; NARRATE produces the pre-verification
 form of it. `docs/walkthrough-spec.md` describes what the page *looks like* — this
 describes what it *eats*.
 
-Reference payload: `fixtures/verified.sample.json` (synthetic repo, 13 anchors).
+Reference payloads: `fixtures/verified.sample.json` (synthetic repo, 13 anchors)
+and `fixtures/verified.ml-gs.json` (this repo, 17 anchors).
 Gate: `node tools/verify-contract.js fixtures/verified.sample.json`.
+
+**How the demo bundle stores these.** Between the `TRAILHEAD-DATA-START` and
+`TRAILHEAD-DATA-END` markers it declares `BUNDLES`, a map of repo name to payload,
+plus a demo-only `SYNTHETIC` lookup that decides whether the SAMPLE chip shows.
+Each value is a pure, unmodified `verified.json`; the wrapper exists so two
+walkthroughs can share one renderer, and the gate checks every payload in it. A
+real generated artifact holds one payload. The markers are what both tools key
+off — the previous end marker was a prose comment containing an em dash, which
+made the gate hostage to its wording.
 
 ---
 
