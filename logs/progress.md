@@ -184,6 +184,8 @@
 
 **Next:** copy the plan set to the GS machine as `workspace/plans/gnn/`, execute Plan 01 in a Copilot session, then run the trial_080 gate ablation
 
+---
+
 ## 2026-07-08
 
 **Focus:** authored the copilot-workflow-overhaul plan suite (remediate all 84 audit findings) via the new write-copilot-plans skill, end to end
@@ -197,3 +199,17 @@
 - First real-world exercise of the write-copilot-plans skill/workflow shipped in 327e658 the day before; it held up (recon caught the still-live incident, the ledger caught the parallel-draft drift, verify caught the rebuilds)
 
 **Next:** on the GS box, copy the suite to `workspace/plans/copilot-workflow-overhaul/`, do the 5 HUMAN-ACTION items first (revoke both PATs), then run Plan 01 (`/execute`) through Gate A
+
+---
+
+## 2026-07-30
+
+**Focus:** docs-only sync ahead of the GS hackathon; two repo-hygiene fixes surfaced by it
+
+- Ran `/sync-docs`. All three guides reported no `.tex`/`.bib` changes, so nothing recompiled — the only content delta was `deliverables/hackathon-ideas.md` (top-5 shortlist for the 2026-07-30/31 GS hackathon: bug-report→failing-test agent, Ask-the-Data, compute-cost rightsizing, synthetic test data, desk-commentary drafting). Committed to main (f12d070), synced to docs-only (598a1bf), both pushed
+- `.git/hooks/pre-commit` was **not installed** — the `.py`→`.py.txt` guard that CLAUDE.md relies on was absent, so the only thing keeping Python off docs-only was the `find ... mv` line in the sync recipe. Reinstalled from `.githooks/pre-commit`. Worth re-checking after any fresh clone; verified docs-only currently carries zero `.py` files
+- Diagnosed why docs-only holds files main doesn't: the sync is **additive-only** — `git checkout main -- <paths>` adds and updates but never deletes, and `git add -A` sweeps in anything untracked sitting in the working tree at sync time. Two distinct causes: (a) files archived on main to `archive/risk-as-alpha/` (glossary, faq, secdb-data-requirements, speaker_script) linger on docs-only; (b) files that were **never on main** got swept in while untracked — `copilot-workflow-overhaul-plans/` (10 plans, ~8,400 lines) entered at sync f49db34 and exists nowhere else, likewise `2026-07-03-linear-alpha-tuning.md`, `notes/session-prompt-*.md`, `notes/vol-project-ref-audit.md`. `desk-pitch-2026-07/` is not drift — it came deliberately from the `presentation` branch (016cd62)
+- Avoided repeating (b) this run by committing the hackathon file to main *before* the sync rather than letting `git add -A` catch it. User's call: leave the existing drift in place for now, so docs-only still carries the extra files
+- Second `/sync-docs` run later in the day: no `.tex`/`.bib` changes, nothing recompiled; only delta was `deliverables/trailhead-walkthrough-spec.md`, synced to docs-only (c51b31e) and pushed
+
+**Next:** hackathon on 2026-07-30/31 (pick one of the top-5 and build it); afterwards, resume the plan set — copy to the GS machine as `workspace/plans/gnn/`, execute Plan 01, run the trial_080 gate ablation. Open hygiene item: decide whether to prune docs-only drift or back up the docs-only-only plan suite onto main

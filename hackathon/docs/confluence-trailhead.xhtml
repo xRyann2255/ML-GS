@@ -1,0 +1,234 @@
+<p><strong>Theme:</strong> Improve the Developer Experience &#183; <strong>Categories:</strong> Saving Time, Improving User Experience</p>
+
+<ac:structured-macro ac:name="toc" ac:schema-version="1"/>
+
+<h2>1. Summary</h2>
+
+<p>Trailhead turns a code repository into a single web page that teaches it. Point it at a repo and you get one file that walks a reader through what the code does, how to run it, and how one request flows through it. Every factual sentence carries a button opening the exact lines of code behind it.</p>
+
+<p>What matters is what happens to sentences it <em>cannot</em> back up: they are deleted before anyone sees the page, and the number deleted is printed on screen.</p>
+
+<table>
+<tbody>
+<tr><th><p>Term</p></th><th><p>Meaning</p></th></tr>
+<tr><td><p><strong>claim</strong></p></td><td><p>One factual sentence in the generated page</p></td></tr>
+<tr><td><p><strong>anchor</strong></p></td><td><p>The <code>file:line</code> range a claim cites, plus those lines and a checksum</p></td></tr>
+<tr><td><p><strong><code>verified.json</code></strong></p></td><td><p>The data file the page is built from - the frozen generator-to-page contract</p></td></tr>
+</tbody>
+</table>
+
+<h2>2. The problem</h2>
+
+<p>Reading code you did not write is slow, and it is not only a new-joiner problem - the same cost lands on experienced engineers several times a year.</p>
+
+<table>
+<tbody>
+<tr><th><p>Situation</p></th><th><p>What they need</p></th><th><p>Where the time goes today</p></th></tr>
+<tr><td><p><strong>New joiner onboarding</strong></p></td><td><p>A map before the detail</p></td><td><p>Files read in arbitrary order; asking a colleague costs two people</p></td></tr>
+<tr><td><p><strong>Engineer entering an unfamiliar module</strong></p></td><td><p>Boundaries, conventions, blast radius</p></td><td><p>Grep-and-guess; conventions live in one or two heads</p></td></tr>
+<tr><td><p><strong>Returning to code after months</strong></p></td><td><p>What it does, and why</p></td><td><p>Re-deriving decisions the code never recorded</p></td></tr>
+<tr><td><p><strong>Understanding a set of changes</strong></p></td><td><p>What moved, and what it affects</p></td><td><p>A diff without the structure to judge its consequences</p></td></tr>
+</tbody>
+</table>
+
+<p><strong>The answer is already in the repo - the cost is locating it and trusting it.</strong> Documentation solves locating, then decays. Asking a person keeps trust but spends two people's time.</p>
+
+<ac:structured-macro ac:name="note" ac:schema-version="1">
+<ac:rich-text-body>
+<p><strong>Scope note.</strong> Trailhead covers the first three cases today. The fourth is roadmap, not a current feature - see section 10.</p>
+</ac:rich-text-body>
+</ac:structured-macro>
+
+<h2>3. What Trailhead does</h2>
+
+<p>Five stages run in order. Only one uses AI.</p>
+
+<ac:structured-macro ac:name="code" ac:schema-version="1">
+<ac:parameter ac:name="language">text</ac:parameter>
+<ac:plain-text-body><![CDATA[repo ──▶ 1 SURVEY ──▶ survey.json ──▶ 2 MAP ──▶ map.json
+                          │                        │
+                          └──▶ 3 NARRATE (LLM) ──▶ content.json
+                                                     │
+                                    4 VERIFY ◀───────┘
+                                        │
+                    verified.json + verification-report.json
+                                        │
+                                   5 RENDER ──▶ trailhead.html]]></ac:plain-text-body>
+</ac:structured-macro>
+
+<table>
+<tbody>
+<tr><th><p>Stage</p></th><th><p>AI?</p></th><th><p>Job</p></th></tr>
+<tr><td><p>1 Survey</p></td><td><p>No</p></td><td><p>File tree, import edges, entry points, git churn</p></td></tr>
+<tr><td><p>2 Map</p></td><td><p>No</p></td><td><p>Collapse to modules; compute the diagram layout up front</p></td></tr>
+<tr><td><p>3 Narrate</p></td><td><p><strong>Yes</strong></p></td><td><p>The prose - one small call per unit, returning claims plus verbatim quotes</p></td></tr>
+<tr><td><p>4 Verify</p></td><td><p>No</p></td><td><p>Re-open every file, hash-match every excerpt, delete what fails</p></td></tr>
+<tr><td><p>5 Render</p></td><td><p>No</p></td><td><p>Turn <code>verified.json</code> into one HTML file</p></td></tr>
+</tbody>
+</table>
+
+<p>A command runner executes the repo's own setup and test commands, capturing real exit codes, output and timings.</p>
+
+<h2>4. Innovation - the model writes, the machine checks</h2>
+
+<p>Most tools ask a model to explain your code and print what it says. Trailhead assumes the model will sometimes be confident and wrong, and puts an automated checker between it and the reader.</p>
+
+<p><strong>Only stage 3 touches a model.</strong> Everything that checks is deterministic code - a model cannot be its own auditor.</p>
+
+<p><strong>Never ask for line numbers; ask for a quote.</strong> Models count badly and copy well. The model receives the file with line numbers attached and must return the snippet it cites; code then locates that snippet and derives the range. A snippet not found word-for-word is deleted, not repaired.</p>
+
+<p><strong>Deleted claims are counted on screen.</strong> The badge opens a ledger of every deletion and its reason. Hiding the number would defeat the point of computing it.</p>
+
+<p><strong>Commands are run, not described.</strong> Exit codes, output and timings come from real execution; failing commands are shown failing, with any suggested cause marked unverified.</p>
+
+<h2>5. How a claim is checked</h2>
+
+<p>All of the above rests on one question: when the page tells you something about the code, why should you believe it? Because a claim must pass a mechanical test before it is allowed onto the page - and that test is ordinary code that never asks a model anything.</p>
+
+<p>Each claim arrives as a sentence plus the <strong>verbatim snippet</strong> it says it is citing, never a line number. The snippet then has to survive five checks:</p>
+
+<ol>
+<li><p><strong>Quality floor</strong> - at least two lines and 40 non-whitespace characters. Shorter quotes are not distinctive enough to locate reliably.</p></li>
+<li><p><strong>Exact match</strong> - searched for character-for-character in the cited file. No fuzzy matching, no whitespace-insensitive comparison, no closest-match fallback; a fallback that can land in the wrong place is the exact failure this exists to prevent.</p></li>
+<li><p><strong>Exactly one match</strong> - if the snippet appears twice, the claim is deleted rather than guessed at. Measured on a real repo, 12.8% of two-line quotes occur more than once in their own file.</p></li>
+<li><p><strong>The right file</strong> - if it resolves in a file other than the one cited, the claim is deleted. Without this check, a wrong-file citation would display as verified with a valid checksum.</p></li>
+<li><p><strong>Checksum</strong> - the cited lines are hashed, and the copy shipped inside the page is re-hashed by an automated gate. A mismatch means what you are reading is not what was checked.</p></li>
+</ol>
+
+<p>A claim failing any check is removed from the page entirely and listed in the ledger with its reason. Twelve reasons are defined; these fire most:</p>
+
+<table>
+<tbody>
+<tr><th><p>What went wrong</p></th><th><p>What the reader sees</p></th></tr>
+<tr><td><p>Snippet is not in the file word-for-word</p></td><td><p><code>snippet not found verbatim in file</code></p></td></tr>
+<tr><td><p>Snippet appears more than once</p></td><td><p><code>snippet ambiguous</code></p></td></tr>
+<tr><td><p>Snippet is really in a different file</p></td><td><p><code>snippet belongs to a different file than the one cited</code></p></td></tr>
+<tr><td><p>The file changed after the prose was written</p></td><td><p><code>excerpt hash mismatch: file changed after narration</code></p></td></tr>
+<tr><td><p>The model returned something unusable</p></td><td><p><code>model returned unparseable output</code></p></td></tr>
+</tbody>
+</table>
+
+<ac:structured-macro ac:name="note" ac:schema-version="1">
+<ac:rich-text-body>
+<p><strong>What this does not check.</strong> None of it establishes that a sentence is a <em>good description</em> of the code - only that it cites real code, uniquely, where it says it does. That boundary is deliberate. Anything unanchorable is marked <code>INFERRED</code> on screen instead of dressed up as fact; the most interpretive part of the walkthrough is marked inferred wholesale; command output comes from execution, not description. What is guaranteed is that the evidence is real and is the evidence that was checked - narrower than "correct", and something ordinary code can guarantee with no model in the loop.</p>
+</ac:rich-text-body>
+</ac:structured-macro>
+
+<p>The resolver is specified in full and written test-first. Stage 4 is not yet built - see section 10.</p>
+
+<h2>6. Impact</h2>
+
+<h3>Saving time</h3>
+
+<p>Generated once per commit, read many times. Two costs disappear: the "who do I ask" hop, and the "is this still true" re-check.</p>
+
+<ac:structured-macro ac:name="info" ac:schema-version="1">
+<ac:rich-text-body>
+<p><strong>Time saved per reader: [TBD - needs measurement].</strong> No figure is quoted because none has been measured; inventing one would contradict the premise of the project.</p>
+</ac:rich-text-body>
+</ac:structured-macro>
+
+<p>Assumptions any figure would rest on, stated so they can be challenged:</p>
+
+<ul>
+<li><p>The reader would otherwise interrupt a colleague - the real cost is two people's time</p></li>
+<li><p>Generation is amortised: one run serves every later reader of that commit</p></li>
+<li><p>The walkthrough covers what people ask first - orientation, setup, one end-to-end path</p></li>
+</ul>
+
+<p><strong>The experiment that would produce the number:</strong> two engineers, one unfamiliar repo, five comprehension questions, one with Trailhead and one without; record time to correct answers.</p>
+
+<h3>Improving user experience</h3>
+
+<table>
+<tbody>
+<tr><th><p>Today</p></th><th><p>With Trailhead</p></th></tr>
+<tr><td><p>You must know what to ask before a chatbot helps</p></td><td><p>A fixed route; no question needed to start</p></td></tr>
+<tr><td><p>Answers arrive with no evidence</p></td><td><p>Every claim expands to the lines behind it</p></td></tr>
+<tr><td><p>Docs may be stale and you cannot tell</p></td><td><p>Unbackable claims deleted; the count is on screen</p></td></tr>
+<tr><td><p>Setup steps may not work</p></td><td><p>Commands were executed; failures shown failing</p></td></tr>
+<tr><td><p>Needs a network, a login, a tool</p></td><td><p>One file, opens offline from <code>file://</code></p></td></tr>
+</tbody>
+</table>
+
+<h2>7. Feasibility</h2>
+
+<p>Some of this is built and machine-checked today; the rest is not. Both gates pass, output quoted verbatim.</p>
+
+<ac:structured-macro ac:name="code" ac:schema-version="1">
+<ac:parameter ac:name="language">bash</ac:parameter>
+<ac:plain-text-body><![CDATA[node tools/check-bundle.js     → BUNDLE OK, exit 0    (21 structural checks, 125.2 KB)
+node tools/verify-contract.js  → ALL ANCHOR + CONTRACT CHECKS PASS, exit 0
+                                 payments-core: 5 tracks, 11 stops, 13 anchors sha256-verified
+                                 ML-GS:         5 tracks, 12 stops, 17 anchors sha256-verified
+PYTHONPATH=src py -3.11 -m unittest discover -s tests → Ran 8 tests, OK]]></ac:plain-text-body>
+</ac:structured-macro>
+
+<table>
+<tbody>
+<tr><th><p>Piece</p></th><th><p>State</p></th></tr>
+<tr><td><p>Artifact spec - 9 sections, 12 acceptance tests</p></td><td><p><ac:structured-macro ac:name="status" ac:schema-version="1"><ac:parameter ac:name="colour">Green</ac:parameter><ac:parameter ac:name="title">DONE</ac:parameter></ac:structured-macro></p></td></tr>
+<tr><td><p><code>verified.json</code> contract</p></td><td><p><ac:structured-macro ac:name="status" ac:schema-version="1"><ac:parameter ac:name="colour">Green</ac:parameter><ac:parameter ac:name="title">FROZEN</ac:parameter></ac:structured-macro></p></td></tr>
+<tr><td><p>Renderer - all 9 block types</p></td><td><p><ac:structured-macro ac:name="status" ac:schema-version="1"><ac:parameter ac:name="colour">Green</ac:parameter><ac:parameter ac:name="title">WORKING</ac:parameter></ac:structured-macro></p></td></tr>
+<tr><td><p>Automated gates</p></td><td><p><ac:structured-macro ac:name="status" ac:schema-version="1"><ac:parameter ac:name="colour">Green</ac:parameter><ac:parameter ac:name="title">BOTH PASSING</ac:parameter></ac:structured-macro></p></td></tr>
+<tr><td><p>Verification design - resolver, drop vocabulary, hash recipe</p></td><td><p><ac:structured-macro ac:name="status" ac:schema-version="1"><ac:parameter ac:name="colour">Blue</ac:parameter><ac:parameter ac:name="title">SPECIFIED</ac:parameter></ac:structured-macro></p></td></tr>
+<tr><td><p>Stage 1 Survey</p></td><td><p><ac:structured-macro ac:name="status" ac:schema-version="1"><ac:parameter ac:name="colour">Yellow</ac:parameter><ac:parameter ac:name="title">PARTIAL</ac:parameter></ac:structured-macro> import parsing, 8 tests; no file walker</p></td></tr>
+<tr><td><p>Stages 2, 4, command runner</p></td><td><p><ac:structured-macro ac:name="status" ac:schema-version="1"><ac:parameter ac:name="colour">Grey</ac:parameter><ac:parameter ac:name="title">NOT BUILT</ac:parameter></ac:structured-macro></p></td></tr>
+<tr><td><p>Stage 3 Narrate</p></td><td><p><ac:structured-macro ac:name="status" ac:schema-version="1"><ac:parameter ac:name="colour">Grey</ac:parameter><ac:parameter ac:name="title">NOT BUILT</ac:parameter></ac:structured-macro> AI tool not yet selected</p></td></tr>
+</tbody>
+</table>
+
+<p>Budget is 10 hours, with the pivot rule fixed in advance: if the generator loop is still unreliable at hour 4, hard-code the demo path rather than chase generality.</p>
+
+<h2>8. What you see on screen</h2>
+
+<p>It reads like a short course, not a chat window - one screen at a time, contents rail down the left.</p>
+
+<ul>
+<li><p><strong>Top bar</strong> - repo, commit, generation date; a badge showing claims, deletions, commands, failures; projector mode, theme, reset</p></li>
+<li><p><strong>Left rail</strong> - the route in five tracks, a tick per completed stop, overall progress</p></li>
+<li><p><strong>Main column</strong> - one stop at a time: prose, excerpts, module diagram, command output, checkpoints</p></li>
+<li><p><strong>Claim marker</strong> - click a marked sentence; the cited lines appear, numbered and highlighted, with a copy button</p></li>
+<li><p><strong>Badge</strong> - opens the ledger of deleted claims and the reason for each</p></li>
+<li><p><strong>Checkpoints</strong> - graded in the page against a key derived from survey data, never a model; with no model present to grade free text, questions are multiple-choice or ordering</p></li>
+<li><p>Progress is saved per commit, so a regenerated walkthrough starts clean</p></li>
+</ul>
+
+<h2>9. Demo - the 60-second path</h2>
+
+<ol>
+<li><p>Open <code>hackathon/demo/trailhead-demo.html</code> - no server, no network</p></li>
+<li><p>Read the top-bar badge: claims, deletions, commands, failures</p></li>
+<li><p>Click it - the ledger lists every deleted claim and why</p></li>
+<li><p>Open <strong>Five things to know</strong>, click a claim marker - the cited lines appear</p></li>
+<li><p>Open <strong>Run the gates</strong> - real captured output, including a command that failed</p></li>
+<li><p>Use the repo switcher to move between the two walkthroughs</p></li>
+</ol>
+
+<h2>10. Status, risks and next steps</h2>
+
+<p>Stated plainly, because a page about verification that overstated itself would be self-defeating.</p>
+
+<table>
+<tbody>
+<tr><th><p>Item</p></th><th><p>Detail</p></th></tr>
+<tr><td><p><strong>No model has run through the pipeline yet</strong></p></td><td><p>Stage 3 is not built; both walkthroughs were written by hand against the frozen contract. The checks in section 5 are specified and test-driven, but the deletion counts shown are authored, not observed.</p></td></tr>
+<tr><td><p><strong>One demo repo is synthetic</strong></p></td><td><p><code>payments-core</code> does not exist - it is test data, labelled <code>SAMPLE &#183; SYNTHETIC REPO</code> on screen. Its command output is illustrative, not captured.</p></td></tr>
+<tr><td><p><strong>The real walkthrough's anchors are pinned to an older commit</strong></p></td><td><p><code>ML-GS</code> cites commit <code>fb3c3ce</code>. Four of its eight cited files match that commit byte-for-byte, 14 of 14 lines. The other four were untracked then, and two have since been rewritten - 93 of 112 bundled lines no longer match the working tree.</p></td></tr>
+<tr><td><p><strong>Why the gates still pass</strong></p></td><td><p>The gate recomputes each checksum from the copy shipped inside the page, proving the excerpt was not altered after generation. Re-opening the file on disk is stage 4's job, and stage 4 is not built - precisely the gap section 5 closes once it ships.</p></td></tr>
+</tbody>
+</table>
+
+<p><strong>Next, in order:</strong> stage 4, so anchors are re-checked against disk; the command runner; select and wire the AI tool for stage 3; regenerate against a repo nobody has read; measure the time saved.</p>
+
+<h2>Judging criteria - where the evidence is</h2>
+
+<table>
+<tbody>
+<tr><th><p>Criterion</p></th><th><p>Evidence on this page</p></th></tr>
+<tr><td><p><strong>Innovation</strong></p></td><td><p>Section 4 - verification is deterministic code, not a second model; quote-not-line-numbers. Section 5 - the five checks a claim must survive and the twelve ways it can be deleted. Section 3 - one stage of five uses AI.</p></td></tr>
+<tr><td><p><strong>Impact</strong></p></td><td><p>Section 2 - four situations, and where the time goes in each. Section 6 - mechanism and assumptions stated; the figure marked <code>[TBD]</code> rather than invented, with the experiment named.</p></td></tr>
+<tr><td><p><strong>Feasibility</strong></p></td><td><p>Section 7 - both gates pass with output quoted, 8 tests pass, contract frozen, verification design specified in full, 10-hour budget with a written pivot rule. Section 10 - what is not built.</p></td></tr>
+<tr><td><p><strong>User experience</strong></p></td><td><p>Section 8 - on-screen anatomy. Section 9 - a 60-second path anyone can follow. Section 6 - one offline file, evidence one click away, no question needed to start.</p></td></tr>
+</tbody>
+</table>

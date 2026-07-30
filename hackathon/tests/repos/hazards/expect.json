@@ -1,0 +1,35 @@
+{
+  "repo": "hazards",
+  "proves": "read_source's whole error surface -- NUL detection, BOM, a PEP 263 cookie, CRLF, a form feed, a 5,000-char line, a SyntaxError -- plus a dangling import target and a stdlib name shadowed by a repo module. It does NOT prove the render armour under this invocation; evil.py is checked in for that day but never reaches the HTML. See gaps.",
+  "plan": ["11.1", "3.1", "3.3", "3.4", "3.5", "9 row 9", "9 row 10"],
+  "invocation": "--provider stub --run-commands none",
+  "degradation_rows": [1, 2, 4, 7, 8],
+  "ledger_rows": [9, 10],
+  "degradations": ["no_trace", "no_test_command", "few_modules", "narration_budget", "no_commands", "stop_dropped"],
+  "degradations_if_no_churn": ["no_churn"],
+  "stop_drops": {
+    "cp-a": "no survey answer key for cp-a2",
+    "cp-c": "no traceable entry point, so the trace stop was not generated"
+  },
+  "notes": [
+    "VOCABULARY IS MEASURED, NOT GUESSED. README caveat 1 said these strings were a best guess against row numbers; they were reconciled on 2026-07-30 by running the invocation above and reading verification-report.json.degradations. The implementation is the shipped contract, so the strings moved: no_entry_point -> no_trace, stops_dropped -> stop_dropped. compose.py keys the CALLOUT 'stops_dropped' in its DEGRADATIONS catalogue, but the ledger ROWS that callout aggregates are 'stop_dropped', one per dropped stop, and the row is what reaches degradations.",
+    "Rows 9 and 10 emit NO degradation row, so parse_failures and files_skipped are gone from degradations and now sit in ledger_rows. That is the reading their empty Mode column supports and the opposite of what section 9's preamble implies; the implementation settled it. They are asserted directly instead -- see the hard assertions below.",
+    "no_commands has no section 9 row at all. compose.py:656 adds it when the runner executed nothing, so it fires on every repo under --run-commands none. A harness running --run-commands safe should subtract it.",
+    "narration_budget (row 7) fires on every repo under --provider stub because no narration store is checked in: 0 of 3 units narrated. It is in the exact set because the section 11.3 invocation always produces it, not because this repo forces it.",
+    "Row 1 fires here on its NO-ENTRY-POINT half (entry_points is empty, correctly) and would fire anyway on its fewer-than-two-hops half: hops are hand-specified per decision 25 in fixtures/trace.<repo>.json and only restored/ has one, so ctx.hops is empty for every fixture repo. cp-c drops with it on all four.",
+    "cp-a drops here for want of cp-a2 only. cp-a1 IS generated -- nine rankable files and no fan-in tie at the top -- but cp-a2 needs an entry point and there is none. The stop needs BOTH keys (compose._needs_checkpoints), so one surviving question is not enough.",
+    "map_nodes is deliberately OMITTED. This repo exists to prove survey does not crash and degrades honestly; pinning a node count here would make an unrelated collapse tweak look like an encoding regression. The measured value is currently 1.",
+    "Hard assertions worth making instead of a node count, all four VERIFIED against survey.json on 2026-07-30: parse_failures == [{path: broken.py, line: 3, offset: 12, msg: invalid syntax}]; walk.skipped == [{path: image.py, reason: 'not text'}]; stdlib_shadowed == ['secrets']; dangling == one target, pkg.missing, one site at evil.py:23.",
+    "Nothing here may raise. 3.5 is explicit: catch SyntaxError AND ValueError, record path/line/offset/msg, set parsed=false, keep loc and the file entry, continue.",
+    "pkg/crlf.py is the CRLF case. If the survey's excerpt of it contains a trailing \\r, or a sha256_range over it disagrees with the gate, read_source is not normalising and every claim on a CRLF repo will drop.",
+    "formfeed.py is the reason 3.1 forbids str.splitlines(). Under splitlines the module docstring is four lines, not two, and every ast.lineno below it points at the wrong source text.",
+    "evil.py's job in THIS run is the dangling target and the parse -- it is read, parsed (loc 25) and its hostile literals pass through survey without incident. Its render-armour payload is NOT exercised: nothing here bundles it. The claim that once read 'evil.py must round-trip through render's armour with check-bundle.js still exiting 0' has moved to gaps, where it is a wish and not a measurement.",
+    "image.py is a real PNG. It must be counted in walk.skipped and must never reach ast.parse -- a NUL through ast is a ValueError, not a SyntaxError, which is exactly why 3.5 catches both."
+  ],
+  "gaps": [
+    "This run proves nothing about verify's drop path: with --provider stub and no narration store, 0 units narrate, report.dropped is [] and resolve-and-delete is never entered. See nested_root/expect.json gaps -- that is the only fixture with enough map nodes and real anchorable quotes to host a store.",
+    "AND IT PROVES NOTHING ABOUT RENDER'S ARMOUR. MEASURED 2026-07-30 under the invocation above: verified.json.files == {} and verification-report.json.files_bundled == 0, so no repo bytes are bundled at all. grep -o -F over the generated hazards.html: '@font-face' 0, '@import' 0, 'x/y.js' 0, 'RENDER — knows only' 1 -- and that one hit is render.SCRAPE_MARKER in the template itself, not evil.py's copy. The armour path opens only once a claim anchors into evil.py and render bundles the file, and the same missing narration store that closes the drop path closes this one: 0 of 2 units narrate. check-bundle.js exiting 0 on this bundle is therefore true and uninformative about decision 9.",
+    "So do NOT describe hazards as covering plan section 7 or decision 9. Those four rules ARE covered today -- by tests/test_render.py's Splice class (test_the_dangerous_sequences_are_escaped, test_json_round_trips_through_the_armour, test_the_payload_cannot_forge_the_end_marker), against hand-written hostile lines that mirror evil.py's PAYLOAD list rather than evil.py itself. What is missing is the round trip of evil.py's OWN bytes. Two ways to close it, neither of them expect.json's to write: a narration store for hazards carrying one claim that quotes evil.py (see nested_root/expect.json gaps for why the store belongs to whoever owns narrate/provider and the harness), or a direct case in test_render.py that reads tests/repos/hazards/evil.py, splices it and asserts check-bundle.js still exits 0.",
+    "Two documents outside this file still make the retired claim and are owned elsewhere: tests/repos/README.md row 'hazards/' lists section 7 in its plan column and its evil.py row says the file proves \"Decision 9's four armour rules and check-bundle.js\"; and tests/test_genericity.py's test_evil_pys_splice_marker_does_not_cut_the_bundle_in_half asserts only that TRAILHEAD-DATA-START and TRAILHEAD-DATA-END each appear, which holds on every repo whether or not evil.py is bundled. Both should be reconciled against this gaps entry by their owners."
+  ]
+}

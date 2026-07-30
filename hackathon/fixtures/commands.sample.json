@@ -1,0 +1,59 @@
+{
+  "contract": "trailhead/commands@1",
+  "env": "captured 2026-07-30, ubuntu-22.04, python 3.11.8",
+  "runs": [
+    {
+      "cmd": "docker compose up -d timescale",
+      "cwd": ".",
+      "exit": 0,
+      "dur_ms": 11400,
+      "dur": "11.4 s",
+      "started": "2026-07-30T13:59:12Z",
+      "timed_out": false,
+      "env": "captured 2026-07-30, ubuntu-22.04, docker 24.0.7",
+      "out": "[+] Running 2/2\n ✔ Network payments-core_default  Created\n ✔ Container timescale             Started"
+    },
+    {
+      "cmd": "poetry install --with dev",
+      "cwd": ".",
+      "exit": 0,
+      "dur_ms": 48300,
+      "dur": "48.3 s",
+      "started": "2026-07-30T13:59:24Z",
+      "timed_out": false,
+      "env": "captured 2026-07-30, ubuntu-22.04, python 3.11.8, poetry 1.7.1",
+      "out": "Installing dependencies from lock file\n\nPackage operations: 84 installs, 0 updates, 0 removals\n\nInstalling the current project: payments-core (2.4.1)"
+    },
+    {
+      "cmd": "make lint",
+      "cwd": ".",
+      "exit": 1,
+      "dur_ms": 3100,
+      "dur": "3.1 s",
+      "started": "2026-07-30T14:00:13Z",
+      "timed_out": false,
+      "env": "captured 2026-07-30, ubuntu-22.04, ruff 0.3.4",
+      "out": "ruff check src tests\nsrc/pricing/curves.py:118:9: E731 Do not assign a lambda expression, use a def\nsrc/risk/limits.py:44:1: F401 `datetime.timezone` imported but unused\nFound 2 errors.\nmake: *** [Makefile:18: lint] Error 1"
+    },
+    {
+      "cmd": "poetry run python -m payments_core.io.smoke",
+      "cwd": ".",
+      "exit": 1,
+      "dur_ms": 2400,
+      "dur": "2.4 s",
+      "started": "2026-07-30T14:00:17Z",
+      "timed_out": false,
+      "out": "Traceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"/work/payments-core/src/io/smoke.py\", line 22, in <module>\n    curves = load_curves(cfg)\n  File \"/work/payments-core/src/io/market_store.py\", line 46, in load_curves\n    raise MissingCurve(ccy, cfg.asof)\nsrc.io.market_store.MissingCurve: ('EUR', datetime.date(2026, 7, 30))"
+    },
+    {
+      "cmd": "poetry run pytest -q",
+      "cwd": ".",
+      "exit": 0,
+      "dur_ms": 41200,
+      "dur": "41.2 s",
+      "started": "2026-07-30T14:00:20Z",
+      "timed_out": false,
+      "out": "........................................................................\n........................................................\n128 passed, 3 skipped in 40.71s"
+    }
+  ]
+}
