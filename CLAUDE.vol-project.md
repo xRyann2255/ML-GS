@@ -1,0 +1,176 @@
+# ML for Realized Volatility Forecasting -- Internship Project
+
+## Session Workflow (READ THIS FIRST)
+
+**Research-first, not plan-first.** Do not jump to implementation plans, sprints, or task lists. The project's value comes from deep understanding of features and data, not from shipping code fast.
+
+### Every session should:
+
+1. **Read `notes/research-journal.md`** to pick up where the last session left off
+2. **Read `notes/open-questions.md`** to see what's queued for exploration
+3. **Ask the user** what they want to explore today -- one topic, in depth
+4. **Go deep** -- compute things on real data, look at distributions, test assumptions, run baselines. Do not skim.
+5. **At session end**, append findings to `notes/research-journal.md` and update the relevant `notes/features/*.md` file with what was learned. Move answered questions out of `open-questions.md`.
+
+### Do NOT:
+- Create implementation plans, sprint structures, or task breakdowns unless the user explicitly asks
+- Jump from "I read a paper that says X" to "let's build X" -- first verify X on our data
+- Propose model architectures before the user understands the features that would feed them
+- Rush to write code when the user is still exploring and learning
+
+### The implementation plan emerges from research, not the other way around.
+
+---
+
+## Purpose
+Research scratchpad for a Goldman Sachs ML internship project (~20 weeks, active May-Sep 2026) focused on forecasting realized volatility. Currently in the exploration and feature understanding phase.
+
+## Repository Structure
+```
+ML/
+├── CLAUDE.md                    # this file
+├── .claude/skills/              # custom skills (write-chapter, research, status, etc.)
+├── logs/progress.md             # daily progress log
+├── deliverables/                # project deliverables (pitch, plans, scripts)
+├── docs/                        # project plans, guide specs, and design docs
+│   ├── project-plans/           # internship project directions
+│   ├── vol-learning-guide/      # learning guide specs and plans
+│   └── claude-code-optimization/# tooling and harness config
+├── notes/                       # research notes and findings
+│   ├── volatility.md            # literature survey (~45 papers)
+│   ├── research-journal.md      # session-by-session findings (append-only)
+│   ├── open-questions.md        # running list of things to investigate
+│   ├── data-access.md           # GS data inventory
+│   ├── features/                # per-feature-family exploration notes
+│   │   ├── har-components.md
+│   │   ├── jump-detection.md
+│   │   ├── leverage-effect.md
+│   │   ├── microstructure.md
+│   │   ├── cross-asset.md
+│   │   └── implied-vol.md
+│   ├── glossary.md
+│   └── faq.md
+├── reference/                   # all reference materials
+│   ├── books/                   # textbooks (Hull, AFML, Natenberg, etc.)
+│   ├── papers/                  # general reference papers + course materials
+│   ├── project-papers/          # papers specific to the vol project (32 curated)
+│   └── bibliography.md
+├── guides/                      # LaTeX learning guides
+│   ├── vol-learning-guide/      # realized-vol estimation, forecasting & ML (20 chapters)
+│   ├── quant-trading/           # quant trading (38 chapters)
+│   └── vol-project-ref/         # realized-vol project reference
+├── archive/                     # archived work (risk-as-alpha, incl. old ml-finance guide)
+└── qr-decode/                   # QR-video → repo decoder (one-command pipeline; see below)
+```
+
+## Current Phase: Exploration & Feature Understanding
+
+The project direction is ML forecasting for realized volatility. Before locking in a specific approach, methodology, or architecture, we are exploring the data and understanding what features capture and why.
+
+**Key baselines to understand first:** HAR, HAR-J/CJ, SHAR, HARQ, Realized GARCH, Ridge/Lasso-HAR
+
+**Evaluation (when we get there):** QLIKE (primary), MSE, Diebold-Mariano tests, Model Confidence Set, purged k-fold CV. Target: 30-80 bps QLIKE improvement + economic-value test.
+
+---
+
+## Writing Learning Guides
+
+New guides go in `guides/<guide-name>/`. Follow existing conventions from `guides/quant-trading/` and `guides/vol-learning-guide/`.
+
+### Setup
+- **Class**: `memoir` `[11pt, openany, a4paper, oneside]` or `report` `[11pt, a4paper]`
+- **Preamble**: Shared file (`preamble.tex`) loaded via `\input{}`. No packages in chapter files
+- **Structure**: `main.tex` → `\input{chapters/chXX_name.tex}`, grouped into `\part{}`
+- **Citations**: `natbib` `[round, authoryear]`, `references.bib` at guide root
+
+### Required Box Types (tcolorbox)
+| Box | Colour | Purpose |
+|---|---|---|
+| `intuition` | Green | Plain-English explanations, analogies |
+| `keyidea` | Blue/Orange | Important concepts, algorithms |
+| `warning` | Red | Common mistakes, methodological errors |
+| `workedexample` | Teal | Step-by-step numerical walk-throughs |
+| `projectconnection` | Teal | Ties content to the GS project |
+| `prereq` | Purple | Background knowledge and prerequisites |
+
+### Style Rules
+- Open with a concrete question, not an abstract definition
+- Every chapter starts with a prereq box
+- Worked examples mandatory for hard concepts (setup → computation → table → intuition)
+- `booktabs` tables only. No vertical rules
+- Cite papers from `reference/` liberally (`\citep{}` parenthetical, `\citet{}` textual)
+- Teach from first principles — define every term on first use (bold it)
+
+---
+
+## Preparing `docs-only` Branch for Download
+
+The `docs-only` branch contains only compiled PDFs, deliverables, and markdown notes (no source code, no reference materials). Use it to download on restricted machines that flag code files.
+
+**To update it from main:**
+
+1. Compile all guides that have changed — to the pagination fixpoint, not a fixed pass count (a shifted page break can leave the TOC one page stale after three passes):
+   ```bash
+   for g in vol-learning-guide quant-trading vol-project-ref; do
+     cd guides/$g
+     pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1; bibtex main >/dev/null 2>&1
+     for i in 1 2 3 4 5; do
+       before=$(md5sum main.toc main.aux main.ind 2>/dev/null)
+       pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1
+       [ "$before" = "$(md5sum main.toc main.aux main.ind 2>/dev/null)" ] && break
+     done
+     grep 'Output written on' main.log | tail -1
+     cd ../..
+   done
+   ```
+2. Commit any updated PDFs to main.
+3. Switch to docs-only and reset it from main, keeping only the target files:
+   ```bash
+   git checkout docs-only
+   git checkout main -- guides/vol-learning-guide/main.pdf guides/vol-learning-guide/markdown/ guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/
+   find guides deliverables notes -name '*.py' -exec sh -c 'mv -f "$1" "$1.txt"' _ {} \;
+   git add -A -- guides deliverables notes
+   git commit -m "chore: sync compiled PDFs, markdown, and notes from main"
+   git push
+   git checkout main
+   ```
+
+**No `.py` files on `docs-only` — ever.** Restricted machines flag Python files, so any `.py` headed for the branch must be renamed to `.py.txt` (the `find` step above). A git pre-commit hook enforces this on every docs-only commit by auto-renaming staged `.py` files. Source of truth is `.githooks/pre-commit` on main; it must be installed locally (tracked files vanish from the working tree on docs-only, so `core.hooksPath` can't be used):
+```bash
+cp .githooks/pre-commit .git/hooks/pre-commit   # re-run after a fresh clone
+```
+
+**What stays on `docs-only`:**
+- `guides/vol-learning-guide/main.pdf`, `guides/quant-trading/main.pdf`, `guides/vol-project-ref/main.pdf`
+- `guides/vol-learning-guide/markdown/` (markdown conversion of learning guide, with Mermaid diagrams, for LLM consumption)
+- `guides/vol-project-ref/markdown/` (markdown conversion of project reference, with Mermaid diagrams, for LLM consumption)
+- `deliverables/` (all .md and .html)
+- `notes/` (all .md)
+
+---
+
+## QR-Code Video Decoder (`qr-decode/`)
+
+Utility to recover a repository that was encoded as base64, split across 810 QR codes, and screen-recorded to video. The whole pipeline runs as **one command**:
+
+```bash
+pip install opencv-python zxing-cpp numpy
+python qr-decode/decode.py [VIDEO] [--out DIR]   # VIDEO defaults to qr_codes.mp4
+```
+
+`decode.py` does everything end to end: scans every video frame with `zxing`, decodes each standard byte-mode QR payload (format `{seq}/{total}:{base64_chunk}`), reassembles the chunks in sequence order into one base64 string, verifies its **SHA-256** (expected `bab1a635…cd90cf`), base64-decodes it to `repo-snapshot.tar.xz`, and extracts it into `restored/`. It aborts on any missing chunk or SHA mismatch (`--keep-going` overrides).
+
+- `regenerate_qrs.py` — source-side companion that (re)generates spec-compliant, self-verified QR PNGs from the base64 (run on the machine holding the source file).
+- `repo-snapshot.tar.xz`, `repo-snapshot.tar.xz.b64`, `restored/` — the recovered, SHA-verified output.
+
+The QRs must be **standard** byte-mode symbols. An earlier non-standard encoder (invalid format-info, each codeword repeated 8× → unreadable and data-truncated) made the video undecodable past chunk 1; regenerating with `regenerate_qrs.py` (or any compliant library, e.g. `segno`) is the fix.
+
+---
+
+## Conventions
+- `docs/project-plans/` for internship project plans (grouped by direction)
+- `docs/vol-learning-guide/` for learning guide specs and plans
+- `docs/claude-code-optimization/` for tooling docs
+- `notes/` for project notes
+- `reference/project-papers/` for ML vol papers, `reference/papers/` for general
+- All code follows TDD: failing test → implement → pass → commit
