@@ -1,0 +1,125 @@
+# Trial-076b: Optuna HPO for LSTM architecture (n_layers × hidden_dim × lr)
+#
+# Base: trial-076 (daily LSTM + IV features, QLIKE 0.1609 with n_layers=3, hidden_dim=2)
+# Change: Search optimal (n_layers, hidden_dim, learning_rate) via Optuna HPO
+#   across 8 GPUs (128 trials total, 16 per GPU).
+#
+# Hypothesis: The Rosenbaum-style tiny hidden_dim (2-8) combined with deeper
+#   layers (1-6) and tuned learning rate can improve upon the manually-found
+#   (3, 2, 0.001) combination. Systematic search will find the Pareto-optimal
+#   architecture for this daily lookback + IV feature set.
+#
+# Fixed params: everything from trial-076 EXCEPT the 3 searched params.
+
+name: trial_076b_lstm_hpo_arch
+n_gpus: 8
+
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2024-12-31"]
+horizons: [1]
+
+feature_layers: [iv_surface, har_core, asymmetry, options]
+
+fold_cache_enabled: false
+
+model:
+  name: lstm
+  params:
+    hidden_dim: 2
+    n_layers: 3
+    dropout: 0.0
+    bidirectional: true
+    learning_rate: 0.001
+    weight_decay: 0.0
+    max_epochs: 500
+    batch_size: 2048
+    val_fraction: 0.15
+    early_stopping_rounds: 7
+    loss: mse
+    device: auto
+    precision: auto
+    compile: false
+    seed: 42
+    symbol_embed_dim: 0
+    pool_mode: last_hidden
+    head_mode: linear
+
+sequences:
+  source: daily_lookback
+  features:
+    - log_rv_d
+    - log_rv_w
+    - log_rv_m
+    - signed_return_d
+    - abs_ret_d
+    - log_atm_iv_d
+    - vrp_d
+    - vvix_d
+    - iv_skew_d
+    - iv_term_slope_d
+  max_bars: 22
+  norm_mode: pooled
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+training_mode: pooled
+
+tuning:
+  enabled: true
+  n_trials: 128
+  timeout: 7200
+  storage_dir: workspace/tmp/trial_076b_hpo_journal
+  search_space:
+    hidden_dim:
+      type: categorical
+      choices: [2, 3, 4, 6, 8]
+    n_layers:
+      type: int
+      low: 1
+      high: 6
+    learning_rate:
+      type: float
+      low: 0.0003
+      high: 0.005
+      log: true
+  inner_cv:
+    method: expanding_window
+    purge_gap: 10
+    train_size: 504
+    test_size: 126
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: true
+  parallel_models: 1
+  models:
+    - lstm
+    - har
+    - har_iv

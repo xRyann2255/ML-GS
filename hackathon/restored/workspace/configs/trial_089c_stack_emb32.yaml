@@ -1,0 +1,134 @@
+# Trial-089c: STACKING arm — 32-dim GNN embeddings into XGBoost champion
+#
+# Plan 09 hybrid arms: Does feeding GNN node embeddings into the tree champion
+# beat feeding just the GNN's scalar forecast? This arm STACKS the scalar
+# prediction PLUS the full 32-dimensional node embedding vector.
+#
+# Architecture:
+#   GNN (2-layer GATv2, hidden_dim=32) → gnn_prediction + 32 gnn_emb_* columns
+#   XGBoost (trial-063 champion spec) gets 1 + 32 = 33 extra features
+#
+# Comparison:
+#   arm A        = blend scalar   → 1 extra feature
+#   arm B-8      = stack 8-dim    → 1 + 8 extra features
+#   arm B-32 (this) = stack 32-dim → 1 + 32 extra features
+#
+# Prior: blending ≈ stacking at far lower complexity (Choi-Kim negative exemplar).
+# Decision rule: stacking must beat blending at h=1 with DM p<0.05.
+# TreeSHAP feature importance share of gnn_emb_* columns recorded.
+#
+# Baseline: trial_089a_blend_scalar.yaml (arm A)
+
+name: trial_089c_stack_emb32
+
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    max_leaves: 16
+    max_depth: 4
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv_1w
+
+n_gpus: 8
+
+# ---------------------------------------------------------------------------
+# Feature stack: scalar prediction + 32-dim embedding (STACKING)
+# ---------------------------------------------------------------------------
+feature_stack:
+  source_model: gnn
+  outputs: [prediction, embedding]
+  independent: true
+  model_params:
+    hidden_dim: 32
+    n_heads: 4
+    n_layers: 2
+    dropout: 0.1
+    learning_rate: 0.001
+    weight_decay: 1.0e-4
+    max_epochs: 200
+    batch_size: 32
+    val_fraction: 0.15
+    early_stopping_rounds: 15
+    loss: qlike
+    adj_window: 60
+    adj_threshold: 0.3
+    device: auto
+    precision: auto
+    seed: 42
+  sequences:
+    source: daily_lookback
+    features:
+      - log_rv_d
+      - log_rv_w
+      - log_rv_m
+      - signed_return_d
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  gsvivs_iv_sources:
+    - spx_allday_vols
+    - spx_allday_vols_tc
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+    - spx_atm_iv_1w
+  dh_enabled: false
+
+explainability:
+  enabled: true
+  method: treeshap

@@ -1,0 +1,149 @@
+# Trial-077: XGBoost Mega HPO — 8 GPU overnight squeeze
+#
+# Goal: Exhaustive HPO to squeeze maximum QLIKE performance from XGBoost.
+# Target runtime: ~4 hours on 8x NVIDIA GPUs.
+#
+# Design:
+#   - 1000 Optuna trials across 8 GPU workers (125 trials/GPU)
+#   - 14400s (4h) hard timeout to guarantee overnight completion
+#   - Journal-file storage: fully resumable if interrupted
+#   - Larger inner CV (5 folds, 504 train, 126 test) = more reliable signal
+#   - Per-trial max 5000 boosting rounds with patient early stopping (200 rounds)
+#     → each trial trains longer before declaring convergence
+#   - All 3 horizons (1/5/22) with per-horizon HAR-IV init matching
+#   - All feature layers including cross_asset + long_memory for maximum signal
+#   - Full 21-symbol universe for robust pooled estimation
+#   - Wider search space than trial-063: includes reg_alpha extremes, grow_policy,
+#     colsample_bylevel, gamma
+#
+# Storage: data/models/trial_077_xgboost_mega_hpo/optuna/
+#   → Optuna journal persists every completed trial. Safe to kill & resume.
+#   → Output models saved per fold in output_dir.
+#
+# Baseline: trial-063 champion (h1 QLIKE=0.1292) — can we break 0.125?
+
+name: trial_077_xgboost_mega_hpo_8gpu
+
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-06-30"]
+horizons: [1, 5, 22]
+
+feature_layers:
+  - iv_surface
+  - har_core
+  - asymmetry
+  - noise_robust
+  - options
+  - calendar
+  - cross_asset
+  - cross_asset_momentum
+  - long_memory
+  - tree_expansion
+
+model:
+  name: xgboost
+  params:
+    # These are the "fallback" params used for final refit after HPO selects best.
+    # During HPO, the search space overrides these.
+    n_estimators: 5000
+    early_stopping_rounds: 200
+    learning_rate: 0.01
+    max_leaves: 16
+    max_depth: 5
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv_1w
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tuning:
+  enabled: true
+  n_trials: 1000
+  timeout: 14400          # 4 hours hard cap
+  storage_dir: data/models/trial_077_xgboost_mega_hpo/optuna
+  min_train_size: 252
+  tune_every_n_folds: 3  # Re-tune more frequently (every 3 folds) to adapt to regime
+  n_jobs: 1
+  n_workers: 8           # 1 worker per GPU
+  inner_cv:
+    method: expanding_window
+    n_splits: 5          # 5 inner folds (more signal per trial, longer per trial)
+    purge_gap: 10
+    train_size: 504      # 2 years inner train
+    test_size: 126       # 6 months inner test
+
+# Per-horizon base model tenor matching
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  5:
+    model:
+      params:
+        base_model: har_iv_1w
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  models:
+    - har
+    - har_iv
+    - har_iv_0dte
+    - har_iv_1w
+    - ridge_har_iv
+    - shar_iv
+    - xgboost
+    - ewma
+    - atm_iv_implied
+  baseline: har_iv
+  mcs_bootstrap: 10000
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0
+  gsvivs_iv_sources:
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+
+seed: 42
+training_mode: pooled
+output_dir: data/models/trial_077_xgboost_mega_hpo

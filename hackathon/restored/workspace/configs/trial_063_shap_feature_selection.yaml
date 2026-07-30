@@ -1,0 +1,109 @@
+# Trial-063: SHAP-based feature selection — kitchen-sink → pruned
+#
+# Hypothesis: Training a full-feature LightGBM (all layers enabled), running
+# TreeSHAP on OOS validation data, and pruning features whose importance falls
+# below a Boruta-style shadow-feature threshold yields equal or better QLIKE
+# than the manually-curated trial-036 champion feature set.
+#
+# Method: Per-fold Boruta-SHAP elimination (shap_rfe, max 3 rounds).
+# The pipeline trains with ALL features, computes SHAP, generates shadow
+# features (random permutations), drops real features below max(shadow),
+# then retrains on the pruned set — all inside each outer CV fold.
+#
+# Baseline: trial_036_CHAMPION (128 curated features, h1=0.1289)
+
+name: trial_063_shap_feature_selection
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+# Kitchen-sink: ALL feature layers enabled
+feature_layers:
+  - iv_surface
+  - har_core
+  - asymmetry
+  - noise_robust
+  - options
+  - calendar
+  - cross_asset
+  - cross_asset_momentum
+  - long_memory
+  - realized_correlation
+  - tree_expansion
+
+model:
+  name: lightgbm
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    num_leaves: 16
+    max_depth: 4
+    min_child_samples: 150
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 3
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    base_model: har_iv_1w
+
+# SHAP feature selection: Boruta-style recursive elimination
+feature_selection:
+  enabled: true
+  method: shap_rfe
+  shadow_features: 5
+  threshold_multiplier: 1.0
+  min_features: 10
+  max_rounds: 3
+  shap_samples: 500
+  stability_threshold: 0.8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  models:
+    - lightgbm
+  gsvivs_enabled: true
+  gsvivs_iv_source: edrvs
+  dh_enabled: true
+  vt_enabled: true
+  explainability:
+    enabled: true
+    methods: [treeshap, ale]

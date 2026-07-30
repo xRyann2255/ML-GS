@@ -1,0 +1,29 @@
+# Baseline HAR experiment — SPY only, all horizons
+# Usage: vol run --config workspace/configs/baseline_har.yaml
+
+name: baseline_har
+universe:
+  - SPY
+date_range:
+  - "2015-01-02"
+  - "2024-12-31"
+horizons:
+  - 1
+  - 5
+  - 22
+feature_layers:
+  - har_core
+model:
+  name: har
+  params: {}
+cv:
+  method: expanding_window
+  n_splits: 5
+  purge_gap: 5
+  train_size: 252
+  test_size: 63
+tournament:
+  models: [har]
+training_mode: per_symbol
+seed: 42
+output_dir: data/models/baseline_har

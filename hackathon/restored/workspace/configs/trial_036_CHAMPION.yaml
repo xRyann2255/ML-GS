@@ -1,0 +1,124 @@
+# Trial-036: LightGBM with per-horizon exact tenor-matched init_score
+#
+# Hypothesis: Using 0DTE IV for h=1 init (exact 1-day tenor match) improves
+# over 1w IV init (trial-033). The 0DTE ATM IV prices exactly tomorrow's
+# realized vol, removing 4-day term premium contamination from 1w tenor.
+#
+# Note: trial-035 found HARX-0DTE (8 params) harmful, but that was a richer
+# model prone to overfitting. This tests the minimal 4-param har_iv_0dte as
+# init_score — a cleaner signal for LightGBM to build residuals from.
+#
+# Tenor mapping:
+#   h=1:  base_model=har_iv_0dte (0DTE ATM IV — exact match)
+#   h=5:  base_model=har_iv_1w   (1-week ATM IV — exact match)
+#   h=22: base_model=har_iv      (1-month ATM IV — exact match)
+#
+# Baseline: trial_033_lgbm_tenor_matched_LOCKED (h=1 uses har_iv_1w)
+
+name: trial_036_lgbm_0dte_tenor_matched
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+model:
+  name: lightgbm
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    num_leaves: 16
+    max_depth: 4
+    min_child_samples: 150
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 3
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    base_model: har_iv_1w
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# Per-horizon init: exact tenor matching
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030  # variance-space dead-band (single-seed sweep, 2026-06-12): Sharpe 1.95 -> 2.27 @ h=1 on Exec Kvar; supersedes trial-042 threshold=0 finding pending multi-seed confirmation
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1  # Sequential required for SHAP/ALE (models must persist in memory)
+  explainability:
+    enabled: true
+    methods: [treeshap, ale]
+    treeshap_max_samples: 500
+    ale_features: top_20
+    models: [lgbm_hariv0dte_init]
+  models:
+    - ewma
+    - har
+    - har_iv
+    - har_iv_1w
+    - har_iv_0dte
+    - same_day_rv
+    - lgbm_hariv0dte_init
+  baseline: lgbm_hariv1w_init
+  mcs_bootstrap: 10000
+  model_configs:
+    lgbm_hariv0dte_init:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_0dte
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_036_lgbm_0dte_tenor_matched

@@ -1,0 +1,76 @@
+# ============================================================================
+# MIRROR-ONLY WORKFLOW (Gate C, plan-02, 2026-07): the real remote is GS GitLab
+# (memory/ref/git-workflow.md — gitlab.aws.site.gs.com/eq-tech/sts/ml-vol-estimator),
+# where GitHub Actions never fire. This file runs ONLY on the personal GitHub
+# mirror and only if that mirror's default branch carries it. It is NOT the
+# project's quality gate — the lint gate lives in workspace/lint/ (pre-commit
+# trigger: Plan 04). CI here is the sanctioned bare-command context: ./vol
+# cannot run on ubuntu-latest (nix/GS-internal deps), so ruff/mypy/pytest run
+# directly, with --ignore-missing-imports on mypy for absent GS packages.
+# ============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', '.github/workflows/ci.yml']
+  pull_request:
+    branches: ["**"]
+    paths: ['src/**', '.github/workflows/ci.yml']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Workspace governance lint (lint_all.py, 21 checks)
+        # wfo-04-13: server-side mirror of the local pre-commit workspace-lint hook.
+        # Runs at repo ROOT (not src/) — stdlib-only, no venv/uv needed.
+        working-directory: ${{ github.workspace }}
+        run: python workspace/lint/lint_all.py
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (public PyPI — the GS mirror in src/uv.toml is unreachable from ubuntu-latest)
+        env:
+          UV_INDEX_URL: https://pypi.org/simple
+        run: uv sync --dev --extra ml   # --extra ml (AW-G28): without it every importorskip'd lightgbm/xgboost/optuna/shap test is silently SKIPPED here while ./vol test-all runs them
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Format check (ruff)
+        run: uv run ruff format --check .
+
+      - name: Type check (mypy)
+        run: uv run mypy volforecast/ --ignore-missing-imports
+
+      # NOTE (AW-G27): this --cov-fail-under=30 is the ONLY coverage gate anywhere.
+      # ./vol test / ./vol test-all measure no coverage, so local green is not a
+      # coverage signal. Do not copy this gate into pyproject addopts — it would
+      # false-fail the fast `-m "not slow"` loop (Plan 04 owns any gate unification).
+      - name: Test with coverage
+        run: uv run pytest tests/ --cov=volforecast --cov-report=term-missing --cov-fail-under=30
+
+      - name: Suggest debug on failure
+        if: failure()
+        run: |
+          echo "::warning::Tests or checks failed. To debug, use: /debug <failing_test_name>"
+          echo "Attach the error output above when invoking the debug workflow."

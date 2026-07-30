@@ -1,0 +1,69 @@
+# Trial-102: GNNHAR with per-fold z-score normalisation — ablation vs trial-083.
+#
+# Baseline (trial-083): GNNHAR h=1/h=5/h=22 QLIKE = 0.1837 / 0.1606 / 0.1348 (no norm).
+# Hypothesis: GNN underperformance was driven by unnormalised inputs (features spanning
+# 3 orders of magnitude, same failure mode the LSTM path had). Applying per-fold z-score
+# should close most of the gap against tree champions.
+#
+# Ablation is clean: config identical to trial-083 GNNHAR arm except graph.graph_norm_mode.
+# Gate: h=1 QLIKE < 0.170 (>13 bps improvement).
+
+name: trial_102_gnnhar_normalised
+n_gpus: 8
+
+universe: [SPY, AAPL, MSFT, NVDA, AVGO, GOOGL, AMZN, V, MA, XOM, PG,
+           JNJ, HD, NFLX, TSLA, CRM, UNH, BAC, ADBE, IWM, DIA]
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [har_core]
+
+model:
+  name: gnnhar
+  params: {}
+
+graph:
+  method: glasso
+  input: returns
+  window: 1000
+  refit_every: 21
+  min_history: 252
+  node_features: [log_rv_d, log_rv_w, log_rv_m]
+  params: {}
+  graph_norm_mode: per_fold   # <-- the only substantive delta vs trial-083
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  models: [har, ghar, stid, gnnhar_1l, gnnhar_2l]
+  baseline: har
+  mcs_bootstrap: 10000
+  parallel_models: 1
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+  model_configs:
+    ghar:
+      name: ghar
+      params: {}
+    gnnhar_1l:
+      name: gnnhar
+      params: {hidden_dim: 9, n_layers: 1, loss: qlike, n_seeds: 5, max_epochs: 300,
+               early_stopping_rounds: 25, learning_rate: 0.001, device: auto, seed: 42}
+    gnnhar_2l:
+      name: gnnhar
+      params: {hidden_dim: 9, n_layers: 2, loss: qlike, n_seeds: 5, max_epochs: 300,
+               early_stopping_rounds: 25, learning_rate: 0.001, device: auto, seed: 42}
+    stid:
+      name: stid
+      params: {embed_dim: 16, hidden_dim: 64, loss: qlike, max_epochs: 300,
+               early_stopping_rounds: 25, device: auto, seed: 42}
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_102_gnnhar_normalised

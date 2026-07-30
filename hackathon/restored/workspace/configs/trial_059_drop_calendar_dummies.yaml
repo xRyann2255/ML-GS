@@ -1,0 +1,236 @@
+# Trial-059: Drop calendar dummy features (Tier 1 dead weight)
+#
+# Hypothesis: Removing day_of_week, month, quarter_end, year_end (and their
+# tree_expansion derivatives) from the champion spec produces equal or better
+# QLIKE. These features have near-zero information for daily vol forecasting:
+# year_end/quarter_end are too sparse (~5 obs/year), month is a 12-category
+# with no established RV seasonality at daily freq, and day_of_week effects
+# vanish after controlling for IV/RV levels.
+#
+# Design: Identical to trial-036 CHAMPION in every respect except
+# drop_features removes the 4 calendar dummies + their 4 _change + 4 _zscore
+# expansions (12 features total, reducing 128 -> 116).
+#
+# Baseline: trial_036_CHAMPION (full 128-feature LightGBM)
+# Comparison envelope: trial-047 reseed (5-seed mean ± std)
+
+name: trial_059_drop_calendar_dummies
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+model:
+  name: lightgbm
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    num_leaves: 16
+    max_depth: 4
+    min_child_samples: 150
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 3
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    base_model: har_iv_1w
+    drop_features:
+      - day_of_week
+      - month
+      - quarter_end
+      - year_end
+      - day_of_week_change
+      - day_of_week_zscore
+      - month_change
+      - month_zscore
+      - quarter_end_change
+      - quarter_end_zscore
+      - year_end_change
+      - year_end_zscore
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# Per-horizon init: exact tenor matching (same as champion)
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 2
+  models:
+    - har_iv
+    - har_iv_0dte
+    - lgbm_full
+    - lgbm_drop_calendar
+    - lgbm_drop_tier123
+    - lgbm_add_0dte_ratio
+  baseline: lgbm_full
+  mcs_bootstrap: 10000
+  model_configs:
+    lgbm_full:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_0dte
+        # No drop_features — full 128-feature champion
+    lgbm_drop_calendar:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_0dte
+        drop_features:
+          - day_of_week
+          - month
+          - quarter_end
+          - year_end
+          - day_of_week_change
+          - day_of_week_zscore
+          - month_change
+          - month_zscore
+          - quarter_end_change
+          - quarter_end_zscore
+          - year_end_change
+          - year_end_zscore
+    lgbm_drop_tier123:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_0dte
+        drop_features:
+          # Tier 1: sparse calendar dummies (4 base + 8 expansion)
+          - day_of_week
+          - month
+          - quarter_end
+          - year_end
+          - day_of_week_change
+          - day_of_week_zscore
+          - month_change
+          - month_zscore
+          - quarter_end_change
+          - quarter_end_zscore
+          - year_end_change
+          - year_end_zscore
+          # Tier 2: manual interactions redundant for trees (6 base + 6 expansion)
+          - atm_iv_x_log_rv_d
+          - atm_iv_x_log_rv_w
+          - atm_iv_x_log_rv_m
+          - vix_x_log_rv_d
+          - vix_x_log_rv_w
+          - vix_x_log_rv_m
+          - vix_x_log_rv_d_change
+          - vix_x_log_rv_d_zscore
+          - vix_x_log_rv_w_change
+          - vix_x_log_rv_w_zscore
+          - vix_x_log_rv_m_change
+          - vix_x_log_rv_m_zscore
+          # Tier 3: expansion of already-weak signals (8 features)
+          - noise_gap_d_change
+          - noise_gap_d_zscore
+          - noise_gap_w_change
+          - noise_gap_w_zscore
+          - rq_rv_interaction_d_change
+          - rq_rv_interaction_d_zscore
+          - overnight_return_change
+          - overnight_return_zscore
+    lgbm_add_0dte_ratio:
+      # Champion + log_iv_0dte_1w_ratio_d (and other 0DTE features from options layer).
+      # The options layer now produces log_iv_0dte_1w_ratio_d, log_atm_iv_0dte_d,
+      # iv_term_slope_0dte1w_d, iv_0dte_accel_d when iv_0dte_atm is in data.
+      # lgbm_full was frozen at 128 features (pre-0DTE code). This model is the
+      # same spec but benefits from the new 0DTE features (~132 features total).
+      # The key addition: log_iv_0dte_1w_ratio_d (partial corr 0.24 with fwd RV).
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_0dte
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_059_drop_calendar_dummies

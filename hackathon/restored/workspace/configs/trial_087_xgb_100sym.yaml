@@ -1,0 +1,214 @@
+# Trial-087: XGBoost champion scaled to 100-symbol universe
+#
+# Hypothesis: XGBoost champion (trial-067 architecture) trained on 100 symbols
+# (pooled) improves QLIKE over the 21-symbol pooled model by exposing the tree
+# to ~5x more cross-sectional variation. More training samples per fold should
+# reduce variance and potentially improve generalization.
+#
+# Same hyperparameters as trial-063 champion. Only change: universe expanded
+# from 21 to 100 symbols (all symbols with OHLCV + ticks coverage).
+#
+# Risk: some symbols have shorter history or sparser IV data. The tree should
+# handle NaN features gracefully, but QLIKE evaluation must be apples-to-apples
+# (compare on the original 21-symbol subset for backward compatibility).
+#
+# Baseline: trial_063_xgboost_champion.yaml (21 symbols)
+
+name: trial_087_xgb_100sym
+
+universe:
+  - AAPL
+  - ABBV
+  - ABT
+  - ACN
+  - ADBE
+  - ADI
+  - AMAT
+  - AMD
+  - AMGN
+  - AMZN
+  - AVGO
+  - AXP
+  - BA
+  - BAC
+  - BKNG
+  - BLK
+  - BRK.B
+  - CAT
+  - CI
+  - CMCSA
+  - COP
+  - COST
+  - CRM
+  - CSCO
+  - CVX
+  - DE
+  - DHR
+  - DIA
+  - DIS
+  - ELV
+  - F
+  - GE
+  - GILD
+  - GM
+  - GOOGL
+  - GS
+  - HD
+  - HON
+  - IBM
+  - INTC
+  - INTU
+  - ISRG
+  - IWM
+  - JNJ
+  - JPM
+  - KO
+  - LIN
+  - LLY
+  - LOW
+  - LRCX
+  - MA
+  - MCD
+  - META
+  - MRK
+  - MS
+  - MSFT
+  - MU
+  - NEE
+  - NFLX
+  - NKE
+  - NOW
+  - NVDA
+  - PANW
+  - PEP
+  - PFE
+  - PG
+  - PLD
+  - PM
+  - PYPL
+  - QCOM
+  - QQQ
+  - REGN
+  - RTX
+  - SBUX
+  - SCHW
+  - SHW
+  - SLB
+  - SNPS
+  - SO
+  - SPGI
+  - SPX
+  - SPY
+  - SYK
+  - T
+  - TGT
+  - TJX
+  - TMO
+  - TSLA
+  - TXN
+  - UBER
+  - UNH
+  - UNP
+  - UPS
+  - USB
+  - V
+  - VRTX
+  - VZ
+  - WFC
+  - WMT
+  - XOM
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    max_leaves: 16
+    max_depth: 4
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv_1w
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# Per-horizon init: exact tenor matching (same as champion)
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  gsvivs_iv_sources:
+    - spx_allday_vols
+    - spx_allday_vols_tc
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+    - spx_atm_iv_1w
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+  explainability:
+    enabled: true
+    methods: [treeshap, ale]
+    treeshap_max_samples: 500
+    treeshap_interaction: false
+    ale_features: all
+    ale_grid_size: 50
+    models: [xgboost]
+  models:
+    - ewma
+    - har
+    - har_iv
+    - har_iv_1w
+    - same_day_rv
+    - xgboost
+  baseline: har_iv
+  mcs_bootstrap: 10000
+  model_configs:
+    xgboost:
+      name: xgboost
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 16
+        max_depth: 4
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_087_xgb_100sym

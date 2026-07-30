@@ -1,0 +1,64 @@
+# Trial-086: Spectral (GSP-HAR) + Learned Adjacency (MTGNN) arms
+#
+# Hypothesis: Two frontier graph architectures tested against the Plan-04 incumbent:
+# (a) GSP-HAR (magnetic Laplacian spectral filter on DY directed graph, q=0.25)
+#     will near-tie GNNHAR under QLIKE (its SPX MSE gain was <3%, no QLIKE evidence);
+# (b) GNN-learned (MTGNN end-to-end adjacency) will be the first predefined-vs-learned
+#     ablation on equities — unknown direction. STID (Plan 04) is the deflation control.
+#
+# Interpretation step: run energy_series over DY and corr schedules for 2020-02..2020-06;
+# if DY energy spikes in crises but corr energy doesn't, the graph-quality diagnostic
+# validates DY as the better spillover proxy (independently of model performance).
+#
+# COVID handling: included (expanding window).
+# Depends on: Plans 01–07 merged.
+
+name: trial_086_spectral_learned
+n_gpus: 8
+
+universe: [SPY, AAPL, MSFT, NVDA, AVGO, GOOGL, AMZN, V, MA, XOM, PG,
+           JNJ, HD, NFLX, TSLA, CRM, UNH, BAC, ADBE, IWM, DIA]
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [har_core]
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  models: [har, gnnhar_1l, gsp_har, gnn_learned]
+  baseline: har
+  mcs_bootstrap: 10000
+  parallel_models: 1
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+  model_configs:
+    gnnhar_1l:
+      name: gnnhar
+      params: {hidden_dim: 9, n_layers: 1, loss: qlike, n_seeds: 5, max_epochs: 300,
+               early_stopping_rounds: 25, learning_rate: 0.001, device: auto, seed: 42}
+      graph: {method: glasso, input: returns, window: 1000, refit_every: 21, min_history: 252,
+              node_features: [log_rv_d, log_rv_w, log_rv_m], params: {}}
+    gsp_har:
+      name: gsp_har
+      params: {q: 0.25, loss: qlike, n_seeds: 5, max_epochs: 300,
+               early_stopping_rounds: 25, learning_rate: 0.001, device: auto, seed: 42}
+      graph: {method: dy, input: log_rv, window: 252, refit_every: 21, min_history: 100,
+              node_features: [log_rv_d, log_rv_w, log_rv_m],
+              params: {var_lags: 4, fevd_horizon: 10, threshold: 0.05}}
+    gnn_learned:
+      name: gnn_learned
+      params: {embed_dim: 8, top_k: 5, hidden_dim: 9, loss: qlike, n_seeds: 5,
+               max_epochs: 300, early_stopping_rounds: 25, learning_rate: 0.001,
+               device: auto, seed: 42}
+      graph: {method: identity}
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_086_spectral_learned

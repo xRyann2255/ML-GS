@@ -1,0 +1,118 @@
+# Trial-051: LSTM full pooled run (H100 — production capacity)
+#
+# Goal: First serious LSTM result. Pool across all 21 trial-047 symbols, all
+# three horizons. Designed for an NVIDIA H100. Falls back to CPU if no GPU.
+#
+# Performance knobs:
+#   - device: auto         → picks cuda when available
+#   - precision: auto      → bf16 on cuda (H100 native), fp32 elsewhere
+#   - compile: true        → torch.compile(mode='max-autotune')
+#   - batch_size: 256      → fills H100 SM array; reduce if OOM
+#
+# Sequences: 10s bars (390 min × 6 bars/min = 2340 per day), 5 micro features.
+# CV: trial-047 protocol (train=504, test=126, gap=10) → ~14 folds.
+#
+# Reference baselines (pool21 reseed envelope, trial-047):
+#   h=1 har_iv = 0.1368, h=5 har_iv = 0.1080, h=22 har_iv = 0.1676
+# LSTM target: any horizon beating har_iv by ≥1% qualifies as a finding.
+
+name: trial_051_lstm_pool21
+n_gpus: 8
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2024-12-31"]
+horizons: [1, 5, 22]
+
+feature_layers: [har_core]
+
+model:
+  name: lstm
+  params:
+    hidden_dim: 128
+    n_layers: 2
+    dropout: 0.2
+    bidirectional: false
+    learning_rate: 0.001
+    weight_decay: 1.0e-4
+    max_epochs: 50
+    batch_size: 1024
+    val_fraction: 0.15
+    early_stopping_rounds: 5
+    loss: qlike
+    device: auto
+    precision: auto
+    compile: true
+    seed: 42
+
+sequences:
+  features:
+    - log_ret
+    - vol_share
+    - buy_ratio
+    - log_n_trades
+    - abs_ret
+  max_bars: 2340
+  # Phase 2.7: per-symbol z-scoring; see workspace/research/lstm-v2-notes.md
+  norm_mode: per_symbol
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+training_mode: pooled
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: true
+  parallel_models: 1
+  baseline: lstm
+  mcs_bootstrap: 10000
+  models:
+    - har
+    - har_iv
+    - lgbm_champion
+    - lstm
+  model_configs:
+    lgbm_champion:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_1w
+
+seed: 42
+output_dir: data/models/trial_051_lstm_pool21

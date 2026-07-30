@@ -1,0 +1,126 @@
+# Trial-099: GEX interaction features for h=22
+#
+# Hypothesis: Explicit GEX × IV/VRP interaction features improve h=22 QLIKE
+# by 10-20 bps over trial-098 (GEX base features only). Rationale: GEX regime
+# modulates the IV-RV relationship — in long-gamma regimes, VRP is lower
+# (dealer hedging dampens moves); in short-gamma regimes, VRP is amplified.
+# These multiplicative interactions give the tree splits it would need many
+# depth levels to discover on its own (depth=4 limits this).
+#
+# New interaction columns (computed in dealer_gamma layer):
+#   - gex_x_iv_term_slope: gex_zscore_d × iv_term_slope_d
+#   - gex_x_vrp: gex_zscore_d × vrp_d
+#   - gex_x_iv_rv_gap: gex_regime_d × iv_rv_gap_d
+#   - gex_x_vix: gex_regime_d × vix (level interaction)
+#
+# Design: h=22 only, single-seed first. If > 10 bps improvement over
+# trial-098 mean (0.16071), promote to multi-seed.
+#
+# Baseline: trial_098_gex_reseed_h22.yaml (5-seed mean 0.16071)
+# Code dependency: dealer_gamma layer must compute interaction columns
+# when options/iv_surface columns are present in daily_data.
+
+name: trial_099_gex_interactions_h22
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, dealer_gamma, calendar, tree_expansion]
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    max_leaves: 16
+    max_depth: 4
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  gsvivs_iv_sources:
+    - spx_allday_vols
+    - spx_allday_vols_tc
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+    - spx_atm_iv_1w
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+  explainability:
+    enabled: true
+    methods: [treeshap, ale]
+    treeshap_max_samples: 500
+    treeshap_interaction: false
+    ale_features: all
+    ale_grid_size: 50
+    models: [xgboost]
+  baseline: har_iv
+  mcs_bootstrap: 10000
+  models:
+    - har
+    - har_iv
+    - xgboost
+  model_configs:
+    xgboost:
+      name: xgboost
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 16
+        max_depth: 4
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_099_gex_interactions_h22

@@ -1,0 +1,150 @@
+# Trial-054: LSTM v2 residual on CHAMPION with symbol embedding (h=1)
+#
+# Combines:
+#   - trial-052 symbol embedding (dim=8) — gives LSTM symbol identity
+#   - trial-053 residual stacking — LSTM learns residuals on top of LightGBM champion
+#
+# Hypothesis: Symbol embedding helps the LSTM learn symbol-specific residual
+# patterns that the pooled LightGBM misses (e.g., NVDA has different intraday
+# vol dynamics than JNJ even after the tabular model accounts for features).
+#
+# Reference baseline (trial-047 reseed envelope, pool21):
+#   h=1  har_iv = 0.1368  lgbm_champion_mean = 0.13679
+# Target: beat CHAMPION base by >=1% QLIKE.
+
+name: trial_054_lstm_residual_embed_h1
+n_gpus: 8
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+# Top-level feature_layers feeds tabular paths in the tournament (har,
+# har_iv, etc). The LSTM consumes sequences (below) and its base model
+# has its OWN feature_layers (under `base_model`).
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+# ---------------------------------------------------------------------------
+# Sequence model (LSTM residual learner + symbol embedding)
+# ---------------------------------------------------------------------------
+model:
+  name: lstm
+  params:
+    hidden_dim: 128
+    n_layers: 2
+    dropout: 0.2
+    bidirectional: false
+    learning_rate: 0.001
+    weight_decay: 1.0e-4
+    max_epochs: 50
+    batch_size: 512
+    val_fraction: 0.15
+    early_stopping_rounds: 5
+    loss: qlike
+    device: auto
+    precision: auto
+    compile: false
+    seed: 42
+    symbol_embed_dim: 8
+
+sequences:
+  features:
+    - log_ret
+    - vol_share
+    - buy_ratio
+    - log_n_trades
+    - abs_ret
+  max_bars: 2340
+
+# ---------------------------------------------------------------------------
+# Tabular base model: LightGBM CHAMPION with har_iv_0dte init at h=1
+# ---------------------------------------------------------------------------
+base_model:
+  name: lightgbm
+  feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    num_leaves: 16
+    max_depth: 4
+    min_child_samples: 150
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 3
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    base_model: har_iv_1w
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+training_mode: pooled
+
+# h=1: swap LGBM's internal init to 0DTE IV (exact tenor match)
+horizon_overrides:
+  1:
+    base_model:
+      params:
+        base_model: har_iv_0dte
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: true
+  parallel_models: 1
+  baseline: lstm_residual
+  mcs_bootstrap: 10000
+  models:
+    - har
+    - har_iv
+    - har_iv_1w
+    - har_iv_0dte
+    - lgbm_champion
+    - lstm
+  model_configs:
+    lgbm_champion:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_1w
+
+seed: 42
+output_dir: data/models/trial_054_lstm_residual_embed_h1

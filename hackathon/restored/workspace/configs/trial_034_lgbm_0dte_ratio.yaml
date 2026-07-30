@@ -1,0 +1,83 @@
+# Trial-034: LightGBM with log(iv_0dte/iv_1w) ratio feature
+#
+# Hypothesis: Adding log_iv_0dte_1w_ratio_d as a LightGBM feature improves h=1
+# QLIKE by providing a de-biased event-intensity signal (partial corr 0.24 with
+# forward RV after controlling for iv_1w level).
+#
+# Changes vs trial-033 LOCKED:
+# - No config change needed — the feature is computed by the options layer
+#   automatically when iv_0dte_atm is available in the data.
+# - The new log_iv_0dte_1w_ratio_d feature will appear in tree splits if useful.
+# - Init remains har_iv_1w (validated as optimal, moderate bias tree corrects).
+#
+# Baseline: trial_033_lgbm_tenor_matched_LOCKED (h1=0.1336, h5=0.1077, h22=0.1764)
+# Expected improvement: h=1 only (partial corr 0.24 suggests meaningful signal).
+
+name: trial_034_lgbm_0dte_ratio
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2024-12-31"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+model:
+  name: lightgbm
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    num_leaves: 16
+    max_depth: 4
+    min_child_samples: 150
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 3
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    base_model: har_iv_1w
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# h=22 uses 1m tenor init (better for monthly horizon)
+horizon_overrides:
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_034_lgbm_0dte_ratio
+
+tournament:
+  models: [har, lightgbm]
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.03
+  gsvivs_default_long: true

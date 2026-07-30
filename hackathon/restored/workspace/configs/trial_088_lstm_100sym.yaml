@@ -1,0 +1,200 @@
+# Trial-088: LSTM 5-min enriched scaled to 100-symbol universe
+#
+# Hypothesis: LSTM with 5-min enriched sequences (trial-073 architecture)
+# trained on 100 symbols (pooled) improves QLIKE over the 2-symbol config
+# by exposing the LSTM to much more cross-sectional variation. With 100
+# symbols × 2000 training days = 200K sequences per fold, the LSTM has
+# sufficient data to learn generalizable intraday patterns.
+#
+# Same architecture as trial-073 (best LSTM: QLIKE 0.1998, only 11 bps
+# below HAR, in MCS, DM p=0.076):
+#   - Bidirectional LSTM, hidden_dim=128, 2 layers
+#   - 78 bars × 12 enriched features (5-min aggregation)
+#   - train_size=2000, attention pooling
+#
+# Risk: 100-symbol pooled training is ~50× more data per epoch. May need
+# more epochs or larger batch size. Some symbols may have shorter sequence
+# history. GPU memory should be fine (78×12 is small per sample).
+#
+# Baseline: trial_073_lstm_5min_train2000_h1.yaml (2 symbols)
+
+name: trial_088_lstm_100sym
+
+universe:
+  - AAPL
+  - ABBV
+  - ABT
+  - ACN
+  - ADBE
+  - ADI
+  - AMAT
+  - AMD
+  - AMGN
+  - AMZN
+  - AVGO
+  - AXP
+  - BA
+  - BAC
+  - BKNG
+  - BLK
+  - BRK.B
+  - CAT
+  - CI
+  - CMCSA
+  - COP
+  - COST
+  - CRM
+  - CSCO
+  - CVX
+  - DE
+  - DHR
+  - DIA
+  - DIS
+  - ELV
+  - F
+  - GE
+  - GILD
+  - GM
+  - GOOGL
+  - GS
+  - HD
+  - HON
+  - IBM
+  - INTC
+  - INTU
+  - ISRG
+  - IWM
+  - JNJ
+  - JPM
+  - KO
+  - LIN
+  - LLY
+  - LOW
+  - LRCX
+  - MA
+  - MCD
+  - META
+  - MRK
+  - MS
+  - MSFT
+  - MU
+  - NEE
+  - NFLX
+  - NKE
+  - NOW
+  - NVDA
+  - PANW
+  - PEP
+  - PFE
+  - PG
+  - PLD
+  - PM
+  - PYPL
+  - QCOM
+  - QQQ
+  - REGN
+  - RTX
+  - SBUX
+  - SCHW
+  - SHW
+  - SLB
+  - SNPS
+  - SO
+  - SPGI
+  - SPX
+  - SPY
+  - SYK
+  - T
+  - TGT
+  - TJX
+  - TMO
+  - TSLA
+  - TXN
+  - UBER
+  - UNH
+  - UNP
+  - UPS
+  - USB
+  - VRTX
+  - VZ
+  - WFC
+  - WMT
+  - XOM
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [har_core]
+
+model:
+  name: lstm
+  params:
+    hidden_dim: 128
+    n_layers: 2
+    dropout: 0.2
+    bidirectional: true
+    learning_rate: 5.0e-4
+    weight_decay: 1.0e-4
+    max_epochs: 80
+    batch_size: 512
+    val_fraction: 0.15
+    val_purge_gap: 10
+    early_stopping_rounds: 8
+    loss: qlike
+    device: auto
+    precision: auto
+    compile: false
+    seed: 42
+    pool_mode: attention
+    head_mode: mlp
+
+sequences:
+  features:
+    - log_ret
+    - abs_ret
+    - vol_share
+    - buy_ratio
+    - order_flow_imbalance
+    - rolling_vpin
+    - cum_rv
+    - session_frac
+    - price_accel
+    - log_n_trades
+    - intrabar_rv
+    - volume_surprise
+  max_bars: 78
+  bar_interval: 300
+  norm_mode: per_symbol
+  source: parquet
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 2000
+  test_size: 252
+
+training_mode: pooled
+seed: 42
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  gsvivs_iv_sources:
+    - spx_allday_vols
+    - spx_allday_vols_tc
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+    - spx_atm_iv_1w
+  parallel_models: 1
+  models:
+    - har
+    - har_iv
+    - lstm
+  baseline: har_iv
+
+output_dir: data/models/trial_088_lstm_100sym

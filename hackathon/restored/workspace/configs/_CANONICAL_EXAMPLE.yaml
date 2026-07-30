@@ -1,0 +1,517 @@
+# ============================================================================
+# CANONICAL EXAMPLE CONFIG — Reference for all experiment/trial YAML files
+# ============================================================================
+# This file documents every field accepted by ExperimentConfig.from_yaml().
+# Copy this file as a starting point for new trials and delete sections you
+# don't need. All optional sections have defaults noted in comments.
+#
+# Source of truth: src/volforecast/config.py (dataclasses)
+# Last updated: 2026-06-19 (LSTM residual era, sequences + base_model + GSVIVS)
+#
+# To validate this file parses correctly:
+#   ./vol exec python -c "from volforecast.config import ExperimentConfig; ExperimentConfig.from_yaml('workspace/configs/_CANONICAL_EXAMPLE.yaml')"
+# ============================================================================
+
+# --- REQUIRED FIELDS ---------------------------------------------------------
+
+name: canonical_example  # Unique experiment identifier (used in output paths)
+
+universe:  # List of ticker symbols (max 34 in full universe)
+  - SPY
+  - AAPL
+  - MSFT
+
+date_range: ["2020-01-02", "2024-12-31"]  # [start, end] inclusive, ISO format
+
+horizons: [1, 5, 22]  # Forecast horizons in trading days (1=daily, 5=weekly, 22=monthly)
+
+# Feature layers — order matters!
+# Valid values (from src/volforecast/features/ registry):
+#   iv_surface            — Enrichment-only: loads per-symbol IV data for downstream options layer
+#   har_core              — Log RV daily/weekly/monthly (6 features)
+#   asymmetry             — Semivariances, signed jumps (12 features)
+#   noise_robust          — RQ, BPV, continuous variation (4 features)
+#   options               — ATM IV, VRP, skew, term slope, butterfly (~18 features)
+#   calendar              — FOMC, earnings, OpEx, day-of-week (11 features)
+#   cross_asset           — Treasury slope, FX vol, commodity vol (variable)
+#   cross_asset_momentum  — Daily changes/z-scores of cross-asset signals (variable)
+#   microstructure        — E-mini L2 features: OBI, depth, VPIN (variable)
+#   realized_correlation  — Realized correlation with market (variable)
+#   implied_correlation   — Cross-symbol implied correlation from IV surfaces (variable)
+#   long_memory           — Long-memory / fractional-difference features (variable)
+#   vol_of_vol            — Rolling volatility of realized volatility (variable)
+#   dealer_gamma          — Dealer gamma exposure proxies (variable)
+#   gsvivs_signals        — GSVIVS01 variance-swap signals: IV-RV gap, Kvar (variable)
+#   tree_expansion        — _change and _zscore for base features (2x expandable features)
+#
+# ORDERING CONSTRAINTS:
+#   - iv_surface MUST come before options (provides IV data that options layer consumes)
+#   - tree_expansion MUST come last (expands features from all preceding layers)
+feature_layers:
+  - iv_surface
+  - har_core
+  - asymmetry
+  - noise_robust
+  - options
+  - calendar
+  - tree_expansion
+
+# --- MODEL -------------------------------------------------------------------
+
+model:
+  # Valid model names (from src/volforecast/models/ registry):
+  #   HAR family:  har, harq, shar, har_j, har_cj, ridge_har, lasso_har
+  #   HAR-IV:      har_iv, har_iv_1w, har_iv_0dte, har_iv_1dte, har_iv_0dte_1dte,
+  #                har_iv_vvix, har_iv_skew, har_iv_term, har_iv_rich, har_iv_vrp,
+  #                har_iv_kitchen, har_iv_freq, har_iv_freq_vrp, har_iv_optimal,
+  #                har_iv_xasset, har_iv_ratevol, har_iv_1w_ratevol, har_iv_2tenor,
+  #                har_iv_noise
+  #   HAR-IV reg:  ridge_har_iv, ridge_har_iv_1w, ridge_har_iv_0dte, ridge_har_iv_xasset,
+  #                lasso_har_iv, lasso_har_iv_1w, lasso_har_iv_0dte,
+  #                elasticnet_har_iv, elasticnet_har_iv_1w, elasticnet_har_iv_0dte
+  #   SHAR-IV:     shar_iv, shar_iv_1w, shar_iv_0dte, shar_iv_freq, shar_cj_iv_0dte,
+  #                shar_cj_iv_freq, shar_cj_iv_freq_vrp
+  #   HARQ-IV:     harq_iv, harq_iv_1w
+  #   HARX-IV:     harx_iv_h1, harx_iv_h5, harx_iv_h22 (+ ridge/lasso/elasticnet variants)
+  #   HAR-CJ-IV:   har_cj_iv_0dte, har_cj_iv_freq, har_cj_iv_freq_vrp
+  #   SHARQ-CJ:    sharq_cj_iv_0dte, sharq_cj_iv_freq, sharq_cj_iv_freq_vrp
+  #   Generic HAR-X: harx, ridge_harx, lasso_harx, elasticnet_harx
+  #                (config-driven; requires model.params.extra_features)
+  #   HARX-IV:     harx_iv_h1, harx_iv_h5, harx_iv_h22,
+  #                ridge_harx_iv_h1, ridge_harx_iv_h5, ridge_harx_iv_h22,
+  #                lasso_harx_iv_h1, lasso_harx_iv_h5, lasso_harx_iv_h22,
+  #                elasticnet_harx_iv_h1, elasticnet_harx_iv_h5, elasticnet_harx_iv_h22
+  #   HAR-IV ext:  ridge_har_iv_ratevol, lasso_har_iv_ratevol
+  #   ML:          lightgbm, lightgbm_dart, lightgbm_bagged, lightgbm_calibrated, xgboost
+  #   Ensemble:    stacking_har_lgbm, regime_blend, blend
+  #   Graph:       ghar, gnn, gnn_learned, gnnhar, dcrnn_har, stid, gsp_har
+  #                (require graph: block; gnn family additionally requires the
+  #                 torch-geometric extra — imported lazily inside models/gnn.py)
+  #   Deep:        lstm, tcn
+  #   Naive:       ewma, same_day_rv, random_walk, vix_implied, atm_iv_implied,
+  #                historical_mean, rolling_mean, median_rv, ar1
+  name: lightgbm
+
+  # Model-specific hyperparameters (keys depend on model.name)
+  # For lightgbm / lightgbm_dart:
+  params:
+    n_estimators: 5000            # Max boosting rounds (early stopping usually fires first)
+    early_stopping_rounds: 150    # Stop if val loss doesn't improve for N rounds
+    learning_rate: 0.01           # Shrinkage rate
+    num_leaves: 16                # Max leaves per tree (controls capacity)
+    max_depth: 4                  # Hard depth limit (-1 = unlimited)
+    min_child_samples: 150        # Min samples per leaf (regularization)
+    feature_fraction: 0.8         # Column subsampling per tree
+    bagging_fraction: 0.8         # Row subsampling per iteration
+    bagging_freq: 3               # Subsample every N iterations (1 = every round)
+    reg_lambda: 5.0               # L2 regularization on leaf weights
+    reg_alpha: 0.1                # L1 regularization on leaf weights
+    val_fraction: 0.15            # Fraction of train fold used for early-stopping val
+    val_purge_gap: 10             # Rows between train and val (prevents leakage)
+    # path_smooth: 1.0            # Smooth leaf values using parent stats (LightGBM 3.0+)
+    # linear_tree: false          # Fit linear model at each leaf (3x slower)
+
+  # For har / harq / shar / har_j / har_cj:
+  # params: {}  # No params needed (OLS-based)
+
+  # For ridge_har / lasso_har:
+  # params:
+  #   alpha: 1.0  # Regularization strength
+
+  # For stacking_har_lgbm:
+  # params:
+  #   base_model_params: {}       # LightGBM sub-model params
+  #   meta_alpha: 1.0             # Ridge meta-learner alpha
+  #   blend_weight: 0.5           # HAR blend weight (0-1, higher = more HAR)
+
+  # For lstm / tcn (sequence models):
+  # params:
+  #   hidden_dim: 128             # Hidden state dimension
+  #   n_layers: 2                 # Number of recurrent layers
+  #   dropout: 0.2                # Dropout rate between layers
+  #   bidirectional: false        # Use bidirectional LSTM
+  #   learning_rate: 0.001        # Adam learning rate
+  #   weight_decay: 1.0e-4        # L2 weight decay
+  #   max_epochs: 50              # Max training epochs
+  #   batch_size: 512             # Training batch size (512-1024 typical)
+  #   val_fraction: 0.15          # Fraction of train for early-stopping
+  #   early_stopping_rounds: 5    # Patience (in epochs)
+  #   loss: qlike                 # Loss function: "qlike" | "mse"
+  #   device: auto                # "auto" | "cuda" | "cpu"
+  #   precision: auto             # "auto" | "bf16" | "fp32"
+  #   compile: false              # torch.compile (faster but longer startup)
+  #   seed: 42                    # Seed for weight init
+  #   symbol_embed_dim: 8         # Symbol embedding dimension (0 = no embedding)
+
+# --- SEQUENCES (optional, LSTM/TCN only) -------------------------------------
+# Required when model.name is lstm or tcn (requires_sequences = True).
+# Defines the intraday bar tensor fed to the sequence model.
+
+# sequences:
+#   features:                     # Per-bar columns from source parquet, in order
+#     - log_ret
+#     - vol_share
+#     - buy_ratio
+#     - log_n_trades
+#     - abs_ret
+#   max_bars: 2340                # Padding/truncation target (2340 = 5-min bars × 6.5h)
+#   bar_interval: 10              # Bar interval in seconds (10 = 10s, 300 = 5-min); config.py SequenceConfig
+#   source: parquet               # Enum: parquet | parquet_5min | parquet_5min_multiday | daily_lookback
+#   lookback_days: 20             # Trading days per sequence for parquet_5min_multiday / daily_lookback
+#   # sequences_dir: data/raw/micro/sequences   # Source parquet directory (default)
+#   # cache_dir: data/processed/sequences        # Tensor cache directory (default)
+#   # norm_mode: pooled           # "pooled" | "per_symbol"
+
+# --- BASE MODEL (optional, residual/stacked learning) -------------------------
+# Used by sequence models that learn the RESIDUAL of a tabular base forecast.
+# The base model trains on the same fold and its predictions feed into the
+# sequence model. Carries its own feature_layers (independent of top-level).
+
+# base_model:
+#   name: lightgbm               # Registry key for base (e.g. "lightgbm", "har_iv")
+#   feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+#   params:                       # Full params for the base model
+#     n_estimators: 5000
+#     early_stopping_rounds: 150
+#     learning_rate: 0.01
+#     num_leaves: 16
+#     max_depth: 4
+#     min_child_samples: 150
+#     feature_fraction: 0.8
+#     bagging_fraction: 0.8
+#     bagging_freq: 3
+#     reg_lambda: 5.0
+#     reg_alpha: 0.1
+#     val_fraction: 0.15
+#     val_purge_gap: 10
+#     base_model: har_iv_1w      # LightGBM init model (HAR linear base for boosting)
+
+# --- FEATURE STACK (optional, LSTM → tabular model stacking) -----------------
+# Trains a sequence model (LSTM) on intraday bars per CV fold, then injects
+# its outputs as extra columns in the tabular model's feature matrix.
+# This is the INVERSE of residual stacking: LSTM features feed the tree.
+#
+# The tabular model (e.g. LightGBM) sees these as additional features alongside
+# its standard feature_layers columns. It can learn arbitrary non-linear
+# combinations and regime-conditional weighting of the LSTM signal.
+
+# feature_stack:
+#   source_model: lstm            # Model registry key for the stacking source
+#   outputs:                      # Features to extract from the source model
+#     - prediction                # Scalar log-RV prediction (1 column: lstm_prediction)
+#     - attention_entropy         # Shannon entropy of attention weights (lstm_attention_entropy)
+#     # - attention_peak_time     # Normalized argmax of attention (lstm_attention_peak_time)
+#     # - embedding               # Pooled hidden state (lstm_embedding_0..N columns)
+#   # embedding_dim: 16           # PCA-reduce embedding to this dim (null = raw hidden_dim)
+#   independent: true             # true: LSTM trains WITHOUT seeing tabular base predictions
+#                                 # false: LSTM also receives base_preds (bidirectional stacking)
+#   model_params:                 # Hyperparameters for the source model
+#     hidden_dim: 128
+#     n_layers: 2
+#     dropout: 0.2
+#     bidirectional: true
+#     learning_rate: 3.0e-4
+#     weight_decay: 5.0e-4
+#     max_epochs: 50
+#     batch_size: 256
+#     loss: qlike
+#     device: auto
+#     precision: auto
+#     seed: 42
+#   sequences:                    # Override top-level sequences config for this LSTM
+#     features:                   # v2 + v3 features the LSTM sees per 10s bar
+#       - log_ret
+#       - vol_share
+#       - buy_ratio
+#       - log_n_trades
+#       - abs_ret
+#       # v3 enriched (available):
+#       # - rolling_vpin           # 50-bar rolling VPIN (order flow toxicity)
+#       # - price_accel            # Second-difference of returns (momentum change)
+#       # - cum_rv                 # Cumulative intraday realized variance
+#       # - session_frac           # Normalized session position [0,1]
+#     max_bars: 2340              # 10s bars × 6.5h RTH session
+
+# --- CROSS-VALIDATION --------------------------------------------------------
+
+cv:
+  # Valid methods: expanding_window | purged_kfold | rolling_window | blocked_kfold
+  method: expanding_window
+  n_splits: 5          # Number of CV folds (used by kfold methods; expanding_window auto-calculates)
+  purge_gap: 10        # Embargo gap in DATE units between train/test to prevent leakage
+  embargo: 0           # Post-test date embargo — drops indices in [test_end, test_end + embargo) from all subsequent folds' train sets (default 0; used by no trial config to date)
+  train_size: 504      # Initial training window in trading days (504 = 2 years)
+  test_size: 126       # Test window per fold in trading days (126 = 6 months)
+
+# --- TUNING (optional) -------------------------------------------------------
+# Omit this section entirely if not using Optuna HPO.
+
+tuning:
+  enabled: false       # Set true to run Optuna hyperparameter optimization
+  n_trials: 50         # Number of Optuna trials per tuning round
+  timeout: 600         # Max seconds per tuning round (null = unlimited)
+  storage_dir: null    # Path for Optuna study persistence (null = in-memory)
+  min_train_size: 252  # Skip tuning if outer fold train set < this many dates
+  tune_every_n_folds: 5   # Re-tune every N outer folds (reuse params in between)
+  n_jobs: 1            # Parallel Optuna trials (LightGBM releases GIL, safe >1)
+  n_workers: 1         # Multi-process Optuna workers (separate LightGBM instances)
+
+  # Inner CV for tuning (nested inside each outer fold)
+  inner_cv:
+    method: expanding_window
+    n_splits: 3
+    purge_gap: 10
+    train_size: 252
+    test_size: 63
+
+# --- FEATURE SELECTION (optional) --------------------------------------------
+# SHAP-based feature elimination. Trains a full-feature model per CV fold,
+# computes TreeSHAP on the OOS validation split, and drops features whose
+# importance falls below a Boruta-style shadow-feature threshold. The pruned
+# model is then retrained on the selected features only.
+#
+# This is INDEPENDENT of tuning — you can use both (tune first, then select).
+# Selection happens INSIDE each outer CV fold to prevent data leakage.
+
+# feature_selection:
+#   enabled: false            # Set true to activate SHAP feature selection
+#   method: shap_rfe          # "shap_rfe" (recursive elimination) | "boruta_shap" (single pass)
+#   shadow_features: 5        # Number of random-permutation shadow features for threshold
+#   threshold_multiplier: 1.0 # Scale factor: threshold = max(shadow_importance) * this
+#   min_features: 5           # Floor: never drop below this many features
+#   max_rounds: 3             # Max elimination rounds (shap_rfe); boruta_shap always uses 1
+#   shap_samples: 500         # Max samples for TreeSHAP computation per round
+#   stability_threshold: 0.8  # Dashboard reports features kept in >= this fraction of folds
+
+# --- TOURNAMENT (optional) ---------------------------------------------------
+# Omit if running a single model. Used for multi-model comparison.
+
+tournament:
+  # List of model names to evaluate (must be valid registry names)
+  models:
+    - ewma
+    - same_day_rv
+    - har
+    - har_iv
+    - atm_iv_implied
+    - har_j
+    - har_cj
+    - lasso_har
+    - ridge_har
+    - lightgbm
+  baseline: har            # Reference model for DM tests / delta tables
+  mcs_bootstrap: 10000    # Bootstrap samples for Model Confidence Set test
+  parallel_models: 1      # >1 runs models in separate processes (careful with memory)
+
+  # --- Economic-value backtests ---
+  dh_enabled: true         # Delta-hedged straddle PnL table + plots
+  dh_mode: realistic       # "realistic" | "discrete" | "simple"
+  vt_enabled: true         # Vol-targeting Sharpe / PnL table + plots
+
+  # --- GSVIVS variance swap signal backtest ---
+  gsvivs_enabled: true     # Enable GSVIVS01 variance swap signal backtest
+  gsvivs_short_threshold: 0.0   # Threshold in signal_space units (0 = binary, trial-042 optimal)
+  gsvivs_default_long: false    # If true, default position is +1 (long) unless confident short
+  gsvivs_signal_type: iv_rv_gap # "iv_rv_gap" | "iv_acceleration"
+  gsvivs_flat_percentile: 80    # Go flat when IV acceleration exceeds this percentile
+  gsvivs_iv_source: edrvs       # "edrvs" (prev-close 1-DTE varswap, no lookahead)
+  gsvivs_signal_space: variance # "vol" | "variance"
+  # gsvivs_iv_sources:           # IV sources for signal comparison (default: [spx_allday_vols])
+  #   - spx_allday_vols           # SPX AllDay Mark Kvar at 09:10 ET (best — no slippage, decision-time)
+  #   - exec_kvar                # True execution Kvar from GSVIVS01 fills
+  #   - edrvs_prev_close_1dte    # EDRVS previous-close 1-DTE variance swap strike
+  #   - spx_atm_iv_1d            # SPX ATM implied vol (0-DTE / 1-day)
+  #   - spx_atm_iv_1w            # SPX ATM implied vol (1-week)
+  #   - spx_allday_vols_tc       # SPX AllDay TC-adjusted Kvar (mark − rolling TC drag)
+  # When multiple sources are listed, the dashboard shows IV-source selector
+  # buttons. When only one source is listed (or absent), no buttons appear.
+  # gsvivs_sizings:              # Position-sizing variants (null = project default 4-mode)
+  #   - binary                   # String shorthand for default params
+  #   - {mode: asym_long, max_leverage: 2.0, lookback: 63}
+  #   - {mode: zscore, max_leverage: 1.0, lookback: 63}
+  #   - long_flat
+  # Valid sizing modes: "binary" | "asym_long" | "zscore" | "long_flat"
+
+  # Override params for specific models in the tournament:
+  # model_configs:
+  #   lightgbm_aggressive:
+  #     name: lightgbm
+  #     params:
+  #       num_leaves: 31
+  #       max_depth: 6
+  #       min_child_samples: 50
+  #   ghar_glasso:              # Per-label graph override (different adjacency, same model)
+  #     name: ghar
+  #     params: {}
+  #     graph: {method: glasso, window: 1000, refit_every: 21}
+  #   ghar_dy:                  # Directed DY graph with row normalization
+  #     name: ghar
+  #     params: {w_norm: row}
+  #     graph: {method: dy, input: log_rv, window: 252, refit_every: 21,
+  #             params: {var_lags: 4, fevd_horizon: 10, threshold: 0.05}}
+
+  # --- Explainability (SHAP + ALE) ---
+  # Opt-in: compute TreeSHAP and ALE plots for tree-based models.
+  # Results appear in the model detail panel (click a model in the dashboard).
+  # explainability:
+  #   enabled: true              # Master switch (default: false)
+  #   methods: [treeshap, ale]   # Which methods to compute
+  #   treeshap_max_samples: 500  # Subsample OOS for speed (null = all)
+  #   treeshap_interaction: false # SHAP interaction values (expensive: O(TLD²))
+  #   ale_features: top_20      # "top_N" | ["feat1", "feat2"] | "all"
+  #   ale_grid_size: 50         # ALE quantile bin count
+  #   models: [lightgbm]        # null = all tree-based models
+
+# --- TRAINING MODE -----------------------------------------------------------
+
+# Valid values: pooled | per_symbol
+#   pooled     — All symbols train one model (panel data, our default)
+#   per_symbol — Separate model per symbol (more params, less data each)
+training_mode: pooled
+
+# --- OTHER -------------------------------------------------------------------
+
+seed: 42                              # Random seed for reproducibility
+output_dir: data/models/canonical_example  # Results output directory
+n_gpus: 1                             # GPUs for fold-level parallelism (LSTM/TCN only; 1 = sequential)
+fold_cache_enabled: true              # Cache fold training results for sequence models (skip re-training)
+# fold_cache_dir: null                # Override fold cache path (default: data/models/lstm_cache)
+
+# --- HORIZON OVERRIDES (optional) --------------------------------------------
+# Per-horizon overrides for model params, CV config, or base_model.
+# Keys are horizon integers. Each can contain "model", "cv", or "base_model" sub-dicts.
+
+# horizon_overrides:
+#   1:
+#     model:
+#       params:
+#         base_model: har_iv_0dte    # LightGBM: use 0DTE IV init at h=1
+#     # cv:                          # Override CV for this horizon
+#     #   train_size: 756
+#   5:
+#     model:
+#       params:
+#         base_model: har_iv_1w      # LightGBM: use 1w IV init at h=5
+#   22:
+#     model:
+#       params:
+#         base_model: har_iv         # LightGBM: use standard IV init at h=22
+#     # For residual LSTM: override the base_model entirely at h=22
+#     # base_model:
+#     #   name: har_iv
+#     #   feature_layers: [iv_surface, har_core]
+#     #   params: {}
+
+# --- GRAPH: point-in-time adjacency for graph models (ghar/gnnhar/gnn) -------
+# method: identity | full | sector | corr | knn | glasso | dy | factor_residual
+# input: returns (corr/glasso/knn/factor_residual) | log_rv (dy)
+# params are builder-specific: corr/knn -> {threshold: 0.3} / {k: 5};
+# glasso -> {alpha: 0.1 or omit for CV}; dy -> {var_lags: 4, fevd_horizon: 10, threshold: 0.05};
+# factor_residual -> {base: corr, factor: mean, threshold: 0.5}
+# node_features: list of panel columns used as node features (default: trial_068's 9 features)
+#   [log_rv_d, log_rv_w, log_rv_m, signed_return_d, abs_ret_d, log_rs_negative_d, log_jump_d, log_bpv_d, log_cont_d]
+# graph:
+#   method: glasso
+#   window: 1000
+#   refit_every: 21
+#   min_history: 252
+#   input: returns
+#   params: {}
+#   node_features: null  # null -> default 9 features from trial_068
+#   edge_features: weight  # "weight" (scalar, default) | "volofvol" ([w, vov_src, vov_dst])
+
+# --- INGEST (optional) -------------------------------------------------------
+# Only needed for mode: ingest configs. Omit for training/tournament.
+
+# mode: ingest  # Uncomment to make this an ingestion-only config
+# ingest:
+#   workers: 4
+#   batch_size: 5
+#   checkpoint_interval: 1
+#   compute_workers: null
+#   symbol_workers: 1
+
+# ============================================================================
+# PLAN-06 EXTENSIONS — new schema surfaces added by the completeness lint
+# ============================================================================
+
+# ---- conditional_duan (config.py ~:525; heteroscedastic Duan correction, trial-068 family) ----
+# Free-form dict[str, Any] on ExperimentConfig. Contents shown here follow
+# workspace/configs/trial_068_conditional_duan.yaml (the canonical shape).
+# conditional_duan:
+#   enabled: true                 # Master switch
+#   n_estimators: 300             # XGBoost boosting rounds for the variance model
+#   max_leaves: 8                 # Leaf cap per tree
+#   max_depth: 3                  # Hard depth cap
+#   learning_rate: 0.05           # Shrinkage rate
+#   min_child_weight: 30          # Regularisation on leaf weight
+#   subsample: 0.8                # Row subsampling per tree
+#   colsample_bytree: 0.5         # Column subsampling per tree
+#   reg_lambda: 3.0               # L2 regularisation
+#   max_var: 1.0                  # Clamp on estimated σ²(x)
+#   min_folds_for_training: 2     # Skip until this many completed folds of OOS residuals
+
+# ---- feature_selection (FeatureSelectionConfig, config.py ~:251) ----
+# feature_selection:
+#   enabled: false                # Master switch — Boruta-style SHAP elimination per outer fold
+#   method: shap_rfe              # "shap_rfe" (recursive) | "boruta_shap" (single-pass)
+#   shadow_features: 5            # # of permuted shadow features for threshold
+#   threshold_multiplier: 1.0     # threshold = max(shadow_importance) * this
+#   min_features: 5               # Floor — never drop below this many
+#   max_rounds: 3                 # Max elimination rounds (shap_rfe only)
+#   shap_samples: 500             # Max samples for TreeSHAP per round
+#   stability_threshold: 0.8      # Dashboard reports features kept in ≥ this fraction of folds
+
+# ---- blend (BlendConfig, config.py ~:397; trial-072 family) ----
+# model:
+#   name: blend                   # top-level model.name; sub-models live under `blend:`
+# blend:
+#   models:                       # >=2 BlendSubModelConfig entries required
+#     - name: har_iv_0dte
+#       feature_layers: [iv_surface, har_core]
+#       params: {}
+#     - name: lightgbm
+#       feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+#       params: { n_estimators: 5000, early_stopping_rounds: 150, learning_rate: 0.01 }
+#   weight_method: inverse_qlike  # fixed | inverse_qlike | ridge_meta | regime_dependent
+#   fixed_weights: null           # required (and must sum to 1.0) when weight_method=fixed
+#   regime_indicator: null        # required column name when weight_method=regime_dependent
+#   regime_threshold: null        # threshold value (or percentile) for regime split
+#   regime_threshold_type: percentile   # "percentile" | "absolute"
+#   val_fraction: 0.20            # Validation slice for inverse_qlike / ridge_meta
+#   val_purge_gap: 10             # Rows between train and val
+#   ridge_alpha: 1.0              # ridge_meta regularisation strength
+
+# ---- implied_correlation feature layer (features/implied_correlation.py) ----
+# feature_layers:
+#   - iv_surface
+#   - implied_correlation         # requires iv_surface; SPX + constituent IVs
+
+# ---- graph model + torch-geometric extra (models/gnn.py; also gnn_learned, stid, gsp_har, dcrnn_har, gnnhar) ----
+# model:
+#   name: gnn                     # gnn | gnn_learned | gnnhar | dcrnn_har | stid | gsp_har
+#   params: { hidden_dim: 128, n_layers: 2, dropout: 0.1, loss: qlike, device: auto }
+# feature_stack:
+#   source_model: gnn
+#   outputs: [prediction, node_attention]   # node_attention is gnn-only
+# graph:
+#   method: corr                  # See ---- graph section above for enum
+#   window: 252
+#   refit_every: 21
+#   input: returns
+
+# ---- sequences.source enum (SequenceConfig, config.py ~:314–342) ----
+# sequences:
+#   source: parquet_5min          # parquet | parquet_5min | parquet_5min_multiday | daily_lookback
+#   bar_interval: 10              # seconds (10 = 10s bars, 300 = 5-min bars)
+#   lookback_days: 20             # only used by parquet_5min_multiday / daily_lookback
+#   features:                     # daily_lookback panel columns example (trial_068_gnn_standalone.yaml)
+#     - log_rv_d
+#     - log_rv_w
+#     - log_rv_m
+#     - signed_return_d
+#     - abs_ret_d
+#     - log_rs_negative_d
+#     - log_jump_d
+#     - log_bpv_d
+#     - log_cont_d

@@ -1,0 +1,421 @@
+
+Link( "_Const Database Ring" );
+Link( "_Const Slang Nulls" );
+Link( "_LIB Array Functions" );
+Link( "_LIB Config Script" );
+Link( "_LIB Container Functions" );
+Link( "_LIB CRMA PE Config" );
+Link( "_LIB DCP Catalog" );
+Link( "_LIB DCP Trade Fns" );
+Link( "_LIB FasTest" );
+Link( "_LIB Group Entitlements Fns" );
+Link( "_LIB iFS Fns" );
+Link( "_LIB RegTest Fns" );
+Link( "_LIB Value Match" );
+Link( "_Slang RegTest Stub Function" );
+
+/****************************************************************
+**  Routine: Private::Test Container ReadAll
+**
+**  Test for overwriting Container::ReadAll() by intercepting
+**  this function call and deciding whether to pass it to original
+**  function or capture it and return different results.
+****************************************************************/
+Private::Test Container ReadAll = Func()
+Returns()
+{
+    Container ReadAll Orig = Container::ReadAll;
+
+    DCP Cont = Structure( "Some", "DCP Content" );
+
+    /****************************************************************
+    **  Routine: Container ReadAll Mock Func
+    **
+    **  Mock function for Container ReadAll.
+    ****************************************************************/
+    Container ReadAll Mock Func = Lambda(
+        String( Container ),
+        Double( Refresh )               := False,
+        Database( Database )            := Database(),
+        Double( Dont Cache )            := False,
+        Double( Lock In Cache )         := False,
+        Structure( Default )            := Null::Structure,
+        Double( Min Refresh Interval )  := Null::Double,
+    )
+    {
+        // If the container name does not start with "DCP " call the original Container::ReadAll function
+        If( !StrBegins( Container, "DCP " ) )
+        {
+            Printf( ">>> Reading '%s' from '%s'.\n", Container, Database );
+            Cont = @Container ReadAll Orig(
+                Container,
+                Refresh := Refresh,
+                Database := Database,
+                Dont Cache := Dont Cache,
+                Lock In Cache := Lock In Cache,
+                Default := Default,
+                Min Refresh Interval := Min Refresh Interval,
+            );
+        }
+        :
+        {
+            // If container names starts with "DCP " return DCP Cont variable instead
+            Printf( ">>> Using DCP Cont for '%s' container contents.\n", Container );
+            Cont = DCP Cont;
+        };
+        Return( Cont );
+    };
+
+    RegTestStubFunction( Structure(
+        "_LIB Container Functions::Container::ReadAll", Container ReadAll Mock Func,
+    ) )
+    {
+        // Test reading from an arbitrary container from the current database
+        ForSecurity( Sec, "Container", "A", "Z~" )
+        {
+            // Read a container that is passed through
+            Cont = @Container::ReadAll( Sec );
+            Assert( Null != Cont );
+            Break;
+        };
+
+        // Test reading container prefixed with special string "DCP "
+        Cont = @Container::ReadAll( "DCP Test Container" );
+        Assert( Cont == DCP Cont );
+    };
+    Return();
+};
+
+/****************************************************************
+**  Routine: Private::Test SQL Query
+**
+**  Test function for getting trade details that intercepts
+**  and prints sql query
+****************************************************************/
+Private::Test SQL Query = Func()
+Returns()
+{
+    Tds = TdsArray( [ {|
+        RpID := "123",
+        RpIDOverride := "234",
+        RpIDwRollup := "123",
+        SecurityName := "abc",
+        SourceRefID := "123",
+        firmRiskAccount := "7627123",
+        CustomerAccountID := "1232132",
+        pricingEnvName := "DCPRE nyc",
+        vmMarginID := 1111,
+        regVmMarginID := 1111,
+        regIMMarginID := 1111,
+        externalTradeId := "ETI123",
+        securityType := "Forward",
+        securityQuantity := 1e6,
+        firmAccountId := "123",
+    |} ] );
+
+    /****************************************************************
+    **  Routine: Execute Raw SQL Mock Func Mock Func
+    **
+    **  Mock function for Execute Raw SQL.
+    ****************************************************************/
+    Execute Raw SQL Mock Func = Lambda(
+        String( SQL ),
+        String( Area ) := "Prod",
+    )
+    {
+        LintPragma( "Ignore apparently unused Area" );
+        Printf( ">> Intercepted SQL = '%s'\n\n", SQL );
+        Return( Tds );
+    };
+
+    RegTestStubFunction( Structure(
+        // NOTE: library name is not required for a public function
+        "DCP Datawarehouse::Execute Raw SQL", Execute Raw SQL Mock Func,
+    ) )
+    {
+        COB Date = Date( "30May25" );
+        Products = [ "Swaps" ];
+        Trade Tds = @DCP Trade::PE Trade Details New( COB Date, Products );
+        Assert( Size( Trade Tds ) == 1 );
+    };
+
+    Return();
+};
+
+/****************************************************************
+**  Routine: Private::Test File Reading
+**
+**  Test for ifs file reading mock function.
+****************************************************************/
+Private::Test File Reading = Func()
+Returns()
+{
+    File Name = "/crma_archive/20190305/PEConfig/Ras Base";
+    iFS Cache = Structure(
+        File Name, {| Report := "ras" |},
+    );
+
+    /****************************************************************
+    **  Routine: iFS File Read Mock Func
+    **
+    **  Mock function for iFS file read.
+    ****************************************************************/
+    iFS File Read Mock Func = Lambda(
+        String( Path ),
+        String( Storage ) := "CRMA";
+        Double( All Lower Case ) := True,
+        Double( On Archive ) := False,
+        Double( Timeout ) := 60,
+        String( &Error Msg ) := "",
+        Double( Use ATMOS Index ) := True,
+        Double( Use Index ) := True,
+    )
+    {
+        LintPragma( "Ignore apparently unused Storage" );
+        LintPragma( "Ignore apparently unused All Lower Case" );
+        LintPragma( "Ignore apparently unused On Archive" );
+        LintPragma( "Ignore apparently unused Timeout" );
+        LintPragma( "Ignore apparently unused Use ATMOS Index" );
+        LintPragma( "Ignore apparently unused Use Index" );
+
+        // Read data from iFS Cache
+        Ret = ComponentExtract( iFS Cache, Path, Null );
+        If( IsError( Ret ) )
+        {
+            // If data not found, set error message and return
+            Error Msg = Sprintf( "%s(): file not found: '%s'", CurrentFunctionName(), Path );
+            Print( Error Msg, "\n" );
+            Return( Null );
+        };
+        Return( Ret );
+    };
+
+    RegTestStubFunction( Structure(
+        "iFS::File Read", iFS File Read Mock Func,
+    ) )
+    {
+        // Try reading a file in iFS Cache
+        Result = @iFS::File Read( File Name );
+        Assert( Result == iFS Cache[ File Name ] );
+        // Try reading a non-existent file
+        Err Msg = "";
+        Result = @iFS::File Read( "non_existent_file_name", Error Msg := &Err Msg );
+        Assert( Null == Result );
+        Assert( Size( Err Msg ) );
+    };
+
+    Return();
+};
+
+/****************************************************************
+**  Routine: Private::Test File Reading with Fallback
+**
+**  Test iFS file read function with an override and fall back to
+**  original when file is not found.
+****************************************************************/
+Private::Test File Reading with Fallback = Func()
+Returns()
+{
+    File Name = "/crma_archive/20190305/PEConfig/Ras Base";
+    iFS Cache = Structure(
+        File Name, {| Report := "ras" |},
+    );
+
+    // Save original function into iFS File Read Orig variable
+    // that is subsequently used inside of iFS File Read Mock Func
+    // as a "fallback" function
+    iFS File Read Orig = iFS::File Read;
+
+    /****************************************************************
+    **  Routine: iFS File Read Mock Func
+    **
+    **  Mock function for iFS file read.
+    ****************************************************************/
+    iFS File Read Mock Func = Lambda(
+        String( Path ),
+        String( Storage ) := "CRMA";
+        Double( All Lower Case ) := True,
+        Double( On Archive ) := False,
+        Double( Timeout ) := 60,
+        String( &Error Msg ) := "",
+        Double( Use ATMOS Index ) := True,
+        Double( Use Index ) := True,
+        Double( Check Exist ) := False,
+    )
+    {
+        // 1) try reading the file from iFS Cache
+        If( !ComponentTestAndGet( iFS Cache, Path, Ret ) )
+            // 2) fall back to original iFS::File Read() function
+            Ret = @iFS File Read Orig(
+                Path,
+                Storage := Storage,
+                All Lower Case := All Lower Case,
+                On Archive := On Archive,
+                Timeout := Timeout,
+                Error Msg := &Error Msg,
+                Use ATMOS Index := Use ATMOS Index,
+                Use Index := use Index,
+                Check Exist := Check Exist,
+            );
+        If( IsError( Ret ) )
+        {
+            // 3) if still file not found, throw
+            Error Msg = Sprintf( "%s(): file not found: '%s'", CurrentFunctionName(), Path );
+            Print( Error Msg, "\n" );
+            Return( Null );
+        };
+        Return( Ret );
+    };
+
+    RegTestStubFunction( Structure(
+        "iFS::File Read", iFS File Read Mock Func,
+    ) )
+    {
+        // Try reading file from cache
+        Result = @iFS::File Read( File Name );
+        Assert( Result == iFS Cache[ File Name ] );
+        // Next read a file from the file system
+        Existing File Name = @CRMA PE Config::PE Config Dir( Date() ) + "/ccar base";
+        Result = @iFS::File Read( Existing File Name );
+        Assert( Size( Result ) > 1 );
+        // Finally let's make sure we get an exception when we are trying to read a non existent file
+        Err Msg = "";
+        Result = @iFS::File Read( "non_existent_file_name", Error Msg := &Err Msg );
+        Assert( Null == Result );
+        Assert( Size( Err Msg ) );
+    };
+
+    Return();
+};
+
+/****************************************************************
+**  Routine: Private::Test Catalog Read and Write
+**
+**  Test function for catalog read and write.
+****************************************************************/
+Private::Test Catalog Read and Write = Func()
+Returns()
+{
+    // Cache for storing incremental updates
+    Increment Cache = [
+        {| Entry Key := "Run Date", Value := Date( "1Jan1999" ) |},
+    ];
+
+    /****************************************************************
+    **  Routine: DCP Catalog Write Mock Func
+    **
+    **  Mock function for DCP Catalog Write.
+    ****************************************************************/
+    DCP Catalog Write Mock Func = Lambda(
+        Security( Catalog ),
+        String( Entry Key ),
+        Any( Value ),
+        String( Catalog Update Description )
+    )
+    Returns()
+    {
+        LintPragma( "Ignore apparently unused Catalog" );
+        LintPragma( "Ignore apparently unused Catalog Update Description" );
+        Increment Cache &= {| Entry Key, Value |};
+        Return();
+    };
+
+    DCP Catalog Read Orig = DCP Catalog::Read;
+
+    /****************************************************************
+    **  Routine: DCP Catalog Read Mock Func
+    **
+    **  Mock function for dcp catalog read.
+    ****************************************************************/
+    DCP Catalog Read Mock Func = Lambda(
+        Security( Catalog In ),
+        String( Entry Key ),
+        Double( Version To Read ) = Current Version( Catalog In ) + Size( Increment Cache ),
+    )
+    {
+        CV = Current Version( Catalog In );
+
+        // Check Increment Cache first
+        For( i = Min( Version to Read - CV - 1, Size( Increment Cache ) - 1 ); i >= 0; i-- )
+        {
+            If( Increment Cache[ i ].Entry Key == Entry Key )
+            {
+                Printf( ">> Reading '%s' from Increment Cache[ %d ]\n", Entry Key, i );
+                Res = Increment Cache[ i ].Value;
+                Return( Res );
+            };
+        };
+
+        // If not found in Increment Cache, check passed in catalog
+        Printf( ">> Reading '%s' from '%s' version %d\n", Entry Key, Catalog In, Version to Read );
+        Res = @DCP Catalog Read Orig( Catalog In, Entry Key, Version to Read );
+        Return( Res );
+    };
+
+    RegTestStubFunction( Structure(
+        "DCP Catalog::Read",    DCP Catalog Read Mock Func,
+        "DCP Catalog::Write",   DCP Catalog Write Mock Func,
+    ) )
+    {
+        UseDatabase( Database( DbRing::DCP Front QA ) )
+        {
+            // First let's find a catalog in DCP Front QA that we could use
+            ForSecurity( Sec, "DCP ExoMap", "DCP Cat CCAR ", "DCP Cat CCAR ~" )
+            {
+                Catalog = GetSecurity( Sec, SDB_REFRESH_CACHE );
+                Try( Ex )
+                {
+                    Group = Group( "Prod!" + StrSplit( Storage Location( Catalog ), "/", True )[ 1 ] );
+                    If( !@Group::Entitled for Read( Group ) )
+                    // Skip the test if not entitled to read from the catalog
+                        Return();
+                }
+                :
+                {
+                    Print( Ex.PrettyPrint( True ), "\nSkipping this test.\n" );
+                    Return();
+                };
+                If( @DCP Catalog::Has Entry( Catalog, "Run Date" ) )
+                    Break;
+            };
+            // Next let's run some tests of DCP Catalog::Read
+            Run Date = @DCP Catalog::Read( Catalog, "Run Date" );
+            Assert( Date( "1Jan1999" ) == Run Date );
+            Next Run Date = RDateAdd( "10y", Run Date );
+            @DCP Catalog::Write( Catalog, "Run Date", Next Run Date, "Adding Next Run Date" );
+            Run Date Check = @DCP Catalog::Read( Catalog, "Run Date" );
+            Assert( Run Date Check == Next Run Date );
+            Run Date = @DCP Catalog::Read( Catalog, "Run Date", CheckN( Current Version( Catalog ) ) );
+            Assert( Date( "1Jan1999" ) != Run Date );
+            AssertException( @DCP Catalog::Read( Catalog, "Run Date", 0 ) );
+        };
+    };
+
+    Return();
+};
+
+/****************************************************************
+**  Routine: Private::Test RegTestStubConfig
+**
+**  Test RegTestStubConfig function for overwriting configs
+**  used in regression tests
+****************************************************************/
+Private::Test RegTestStubConfig = Func()
+Returns()
+{
+    Config Name = "_Cfg CRMA PE Simulation";
+    Overwritten Config = {| Overwritten Component := "Value" |};
+
+    RegTestStubConfig( Structure( Config Name, Overwritten Config ) )
+    {
+        Result = CheckN( @Config::Load( Config Name, Reload := True, ReallyReload := True ) );
+        Assert( Overwritten Config == Result );
+        Assert( Size( Result ) == 1 );
+    };
+
+    Result = CheckN( @Config::Load( Config Name, Reload := True, ReallyReload := True ) );
+    Assert( Overwritten Config != Result );
+    Assert( Size( Result ) != 1 );
+
+    Return();
+};

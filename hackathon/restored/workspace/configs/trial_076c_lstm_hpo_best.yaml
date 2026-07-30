@@ -1,0 +1,98 @@
+# Trial-076c: LSTM with HPO-found architecture from trial-076b
+#
+# Base: trial-076b HPO (Optuna trial 3, QLIKE=0.14960 on inner CV)
+# Architecture: 4 layers, hidden_dim=2, lr=9.084e-04
+# This is the exact best configuration from the HPO search, run as a
+# standalone trial with full walk-forward CV for proper OOS evaluation.
+
+name: trial_076c_lstm_hpo_best
+n_gpus: 1
+
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2024-12-31"]
+horizons: [1]
+
+feature_layers: [iv_surface, har_core, asymmetry, options]
+
+fold_cache_enabled: false
+
+model:
+  name: lstm
+  params:
+    hidden_dim: 2
+    n_layers: 4
+    dropout: 0.0
+    bidirectional: true
+    learning_rate: 0.0009084
+    weight_decay: 0.0
+    max_epochs: 500
+    batch_size: 2048
+    val_fraction: 0.15
+    early_stopping_rounds: 7
+    loss: mse
+    device: auto
+    precision: auto
+    compile: false
+    seed: 42
+    symbol_embed_dim: 0
+    pool_mode: last_hidden
+    head_mode: linear
+
+sequences:
+  source: daily_lookback
+  features:
+    - log_rv_d
+    - log_rv_w
+    - log_rv_m
+    - signed_return_d
+    - abs_ret_d
+    - log_atm_iv_d
+    - vrp_d
+    - vvix_d
+    - iv_skew_d
+    - iv_term_slope_d
+  max_bars: 22
+  norm_mode: pooled
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+training_mode: pooled
+
+tuning:
+  enabled: false
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: true
+  parallel_models: 1
+  models:
+    - lstm
+    - har
+    - har_iv

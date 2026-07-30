@@ -1,0 +1,80 @@
+# Trial-085: DCRNN-HAR horizon-conflict arbiter
+#
+# Hypothesis: DCRNN-HAR's MSE gains (−13% h=1 → −54% h=22 on SPX, Chi et al. 2026)
+# do NOT survive under QLIKE + DM. Pre-registered prediction: "h=1 gains shrink to
+# low single digits under QLIKE; the h=22 blowout (−54%) inverts or vanishes."
+#
+# Key design: dynamic daily DY graphs (refit_every: 1, 252-day lookback) paired with
+# a GRU whose matmuls are replaced by bidirectional diffusion convolutions (K=2 hops).
+# Jointly-trained HAR skip connection (the paper's best design decision).
+#
+# COVID handling: included (expanding window).
+# Depends on: Plans 01–05 merged (graph infrastructure).
+
+name: trial_085_dcrnn_har
+n_gpus: 8
+
+universe: [SPY, AAPL, MSFT, NVDA, AVGO, GOOGL, AMZN, V, MA, XOM, PG,
+           JNJ, HD, NFLX, TSLA, CRM, UNH, BAC, ADBE, IWM, DIA]
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [har_core]
+
+model:
+  name: dcrnn_har
+  params:
+    hidden_dim: 16
+    k: 2
+    seq_len: 22
+    loss: qlike
+    max_epochs: 150
+    early_stopping_rounds: 15
+    device: auto
+    seed: 42
+
+graph:
+  method: dy
+  input: log_rv
+  window: 252
+  refit_every: 1
+  min_history: 100
+  node_features: [log_rv_d, log_rv_w, log_rv_m]
+  params:
+    var_lags: 4
+    fevd_horizon: 10
+    threshold: 0.05
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  models: [har, gnnhar_1l, dcrnn_har]
+  baseline: har
+  mcs_bootstrap: 10000
+  parallel_models: 1
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+  model_configs:
+    gnnhar_1l:
+      name: gnnhar
+      params: {hidden_dim: 9, n_layers: 1, loss: qlike, n_seeds: 5, max_epochs: 300,
+               early_stopping_rounds: 25, learning_rate: 0.001, device: auto, seed: 42}
+      graph: {method: glasso, input: returns, window: 1000, refit_every: 21, min_history: 252,
+              node_features: [log_rv_d, log_rv_w, log_rv_m], params: {}}
+    dcrnn_har:
+      name: dcrnn_har
+      params: {hidden_dim: 16, k: 2, seq_len: 22, loss: qlike, max_epochs: 150,
+               early_stopping_rounds: 15, device: auto, seed: 42}
+      graph: {method: dy, input: log_rv, window: 252, refit_every: 1, min_history: 100,
+              node_features: [log_rv_d, log_rv_w, log_rv_m],
+              params: {var_lags: 4, fevd_horizon: 10, threshold: 0.05}}
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_085_dcrnn_har

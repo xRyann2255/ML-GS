@@ -1,0 +1,59 @@
+# Trial-090b: GNNHAR 1-layer + regime_prob_d as node feature
+#
+# Arm B of the regime-feature experiment (Plan 09, Task 5).
+# Baseline: trial_083 GNNHAR 1-layer arm (without regime node feature).
+#
+# Adds regime_prob_d to the GNNHAR node features alongside the standard
+# log-RV HAR lookbacks. The regime probability provides a state indicator
+# that modulates how the graph propagation channels volatility spillovers.
+#
+# Interpretation: regime-conditional QLIKE breakdown (median-split +
+# top-25% regime probability dates vs bottom-75%).
+
+name: trial_090b_gnnhar_regime
+n_gpus: 8
+
+universe: [SPY, AAPL, MSFT, NVDA, AVGO, GOOGL, AMZN, V, MA, XOM, PG,
+           JNJ, HD, NFLX, TSLA, CRM, UNH, BAC, ADBE, IWM, DIA]
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [har_core, regime]
+
+model:
+  name: gnnhar
+  params:
+    hidden_dim: 9
+    n_layers: 1
+    loss: qlike
+    n_seeds: 5
+    max_epochs: 300
+    early_stopping_rounds: 25
+    learning_rate: 0.001
+    device: auto
+    seed: 42
+
+graph:
+  method: glasso
+  input: returns
+  window: 1000
+  refit_every: 21
+  min_history: 252
+  node_features: [log_rv_d, log_rv_w, log_rv_m, regime_prob_d]
+  params: {}
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_090b_gnnhar_regime

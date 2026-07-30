@@ -1,0 +1,141 @@
+# Trial-068: XGBoost champion + ALL available feature layers
+#
+# Hypothesis: Adding all implemented layers with available data (cross_asset_momentum,
+# microstructure, long_memory, realized_correlation) to the XGBoost champion
+# config improves QLIKE by providing richer signal diversity.
+#
+# Layers added vs trial-063:
+#   - cross_asset_momentum: 5 level + 21 momentum features (rates, credit, FX, commodity)
+#   - microstructure: Kyle lambda, Amihud, VPIN, OFI, SVR, flow persistence (~12 base + tree expansion)
+#   - long_memory: 60d/90d RV lags, semivariances, mean-reversion ratio (~8 features)
+#   - realized_correlation: panel_corr_22d/5d, change, z-score (4 features)
+#
+# Risk: Signal dilution with depth=4/leaves=16 (trial-039 showed micro hurt LightGBM).
+# Mitigation: XGBoost may handle larger feature sets differently; if QLIKE degrades,
+# next step is num_leaves=32 or interaction_constraints.
+#
+# Data verified: cross_asset/ (5 parquets), micro/ (36 parquets), ohlcv/ (37 parquets, for realized_corr)
+# Layer 7 (implied correlation from Marquee) NOT included — no data available.
+#
+# Baseline: trial_063_xgboost_champion.yaml
+
+name: trial_068_xgboost_all_layers
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers:
+  - iv_surface
+  - har_core
+  - asymmetry
+  - noise_robust
+  - options
+  - calendar
+  - cross_asset_momentum
+  - microstructure
+  - long_memory
+  - realized_correlation
+  - tree_expansion
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 10000
+    early_stopping_rounds: 200
+    learning_rate: 0.005
+    max_leaves: 32
+    max_depth: 8
+    min_child_weight: 300
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv_0dte
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# Per-horizon init: exact tenor matching (same as trial-036/063)
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+  explainability:
+    enabled: true
+    methods: [treeshap, ale]
+    treeshap_max_samples: 500
+    ale_features: top_20
+    models: [xgb_hariv0dte_init]
+  models:
+    - ewma
+    - har
+    - har_iv
+    - har_iv_1w
+    - har_iv_0dte
+    - same_day_rv
+    - xgb_hariv0dte_init
+  baseline: har_iv
+  mcs_bootstrap: 10000
+  model_configs:
+    xgb_hariv0dte_init:
+      name: xgboost
+      params:
+        n_estimators: 10000
+        early_stopping_rounds: 200
+        learning_rate: 0.005
+        max_leaves: 32
+        max_depth: 8
+        min_child_weight: 300
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_068_xgboost_all_layers

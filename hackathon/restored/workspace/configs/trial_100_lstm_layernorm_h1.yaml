@@ -1,0 +1,80 @@
+# Trial-100: LSTM LayerNorm ablation (h=1)
+#
+# Same as trial-073 (best standalone LSTM, QLIKE=0.1998) except:
+#   - model.params.layer_norm: true (in-network LayerNorm on input + output)
+#
+# Rationale: In-network LayerNorm stabilises hidden state magnitudes across
+# long sequences (78 5-min bars), improves gradient flow, and provides
+# per-sample adaptive normalisation that pipeline z-score cannot.
+#
+# Gate: single-seed QLIKE < 0.195 (> 5 bps over trial-073)
+
+name: trial_100_lstm_layernorm_h1
+universe: [SPY, AAPL]
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [har_core]
+
+model:
+  name: lstm
+  params:
+    hidden_dim: 128
+    n_layers: 2
+    dropout: 0.2
+    bidirectional: true
+    learning_rate: 5.0e-4
+    weight_decay: 1.0e-4
+    max_epochs: 80
+    batch_size: 128
+    val_fraction: 0.15
+    val_purge_gap: 10
+    early_stopping_rounds: 8
+    loss: qlike
+    device: auto
+    precision: auto
+    compile: false
+    seed: 42
+    pool_mode: attention
+    head_mode: mlp
+    layer_norm: true
+
+sequences:
+  features:
+    - log_ret
+    - abs_ret
+    - vol_share
+    - buy_ratio
+    - order_flow_imbalance
+    - rolling_vpin
+    - cum_rv
+    - session_frac
+    - price_accel
+    - log_n_trades
+    - intrabar_rv
+    - volume_surprise
+  max_bars: 78
+  bar_interval: 300
+  norm_mode: per_symbol
+  source: parquet
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 2000
+  test_size: 252
+
+training_mode: pooled
+seed: 42
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+  baseline: lstm_5min
+  models:
+    - har
+    - har_iv
+    - lstm
+
+output_dir: data/models/trial_100_lstm_layernorm

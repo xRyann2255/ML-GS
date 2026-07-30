@@ -1,0 +1,58 @@
+# Trial-070: DeepVol-style TCN on 5-minute raw returns
+#
+# Implements Moreno-Pino & Zohren (2022) insight: raw 5-min returns fed into
+# dilated causal convolutions capture multi-scale volatility patterns directly.
+# The TCN sees 78 five-minute bars per day (one full trading session).
+#
+# This is a single-symbol smoke test on SPY, h=1. If the TCN produces
+# reasonable QLIKE (< 0.30), follow up with multi-symbol pooled training.
+#
+# Architecture: 3 residual blocks with dilations [1, 2, 4], kernel_size=7.
+# Receptive field = 2 * 6 * (1+2+4) = 84 > 78 bars → full sequence coverage.
+
+name: trial_070_tcn_deepvol_h1
+universe: [SPY, AAPL]
+date_range: ["2015-01-02", "2024-12-31"]
+horizons: [1]
+
+feature_layers: [har_core]
+
+model:
+  name: tcn
+  params:
+    input_dim: 1
+    n_channels: [64, 64, 32]
+    kernel_size: 7
+    dropout: 0.2
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    max_epochs: 100
+    batch_size: 64
+    val_fraction: 0.15
+    early_stopping_rounds: 10
+    loss: qlike
+    device: auto
+    precision: auto
+    seed: 42
+
+sequences:
+  source: parquet_5min
+  features: [log_ret]
+  max_bars: 78
+  norm_mode: pooled
+
+cv:
+  method: expanding_window
+  purge_gap: 5
+  train_size: 504
+  test_size: 126
+
+training_mode: pooled
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+  models:
+    - tcn
+    - har

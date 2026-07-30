@@ -1,0 +1,126 @@
+# Trial-101: Dealer gamma + GSVIVS signals combined at h=22
+#
+# Hypothesis: Combining dealer_gamma (trial-098 champion, QLIKE 0.16071)
+# with gsvivs_signals (trial-099 showed +17 bps at h=5, neutral at h=22)
+# may unlock interactions that neither layer achieves alone at h=22.
+#
+# Rationale: dealer_gamma captures options market-maker positioning;
+# gsvivs_signals capture VIX/VX1 dynamics, credit CDS returns, and SPX
+# skew term structure. These are complementary — GEX is a positioning
+# signal while GSVIVS features are price/vol dynamics of the vol complex.
+#
+# Design: Single XGBoost model with both feature layers, h=22 only.
+# Same hyperparameters and har_iv init as the h=22 champion (trial-098).
+# If single-seed improves on 0.16071, proceed to multi-seed.
+#
+# Gate: QLIKE < 0.160 (≥7 bps over h=22 champion 0.16071).
+# If marginal (0.160–0.161): multi-seed to confirm.
+# If worse: reject combination at h=22.
+#
+# Baseline: trial-098 (5-seed mean h22=0.16071)
+
+name: trial_101_gex_gsvivs_h22
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, dealer_gamma, gsvivs_signals, calendar, tree_expansion]
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 10000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    max_leaves: 16
+    max_depth: 4
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  gsvivs_iv_sources:
+    - spx_allday_vols
+    - spx_allday_vols_tc
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+    - spx_atm_iv_1w
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+  explainability:
+    enabled: true
+    methods: [treeshap, ale]
+    treeshap_max_samples: 500
+    treeshap_interaction: false
+    ale_features: all
+    ale_grid_size: 50
+    models: [xgb_gex_gsvivs]
+  baseline: har_iv
+  mcs_bootstrap: 10000
+  models:
+    - har
+    - har_iv
+    - xgb_gex_gsvivs
+  model_configs:
+    xgb_gex_gsvivs:
+      name: xgboost
+      feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, dealer_gamma, gsvivs_signals, calendar, tree_expansion]
+      params:
+        n_estimators: 10000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 16
+        max_depth: 4
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_101_gex_gsvivs_h22

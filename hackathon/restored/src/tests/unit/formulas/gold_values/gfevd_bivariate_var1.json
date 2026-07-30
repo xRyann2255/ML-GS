@@ -1,0 +1,13 @@
+{
+  "source": "Pesaran & Shin (1998) eq. 2.9; Diebold & Yilmaz (2012) eqs. 2-3",
+  "derivation": "VAR(1) y_t = A y_{t-1} + u_t. Psi_0=I, Psi_1=A. H=2. Numerators: (e_i' Psi_h Sigma e_j)^2 summed over h, scaled by 1/sigma_jj. Denominators: sum_h e_i' Psi_h Sigma Psi_h' e_i. A*Sigma = [[0.56,0.40],[0.08,0.40]]; A*Sigma*A' = [[0.40,0.16],[0.16,0.16]]. Row i=0: theta_00=(1.0^2+0.56^2)/1.40=0.938286, theta_01=(0.2^2+0.40^2)/1.40=0.142857; normalized [0.867864, 0.132136]. Row i=1: theta_10=(0.2^2+0.08^2)/1.16=0.040000, theta_11=(1.0^2+0.40^2)/1.16=1.000000; normalized [0.038462, 0.961538]. Total spillover = 100*(0.132136+0.038462)/2 = 8.529886.",
+  "inputs": {
+    "A": [[0.5, 0.3], [0.0, 0.4]],
+    "sigma": [[1.0, 0.2], [0.2, 1.0]],
+    "horizon": 2
+  },
+  "expected": {
+    "theta_normalized": [[0.86786469344609, 0.13213530655391], [0.03846153846154, 0.96153846153846]],
+    "total_spillover_pct": 8.529842250772
+  }
+}

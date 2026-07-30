@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "paper_rq": "Barndorff-Nielsen, O.E. & Shephard, N. (2002) 'Econometric Analysis of Realized Volatility and its Use in Estimating Stochastic Volatility Models', Journal of the Royal Statistical Society Series B, 64(2), pp. 253-280",
+    "equation_rq": "Definition 2: RQ_t = (M/3) * sum_{i=1}^{M} r_{t,i}^4",
+    "paper_rtq": "Barndorff-Nielsen, O.E. & Shephard, N. (2004) 'Power and Bipower Variation with Stochastic Volatility and Jumps', Journal of Financial Econometrics, 2(1), pp. 1-37",
+    "equation_rtq": "Eq. (5): RTQ = M * mu_{4/3}^{-3} * sum_{i=3}^{M} |r_i|^{4/3} |r_{i-1}|^{4/3} |r_{i-2}|^{4/3}",
+    "computed_by": "hand + NumPy verification",
+    "last_verified": "2026-05-29",
+    "tolerance": "rel=1e-12 for RQ (pure arithmetic), rel=1e-10 for RTQ (gamma function)"
+  },
+  "rq_three_returns": {
+    "input": [0.01, -0.02, 0.03],
+    "computation": "sum(r^4) = 0.01^4 + 0.02^4 + 0.03^4 = 1e-8 + 16e-8 + 81e-8 = 98e-8. RQ = (3/3) * 98e-8 = 9.8e-7",
+    "expected": 9.8e-7
+  },
+  "rq_six_uniform": {
+    "input": [0.01, 0.01, 0.01, 0.01, 0.01, 0.01],
+    "computation": "sum(r^4) = 6 * 0.01^4 = 6e-8. RQ = (6/3) * 6e-8 = 1.2e-7",
+    "expected": 1.2e-7
+  },
+  "rtq_five_returns": {
+    "input": [0.01, 0.02, 0.03, 0.04, 0.05],
+    "mu_43_approx": 0.8309,
+    "computation": "M=5, products for i=2..4: |0.03|^{4/3}*|0.02|^{4/3}*|0.01|^{4/3} + |0.04|^{4/3}*|0.03|^{4/3}*|0.02|^{4/3} + |0.05|^{4/3}*|0.04|^{4/3}*|0.03|^{4/3}. RTQ = 5 * mu_{4/3}^{-3} * sum"
+  },
+  "mu_43_constant": {
+    "formula": "mu_{4/3} = 2^{2/3} * Gamma(7/6) / Gamma(1/2)",
+    "expected_approx": 0.8309,
+    "tolerance": 0.001
+  },
+  "theta_constant": {
+    "formula": "theta = pi^2/4 + pi - 5",
+    "expected_approx": 0.6090,
+    "tolerance": 0.001
+  }
+}

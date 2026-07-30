@@ -1,0 +1,155 @@
+# Trial-046: Single-feature drop ablation on backward-looking RV features
+#
+# Hypothesis: Removing the least-important backward-looking RV features frees
+# tree split capacity (16 leaves / many features) for forward-looking signals
+# (IV, calendar, cross-asset), improving QLIKE versus the trial-036 champion.
+#
+# This is the structural follow-up to trial-045 which proved that hyperparameter
+# tuning alone cannot fix the dilution problem — the fix must be feature-level.
+# Each variant drops EXACTLY ONE feature so the marginal effect is isolated.
+#
+# Feature selection: 7 lowest-gain backward-looking features from h=1 importance
+# (no IV, no calendar, no cross-asset, no VVIX/VIX). Selected from
+# src/workspace/tmp/feature_importances.json (trial-036 fit). log_jump_d (gain
+# 15.4) was dropped from the candidate list — too trivially low to be informative
+# (the drop would be a guaranteed no-op).
+#
+# | Variant              | Drops                     | h=1 gain |
+# | lgbm_drop_rk_d_zs    | log_rk_d_zscore           | 153.6    |
+# | lgbm_drop_cont_w_ch  | log_cont_w_change         | 167.0    |
+# | lgbm_drop_rsp_d_zs   | log_rs_positive_d_zscore  | 189.4    |
+# | lgbm_drop_rsp_w_ch   | log_rs_positive_w_change  | 198.0    |
+# | lgbm_drop_jump_d_ch  | log_jump_d_change         | 203.1    |
+# | lgbm_drop_rk_w_ch    | log_rk_w_change           | 208.4    |
+# | lgbm_drop_noise_w_zs | noise_gap_w_zscore        | 234.5    |
+#
+# Controls:
+#   har_iv               — linear sanity-check baseline (cheap, runs sequentially)
+#   lgbm_hariv0dte_init  — trial-036 champion spec, NO features dropped
+#                          (primary bps comparison target)
+#
+# Top-level model + horizon_overrides preserve the trial-036 per-horizon init.
+#
+# Baseline: trial_036_lgbm_0dte_tenor_matched (h1=0.1289, h5=0.1067, h22=0.1628)
+
+name: trial_046_drop_backward_ablation
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2024-12-31"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+# Top-level model = trial-036 champion (used only for context/feature_layers
+# inference; tournament variants override params via model_configs).
+model:
+  name: lightgbm
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    num_leaves: 16
+    max_depth: 4
+    min_child_samples: 150
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 3
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    base_model: har_iv_1w
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# Per-horizon init: exact tenor matching (unchanged from trial-036).
+# These overrides are merged into EVERY tournament model's params.
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  gsvivs_enabled: true  
+  parallel_models: 2     # 8 LightGBM variants in parallel; har_iv slots in
+  baseline: lgbm_hariv0dte_init  # Full-feature control (trial-036 spec)
+  mcs_bootstrap: 10000
+  models:
+    - har_iv
+    - lgbm_hariv0dte_init
+    - lgbm_drop
+
+  model_configs:
+    # Full-feature control (identical spec to trial-036 champion).
+    # Re-running here ensures bps deltas are computed against a model fit on the
+    # IDENTICAL data / CV split as the ablation variants (no cross-trial noise).
+    lgbm_hariv0dte_init:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_1w
+        # drop_features intentionally omitted — full 128-feature set
+
+    lgbm_drop:
+      name: lightgbm
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        num_leaves: 16
+        max_depth: 4
+        min_child_samples: 150
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 3
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        base_model: har_iv_1w
+        drop_features: [log_rk_d_zscore, log_cont_w_change, log_rs_positive_d_zscore, log_rs_positive_w_change, log_jump_d_change, noise_gap_w_zscore, log_rk_w_change]
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_046_drop_backward_ablation

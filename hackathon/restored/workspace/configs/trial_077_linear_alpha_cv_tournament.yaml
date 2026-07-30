@@ -1,0 +1,196 @@
+# Trial-077: Linear Tournament with Per-Fold CV Alpha Selection
+#
+# Hypothesis: (1) CV-selected alpha beats the fixed alphas used in trials
+# 034/055/056 for at least some regularized HAR variants; (2) running the
+# full 055+056 roster under ONE config (one valid-row mask) settles the
+# unresolved h=1 discrepancy (055: ridge_har_cj_iv_0dte 0.13397 vs
+# 056: lasso_shar_iv_0dte 0.13663) and identifies the true best linear
+# model per horizon.
+#
+# Infra: tuning.enabled=true triggers _BaseOLS.tune_and_fit (deterministic
+# grid search, no Optuna) for every ridge_/lasso_/elasticnet_ model. Grids:
+#   ridge alpha:      0.01 .. 10000 (11 log-spaced)
+#   lasso/enet alpha: 1e-5 .. 0.1   (9 log-spaced)
+#   enet l1_ratio:    0.2 / 0.5 / 0.8 / 0.95
+# OLS variants are untuned controls. NO tree models in this roster —
+# global tuning would trigger Optuna HPO on them.
+#
+# Success criterion: any tuned variant beats its fixed-alpha 055/056
+# QLIKE by >5 bps at the matching horizon, OR the tournament crowns a
+# single h=1 winner with DM p<0.05 vs har_iv_0dte.
+#
+# Baseline for stats: har_iv (same as 055/056 registry entries).
+
+name: trial_077_linear_alpha_cv_tournament
+
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+# Minimal union for this roster. Deliberately excludes cross_asset (055) and
+# calendar/tree_expansion (056) so the valid-row mask is identical for all
+# models and comparable across both prior tournaments' feature sets.
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options]
+
+# Primary model slot (placeholder — tournament runs the full roster)
+model:
+  name: ridge_har_cj_iv_0dte
+  params: {}
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tuning:
+  enabled: true
+  tune_every_n_folds: 1
+  min_train_size: 252
+  inner_cv:
+    method: expanding_window
+    purge_gap: 10
+    train_size: 252
+    test_size: 63
+
+tournament:
+  gsvivs_enabled: false
+  dh_enabled: false
+  vt_enabled: false
+  mcs_bootstrap: 0
+  baseline: har_iv
+  models:
+    # --- OLS controls (untuned) ---
+    - har
+    - har_iv
+    - har_iv_1w
+    - har_iv_0dte
+    - shar_iv_0dte
+    - har_cj_iv_0dte
+    - shar_cj_iv_0dte
+    - sharq_cj_iv_0dte
+    - har_iv_freq
+    - har_iv_freq_vrp
+    - har_cj_iv_freq
+    - har_cj_iv_freq_vrp
+    - shar_iv_freq
+    - shar_cj_iv_freq
+    - shar_cj_iv_freq_vrp
+    - sharq_cj_iv_freq
+    - sharq_cj_iv_freq_vrp
+    - har_iv_optimal
+    - har_iv_2tenor
+    - har_iv_noise
+    - harq_iv
+    - harq_iv_1w
+    - shar_iv
+    - shar_iv_1w
+
+    # --- Tuned: simple HAR-IV family ---
+    - ridge_har_iv
+    - ridge_har_iv_1w
+    - ridge_har_iv_0dte
+    - lasso_har_iv
+    - lasso_har_iv_1w
+    - lasso_har_iv_0dte
+    - elasticnet_har_iv
+    - elasticnet_har_iv_1w
+    - elasticnet_har_iv_0dte
+
+    # --- Tuned: SHAR-IV family ---
+    - ridge_shar_iv
+    - ridge_shar_iv_1w
+    - ridge_shar_iv_0dte
+    - lasso_shar_iv
+    - lasso_shar_iv_1w
+    - lasso_shar_iv_0dte
+    - elasticnet_shar_iv
+    - elasticnet_shar_iv_1w
+    - elasticnet_shar_iv_0dte
+
+    # --- Tuned: HARQ-IV family ---
+    - ridge_harq_iv
+    - ridge_harq_iv_1w
+    - lasso_harq_iv
+    - lasso_harq_iv_1w
+    - elasticnet_harq_iv
+    - elasticnet_harq_iv_1w
+
+    # --- Tuned: multi-tenor + noise ---
+    - ridge_har_iv_2tenor
+    - lasso_har_iv_2tenor
+    - elasticnet_har_iv_2tenor
+    - ridge_har_iv_noise
+    - lasso_har_iv_noise
+    - elasticnet_har_iv_noise
+
+    # --- Tuned: CJ + IV (trial-055 h=1 winner family) ---
+    - ridge_har_cj_iv_0dte
+    - lasso_har_cj_iv_0dte
+    - elasticnet_har_cj_iv_0dte
+
+    # --- Tuned: combined decompositions ---
+    - ridge_shar_cj_iv_0dte
+    - lasso_shar_cj_iv_0dte
+    - elasticnet_shar_cj_iv_0dte
+    - ridge_sharq_cj_iv_0dte
+    - lasso_sharq_cj_iv_0dte
+    - elasticnet_sharq_cj_iv_0dte
+
+    # --- Tuned: frequency-matched IV + VRP families ---
+    - ridge_har_iv_freq
+    - lasso_har_iv_freq
+    - elasticnet_har_iv_freq
+    - ridge_har_iv_freq_vrp
+    - lasso_har_iv_freq_vrp
+    - elasticnet_har_iv_freq_vrp
+    - ridge_har_iv_optimal
+    - lasso_har_iv_optimal
+    - elasticnet_har_iv_optimal
+    - ridge_shar_iv_freq
+    - lasso_shar_iv_freq
+    - elasticnet_shar_iv_freq
+    - ridge_har_cj_iv_freq
+    - lasso_har_cj_iv_freq
+    - elasticnet_har_cj_iv_freq
+    - ridge_har_cj_iv_freq_vrp
+    - lasso_har_cj_iv_freq_vrp
+    - elasticnet_har_cj_iv_freq_vrp
+    - ridge_shar_cj_iv_freq
+    - lasso_shar_cj_iv_freq
+    - elasticnet_shar_cj_iv_freq
+    - ridge_shar_cj_iv_freq_vrp
+    - lasso_shar_cj_iv_freq_vrp
+    - elasticnet_shar_cj_iv_freq_vrp
+    - ridge_sharq_cj_iv_freq
+    - lasso_sharq_cj_iv_freq
+    - elasticnet_sharq_cj_iv_freq
+    - ridge_sharq_cj_iv_freq_vrp
+    - lasso_sharq_cj_iv_freq_vrp
+    - elasticnet_sharq_cj_iv_freq_vrp
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_077_linear_alpha_cv_tournament

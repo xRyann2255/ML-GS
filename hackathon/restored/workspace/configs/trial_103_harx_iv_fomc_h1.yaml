@@ -1,0 +1,105 @@
+# Trial-103: Generic HAR-X with 0DTE IV + FOMC dummy (h=1 only)
+#
+# Hypothesis: HAR core + [log_atm_iv_0dte_d, fomc_day] via the new
+# config-driven harx model matches or beats har_iv_0dte at h=1 and
+# closes part of the ~200 bps gap to the XGBoost champion (trial-067, 0.1292).
+#
+# Design: linear tournament — har, har_iv, har_iv_0dte, harx (new) —
+# plus xgb_champion (xgb_seed_42 lifted from trial-067) as the strong
+# nonlinear reference. Baseline for DM: har_iv_0dte (strongest linear
+# baseline; puts the fomc_day marginal on trial).
+#
+# Baseline config: trial_067_xgb_reseed_h1.yaml
+
+name: trial_103_harx_iv_fomc_h1
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+model:
+  name: harx
+  params:
+    extra_features:
+      - log_atm_iv_0dte_d
+      - fomc_day
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0
+  gsvivs_iv_sources:
+    - spx_allday_vols
+    - spx_allday_vols_tc
+    - exec_kvar
+  gsvivs_sizings:
+    - long_flat
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+  explainability:
+    enabled: true
+    methods: [treeshap, ale]
+    treeshap_max_samples: 500
+    treeshap_interaction: false
+    ale_features: all
+    ale_grid_size: 50
+    models: [harx]
+  baseline: har_iv_0dte
+  mcs_bootstrap: 10000
+  models:
+    - har
+    - har_iv
+    - har_iv_0dte
+    - harx
+    - xgb_champion
+  model_configs:
+    xgb_champion:
+      name: xgboost
+      params:
+        seed: 42
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 32
+        max_depth: 8
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+
+training_mode: pooled
+output_dir: data/models/trial_103_harx_iv_fomc_h1

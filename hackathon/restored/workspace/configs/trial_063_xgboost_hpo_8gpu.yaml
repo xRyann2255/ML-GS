@@ -1,0 +1,116 @@
+# Trial-063: XGBoost HPO on 8x GPU (Approach A — 1 GPU per Optuna worker)
+#
+# Hypothesis: XGBoost with Optuna-tuned hyperparameters on GPU matches or beats
+# the LightGBM champion (trial-047: h1=0.13679, h5=0.10804, h22=0.16755).
+# GPU tree construction enables faster HPO trials than CPU LightGBM.
+#
+# Design:
+#   - 200 Optuna trials × 8 parallel GPU workers = 25 trials per GPU
+#   - Each worker pinned to cuda:0..7 (Approach A: full GPU parallelism)
+#   - Inner CV: expanding window, 3 folds, train=252, test=63
+#   - Search space: max_leaves, max_depth, learning_rate, min_child_weight,
+#     colsample_bytree, subsample, reg_lambda, reg_alpha, n_estimators
+#   - Per-horizon init: har_iv_0dte (h=1), har_iv_1w (h=5), har_iv (h=22)
+#
+# Baseline: trial_036_CHAMPION (LightGBM 5-seed mean from trial-047)
+
+name: trial_063_xgboost_hpo_8gpu
+
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 2000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    max_leaves: 16
+    max_depth: 5
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv_1w
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tuning:
+  enabled: true
+  n_trials: 200
+  timeout: 7200
+  storage_dir: data/models/trial_063_xgboost_hpo_8gpu/optuna
+  min_train_size: 252
+  tune_every_n_folds: 5
+  n_jobs: 1
+  n_workers: 8
+  inner_cv:
+    method: expanding_window
+    n_splits: 3
+    purge_gap: 10
+    train_size: 252
+    test_size: 63
+
+# Per-horizon init: exact tenor matching
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  models:
+    - har
+    - har_iv
+    - har_iv_1w
+    - har_iv_0dte
+    - xgboost
+    - atm_iv_implied
+    - ewma
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+
+seed: 42
+training_mode: pooled

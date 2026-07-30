@@ -1,0 +1,97 @@
+# Trial-074: LSTM max training window — apples-to-apples comparison with XGBoost
+#
+# Design: Single-fold evaluation. train_size=2200 gives ~8.7 years of training
+# (2015 through mid-2023). Test on the final 252 days (~all of 2024).
+# XGBoost runs with IDENTICAL CV (trial_074_xgb_maxwin_h1.yaml) so both models
+# are evaluated on the exact same OOS dates.
+#
+# Key change vs trial-073: train_size 2000 → 2200, test_size 252 (was 252).
+# Expected: slight improvement from +200 extra training days.
+# True purpose: fair QLIKE comparison with XGBoost on same test window.
+#
+# Trial-073 result: LSTM QLIKE=0.1998 (train_size=2000, 3 folds)
+
+name: trial_074_lstm_maxwin_h1
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1]
+
+feature_layers: [har_core]
+
+model:
+  name: lstm
+  params:
+    hidden_dim: 128
+    n_layers: 2
+    dropout: 0.2
+    bidirectional: true
+    learning_rate: 5.0e-4
+    weight_decay: 1.0e-4
+    max_epochs: 80
+    batch_size: 128
+    val_fraction: 0.15
+    val_purge_gap: 10
+    early_stopping_rounds: 8
+    loss: qlike
+    device: auto
+    precision: auto
+    compile: false
+    seed: 42
+    pool_mode: attention
+    head_mode: mlp
+
+sequences:
+  features:
+    - log_ret
+    - abs_ret
+    - vol_share
+    - buy_ratio
+    - order_flow_imbalance
+    - rolling_vpin
+    - cum_rv
+    - session_frac
+    - price_accel
+    - log_n_trades
+    - intrabar_rv
+    - volume_surprise
+  max_bars: 78
+  bar_interval: 300
+  norm_mode: per_symbol
+  source: parquet
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 2200
+  test_size: 252
+
+training_mode: pooled
+seed: 42
+
+tournament:
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+
+output_dir: data/models/trial_074_lstm_maxwin

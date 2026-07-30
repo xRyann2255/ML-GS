@@ -1,0 +1,67 @@
+# Trial-083: GNNHAR vs GHAR vs STID — the neural gate.
+#
+# Gate 1 (nonlinearity): gnnhar_1l < ghar, DM p<0.05 at h=1 or h=5.
+# Gate 2 (graph vs identity-embedding): gnnhar_1l < stid, DM p<0.05.
+# Depth null replication: gnnhar_2l expected NOT to beat gnnhar_1l (DM n.s.).
+# COVID: included, expanding window.
+#
+# Graph method placeholder: glasso (TODO: substitute trial-081 winner when available).
+
+name: trial_083_gnnhar_vs_ghar_stid
+n_gpus: 8
+
+universe: [SPY, AAPL, MSFT, NVDA, AVGO, GOOGL, AMZN, V, MA, XOM, PG,
+           JNJ, HD, NFLX, TSLA, CRM, UNH, BAC, ADBE, IWM, DIA]
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [har_core]
+
+model:
+  name: gnnhar
+  params: {}
+
+graph:
+  method: glasso             # TODO: substitute trial-081 winning graph method
+  input: returns
+  window: 1000
+  refit_every: 21
+  min_history: 252
+  node_features: [log_rv_d, log_rv_w, log_rv_m]
+  params: {}
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  models: [har, ghar, stid, gnnhar_1l, gnnhar_2l]
+  baseline: har
+  mcs_bootstrap: 10000
+  parallel_models: 1          # GPU models run sequentially, each owning the 8 GPUs
+  dh_enabled: false
+  vt_enabled: false
+  gsvivs_enabled: false
+  model_configs:
+    ghar:
+      name: ghar
+      params: {}
+    gnnhar_1l:
+      name: gnnhar
+      params: {hidden_dim: 9, n_layers: 1, loss: qlike, n_seeds: 5, max_epochs: 300,
+               early_stopping_rounds: 25, learning_rate: 0.001, device: auto, seed: 42}
+    gnnhar_2l:
+      name: gnnhar
+      params: {hidden_dim: 9, n_layers: 2, loss: qlike, n_seeds: 5, max_epochs: 300,
+               early_stopping_rounds: 25, learning_rate: 0.001, device: auto, seed: 42}
+    stid:
+      name: stid
+      params: {embed_dim: 16, hidden_dim: 64, loss: qlike, max_epochs: 300,
+               early_stopping_rounds: 25, device: auto, seed: 42}
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_083_gnnhar_vs_ghar_stid

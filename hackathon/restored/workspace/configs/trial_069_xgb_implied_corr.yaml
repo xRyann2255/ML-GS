@@ -1,0 +1,140 @@
+# Trial-069: XGBoost champion + implied correlation (Layer 7)
+#
+# Hypothesis: Adding implied correlation features (implied_corr_spx_1m,
+# realized_corr_spx_1m, corr_risk_premium, dispersion_signal, corr_momentum,
+# corr_zscore) improves XGBoost QLIKE, especially at h=22 where correlation
+# spikes precede vol spikes (systemic risk channel).
+#
+# Design: A/B test within the same config —
+#   xgb_control: trial-063 champion spec (no correlation features)
+#   xgb_implied_corr: same spec + implied_correlation layer
+#
+# The control model sees the SAME feature_layers as trial-063 (via
+# feature_layers_override in model_configs). The treatment adds
+# implied_correlation + tree_expansion of those 6 new features.
+#
+# Baseline: trial-063 XGBoost champion QLIKE
+# Success: xgb_implied_corr beats xgb_control at any horizon (DM significant)
+
+name: trial_069_xgb_implied_corr
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+# Treatment feature layers: trial-063 + implied_correlation
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, implied_correlation, tree_expansion]
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 5000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    max_leaves: 16
+    max_depth: 4
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv_1w
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# Per-horizon init: exact tenor matching (same as trial-063)
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+  mcs_bootstrap: 10000
+  models:
+    - har
+    - har_iv
+    - har_iv_0dte
+    - xgb_control
+    - xgb_implied_corr
+  baseline: har_iv
+  model_configs:
+    xgb_control:
+      name: xgboost
+      # Control: trial-063 spec WITHOUT implied_correlation
+      feature_layers_override: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 16
+        max_depth: 4
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+    xgb_implied_corr:
+      name: xgboost
+      # Treatment: full feature_layers (inherits top-level, includes implied_correlation)
+      params:
+        n_estimators: 5000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 16
+        max_depth: 4
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_0dte
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_069_xgb_implied_corr

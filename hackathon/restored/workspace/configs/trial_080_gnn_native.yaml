@@ -1,0 +1,59 @@
+# Trial-079: native GNN as a first-class tournament entry (Plan 02 acceptance run)
+#
+# Hypothesis: the standalone GATv2 path reproduces trial_068's stacked-GNN signal
+# quality when scored directly under QLIKE (no XGBoost wrapper), establishing the
+# harness for the GHAR/GNNHAR ablations (Plans 03-04).
+# COVID handling: included (2020 inside the training span; expanding window absorbs it).
+
+name: trial_080_gnn_native
+n_gpus: 8
+
+universe: [SPY, AAPL, MSFT, NVDA, AVGO, GOOGL, AMZN, V, MA, XOM, PG,
+           JNJ, HD, NFLX, TSLA, CRM, UNH, BAC, ADBE, IWM, DIA]
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [har_core, asymmetry]
+
+model:
+  name: gnn
+  params:
+    hidden_dim: 32
+    n_heads: 4
+    dropout: 0.1
+    learning_rate: 0.001
+    weight_decay: 1.0e-4
+    max_epochs: 200
+    early_stopping_rounds: 15
+    loss: qlike
+    device: auto
+    precision: auto
+    seed: 42
+
+graph:
+  method: corr
+  input: returns
+  window: 60
+  refit_every: 1          # trial_068 parity: daily-refreshed rolling correlation
+  min_history: 60
+  params: {threshold: 0.3}
+  # node_features: default 9 (trial_068 parity)
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+tournament:
+  models: [ewma, har, har_iv, gnn]
+  baseline: har_iv
+  mcs_bootstrap: 10000
+  parallel_models: 1      # gnn owns the GPUs; HAR baselines are instant
+  dh_enabled: false
+  vt_enabled: false
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_080_gnn_native

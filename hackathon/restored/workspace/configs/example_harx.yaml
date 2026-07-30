@@ -1,0 +1,47 @@
+# Minimal HARX example — HAR core + one YAML-supplied extra regressor.
+#
+# HARX is the generic HAR-X model registered as `harx` in the model registry.
+# Unlike fixed-feature HAR variants (`har_iv`, `shar`, `har_j`, …), HARX takes
+# its extra regressor list from `model.params.extra_features` — so you can
+# assemble bespoke HAR-plus-X combinations without adding new model classes.
+#
+# This config is intentionally minimal: one symbol, one horizon, one extra
+# feature. It is the anchor example referenced by:
+#   - the integration test at src/tests/integration/test_harx_end_to_end.py
+#   - .github/instructions/yaml-config.instructions.md
+#   - workspace/docs/user-manual.md (HARX section)
+#
+# Usage:
+#   vol run --config workspace/configs/example_harx.yaml
+
+name: example_harx
+universe:
+  - SPY
+date_range: ["2021-01-04", "2021-07-30"]
+horizons:
+  - 1
+
+# feature_layers must include:
+#   - `har_core` (owns log_rv_d/w/m — always required)
+#   - the layer that emits every column named in extra_features
+#     (log_bpv_d is emitted by AsymmetryLayer)
+feature_layers:
+  - har_core
+  - asymmetry
+
+model:
+  name: harx
+  params:
+    # Any column present in the assembled feature matrix works here.
+    # log_bpv_d = log of daily bipower variation (Barndorff-Nielsen–Shephard),
+    # a jump-robust volatility proxy from the asymmetry layer.
+    extra_features:
+      - log_bpv_d
+
+cv:
+  method: blocked_kfold
+  n_splits: 3
+  purge_gap: 5
+
+training_mode: per_symbol
+seed: 42

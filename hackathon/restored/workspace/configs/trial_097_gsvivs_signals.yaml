@@ -1,0 +1,156 @@
+# Trial-097: GSVIVS01 strategy feature enrichment
+# (renumbered from 096 — trial-096 was already taken by dealer_gamma)
+#
+# Hypothesis: 73 features derived from the GSVIVS01 systematic short-vol
+# strategy (VIX/VX1 return dynamics, VIX option skew, SPX skew term
+# structure, credit CDS returns) improve QLIKE by 10-30 bps over the
+# XGBoost champion (trial-063) when added to the existing 128-feature set.
+#
+# Prior: signal dilution is the main risk (trial-039 lost 86 bps adding
+# 36 microstructure features), but these features come from an active
+# trading strategy with demonstrated economic value, and the VIX option
+# skew signals are completely novel to our pipeline.
+#
+# Design: A/B in the same tournament with two XGBoost variants that share
+# every hyperparameter and differ ONLY in the presence of `gsvivs_signals`
+# in their per-model `feature_layers`. Fair Diebold-Mariano comparison.
+#
+# Top-level feature_layers is the UNION so iv_surface loads all enrichment
+# columns for both variants.
+
+name: trial_097_gsvivs_signals
+universe:
+  - SPY
+  - AAPL
+  - MSFT
+  - NVDA
+  - AVGO
+  - GOOGL
+  - AMZN
+  - V
+  - MA
+  - XOM
+  - PG
+  - JNJ
+  - HD
+  - NFLX
+  - TSLA
+  - CRM
+  - UNH
+  - BAC
+  - ADBE
+  - IWM
+  - DIA
+
+date_range: ["2015-01-02", "2026-05-30"]
+horizons: [1, 5, 22]
+
+feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, gsvivs_signals, tree_expansion]
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 10000
+    early_stopping_rounds: 150
+    learning_rate: 0.01
+    max_leaves: 16
+    max_depth: 4
+    min_child_weight: 150
+    colsample_bytree: 0.8
+    subsample: 0.8
+    reg_lambda: 5.0
+    reg_alpha: 0.1
+    val_fraction: 0.15
+    val_purge_gap: 10
+    device: "cuda"
+    base_model: har_iv_1w
+
+n_gpus: 8
+
+cv:
+  method: expanding_window
+  purge_gap: 10
+  train_size: 504
+  test_size: 126
+
+# Per-horizon init: exact tenor matching (same as trial-063)
+horizon_overrides:
+  1:
+    model:
+      params:
+        base_model: har_iv_0dte
+  22:
+    model:
+      params:
+        base_model: har_iv
+
+tournament:
+  gsvivs_enabled: true
+  gsvivs_short_threshold: 0.0030
+  gsvivs_iv_sources:
+    - spx_allday_vols
+    - spx_allday_vols_tc
+    - exec_kvar
+    - edrvs_prev_close_1dte
+    - spx_atm_iv_1d
+    - spx_atm_iv_1w
+  dh_enabled: false
+  vt_enabled: false
+  parallel_models: 1
+  explainability:
+    enabled: true
+    methods: [treeshap, ale]
+    treeshap_max_samples: 500
+    treeshap_interaction: false
+    ale_features: all
+    ale_grid_size: 50
+    models: [xgboost_champion, xgboost_enriched]
+  models:
+    - ewma
+    - har
+    - har_iv
+    - xgboost_champion
+    - xgboost_enriched
+  baseline: har_iv
+  mcs_bootstrap: 10000
+  model_configs:
+    xgboost_champion:
+      name: xgboost
+      feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, tree_expansion]
+      params:
+        n_estimators: 10000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 16
+        max_depth: 4
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_1w
+    xgboost_enriched:
+      name: xgboost
+      feature_layers: [iv_surface, har_core, asymmetry, noise_robust, options, calendar, gsvivs_signals, tree_expansion]
+      params:
+        n_estimators: 10000
+        early_stopping_rounds: 150
+        learning_rate: 0.01
+        max_leaves: 16
+        max_depth: 4
+        min_child_weight: 150
+        colsample_bytree: 0.8
+        subsample: 0.8
+        reg_lambda: 5.0
+        reg_alpha: 0.1
+        val_fraction: 0.15
+        val_purge_gap: 10
+        device: "cuda"
+        base_model: har_iv_1w
+
+training_mode: pooled
+seed: 42
+output_dir: data/models/trial_097_gsvivs_signals
