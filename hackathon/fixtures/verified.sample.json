@@ -1,0 +1,930 @@
+{
+  "repo": {
+    "name": "payments-core",
+    "commit": "a3f9c21",
+    "generated_at": "2026-07-30T14:02:11Z"
+  },
+  "report": {
+    "claims": 142,
+    "verified": 134,
+    "dropped": 8,
+    "inferred": 19,
+    "commands": 23,
+    "failed": 2,
+    "tool_version": "0.3.1",
+    "duration_s": 238
+  },
+  "map": {
+    "nodes": [
+      {
+        "id": "api",
+        "label": "src/api",
+        "loc": 1240,
+        "x": 88,
+        "y": 212,
+        "w": 132,
+        "files": 9,
+        "why": "Owns the single HTTP surface. Declares one route, binds a Calendar per request, and delegates immediately. No pricing logic lives here.",
+        "top": [
+          "app.py (41 commits)",
+          "schemas.py (28)",
+          "serializers.py (12)"
+        ]
+      },
+      {
+        "id": "instr",
+        "label": "src/instruments",
+        "loc": 2180,
+        "x": 308,
+        "y": 96,
+        "w": 176,
+        "files": 14,
+        "why": "A registry keyed by instrument kind. Adding an instrument means registering a class here, not editing the engine.",
+        "top": [
+          "factory.py (33)",
+          "swap.py (19)",
+          "option.py (17)"
+        ]
+      },
+      {
+        "id": "pricing",
+        "label": "src/pricing",
+        "loc": 4860,
+        "x": 322,
+        "y": 262,
+        "w": 150,
+        "files": 21,
+        "why": "The largest and most-edited module. Holds the engine, the curve cache, and the closed-form models. Most incidents start here.",
+        "top": [
+          "engine.py (87 commits)",
+          "curves.py (44)",
+          "black76.py (21)"
+        ]
+      },
+      {
+        "id": "cal",
+        "label": "src/calendars",
+        "loc": 980,
+        "x": 556,
+        "y": 92,
+        "w": 170,
+        "files": 6,
+        "why": "Business-day and holiday logic. Small, stable, and depended on by everything that touches a date.",
+        "top": [
+          "roll.py (24)",
+          "holidays.py (18)"
+        ]
+      },
+      {
+        "id": "risk",
+        "label": "src/risk",
+        "loc": 1640,
+        "x": 566,
+        "y": 268,
+        "w": 126,
+        "files": 11,
+        "why": "Bumps and re-prices for greeks. Consumes the engine; the engine never imports risk.",
+        "top": [
+          "greeks.py (29)",
+          "bump.py (14)"
+        ]
+      },
+      {
+        "id": "io",
+        "label": "src/io",
+        "loc": 760,
+        "x": 772,
+        "y": 180,
+        "w": 120,
+        "files": 7,
+        "why": "Loads curves and vol surfaces from the market store at startup. The only module that reaches outside the process.",
+        "top": [
+          "market_store.py (31)",
+          "cache.py (6)"
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "a": "api",
+        "b": "instr",
+        "n": 14
+      },
+      {
+        "a": "api",
+        "b": "pricing",
+        "n": 23
+      },
+      {
+        "a": "instr",
+        "b": "cal",
+        "n": 9
+      },
+      {
+        "a": "pricing",
+        "b": "cal",
+        "n": 31
+      },
+      {
+        "a": "pricing",
+        "b": "risk",
+        "n": 12
+      },
+      {
+        "a": "pricing",
+        "b": "io",
+        "n": 18
+      },
+      {
+        "a": "risk",
+        "b": "io",
+        "n": 7
+      },
+      {
+        "a": "instr",
+        "b": "io",
+        "n": 5
+      }
+    ]
+  },
+  "files": {
+    "src/api/app.py": {
+      "58": "@router.post(\"/v1/price\", response_model=PriceResponse)",
+      "59": "async def price_instrument(",
+      "60": "    req: PriceRequest,",
+      "61": "    cal: Calendar = Depends(get_calendar),",
+      "62": ") -> PriceResponse:",
+      "63": "    instrument = build_instrument(req.instrument)",
+      "64": "    settle = roll_forward(req.settlement_date, cal)",
+      "65": "    result = ENGINE.price(instrument, settle, req.market)",
+      "66": "    return serialize_price(result)"
+    },
+    "src/api/schemas.py": {
+      "28": "class PriceRequest(BaseModel):",
+      "29": "    instrument: InstrumentSpec",
+      "30": "    settlement_date: date",
+      "31": "    market: MarketSnapshot",
+      "32": "",
+      "33": "    @field_validator(\"settlement_date\")",
+      "34": "    @classmethod",
+      "35": "    def not_in_past(cls, v: date) -> date:",
+      "36": "        if v < date.today():",
+      "37": "            raise ValueError(\"settlement_date is in the past\")",
+      "38": "        return v"
+    },
+    "src/instruments/factory.py": {
+      "52": "def build_instrument(spec: InstrumentSpec) -> Instrument:",
+      "53": "    kind = Kind(spec.kind)",
+      "54": "    cls = _REGISTRY.get(kind)",
+      "55": "    if cls is None:",
+      "56": "        raise UnknownInstrument(spec.kind)",
+      "57": "    return cls.from_spec(spec)"
+    },
+    "src/calendars/roll.py": {
+      "112": "def roll_forward(d: date, cal: Calendar) -> date:",
+      "113": "    \"\"\"Advance d to the next business day on cal.\"\"\"",
+      "114": "    if cal is None:",
+      "115": "        raise CalendarMissing(\"no calendar bound to this request\")",
+      "116": "    moved = 0",
+      "117": "    while not cal.is_business_day(d):",
+      "118": "        d += timedelta(days=1)",
+      "119": "        moved += 1",
+      "120": "        if moved > MAX_ROLL_DAYS:",
+      "121": "            raise RollOverflow(d, moved)",
+      "122": "    return d"
+    },
+    "src/pricing/engine.py": {
+      "88": "def price(self, inst: Instrument, settle: date, mkt: MarketSnapshot) -> Priced:",
+      "89": "    curve = self._curves[inst.currency]",
+      "90": "    df = curve.discount(settle)",
+      "91": "    if inst.kind is Kind.OPTION:",
+      "92": "        vol = self._surface(inst.currency).vol(inst.strike, settle)",
+      "93": "        pv = black76(inst, mkt.forward, vol, df)",
+      "94": "    else:",
+      "95": "        pv = df * inst.notional * (mkt.forward - inst.strike)",
+      "96": "    return Priced(pv=pv, df=df, asof=mkt.asof)"
+    },
+    "src/api/serializers.py": {
+      "19": "def serialize_price(p: Priced) -> PriceResponse:",
+      "20": "    return PriceResponse(",
+      "21": "        pv=round(p.pv, 6),",
+      "22": "        discount_factor=round(p.df, 8),",
+      "23": "        asof=p.asof.isoformat(),",
+      "24": "    )"
+    },
+    "src/io/market_store.py": {
+      "40": "def load_curves(cfg: StoreConfig) -> dict[str, Curve]:",
+      "41": "    \"\"\"Read every curve for cfg.asof. Fails loudly on a gap.\"\"\"",
+      "42": "    out: dict[str, Curve] = {}",
+      "43": "    for ccy in cfg.currencies:",
+      "44": "        raw = _fetch(cfg, f\"curve/{ccy}/{cfg.asof:%Y%m%d}\")",
+      "45": "        if raw is None:",
+      "46": "            raise MissingCurve(ccy, cfg.asof)",
+      "47": "        out[ccy] = Curve.parse(raw)",
+      "48": "    return out"
+    }
+  },
+  "tracks": [
+    {
+      "title": "ORIENT",
+      "minutes": 15,
+      "stops": [
+        {
+          "id": "cover",
+          "title": "What you are looking at",
+          "kind": "stop",
+          "minutes": 2,
+          "lede": "A generated walkthrough of payments-core at commit a3f9c21. Every factual sentence below is anchored to a line range in the repo and re-checked after it was written. Claims that failed the check were deleted, not softened. The count is in the top bar.",
+          "blocks": [
+            {
+              "type": "callout",
+              "level": "info",
+              "title": "BEFORE YOU START",
+              "text": "You need Python 3.11, Poetry 1.7+, and Docker. Two of the setup commands below failed during generation and are marked as such. That is the repo's current state, not a bug in this page."
+            },
+            {
+              "type": "table",
+              "caption": "Generation record",
+              "sortable": false,
+              "columns": [
+                "FIELD",
+                "VALUE"
+              ],
+              "rows": [
+                [
+                  "commit",
+                  "<code>a3f9c21</code>"
+                ],
+                [
+                  "generated",
+                  "2026-07-30 14:02:11 UTC"
+                ],
+                [
+                  "tool",
+                  "trailhead 0.3.1"
+                ],
+                [
+                  "wall clock",
+                  "3 min 58 s"
+                ],
+                [
+                  "claims kept",
+                  "134 of 142"
+                ],
+                [
+                  "commands executed",
+                  "23 (2 failing)"
+                ],
+                [
+                  "est. reading time",
+                  "90 minutes"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "five",
+          "title": "Five sentences",
+          "kind": "stop",
+          "minutes": 4,
+          "lede": "If you read nothing else, read these. The fifth is the only one this tool could not verify, and it says so.",
+          "blocks": [
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-001",
+                  "text": "payments-core prices linear and option instruments behind a single HTTP endpoint.",
+                  "status": "verified",
+                  "anchor": {
+                    "file": "src/api/app.py",
+                    "start": 58,
+                    "end": 66,
+                    "focus": [
+                      63,
+                      65
+                    ],
+                    "sha256": "a28c84fa7d064a7376dd1b99cd9a51855cee2df2e4440d95c9b6f6b047581110"
+                  }
+                },
+                {
+                  "id": "c-002",
+                  "text": "Every request must carry a settlement date, an instrument spec, and a market snapshot, and the date is rejected if it is in the past.",
+                  "status": "verified",
+                  "anchor": {
+                    "file": "src/api/schemas.py",
+                    "start": 28,
+                    "end": 38,
+                    "focus": [
+                      36,
+                      37
+                    ],
+                    "sha256": "0a9a481fd1bed4ae5aea6fe3e32d63a4f2448edec77d5fffaa12b768f74c013d"
+                  }
+                },
+                {
+                  "id": "c-003",
+                  "text": "Every response carries the discount factor used and the timestamp of the market snapshot it was priced against.",
+                  "status": "verified",
+                  "anchor": {
+                    "file": "src/api/serializers.py",
+                    "start": 19,
+                    "end": 24,
+                    "focus": [
+                      22,
+                      23
+                    ],
+                    "sha256": "ac974e63213d532af1dc0f2db4cfca265812b946f8043c05e354123a3a5bd01d"
+                  }
+                },
+                {
+                  "id": "c-004",
+                  "text": "It depends on curve and vol-surface data loaded at start-up, and it refuses to start if a curve is missing.",
+                  "status": "verified",
+                  "anchor": {
+                    "file": "src/io/market_store.py",
+                    "start": 40,
+                    "end": 48,
+                    "focus": [
+                      45,
+                      46
+                    ],
+                    "sha256": "523b2888ec1d16c9ca04236c87b4a7547bf56527f533f542135b002edb098759"
+                  }
+                },
+                {
+                  "id": "c-005",
+                  "text": "It is not a booking system: nothing in this repo writes to a ledger.",
+                  "status": "inferred"
+                }
+              ]
+            },
+            {
+              "type": "callout",
+              "level": "inferred",
+              "title": "WHY SENTENCE FIVE IS AMBER",
+              "text": "An absence cannot be anchored to a line of code. The tool searched for ledger and persistence writes, found none, and reports that as inferred rather than dressing it up as verified. Every amber mark in this document means the same thing: plausible, unproven."
+            }
+          ]
+        },
+        {
+          "id": "map",
+          "title": "The map",
+          "kind": "stop",
+          "minutes": 5,
+          "lede": "Derived from the real import graph, not from a description of it. Node area is lines of code; edge weight is import count. Click any module.",
+          "blocks": [
+            {
+              "type": "graph"
+            },
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-011",
+                  "text": "src/pricing is the centre of gravity: it is the largest module and it imports the calendar layer 31 times.",
+                  "status": "verified",
+                  "anchor": {
+                    "file": "src/pricing/engine.py",
+                    "start": 88,
+                    "end": 96,
+                    "focus": [
+                      89,
+                      90
+                    ],
+                    "sha256": "d1b31c48636f6bbd42511410510a397925da09f9e0984563ab13fed3b3ea42e1"
+                  }
+                },
+                {
+                  "id": "c-012",
+                  "text": "Dependencies point one way: pricing imports risk, and risk never imports pricing back.",
+                  "status": "verified",
+                  "anchor": {
+                    "file": "src/pricing/engine.py",
+                    "start": 88,
+                    "end": 96,
+                    "focus": [
+                      88
+                    ],
+                    "sha256": "d1b31c48636f6bbd42511410510a397925da09f9e0984563ab13fed3b3ea42e1"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "where",
+          "title": "Where the code lives",
+          "kind": "stop",
+          "minutes": 4,
+          "lede": "The same information as the map, as a list, for the people who prefer lists. Churn rank is commits over the last twelve months.",
+          "blocks": [
+            {
+              "type": "table",
+              "caption": "Sortable. Committer names come from git log and are not a statement about ownership.",
+              "sortable": true,
+              "columns": [
+                "PATH",
+                "PURPOSE",
+                "FILES",
+                "LOC",
+                "CHURN",
+                "RECENT COMMITTERS"
+              ],
+              "rows": [
+                [
+                  "<code>src/pricing/</code>",
+                  "Engine, curve cache, closed-form models",
+                  "21",
+                  "4,860",
+                  "1",
+                  "p.okafor, l.zhang"
+                ],
+                [
+                  "<code>src/instruments/</code>",
+                  "Instrument registry and per-kind classes",
+                  "14",
+                  "2,180",
+                  "3",
+                  "l.zhang"
+                ],
+                [
+                  "<code>src/risk/</code>",
+                  "Bump-and-reprice greeks",
+                  "11",
+                  "1,640",
+                  "4",
+                  "m.haddad"
+                ],
+                [
+                  "<code>src/api/</code>",
+                  "HTTP surface, schemas, serializers",
+                  "9",
+                  "1,240",
+                  "2",
+                  "p.okafor, s.reyes"
+                ],
+                [
+                  "<code>src/calendars/</code>",
+                  "Business-day and holiday logic",
+                  "6",
+                  "980",
+                  "6",
+                  "s.reyes"
+                ],
+                [
+                  "<code>src/io/</code>",
+                  "Market-store loaders",
+                  "7",
+                  "760",
+                  "5",
+                  "m.haddad"
+                ],
+                [
+                  "<code>tests/</code>",
+                  "312 tests, 4 skipped",
+                  "48",
+                  "3,410",
+                  "n/a",
+                  "all"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cp-a",
+          "title": "Checkpoint A",
+          "kind": "cp",
+          "minutes": 3,
+          "blocks": [
+            {
+              "type": "checkpoint",
+              "id": "cp-a1",
+              "kind": "single",
+              "prompt": "Which directory owns holiday-calendar logic?",
+              "options": [
+                "<code>src/pricing/</code>",
+                "<code>src/calendars/</code>",
+                "<code>src/io/</code>",
+                "<code>tests/fixtures/</code>"
+              ],
+              "answer": 1,
+              "provenance": "survey.json → imports → calendars.* is imported by 4 modules and imports none of them",
+              "explanation": "src/calendars/ defines Calendar and roll_forward. src/pricing/ is the heaviest consumer, at 31 imports, which is why people guess it, but it only consumes."
+            },
+            {
+              "type": "checkpoint",
+              "id": "cp-a2",
+              "kind": "single",
+              "prompt": "You need to add a new instrument type. Which file do you edit first?",
+              "options": [
+                "<code>src/pricing/engine.py</code>",
+                "<code>src/instruments/factory.py</code>",
+                "<code>src/api/schemas.py</code>",
+                "<code>src/api/app.py</code>"
+              ],
+              "answer": 1,
+              "provenance": "survey.json → symbols → _REGISTRY defined in factory.py:48, referenced by 6 instrument classes",
+              "explanation": "The registry pattern in factory.py means the engine dispatches on kind without knowing the classes. Editing engine.py to add an instrument is the mistake this design exists to prevent."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "GET IT RUNNING",
+      "minutes": 20,
+      "stops": [
+        {
+          "id": "setup",
+          "title": "Prerequisites and setup",
+          "kind": "stop",
+          "minutes": 8,
+          "lede": "Every command here was executed on the generation machine. The output is real, the timings are real, and the two failures are real.",
+          "blocks": [
+            {
+              "type": "command",
+              "cmd": "docker compose up -d timescale",
+              "exit": 0,
+              "dur": "11.4 s",
+              "out": "[+] Running 2/2\n ✔ Network payments-core_default   Created  0.1s\n ✔ Container pc-timescale-1        Started  11.0s",
+              "env": "captured 2026-07-30, ubuntu-22.04, docker 24.0.7",
+              "cwd": "."
+            },
+            {
+              "type": "command",
+              "cmd": "poetry install --with dev",
+              "exit": 0,
+              "dur": "48.3 s",
+              "out": "Installing dependencies from lock file\n\nPackage operations: 84 installs, 0 updates, 0 removals\n\n  • Installing numpy (1.26.4)\n  • Installing pydantic (2.6.1)\n  • Installing fastapi (0.110.0)\n  … 79 more\n\nInstalling the current project: payments-core (2.14.0)",
+              "env": "captured 2026-07-30, ubuntu-22.04, python 3.11.8, poetry 1.7.1",
+              "cwd": "."
+            },
+            {
+              "type": "command",
+              "cmd": "make lint",
+              "predict": "Before you look: on a clean checkout of this repo, does make lint pass?",
+              "exit": 1,
+              "dur": "3.1 s",
+              "broken": "ruff exits 1 on src/pricing/legacy_curves.py with 14 E501 and 3 F401. The file is excluded in pyproject.toml but make lint does not pass the config flag.",
+              "hypothesis": "The exclude list was added to pyproject.toml in a2b7e40 but the Makefile target still calls ruff without --config, so the exclusion is never read. Unverified: this tool did not test the fix.",
+              "out": "ruff check src/ tests/\nsrc/pricing/legacy_curves.py:41:89: E501 Line too long (104 > 88)\nsrc/pricing/legacy_curves.py:52:1:  F401 'numpy' imported but unused\n… 15 more\nFound 17 errors.\nmake: *** [Makefile:22: lint] Error 1",
+              "env": "captured 2026-07-30, ubuntu-22.04, ruff 0.3.4",
+              "cwd": "."
+            },
+            {
+              "type": "command",
+              "cmd": "poetry run python -m payments_core.io.smoke",
+              "predict": "The smoke check loads market curves from the local fixture set. Does it pass?",
+              "exit": 1,
+              "dur": "2.4 s",
+              "broken": "The market-store smoke check raises MissingCurve('JPY') against the local fixture set. tests/fixtures/curves/ ships EUR, GBP and USD only.",
+              "hypothesis": "JPY was added to the default currency list in config/local.yaml at 7d41c02 but no JPY fixture was committed alongside it. Unverified: this tool did not test the fix.",
+              "out": "Traceback (most recent call last):\n  File \"src/io/market_store.py\", line 46, in load_curves\n    raise MissingCurve(ccy, cfg.asof)\npayments_core.io.errors.MissingCurve: no curve for JPY at 2026-07-30",
+              "env": "captured 2026-07-30, ubuntu-22.04, python 3.11.8",
+              "cwd": "."
+            },
+            {
+              "type": "callout",
+              "level": "broken",
+              "title": "WHAT THE TWO FAILURES MEAN FOR YOU",
+              "text": "Both fail on a clean checkout. Do not spend your first morning believing you broke them. For lint, run ruff check src/ --config pyproject.toml, which exits 0. For the smoke check, drop JPY from config/local.yaml until a fixture lands. Neither blocks the test suite."
+            }
+          ]
+        },
+        {
+          "id": "green",
+          "title": "Your first green test",
+          "kind": "stop",
+          "minutes": 4,
+          "lede": "One command. If this passes, your environment is correct and you can stop configuring things.",
+          "blocks": [
+            {
+              "type": "command",
+              "cmd": "poetry run pytest -q",
+              "predict": "Two of the four commands above failed. Does the test suite itself pass?",
+              "exit": 0,
+              "dur": "41.2 s",
+              "out": "........................................................ [ 18%]\n........................................................ [ 36%]\n........................................................ [ 54%]\n........................................................ [ 72%]\n........................................................ [ 90%]\n................................ssss                     [100%]\n\n312 passed, 4 skipped in 39.87s",
+              "env": "captured 2026-07-30, ubuntu-22.04, python 3.11.8",
+              "cwd": "."
+            },
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-041",
+                  "text": "The four skipped tests need a live market-store connection and are skipped by default outside CI.",
+                  "status": "verified",
+                  "anchor": {
+                    "file": "src/io/market_store.py",
+                    "start": 40,
+                    "end": 48,
+                    "focus": [
+                      44
+                    ],
+                    "sha256": "523b2888ec1d16c9ca04236c87b4a7547bf56527f533f542135b002edb098759"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "callout",
+              "level": "info",
+              "title": "IF IT TOOK MUCH LONGER THAN 41 SECONDS",
+              "text": "The suite is CPU-bound in src/pricing. On a laptop with fewer than 8 cores, expect 90 to 120 seconds. Anything beyond three minutes usually means the timescale container is not up and tests are falling back to retry timeouts."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "FOLLOW ONE REQUEST",
+      "minutes": 25,
+      "stops": [
+        {
+          "id": "trace",
+          "title": "One request, end to end",
+          "kind": "stop",
+          "minutes": 12,
+          "lede": "POST /v1/price, from the route handler to the serialized response. Six hops, each one a real line range. This is the path to hold in your head. Almost everything else in the repo is reached from it.",
+          "blocks": [
+            {
+              "type": "trace",
+              "steps": [
+                {
+                  "claim": "The route binds a Calendar per request through a dependency, then does nothing but delegate three times.",
+                  "anchor": {
+                    "file": "src/api/app.py",
+                    "start": 58,
+                    "end": 66,
+                    "focus": [
+                      63,
+                      64,
+                      65
+                    ],
+                    "sha256": "a28c84fa7d064a7376dd1b99cd9a51855cee2df2e4440d95c9b6f6b047581110"
+                  },
+                  "next": "build_instrument in src/instruments/factory.py"
+                },
+                {
+                  "claim": "Validation happens before any pricing code runs: a past settlement date is rejected at the schema boundary.",
+                  "anchor": {
+                    "file": "src/api/schemas.py",
+                    "start": 28,
+                    "end": 38,
+                    "focus": [
+                      35,
+                      36,
+                      37
+                    ],
+                    "sha256": "0a9a481fd1bed4ae5aea6fe3e32d63a4f2448edec77d5fffaa12b768f74c013d"
+                  },
+                  "next": "the registry lookup"
+                },
+                {
+                  "claim": "The factory maps a string kind to a registered class and raises rather than guessing when the kind is unknown.",
+                  "anchor": {
+                    "file": "src/instruments/factory.py",
+                    "start": 52,
+                    "end": 57,
+                    "focus": [
+                      54,
+                      55,
+                      56
+                    ],
+                    "sha256": "dca48767668c420bb291aab2be4a420b3bf2e125e2e08207c731336a9b4bd68b"
+                  },
+                  "predict": "The factory has built the instrument. Which file does the request touch next?",
+                  "next": "roll_forward in src/calendars/roll.py"
+                },
+                {
+                  "claim": "The settlement date is rolled forward to the next business day, with a hard ceiling that raises instead of looping forever.",
+                  "anchor": {
+                    "file": "src/calendars/roll.py",
+                    "start": 112,
+                    "end": 122,
+                    "focus": [
+                      117,
+                      118,
+                      120,
+                      121
+                    ],
+                    "sha256": "ac980ceb6d05a2bc5166c09536304d7c2737759a26f918ba659d93bdf35ca828"
+                  },
+                  "predict": "The settlement date is now a business day. Where does pricing actually happen?",
+                  "next": "ENGINE.price"
+                },
+                {
+                  "claim": "The engine discounts off the currency curve, then branches: options go through Black-76 with a surface lookup, everything else is a forward difference.",
+                  "anchor": {
+                    "file": "src/pricing/engine.py",
+                    "start": 88,
+                    "end": 96,
+                    "focus": [
+                      91,
+                      92,
+                      93
+                    ],
+                    "sha256": "d1b31c48636f6bbd42511410510a397925da09f9e0984563ab13fed3b3ea42e1"
+                  },
+                  "predict": "A price exists. Which file turns it into the response body?",
+                  "next": "serialize_price"
+                },
+                {
+                  "claim": "Serialization rounds the present value to six decimals and the discount factor to eight before it leaves the process.",
+                  "anchor": {
+                    "file": "src/api/serializers.py",
+                    "start": 19,
+                    "end": 24,
+                    "focus": [
+                      21,
+                      22
+                    ],
+                    "sha256": "ac974e63213d532af1dc0f2db4cfca265812b946f8043c05e354123a3a5bd01d"
+                  },
+                  "next": null
+                }
+              ]
+            },
+            {
+              "type": "callout",
+              "level": "inferred",
+              "title": "ONE THING TO WATCH",
+              "text": "RollOverflow at roll.py:121 fires when a calendar is loaded empty: every day looks like a holiday, so the loop walks past MAX_ROLL_DAYS. It presents as a pricing error but the cause is upstream in src/io. Inferred from the code path; this tool did not reproduce it."
+            }
+          ]
+        },
+        {
+          "id": "cp-c",
+          "title": "Checkpoint C",
+          "kind": "cp",
+          "minutes": 4,
+          "blocks": [
+            {
+              "type": "checkpoint",
+              "id": "cp-c1",
+              "kind": "order",
+              "prompt": "Put these five hops in the order they actually execute.",
+              "options": [
+                "<code>ENGINE.price</code>: discount and branch",
+                "<code>roll_forward</code>: advance to a business day",
+                "<code>PriceRequest</code> validation: reject past dates",
+                "<code>serialize_price</code>: round and return",
+                "<code>build_instrument</code>: registry lookup"
+              ],
+              "answer": [
+                3,
+                5,
+                2,
+                1,
+                4
+              ],
+              "provenance": "survey.json → call graph from src/api/app.py:63-66, resolved statically",
+              "explanation": "Validation runs before the handler body. That is the one most people get wrong, because the code that triggers it is not visible in app.py at all. It happens in the pydantic model bound to the parameter."
+            },
+            {
+              "type": "checkpoint",
+              "id": "cp-c2",
+              "kind": "single",
+              "prompt": "RollOverflow is raised inside src/calendars/, but the empty calendar was built elsewhere. Which module constructs Calendar objects?",
+              "options": [
+                "<code>src/calendars/</code>",
+                "<code>src/io/</code>",
+                "<code>src/api/</code>",
+                "<code>src/pricing/</code>"
+              ],
+              "answer": 1,
+              "provenance": "survey.json → call graph → Calendar instances constructed only in src/io/market_store.py",
+              "explanation": "calendars/ raises it, but the only place a Calendar is constructed is the market store. An empty calendar makes every day a holiday, so the roll walks past its ceiling. The error surfaces three modules away from its cause."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "CONVENTIONS",
+      "minutes": 8,
+      "stops": [
+        {
+          "id": "conv",
+          "title": "Conventions and gotchas",
+          "kind": "stop",
+          "minutes": 8,
+          "lede": "Everything on this page is inferred from patterns in the code and in review history. None of it is verified against a written standard, because no written standard exists in this repo. Treat it as a strong hint, not a rule.",
+          "blocks": [
+            {
+              "type": "callout",
+              "level": "inferred",
+              "title": "THIS ENTIRE STOP IS UNVERIFIED",
+              "text": "The most useful content is the least checkable. Rather than mixing it into the verified stops and diluting them, it is quarantined here and marked once, loudly."
+            },
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-118",
+                  "text": "Errors are raised, never returned as sentinel values: six of six error paths in the trace raise a typed exception.",
+                  "status": "inferred"
+                },
+                {
+                  "id": "c-119",
+                  "text": "New instruments are added by registering a class, never by editing a branch in the engine.",
+                  "status": "inferred"
+                },
+                {
+                  "id": "c-120",
+                  "text": "Dates crossing a module boundary are already rolled; roll_forward is called once, at the API edge.",
+                  "status": "inferred"
+                },
+                {
+                  "id": "c-121",
+                  "text": "Anything reaching outside the process belongs in src/io, which is why it is the smallest module and stays that way.",
+                  "status": "inferred"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "CLOSE",
+      "minutes": 6,
+      "stops": [
+        {
+          "id": "audit",
+          "title": "The ledger",
+          "kind": "stop",
+          "minutes": 6,
+          "lede": "What the tool claimed, what survived, and what it deleted. The deleted rows are the interesting ones.",
+          "blocks": [
+            {
+              "type": "callout",
+              "level": "info",
+              "title": "WHY THIS PAGE EXISTS",
+              "text": "Anyone can generate confident documentation. The only useful question is which parts to trust. Eight claims below were written by the model and then deleted by the checker because their anchors did not resolve. They are shown, not swept up."
+            },
+            {
+              "type": "ledger"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dropped": [
+    {
+      "id": "c-031",
+      "text": "Prices are cached in Redis for 30 seconds to absorb blotter refreshes.",
+      "file": "src/io/cache.py",
+      "reason": "file does not exist at this commit"
+    },
+    {
+      "id": "c-052",
+      "text": "The engine supports SABR calibration for the vol surface.",
+      "file": "src/pricing/engine.py",
+      "reason": "snippet not found verbatim in file"
+    },
+    {
+      "id": "c-058",
+      "text": "Retries are attempted three times with exponential backoff.",
+      "file": "src/io/market_store.py",
+      "reason": "snippet not found verbatim in file"
+    },
+    {
+      "id": "c-067",
+      "text": "A settlement date more than two years out is rejected.",
+      "file": "src/api/schemas.py",
+      "reason": "lines 44-51 out of range (file ends at 38)"
+    },
+    {
+      "id": "c-081",
+      "text": "Greeks are computed analytically for options.",
+      "file": "src/risk/greeks.py",
+      "reason": "snippet not found verbatim in file"
+    },
+    {
+      "id": "c-094",
+      "text": "The Makefile exposes a fmt target that runs black.",
+      "file": "Makefile",
+      "reason": "snippet not found verbatim in file"
+    },
+    {
+      "id": "c-102",
+      "text": "Curve interpolation is log-linear in discount factors.",
+      "file": "src/pricing/curves.py",
+      "reason": "excerpt hash mismatch: file changed after narration"
+    },
+    {
+      "id": "c-133",
+      "text": "All endpoints require an OAuth bearer token.",
+      "file": "src/api/app.py",
+      "reason": "snippet not found verbatim in file"
+    }
+  ],
+  "contract": "trailhead/verified@2"
+}

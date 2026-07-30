@@ -1,176 +1,169 @@
-# ML for Realized Volatility Forecasting -- Internship Project
+# Trailhead — GS Hackathon, 30–31 July 2026
 
-## Session Workflow (READ THIS FIRST)
-
-**Research-first, not plan-first.** Do not jump to implementation plans, sprints, or task lists. The project's value comes from deep understanding of features and data, not from shipping code fast.
-
-### Every session should:
-
-1. **Read `notes/research-journal.md`** to pick up where the last session left off
-2. **Read `notes/open-questions.md`** to see what's queued for exploration
-3. **Ask the user** what they want to explore today -- one topic, in depth
-4. **Go deep** -- compute things on real data, look at distributions, test assumptions, run baselines. Do not skim.
-5. **At session end**, append findings to `notes/research-journal.md` and update the relevant `notes/features/*.md` file with what was learned. Move answered questions out of `open-questions.md`.
-
-### Do NOT:
-- Create implementation plans, sprint structures, or task breakdowns unless the user explicitly asks
-- Jump from "I read a paper that says X" to "let's build X" -- first verify X on our data
-- Propose model architectures before the user understands the features that would feed them
-- Rush to write code when the user is still exploring and learning
-
-### The implementation plan emerges from research, not the other way around.
+> **TEMPORARY FILE.** The real project instructions are archived at `CLAUDE.vol-project.md`.
+> To restore after the hackathon:
+> ```bash
+> rm CLAUDE.md && git mv CLAUDE.vol-project.md CLAUDE.md
+> ```
+> Everything below applies only while the hackathon is running.
 
 ---
 
-## Purpose
-Research scratchpad for a Goldman Sachs ML internship project (~20 weeks, active May-Sep 2026) focused on forecasting realized volatility. Currently in the exploration and feature understanding phase.
+## What we are building
 
-## Repository Structure
-```
-ML/
-├── CLAUDE.md                    # this file
-├── .claude/skills/              # custom skills (write-chapter, research, status, etc.)
-├── logs/progress.md             # daily progress log
-├── deliverables/                # project deliverables (pitch, plans, scripts)
-├── docs/                        # project plans, guide specs, and design docs
-│   ├── project-plans/           # internship project directions
-│   ├── vol-learning-guide/      # learning guide specs and plans
-│   └── claude-code-optimization/# tooling and harness config
-├── notes/                       # research notes and findings
-│   ├── volatility.md            # literature survey (~45 papers)
-│   ├── research-journal.md      # session-by-session findings (append-only)
-│   ├── open-questions.md        # running list of things to investigate
-│   ├── data-access.md           # GS data inventory
-│   ├── features/                # per-feature-family exploration notes
-│   │   ├── har-components.md
-│   │   ├── jump-detection.md
-│   │   ├── leverage-effect.md
-│   │   ├── microstructure.md
-│   │   ├── cross-asset.md
-│   │   └── implied-vol.md
-│   ├── glossary.md
-│   └── faq.md
-├── reference/                   # all reference materials
-│   ├── books/                   # textbooks (Hull, AFML, Natenberg, etc.)
-│   ├── papers/                  # general reference papers + course materials
-│   ├── project-papers/          # papers specific to the vol project (32 curated)
-│   └── bibliography.md
-├── guides/                      # LaTeX learning guides
-│   ├── vol-learning-guide/      # realized-vol estimation, forecasting & ML (20 chapters)
-│   ├── quant-trading/           # quant trading (38 chapters)
-│   └── vol-project-ref/         # realized-vol project reference
-├── archive/                     # archived work (risk-as-alpha, incl. old ml-finance guide)
-└── qr-decode/                   # QR-video → repo decoder (one-command pipeline; see below)
-```
+**Trailhead.** Point it at a repo, get one self-contained HTML file that teaches that repo to a new joiner — and that shows its own evidence for every claim it makes.
 
-## Current Phase: Exploration & Feature Understanding
+**Theme:** Improve the Developer Experience.
 
-The project direction is ML forecasting for realized volatility. Before locking in a specific approach, methodology, or architecture, we are exploring the data and understanding what features capture and why.
+**Why it is not "explain my codebase":** other entrants build a chatbot you ask questions of. This generates an artifact you walk through without knowing what to ask, and every factual sentence is anchored to a `file:line` and re-checked after it was written. Claims whose anchors fail are deleted and counted on screen. Setup commands are actually executed and their real output embedded, failures included.
 
-**Key baselines to understand first:** HAR, HAR-J/CJ, SHAR, HARQ, Realized GARCH, Ridge/Lasso-HAR
-
-**Evaluation (when we get there):** QLIKE (primary), MSE, Diebold-Mariano tests, Model Confidence Set, purged k-fold CV. Target: 30-80 bps QLIKE improvement + economic-value test.
+The pitch is **"the model writes prose, the machine checks the facts — here are the eight claims it caught the model inventing."**
 
 ---
 
-## Writing Learning Guides
+## Working mode
 
-New guides go in `guides/<guide-name>/`. Follow existing conventions from `guides/quant-trading/` and `guides/vol-learning-guide/`.
+**This inverts the archived vol-project rules. Read that as deliberate.**
 
-### Setup
-- **Class**: `memoir` `[11pt, openany, a4paper, oneside]` or `report` `[11pt, a4paper]`
-- **Preamble**: Shared file (`preamble.tex`) loaded via `\input{}`. No packages in chapter files
-- **Structure**: `main.tex` → `\input{chapters/chXX_name.tex}`, grouped into `\part{}`
-- **Citations**: `natbib` `[round, authoryear]`, `references.bib` at guide root
+The vol project is research: go deep, do not rush to code, no plans unless asked. The hackathon is the opposite — a fixed 10-hour budget with a demo at the end.
 
-### Required Box Types (tcolorbox)
-| Box | Colour | Purpose |
+**Do:**
+- Ship working code. Prefer a rough end-to-end loop over any polished fragment.
+- Make the call and state it. Do not stop to ask about anything that has a defensible default.
+- Test the deterministic stages (Survey, Verify, the quote→line resolver). They are pure functions with clear contracts and they are where correctness actually lives.
+- Skip TDD on Render and anything visual. Iterate against the browser instead.
+- Run the gate checks before saying anything works.
+
+**Do not:**
+- Refactor anything outside `hackathon/`.
+- Add a dependency without a one-line reason. Stdlib `ast` beats tree-sitter here.
+- Widen language support, add a second output format, or generalise the pipeline. Python-only is the plan.
+- Chase generality after hour 4 — see the pivot rule.
+
+**Time is the binding constraint, not tokens.** 10 hours total, inside working hours, 30–31 July.
+
+---
+
+## Where things are
+
+```
+hackathon/
+├── README.md                 brief, architecture, state, build order
+├── docs/
+│   ├── ideas-shortlist.md    all 19 candidate ideas + the 10-hour plan
+│   └── walkthrough-spec.md   THE SPEC for the generated artifact — read before touching render
+├── demo/trailhead-demo.html  working front-end on a synthetic repo (stage 5, prototyped)
+├── tools/
+│   ├── check-bundle.js       self-containment + spec §1 checks
+│   └── verify-contract.js    anchor + contract checks (stand-in for stage 4)
+├── src/trailhead/            generator package — not started
+├── tests/                    generator tests — not started
+└── fixtures/                 hand-written verified.json fixtures
+```
+
+`hackathon/docs/walkthrough-spec.md` is authoritative for anything the HTML does. If code and spec disagree, fix one of them on purpose — do not let them drift.
+
+---
+
+## Architecture
+
+Five stages. **Only stage 3 calls a model.**
+
+```
+repo ──▶ 1 SURVEY ──▶ survey.json ──▶ 2 MAP ──▶ map.json
+                          │                        │
+                          └──▶ 3 NARRATE (LLM) ──▶ content.json
+                                                     │
+                                    4 VERIFY ◀───────┘
+                                        │
+                    verified.json + verification-report.json
+                                        │
+                                   5 RENDER ──▶ trailhead.html
+```
+
+| Stage | Model? | Job |
 |---|---|---|
-| `intuition` | Green | Plain-English explanations, analogies |
-| `keyidea` | Blue/Orange | Important concepts, algorithms |
-| `warning` | Red | Common mistakes, methodological errors |
-| `workedexample` | Teal | Step-by-step numerical walk-throughs |
-| `projectconnection` | Teal | Ties content to the GS project |
-| `prereq` | Purple | Background knowledge and prerequisites |
+| 1 Survey | no | File tree, import edges, entry points, git churn |
+| 2 Map | no | Collapse to module level, compute layout at generation time |
+| 3 Narrate | **yes** | Prose. One small call per unit, each returning claims + verbatim quotes |
+| 4 Verify | no | Re-read anchors, hash-match excerpts, delete what fails |
+| 5 Render | no | `verified.json` → one HTML file, knows only the 8 block types |
 
-### Style Rules
-- Open with a concrete question, not an abstract definition
-- Every chapter starts with a prereq box
-- Worked examples mandatory for hard concepts (setup → computation → table → intuition)
-- `booktabs` tables only. No vertical rules
-- Cite papers from `reference/` liberally (`\citep{}` parenthetical, `\citet{}` textual)
-- Teach from first principles — define every term on first use (bold it)
+Plus a command runner that executes setup and test commands and captures real exit codes, stdout, and timings.
 
 ---
 
-## Preparing `docs-only` Branch for Download
+## Non-negotiables
 
-The `docs-only` branch contains only compiled PDFs, deliverables, and markdown notes (no source code, no reference materials). Use it to download on restricted machines that flag code files.
+Break any of these and the project becomes a generic codebase explainer with no pitch.
 
-**To update it from main:**
+1. **Only stage 3 touches a model.** A model cannot verify itself. Everything that checks is ordinary code.
+2. **No factual sentence without a resolvable anchor.** Unanchorable prose is cut or downgraded to `inferred` and visibly marked.
+3. **Deleted claims are counted on screen.** Hiding the drop count defeats the entire point.
+4. **Command output is real.** Never synthesise stdout, exit codes, or timings. A failing command is shown failing.
+5. **One HTML file, zero external requests.** It must open from `file://` with the network off.
+6. **Checkpoint answer keys come from `survey.json`,** never from the model. No free-text questions — there is no model in the page to grade them.
+7. **Never ask the model for line numbers — ask it to quote.** Feed files with line numbers pre-pended, require the verbatim snippet, then resolve the range in code. Models count badly and copy well. This is the difference between a 40% drop rate and ~3%.
 
-1. Compile all guides that have changed — to the pagination fixpoint, not a fixed pass count (a shifted page break can leave the TOC one page stale after three passes):
-   ```bash
-   for g in vol-learning-guide quant-trading vol-project-ref; do
-     cd guides/$g
-     pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1; bibtex main >/dev/null 2>&1
-     for i in 1 2 3 4 5; do
-       before=$(md5sum main.toc main.aux main.ind 2>/dev/null)
-       pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1
-       [ "$before" = "$(md5sum main.toc main.aux main.ind 2>/dev/null)" ] && break
-     done
-     grep 'Output written on' main.log | tail -1
-     cd ../..
-   done
-   ```
-2. Commit any updated PDFs to main.
-3. Switch to docs-only and reset it from main, keeping only the target files:
-   ```bash
-   git checkout docs-only
-   git checkout main -- guides/vol-learning-guide/main.pdf guides/vol-learning-guide/markdown/ guides/quant-trading/main.pdf guides/vol-project-ref/main.pdf guides/vol-project-ref/markdown/ deliverables/ notes/
-   find guides deliverables notes -name '*.py' -exec sh -c 'mv -f "$1" "$1.txt"' _ {} \;
-   git add -A -- guides deliverables notes
-   git commit -m "chore: sync compiled PDFs, markdown, and notes from main"
-   git push
-   git checkout main
-   ```
-
-**No `.py` files on `docs-only` — ever.** Restricted machines flag Python files, so any `.py` headed for the branch must be renamed to `.py.txt` (the `find` step above). A git pre-commit hook enforces this on every docs-only commit by auto-renaming staged `.py` files. Source of truth is `.githooks/pre-commit` on main; it must be installed locally (tracked files vanish from the working tree on docs-only, so `core.hooksPath` can't be used):
-```bash
-cp .githooks/pre-commit .git/hooks/pre-commit   # re-run after a fresh clone
-```
-
-**What stays on `docs-only`:**
-- `guides/vol-learning-guide/main.pdf`, `guides/quant-trading/main.pdf`, `guides/vol-project-ref/main.pdf`
-- `guides/vol-learning-guide/markdown/` (markdown conversion of learning guide, with Mermaid diagrams, for LLM consumption)
-- `guides/vol-project-ref/markdown/` (markdown conversion of project reference, with Mermaid diagrams, for LLM consumption)
-- `deliverables/` (all .md and .html)
-- `notes/` (all .md)
+**Never cut, however far behind:** claim markers, the audit panel, the dropped-claim count.
 
 ---
 
-## QR-Code Video Decoder (`qr-decode/`)
+## Gate checks
 
-Utility to recover a repository that was encoded as base64, split across 810 QR codes, and screen-recorded to video. The whole pipeline runs as **one command**:
+Both must exit 0 before claiming anything works:
 
 ```bash
-pip install opencv-python zxing-cpp numpy
-python qr-decode/decode.py [VIDEO] [--out DIR]   # VIDEO defaults to qr_codes.mp4
+cd hackathon
+node tools/check-bundle.js
+node tools/verify-contract.js
 ```
 
-`decode.py` does everything end to end: scans every video frame with `zxing`, decodes each standard byte-mode QR payload (format `{seq}/{total}:{base64_chunk}`), reassembles the chunks in sequence order into one base64 string, verifies its **SHA-256** (expected `bab1a635…cd90cf`), base64-decodes it to `repo-snapshot.tar.xz`, and extracts it into `restored/`. It aborts on any missing chunk or SHA mismatch (`--keep-going` overrides).
+Do not report a stage as done on the strength of reading the code. Run the checks and quote the output.
 
-- `regenerate_qrs.py` — source-side companion that (re)generates spec-compliant, self-verified QR PNGs from the base64 (run on the machine holding the source file).
-- `repo-snapshot.tar.xz`, `repo-snapshot.tar.xz.b64`, `restored/` — the recovered, SHA-verified output.
+---
 
-The QRs must be **standard** byte-mode symbols. An earlier non-standard encoder (invalid format-info, each codeword repeated 8× → unreadable and data-truncated) made the video undecodable past chunk 1; regenerating with `regenerate_qrs.py` (or any compliant library, e.g. `segno`) is the fix.
+## Build order and pivot rule
+
+| Hours | Ship |
+|---|---|
+| 0–1 | Freeze `verified.json`; hand-write a fixture so render stays testable |
+| 1–3 | Survey: tree, imports, entry points, git churn |
+| 3–4 | Command runner with real capture |
+| 4–5 | Narrate: per-unit calls, quote-based claims |
+| 5–6 | Verify: quote → line resolution, hash check, deletions |
+| 6–7 | Wire render to real `verified.json`; regenerate the demo from a real repo |
+| 7–8 | Checkpoint generation from `survey.json` |
+| 8–9 | Generate against two repos nobody has read; fix what breaks |
+| 9–10 | Rehearse the pitch |
+
+**Pivot rule:** if the core loop is still unreliable at hour 4, hard-code the demo path rather than chase generality.
+
+**Cut list, in order:** stop 12 → stop 15 → stop 10 → checkpoint B → stop 7.
+
+---
+
+## Out of scope — do not touch
+
+`notes/`, `guides/`, `reference/`, `docs/`, `archive/`, `qr-decode/`, and everything in `deliverables/` belong to the vol-forecasting project. The hackathon rules forbid submitting that work, and nothing in it needs to change this week.
+
+`.claude/skills/` holds vol-project skills (`write-chapter`, `research`, `sync-docs`, …). Leave them alone; they will be wanted again on 1 August.
 
 ---
 
 ## Conventions
-- `docs/project-plans/` for internship project plans (grouped by direction)
-- `docs/vol-learning-guide/` for learning guide specs and plans
-- `docs/claude-code-optimization/` for tooling docs
-- `notes/` for project notes
-- `reference/project-papers/` for ML vol papers, `reference/papers/` for general
-- All code follows TDD: failing test → implement → pass → commit
+
+- Conventional commits with a scope, matching repo history: `feat(hackathon):`, `docs(hackathon):`, `fix(hackathon):`.
+- Commit or push only when asked.
+- Python 3.11, stdlib first. `ast` for Survey.
+- Node is available and is what the gate checks run on.
+
+**`docs-only` branch:** `hackathon/` is deliberately not synced there — a folder that will contain `.py` files does not belong on a branch that must have none. If you do touch that branch, the rules are in `CLAUDE.vol-project.md` and the `.py` prohibition is absolute.
+
+---
+
+## Open decisions
+
+1. **Which internal GS tool does Narrate call?** It sits behind an interface so it changes nothing structural, but the brief requires naming it and its rate limits set how many modules can be narrated in a live on-stage run.
+2. **Which repo do we demo on?** Mid-size, unread by the team, fast test suite. Live generation on an unfamiliar repo is the whole credibility story.
+3. **Language scope.** Recommend Python-only via `ast` and say so plainly rather than implying more.
