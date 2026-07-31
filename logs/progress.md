@@ -242,5 +242,6 @@
 
 - Assembled the pitch recording (8424e99, pushed): lossless ffmpeg concat of the 7 screen-recording mkv parts into `presentation.mp4` (9:27, h264 1080p60), end-trims applied per filename (14s/2s/3s/2s off parts 1/2/5/6), part 4 moved to the end on request; force-added past the `*.mp4` gitignore rule
 - Committed the final pitch deck `hackathon/pitch-deck.html` (7a50c16, pushed) — the surviving variant of the three drafted yesterday; deck screenshot strays left untracked
+- Added the same deck to the `hackathon` submission branch as root-level `pitch-deck.html` (7fadfc6, pushed) — throwaway-worktree method again, main checkout never moved
 
 **Next:** demo rehearsal against a genuinely unread repo (generate live on stage), decide the two open CLAUDE.md items (which internal GS tool Narrate names, demo repo choice); after the hackathon, restore CLAUDE.vol-project.md per the header note
