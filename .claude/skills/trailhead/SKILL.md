@@ -21,14 +21,14 @@ pass B: --from-stage narrate → verify → render → --gate
 
 ## Execution
 
-`$HACK` = `C:/Users/ryanv/Documents/Projects/ML-GS/hackathon`. Every command runs from there, with `PYTHONPATH=src`, Python as `py -3.11`. `$REPO` is the repo to walk (a path, absolute or relative to `$HACK`); `restored` is the demo repo.
+`$HACK` = `C:/Users/RyanPC/Documents/Projects/ML-GS/hackathon`. Every command runs from there, with `PYTHONPATH=src`, Python as `python`. `$REPO` is the repo to walk (a path, absolute or relative to `$HACK`); `restored` is the demo repo.
 
 The work directory defaults to `<out-parent>/.trailhead`, so `-o out/restored.html` puts artifacts in `out/.trailhead/`. **Pass A and pass B must use the same `-o`/`--work` and the same `--run-commands` policy** — see *Why the packs go stale*.
 
 ### Step 1 — Pass A: survey, map, commands, and the prompt packs
 
 ```bash
-cd $HACK && PYTHONPATH=src py -3.11 -m trailhead build $REPO -o out/$REPO.html \
+cd $HACK && PYTHONPATH=src python -m trailhead build $REPO -o out/$REPO.html \
     --run-commands safe --emit-prompts -v
 ```
 
@@ -73,6 +73,30 @@ Rules, all enforced by code after you answer:
 - No `cite` at all when you set `"status": "inferred"`. An honest inferred sentence survives and is visibly marked; an invented quote does not survive.
 - One file per pack. Do not merge two packs' answers into one file, and do not rename the file — the filename *is* the cache key the stub replays from.
 
+### The @3 structured packs
+
+Since `trailhead/verified@3`, pass A also emits STRUCTURED packs beside the
+claim packs: `node:<gid>` (drawer narration), `dive:<gid>` (subsystem deep-dive
+claims, answered exactly like `five`), `gloss` (glossary terms), `tour` (map
+tour steps keyed to the node ids the pack fixes), and `cols` (column labels).
+Each pack's own `schema` field is the authority; answer that shape, not
+`{"claims": [...]}`, except for `dive:` which IS a claims pack.
+
+Extra rules for every pack, old and new:
+
+- BANNED in every text/def/role/purpose string: em dash U+2014, en dash
+  U+2013, the character `<`, and the sequence `](`. Write "h up to 5", never
+  "h<=5". Verify sanitises defensively, but a `<` rejects the whole response
+  at parse time.
+- Backticks and bare `[[Term]]` glossary markers are allowed where the pack's
+  system says so; never the `[[id|label]]` form.
+- `node:` cites resolve onto the map node as its drawer anchor; a failed cite
+  keeps the mechanical fallback and ledgers under the node id. `tour` steps
+  whose id is off the board are dropped (`t-<id>`), and the whole tour drops
+  under 3 surviving steps.
+- Unanswered structured packs degrade silently to the exact @2 page. Answer
+  what you can support; skip what you cannot.
+
 ### Quotes are copied, never retyped
 
 Copy the quote out of the window you were shown. Do not tidy the indentation, do not collapse a blank line, do not reflow a long line, do not "fix" a typo in a comment, do not substitute straight quotes for smart ones. The resolver searches for the snippet **verbatim** in the file on disk; the only normalisations it applies are CRLF folding and a trailing rstrip, and neither can rescue a retyped line.
@@ -82,7 +106,7 @@ A quote that does not appear verbatim is deleted with reason `snippet not found 
 ### Step 3 — Pass B: verify, render, gate
 
 ```bash
-cd $HACK && PYTHONPATH=src py -3.11 -m trailhead build $REPO -o out/$REPO.html \
+cd $HACK && PYTHONPATH=src python -m trailhead build $REPO -o out/$REPO.html \
     --run-commands safe --from-stage narrate --offline --gate -v
 ```
 
@@ -159,7 +183,7 @@ Symptom: `narrate <unit>: 0 claims, 0 dropped (provider, key …)` plus `model 0
 
 ## Critical rules
 
-- ALWAYS run from `$HACK` with `PYTHONPATH=src`; Python is `py -3.11` on this machine.
+- ALWAYS run from `$HACK` with `PYTHONPATH=src`; Python is `python` (3.12) on this machine.
 - ALWAYS use the same `-o`/`--work` and the same `--run-commands` value in pass A and pass B.
 - ALWAYS answer a pack into the `out` path the pack itself carries. Never compute the key yourself.
 - ALWAYS re-run pass A after touching the repo — a stale pack silently costs you the whole unit.
