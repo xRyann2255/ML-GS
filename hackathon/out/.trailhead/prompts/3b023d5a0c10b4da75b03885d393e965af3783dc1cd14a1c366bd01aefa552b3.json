@@ -1,0 +1,339 @@
+{
+  "unit": "conv",
+  "kind": "conventions",
+  "title": "How this codebase is written",
+  "max_claims": 4,
+  "key": "3b023d5a0c10b4da75b03885d393e965af3783dc1cd14a1c366bd01aefa552b3",
+  "system": "You are the narration stage of Trailhead, a tool that generates a walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Every\nquote you return is searched for verbatim in the file on disk; anything that is\nnot found exactly is deleted and counted on screen. You cannot talk your way\npast the checker, so do not try: an honest \"inferred\" sentence survives, an\ninvented quote does not.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. `cite.quote` is a VERBATIM, CONTIGUOUS copy of 3-24 lines from ONE file,\n   lines joined with newlines. Copy the leading indentation exactly, character\n   for character. Do not reflow, re-indent, elide, or add an ellipsis.\n4. Quote only code you were shown below. Quoting something you inferred exists\n   is the single most expensive thing you can do here.\n5. `cite.focus` is an array of exact substrings of your own `cite.quote`, the\n   one or two lines that actually carry the point.\n6. If you cannot support a sentence with a quote, set `\"status\": \"inferred\"` and\n   omit `cite` entirely. That is a legitimate, visible answer, not a failure.\n7. `text` is one plain sentence, at most 280 characters. No backticks, no\n   newlines, no markdown links, no `<`. Use commas instead of dashes.\n8. Say what the system DOES in its own domain's terms. When the README or a\n   package docstring states the project's purpose, that purpose is the story;\n   argument parsing, CLI wiring, and directory layout are never what a repo\n   is for.\n9. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"this codebase appears to\", say what it does.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/tests/unit/test_models.py ---\n    1| \"\"\"Tests for model implementations.\n    2| \n    3| Validates:\n    4| 1. HAR-family har_family: fit/predict round-trip on synthetic data\n    5| 2. Model coefficients have correct dimensions\n    6| 3. LightGBM QLIKE gradient/hessian correctness (numerical check)\n    7| 4. Ridge/Lasso regularization affects coefficients as expected\n    8| \"\"\"\n    9| \n   10| import numpy as np\n   11| import pandas as pd\n   12| import pytest\n   ...\n   23| class TestHARModelFitPredict:\n   24|     \"\"\"Basic fit/predict round-trip for HAR model.\"\"\"\n   25| \n   26|     def test_fit_sets_coefficients(self, sample_feature_df, sample_target):\n   27|         X = sample_feature_df[[\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"]]\n   28|         model = HARModel().fit(X, sample_target)\n   29|         assert model.coefficients_ is not None\n   30|         assert len(model.coefficients_) == 3\n   31|         assert model.intercept_ is not None\n   ...\n   63| class TestHARQModel:\n   64|     def test_fit_with_rq_features(self, sample_feature_df, sample_target):\n   65|         X = sample_feature_df.rename(\n   66|             columns={\n   67|                 \"rq_rv_interaction\": \"rq_rv_interaction_d\",\n   68|             }\n   69|         )[[\"log_rv_d\", \"log_rv_w\", \"log_rv_m\", \"rq_rv_interaction_d\"]]\n   70|         model = HARQModel().fit(X, sample_target)\n   71|         assert model.coefficients_ is not None\n   ...\n   75| class TestSHARModel:\n   76|     def test_fit_predict(self, sample_feature_df, sample_target):\n   77|         rng = np.random.default_rng(55)\n   78|         n = len(sample_feature_df)\n   79|         X = pd.DataFrame(\n   80|             {\n   81|                 \"log_rs_positive_d\": -10 + 0.5 * rng.standard_normal(n),\n   82|                 \"log_rs_positive_w\": -10 + 0.4 * rng.standard_normal(n),\n   83|                 \"log_rs_positive_m\": -10 + 0.3 * rng.standard_normal(n),\n   ...\n   95| class TestRidgeHAR:\n   96|     def test_ridge_shrinks_coefficients(self, sample_feature_df, sample_target):\n   97|         \"\"\"Ridge with high alpha should shrink coefficients toward zero.\"\"\"\n   98|         X = sample_feature_df[[\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"]]\n   99|         ols_model = HARModel().fit(X, sample_target)\n  100|         ridge_model = RidgeHARModel(alpha=100.0).fit(X, sample_target)\n  101| \n  102|         ols_norm = np.linalg.norm(ols_model.coefficients_)\n  103|         ridge_norm = np.linalg.norm(ridge_model.coefficients_)\n   ...\n  113| class TestLassoHAR:\n  114|     def test_lasso_can_zero_coefficients(self, sample_feature_df, sample_target):\n  115|         \"\"\"Lasso with high alpha may zero out some coefficients.\"\"\"\n  116|         X = sample_feature_df[[\"log_rv_d\", \"log_rv_w\", \"log_rv_m\", \"rq\", \"rq_rv_interaction\"]]\n  117|         model = LassoHARModel(alpha=1.0).fit(X, sample_target)\n  118|         # At least one coefficient should be zero (or near-zero) with high alpha\n  119|         assert np.any(np.abs(model.coefficients_) < 0.01)\n  120| \n  121|     def test_lasso_predicts(self, sample_feature_df, sample_target):\n   ...\n  128| class TestFeatureSelection:\n  129|     \"\"\"Verify each model selects only its theoretical features from a full matrix.\"\"\"\n  130| \n  131|     @pytest.fixture\n  132|     def full_feature_df(self):\n  133|         \"\"\"DataFrame with ALL possible feature columns (har_core + asymmetry).\"\"\"\n  134|         rng = np.random.default_rng(42)\n  135|         n = 200\n  136|         dates = pd.bdate_range(\"2020-01-02\", periods=n)\n   ...\n  451| class TestNaiveModels:\n  452|     \"\"\"Verify naive baseline models implement the pipeline interface correctly.\"\"\"\n  453| \n  454|     @pytest.fixture\n  455|     def feature_df(self):\n  456|         rng = np.random.default_rng(42)\n  457|         n = 100\n  458|         return pd.DataFrame(\n  459|             {\n   ...\n  580| class TestQLIKEObjectiveGradients:\n  581|     \"\"\"Verify custom QLIKE objective gradient/hessian via numerical differentiation.\"\"\"\n  582| \n  583|     def test_gradient_direction(self):\n  584|         \"\"\"Gradient of QLIKE w.r.t. y_pred.\n  585| \n  586|         d/dy_pred [exp(y_true - y_pred) - (y_true - y_pred) - 1]\n  587|         = -exp(y_true - y_pred) + 1\n  588| \n   ...\n  650|         np.testing.assert_allclose(grad, numerical_grad, atol=1e-4)\n  651| \n  652| \n  653| # ---------------------------------------------------------------------------\n  654| # Composite model regression tests\n  655| # ---------------------------------------------------------------------------\n  656| \n  657| lgb = pytest.importorskip(\"lightgbm\")\n  658| \n  659| \n  660| @pytest.fixture\n  661| def composite_data():\n  662|     \"\"\"Synthetic tabular data suitable for composite models (HAR + LightGBM).\n  663| \n  664|     Uses HAR features (log_rv_d/w/m) with a linear + nonlinear DGP so both\n  665|     sub-models have signal. 2000 rows ensures enough data for holdout splits.\n  666|     \"\"\"\n  667|     rng = np.random.default_rng(42)\n  668|     n = 2000\n  669|     log_rv_d = rng.normal(-8, 1, n)\n  670|     log_rv_w = rng.normal(-8, 0.5, n)\n  671|     log_rv_m = rng.normal(-8, 0.3, n)\n  672| \n  673|     y = (\n  674|         0.4 * log_rv_d\n  675|         + 0.2 * log_rv_w\n  676|         + 0.1 * log_rv_m\n  677|         + 0.05 * np.abs(log_rv_d - log_rv_w)\n  678|         + rng.normal(0, 0.2, n)\n  679|     )\n  680| \n  681|     X = pd.DataFrame(\n  682|         {\"log_rv_d\": log_rv_d, \"log_rv_w\": log_rv_w, \"log_rv_m\": log_rv_m},\n  683|         index=pd.bdate_range(\"2016-01-04\", periods=n),\n  684|     )\n  685|     return X, pd.Series(y, index=X.index, name=\"target\")\n  686| \n  687| \n  688| @pytest.fixture(autouse=True)\n  689| def _register():\n  690|     from volforecast.registry import ensure_registered\n  691| \n  692|     ensure_registered()\n  693| \n  694| \n  695| class TestStackingHARLightGBM:\n  696|     def test_fit_predict_roundtrip(self, composite_data):\n  697|         from volforecast.models.stacking import StackingHARLightGBM\n  698| \n  699|         X, y = composite_data\n  700|         model = StackingHARLightGBM(\n  701|             blend_fraction=0.20,\n  702|             blend_purge_gap=5,\n  703|             n_estimators=20,\n   ...\n  729| class TestCalibratedLightGBM:\n  730|     def test_fit_predict_roundtrip(self, composite_data):\n  731|         from volforecast.models.calibrated import CalibratedLightGBM\n  732| \n  733|         X, y = composite_data\n  734|         model = CalibratedLightGBM(\n  735|             cal_fraction=0.15,\n  736|             cal_purge_gap=5,\n  737|             n_estimators=20,\n   ...\n  760| class TestRegimeBlendModel:\n  761|     def test_fit_predict_roundtrip(self, composite_data):\n  762|         from volforecast.models.regime_blend import RegimeBlendModel\n  763| \n  764|         X, y = composite_data\n  765|         model = RegimeBlendModel(\n  766|             blend_strategy=\"fixed_regime\",\n  767|             n_estimators=20,\n  768|             val_fraction=0.0,\n   ...\n  798| class TestHARIVXAssetModels:\n  799|     \"\"\"Test har_iv_xasset and ridge_har_iv_xasset models.\"\"\"\n  800| \n  801|     @pytest.fixture\n  802|     def xasset_df(self):\n  803|         \"\"\"DataFrame with HAR core + IV + cross-asset columns.\"\"\"\n  804|         rng = np.random.default_rng(42)\n  805|         n = 500\n  806|         dates = pd.bdate_range(\"2018-01-02\", periods=n)\n   ...\n  891| class TestRegularizedHARIV:\n  892|     \"\"\"Tests for Ridge/Lasso/ElasticNet HAR-IV models.\"\"\"\n  893| \n  894|     @pytest.fixture\n  895|     def iv_feature_df(self):\n  896|         \"\"\"Feature DataFrame with HAR core + IV columns.\"\"\"\n  897|         rng = np.random.default_rng(42)\n  898|         n = 500\n  899|         dates = pd.bdate_range(\"2019-01-02\", periods=n)\n   ...\n 1091| class TestHARXIvRich:\n 1092|     \"\"\"Tests for HAR-X IV Rich models (tenor-matched, trial-035).\"\"\"\n 1093| \n 1094|     @pytest.fixture\n 1095|     def harx_feature_df(self):\n 1096|         \"\"\"DataFrame with all features needed by HAR-X IV Rich models.\"\"\"\n 1097|         rng = np.random.default_rng(42)\n 1098|         n = 500\n 1099|         dates = pd.bdate_range(\"2019-01-02\", periods=n)\n   ...\n 1187| class TestHARIVRateVolModels:\n 1188|     \"\"\"Test har_iv_ratevol, ridge_har_iv_ratevol, and lasso_har_iv_ratevol.\"\"\"\n 1189| \n 1190|     @pytest.fixture\n 1191|     def ratevol_df(self):\n 1192|         \"\"\"DataFrame with HAR core + IV + xasset_rate_vol.\"\"\"\n 1193|         rng = np.random.default_rng(42)\n 1194|         n = 500\n 1195|         dates = pd.bdate_range(\"2018-01-02\", periods=n)\n\n--- src/volforecast/models/xgboost.py ---\n    1| \"\"\"XGBoost model with QLIKE custom objective (gradient boosting).\n    2| \n    3| Implements XGBoost for tabular volatility forecasting with:\n    4| - Custom QLIKE objective function (gradient and hessian)\n    5| - Custom QLIKE evaluation metric\n    6| - Feature importance via built-in gain/split\n    7| \"\"\"\n    8| \n    9| from __future__ import annotations\n   10| \n   11| import logging\n   12| import os\n   ...\n   58| def qlike_objective_xgb(y_pred: np.ndarray, dtrain: Any) -> tuple[np.ndarray, np.ndarray]:\n   59|     \"\"\"Custom QLIKE objective for XGBoost.\n   60| \n   61|     Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n   62|     gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)\n   63|     hessian  (d²L/dy_pred²) = exp(y_true - y_pred)\n   64| \n   65|     Parameters\n   66|     ----------\n   ...\n   85| def qlike_eval_xgb(y_pred: np.ndarray, dtrain: Any) -> list[tuple[str, float]]:\n   86|     \"\"\"Custom QLIKE evaluation metric for XGBoost.\n   87| \n   88|     Parameters\n   89|     ----------\n   90|     y_pred : np.ndarray\n   91|         Current predictions.\n   92|     dtrain : xgb.DMatrix\n   93|         Training dataset.\n   ...\n  106| @register_model(\"xgboost\")\n  107| class XGBoostVolModel(_BaseModel):\n  108|     \"\"\"XGBoost model for realized volatility forecasting.\n  109| \n  110|     Optimizes QLIKE loss via custom objective. Supports feature\n  111|     importance analysis.\n  112| \n  113|     Parameters are accepted as flat kwargs:\n  114|         max_leaves, learning_rate, colsample_bytree, etc.\n   ...\n  716| def _make_study_name_xgb(base_params: dict[str, Any] | None) -> str:\n  717|     \"\"\"Build a deterministic study name that includes a hash of relevant params.\n  718| \n  719|     This ensures that when model params change (e.g. search ranges, base_model,\n  720|     feature config), old trials from a prior config are not reused.\n  721| \n  722|     Excludes 'seed' from the hash since seed doesn't change model semantics.\n  723|     \"\"\"\n  724|     import hashlib\n   ...\n  741| def _prebuild_cv_folds_xgb(\n  742|     X: pd.DataFrame,\n  743|     y: pd.Series,\n  744|     cv_config: Any,\n  745|     val_fraction: float = 0.15,\n  746|     purge_gap: int = 10,\n  747|     base_model: Any | None = None,\n  748| ):\n  749|     \"\"\"Pre-build DMatrix objects and CV fold indices once (reused across all trials).\n   ...\n  926| def _make_objective_xgb(\n  927|     X: pd.DataFrame,\n  928|     y: pd.Series,\n  929|     cv_config: Any,\n  930|     seed: int,\n  931|     base_params: dict[str, Any] | None,\n  932|     device: str,\n  933|     prebuilt_folds: list | None = None,\n  934|     base_model: Any | None = None,\n   ...\n 1031| def _make_trial_done_callback_xgb(progress_queue: Any | None, device_id: int):\n 1032|     \"\"\"Create an Optuna callback that emits trial-complete events via queue.\"\"\"\n 1033| \n 1034|     def callback(study, frozen_trial) -> None:  # noqa: ANN001\n 1035|         if progress_queue is None:\n 1036|             return\n 1037|         params = frozen_trial.params\n 1038|         state = frozen_trial.state.name  # COMPLETE, PRUNED, FAIL\n 1039|         qlike = frozen_trial.value if frozen_trial.value is not None else float(\"inf\")\n   ...\n 1052| def _optuna_worker_xgb(\n 1053|     worker_id: int,\n 1054|     n_trials_per_worker: int,\n 1055|     X_path_or_data: Any,\n 1056|     y_path_or_data: Any,\n 1057|     cv_config_dict: dict,\n 1058|     timeout: int | None,\n 1059|     journal_path: str,\n 1060|     seed: int,\n   ...\n 1115|         objective,\n 1116|         n_trials=n_trials_per_worker,\n 1117|         timeout=timeout,\n 1118|         n_jobs=1,\n 1119|         catch=(Exception,),\n 1120|         callbacks=[_make_trial_done_callback_xgb(progress_queue, device_id)],\n 1121|     )\n 1122|     return n_trials_per_worker\n 1123| \n 1124| \n 1125| def tune_hyperparameters_xgb(\n 1126|     X: pd.DataFrame,\n 1127|     y: pd.Series,\n 1128|     cv_config: Any | None = None,\n 1129|     n_trials: int = 50,\n 1130|     timeout: int | None = 3600,\n 1131|     storage_path: Path | None = None,\n 1132|     seed: int = 42,\n 1133|     on_trial_complete: Any | None = None,\n 1134|     on_hpo_event: Any | None = None,\n 1135|     base_params: dict[str, Any] | None = None,\n 1136|     n_workers: int = 1,\n 1137|     gpu_device_ids: list[int] | None = None,\n 1138|     base_model: Any | None = None,\n 1139| ) -> dict[str, Any]:\n 1140|     \"\"\"Tune XGBoost hyperparameters via Optuna with walk-forward CV.\n 1141| \n 1142|     Uses ExpandingWindowCV (walk-forward) to prevent look-ahead bias.\n 1143|     Optimizes QLIKE loss with TPE sampler.\n 1144| \n 1145|     When gpu_device_ids is provided, each worker is pinned to a separate\n 1146|     GPU (round-robin). With 8 GPUs and 8 workers, all trials run in\n 1147|     parallel on different devices.\n 1148| \n 1149|     Parameters\n 1150|     ----------\n 1151|     X : pd.DataFrame\n 1152|         Full training features.\n 1153|     y : pd.Series\n 1154|         Full training target (log RV).\n 1155|     cv_config : CVConfig, optional\n 1156|         CV configuration. Defaults to expanding window.\n 1157|     n_trials : int\n 1158|         Total number of Optuna trials (default: 50).\n 1159|     timeout : int, optional\n 1160|         Maximum seconds for optimization (default: 3600).\n 1161|     storage_path : Path, optional\n 1162|         Path for study storage (enables resume).\n 1163|     seed : int\n 1164|         Random seed for reproducibility (default: 42).\n 1165|     on_trial_complete : callable, optional\n 1166|         Progress callback, called with total completed trial count.\n 1167|     base_params : dict, optional\n 1168|         Fixed params to merge into every trial.\n 1169|     n_workers : int\n 1170|         Number of parallel worker processes (default: 1).\n 1171|     gpu_device_ids : list[int], optional\n 1172|         GPU device indices for multi-GPU training. When provided,\n 1173|         worker i uses device cuda:{gpu_device_ids[i % len(gpu_device_ids)]}.\n 1174| \n\n--- src/volforecast/data/micro.py ---\n    1| \"\"\"Per-symbol microstructure ingestion from ChunkStore LeeReady processor.\n    2| \n    3| Fetches tick data with server-side LeeReadySumVolume trade classification,\n    4| aggregates into 10-second signed-volume bars, then produces:\n    5|   1. Daily aggregates (signed_volume_ratio, vpin, ofi) → data/raw/micro/{SYM}.parquet\n    6|   2. 10-second bar sequences (for LSTM/TCN) → data/raw/micro/sequences/{SYM}.parquet\n    7| \n    8| Public API:\n    9|     ingest_symbol_micro  — Fetch + compute + save for one symbol (both outputs)\n   10|     fetch_micro_bars     — LeeReady + AggGroupBy fetch from ChunkStore\n   11|     compute_vpin         — Volume-time bucket VPIN (Easley et al. 2012)\n   12|     compute_daily_micro  — 10s bars → daily scalar aggregates\n   ...\n   58| def _build_processors(interval: float = MICRO_BAR_INTERVAL) -> list:\n   59|     \"\"\"Build AggGroupBy processor for server-side 10s bar aggregation.\n   60| \n   61|     Client-side BVC (Bulk Volume Classification) is applied after fetch\n   62|     to classify bars as buy/sell initiated using the tick rule.\n   63| \n   64|     Returns\n   65|     -------\n   66|     list\n   ...\n   87| def _classify_bars_bvc(df: pd.DataFrame) -> pd.DataFrame:\n   88|     \"\"\"Apply Bulk Volume Classification (tick rule) to OHLCV bars.\n   89| \n   90|     For each bar:\n   91|       - close > open → all volume is buy-initiated\n   92|       - close < open → all volume is sell-initiated\n   93|       - close == open → split 50/50\n   94| \n   95|     Adds columns: buy_vol, sell_vol, neutral_vol.\n   ...\n  127| def fetch_micro_bars(\n  128|     symbol: str,\n  129|     dates: list[date],\n  130|     batch_size: int = 20,\n  131|     timeout_s: float = 120.0,\n  132|     retries: int = 2,\n  133|     interval: float = MICRO_BAR_INTERVAL,\n  134|     on_batch: Callable[[dict[date, pd.DataFrame]], None] | None = None,\n  135|     progress=None,\n   ...\n  323| def compute_vpin(\n  324|     buy_vols: np.ndarray,\n  325|     sell_vols: np.ndarray,\n  326|     bucket_volume: int | float,\n  327|     n_buckets: int = VPIN_N_BUCKETS,\n  328| ) -> float:\n  329|     \"\"\"Compute Volume-Synchronized Probability of Informed Trading (VPIN).\n  330| \n  331|     Reference: Easley, Lopez de Prado & O'Hara (2012), Eq. 1.\n   ...\n  411| \n  412|     # VPIN = mean of last n_buckets imbalances\n  413|     return float(np.mean(bucket_imbalances[-n_buckets:]))\n  414| \n  415| \n  416| # ---------------------------------------------------------------------------\n  417| # Daily aggregate computation\n  418| # ---------------------------------------------------------------------------\n  419| \n  420| \n  421| def compute_daily_micro(\n  422|     bars_by_date: dict[date, pd.DataFrame],\n  423|     bucket_volume: int | float,\n  424|     n_buckets: int = VPIN_N_BUCKETS,\n  425| ) -> pd.DataFrame:\n  426|     \"\"\"Aggregate 10-second bars to daily microstructure scalars.\n  427| \n  428|     Parameters\n  429|     ----------\n  430|     bars_by_date : dict[date, DataFrame]\n  431|         Mapping of date → DataFrame with at least columns [buy_vol, sell_vol].\n  432|     bucket_volume : int or float\n  433|         VPIN bucket volume (total volume per bucket).\n  434|     n_buckets : int\n  435|         Number of VPIN buckets (default: 50).\n  436| \n  437|     Returns\n  438|     -------\n  439|     pd.DataFrame\n  440|         Daily features with columns from MICRO_DAILY_COLUMNS.\n  441|         Index: date objects (sorted ascending).\n  442|     \"\"\"\n  443|     records: list[dict] = []\n  444| \n  445|     for day in sorted(bars_by_date.keys()):\n  446|         bars = bars_by_date[day]\n  447|         buy = bars[\"buy_vol\"].values.astype(np.float64)\n  448|         sell = bars[\"sell_vol\"].values.astype(np.float64)\n  449| \n  450|         total_buy = float(buy.sum())\n  451|         total_sell = float(sell.sum())\n  452|         total_vol = total_buy + total_sell\n  453| \n  454|         if total_vol <= 0:\n  455|             records.append(\n  456|                 {\n  457|                     \"date\": day,\n  458|                     \"signed_volume_ratio\": float(\"nan\"),\n  459|                     \"vpin\": float(\"nan\"),\n  460|                     \"order_flow_imbalance\": float(\"nan\"),\n  461|                     \"buy_volume\": 0.0,\n  462|                     \"sell_volume\": 0.0,\n  463|                     \"total_volume\": 0.0,\n  464|                 }\n  465|             )\n  466|             continue\n  467| \n  468|         signed_volume_ratio = abs(total_buy - total_sell) / total_vol\n  469|         order_flow_imbalance = (total_buy - total_sell) / total_vol\n  470|         vpin = compute_vpin(buy, sell, bucket_volume, n_buckets=n_buckets)\n   ...\n  496| def _build_sequences_df(bars_by_date: dict[date, pd.DataFrame]) -> pd.DataFrame:\n  497|     \"\"\"Build flat sequences DataFrame from per-day 10s bars.\n  498| \n  499|     Output schema (v3): [date, bar_idx, buy_vol, sell_vol, net_flow, vwap,\n  500|                          n_trades, log_ret, vol_share, buy_ratio,\n  501|                          log_n_trades, abs_ret, price_accel, rolling_vpin,\n  502|                          cum_rv, session_frac]\n  503| \n  504|     V1 columns (buy_vol, sell_vol, net_flow, vwap, n_trades) preserved for\n   ...\n  613| def _build_5min_sequences_df(\n  614|     bars_by_date: dict[date, pd.DataFrame],\n  615| ) -> pd.DataFrame:\n  616|     \"\"\"Aggregate 10-second bars into 5-minute bars with 12 enriched features.\n  617| \n  618|     Parameters\n  619|     ----------\n  620|     bars_by_date : dict[date, pd.DataFrame]\n  621|         Same format as ``_build_sequences_df`` — each value has columns\n   ...\n  768| def save_micro_cache(\n  769|     symbol: str,\n  770|     df: pd.DataFrame,\n  771|     *,\n  772|     cache_dir: Path | None = None,\n  773| ) -> Path:\n  774|     \"\"\"Persist daily micro aggregates to parquet (atomic write).\n  775| \n  776|     Merges new data with any existing cache — new rows take priority\n   ...\n  810| def save_sequences_cache(\n  811|     symbol: str,\n  812|     df: pd.DataFrame,\n  813|     *,\n  814|     sequences_dir: Path | None = None,\n  815|     bar_interval: int = 10,\n  816| ) -> Path:\n  817|     \"\"\"Persist bar sequences to parquet (atomic write).\"\"\"\n  818|     if sequences_dir is None:\n   ...\n  835| def load_micro_cache(symbol: str, *, cache_dir: Path | None = None) -> pd.DataFrame | None:\n  836|     \"\"\"Load cached daily micro aggregates (or None if missing).\"\"\"\n  837|     if cache_dir is None:\n  838|         cache_dir = micro_cache_dir()\n  839|     path = cache_dir / f\"{symbol}.parquet\"\n  840|     if not path.exists():\n  841|         return None\n  842|     return pd.read_parquet(path)\n  843| \n  844| \n  845| def load_sequences_cache(symbol: str, *, sequences_dir: Path | None = None) -> pd.DataFrame | None:\n  846|     \"\"\"Load cached 10s bar sequences (or None if missing).\"\"\"\n  847|     if sequences_dir is None:\n  848|         sequences_dir = micro_sequences_dir()\n  849|     path = sequences_dir / f\"{symbol}.parquet\"\n  850|     if not path.exists():\n  851|         return None\n  852|     return pd.read_parquet(path)\n  853| \n  854| \n  855| def cache_covers_range(\n  856|     symbol: str,\n  857|     start_date: date,\n  858|     end_date: date,\n  859|     *,\n  860|     cache_dir: Path | None = None,\n  861| ) -> bool:\n  862|     \"\"\"Check if cached daily parquet covers the requested date range.\"\"\"\n  863|     df = load_micro_cache(symbol, cache_dir=cache_dir)\n   ...\n  875| def _get_cached_dates(\n  876|     symbol: str, *, sequences_dir: Path | None = None\n  877| ) -> set[date]:\n  878|     \"\"\"Return set of dates present in the existing sequences parquet.\n  879| \n  880|     Sequences are the authoritative source for which dates have been\n  881|     ingested (daily aggregates can be recomputed from them).\n  882|     \"\"\"\n  883|     if sequences_dir is None:\n   ...\n  904| def detect_gaps(\n  905|     symbol: str,\n  906|     start_date: date,\n  907|     end_date: date,\n  908|     *,\n  909|     sequences_dir: Path | None = None,\n  910| ) -> list[date]:\n  911|     \"\"\"Return trading days missing from the sequences cache.\n  912| \n   ...\n  924| def _format_date_ranges(dates: list[date]) -> str:\n  925|     \"\"\"Format a list of dates as compact contiguous ranges for logging.\n  926| \n  927|     Example: [Jan2, Jan3, Jan4, Jan8, Jan9] → \"2024-01-02→2024-01-04, 2024-01-08→2024-01-09\"\n  928|     \"\"\"\n  929|     if not dates:\n  930|         return \"(none)\"\n  931|     sorted_dates = sorted(dates)\n  932|     ranges: list[str] = []\n   ...\n  958| def _get_staged_dates(symbol: str) -> set[date]:\n  959|     \"\"\"Return set of dates already written to staging for this symbol.\"\"\"\n  960|     staging = micro_staging_dir(symbol)\n  961|     if not staging.exists():\n  962|         return set()\n  963|     dates_found: set[date] = set()\n  964|     for f in staging.iterdir():\n  965|         if f.suffix == \".parquet\":\n  966|             try:\n   ...\n  978| def _write_staging_batch(\n  979|     symbol: str,\n  980|     batch_bars: dict[date, pd.DataFrame],\n  981| ) -> None:\n  982|     \"\"\"Write a batch of bars to the staging directory as a parquet chunk.\"\"\"\n  983|     if not batch_bars:\n  984|         return\n  985|     staging = micro_staging_dir(symbol)\n  986|     staging.mkdir(parents=True, exist_ok=True)\n   ...\n 1008| def _consolidate_staging(symbol: str, *, sequences_dir: Path | None = None) -> pd.DataFrame:\n 1009|     \"\"\"Consolidate all staging parquets into the final sequences file.\n 1010| \n 1011|     Merges staging chunks with any existing sequences parquet (preserving\n 1012|     historical data), deduplicates, writes final parquet, then removes\n 1013|     the staging directory.\n 1014| \n 1015|     Returns the consolidated DataFrame (existing + new).\n 1016|     \"\"\"\n   ...\n 1067| def ingest_symbol_micro(\n 1068|     symbol: str,\n 1069|     start_date: date,\n 1070|     end_date: date,\n 1071|     *,\n 1072|     force: bool = False,\n 1073|     recompute: bool = False,\n 1074|     fill_gaps: bool = False,\n 1075|     batch_size: int = 20,\n   ...\n 1269| def _auto_bucket_volume(bars_by_date: dict[date, pd.DataFrame]) -> int:\n 1270|     \"\"\"Auto-calibrate VPIN bucket volume from data.\n 1271| \n 1272|     Strategy: median daily volume / VPIN_N_BUCKETS.\n 1273|     This ensures ~50 buckets per typical day.\n 1274|     \"\"\"\n 1275|     daily_vols = []\n 1276|     for bars in bars_by_date.values():\n 1277|         total = bars[\"buy_vol\"].sum() + bars[\"sell_vol\"].sum()\n\n--- src/volforecast/cli/audit.py ---\n    1| \"\"\"Data integrity audit and manifest generation.\n    2| \n    3| Audits all cached parquet files against their manifest contracts,\n    4| validates integrity, detects issues, assesses per-layer readiness,\n    5| and regenerates data/manifest.json + syncs data/manifest.yaml.\n    6| \n    7| Usage:\n    8|     python -m volforecast.cli.audit [--quiet] [--no-report] [--no-journal]\n    9| \"\"\"\n   10| \n   11| from __future__ import annotations\n   12| \n   ...\n   51| def _find_project_root() -> Path:\n   52|     \"\"\"Walk up from this file to find the project root (contains data/).\"\"\"\n   53|     p = Path(__file__).resolve()\n   54|     for parent in [p] + list(p.parents):\n   55|         if (parent / \"data\" / \"raw\" / \"ticks\").is_dir():\n   56|             return parent\n   57|     # Fallback\n   58|     return Path(\"/home/developer/ml-vol-estimator\")\n   59| \n   60| \n   61| def _discover_universe(root: Path) -> list[str]:\n   62|     \"\"\"Discover the symbol universe from on-disk parquets + constants.\n   63| \n   64|     Scans source directories for parquet files and merges with\n   65|     SYMBOL_UNIVERSE from constants.py.  Excludes underscore-prefixed\n   66|     files (e.g. _MARKET.parquet, _VIX.parquet).\n   67|     \"\"\"\n   68|     on_disk: set[str] = set()\n   69|     for subdir in _SYMBOL_SOURCE_DIRS:\n   ...\n   80| def _get_universe_fallback() -> list[str]:\n   81|     \"\"\"Fallback universe when manifest has no symbols: use SYMBOL_UNIVERSE.\"\"\"\n   82|     return sorted(SYMBOL_UNIVERSE)\n   83| \n   84| \n   85| def _get_universe_from_manifest(manifest_data: Any, root: Path | None = None) -> list[str]:\n   86|     \"\"\"Build the audit universe dynamically.\n   87| \n   88|     Uses on-disk discovery merged with SYMBOL_UNIVERSE from constants.\n   89|     The manifest's symbol list is ignored — the audit should discover\n   90|     what actually exists rather than relying on a stale manifest list.\n   91|     \"\"\"\n   92|     if root is not None:\n   93|         return _discover_universe(root)\n   ...\n  102| def _source_result_to_legacy_rv(result: SourceAuditResult) -> dict[str, Any]:\n  103|     \"\"\"Convert SourceAuditResult for ticks to legacy rv manifest format.\"\"\"\n  104|     rv_manifest: dict[str, Any] = {}\n  105|     schema_groups: dict[tuple, list[str]] = {}\n  106| \n  107|     for sym, fr in result.file_results.items():\n  108|         if not fr.exists:\n  109|             continue\n  110|         cols_key = tuple(sorted(fr.columns))\n   ...\n  147| def _legacy_layer_readiness(\n  148|     layer_readiness: dict[str, dict[str, Any]],\n  149|     source_results: dict[str, SourceAuditResult],\n  150| ) -> dict[str, Any]:\n  151|     \"\"\"Convert new layer readiness to the legacy format expected by report/journal.\"\"\"\n  152|     readiness: dict[str, Any] = {}\n  153| \n  154|     # HAR core (L0): from ticks source\n  155|     ticks_result = source_results.get(\"ticks\")\n   ...\n  238| def generate_report(\n  239|     source_results: dict[str, SourceAuditResult],\n  240|     layer_readiness: dict[str, dict[str, Any]],\n  241|     universe: list[str],\n  242| ) -> str:\n  243|     \"\"\"Generate human-readable Markdown audit report from new-style results.\"\"\"\n  244|     lines = [\n  245|         \"# Data Audit Report\",\n  246|         \"\",\n   ...\n  351| def generate_journal_entry(\n  352|     source_results: dict[str, SourceAuditResult],\n  353|     layer_readiness: dict[str, dict[str, Any]],\n  354|     universe: list[str],\n  355| ) -> str:\n  356|     \"\"\"Generate a research journal entry summarizing data state.\"\"\"\n  357|     from datetime import date\n  358| \n  359|     today = date.today().isoformat()\n   ...\n  424| def update_research_journal(\n  425|     source_results: dict[str, SourceAuditResult],\n  426|     layer_readiness: dict[str, dict[str, Any]],\n  427|     universe: list[str],\n  428|     root: Path,\n  429| ) -> None:\n  430|     \"\"\"Append a data audit summary to the research journal.\"\"\"\n  431|     journal_path = root / \"workspace\" / \"research\" / \"research-journal.md\"\n  432|     if not journal_path.exists():\n   ...\n  457| def _sync_audit_to_yaml(\n  458|     source_results: dict[str, SourceAuditResult],\n  459|     root: Path,\n  460|     *,\n  461|     universe: list[str] | None = None,\n  462|     quiet: bool = False,\n  463| ) -> None:\n  464|     \"\"\"Sync audit results into data/manifest.yaml integrity entries.\"\"\"\n  465|     yaml_path = root / \"data\" / \"manifest.yaml\"\n   ...\n  519|         if not quiet:\n  520|             n_sources = sum(1 for r in source_results.values() if r.found_symbols > 0)\n  521|             print(f\"  manifest.yaml updated: {n_sources} sources synced\")\n  522| \n  523| \n  524| # ══════════════════════════════════════════════════════════════════════════\n  525| #  Main entry point\n  526| # ══════════════════════════════════════════════════════════════════════════\n  527| \n  528| \n  529| def run_audit(\n  530|     *, quiet: bool = False, no_report: bool = False, no_journal: bool = False\n  531| ) -> dict[str, Any]:\n  532|     \"\"\"Run the full data audit and update manifest.\n  533| \n  534|     Returns the manifest dict (legacy format for backward compatibility).\n  535|     \"\"\"\n  536|     root = _find_project_root()\n  537|     yaml_path = root / \"data\" / \"manifest.yaml\"\n  538|     manifest_path = root / \"data\" / \"manifest.json\"\n  539|     report_path = root / \"workspace\" / \"tmp\" / \"data_audit_report.md\"\n  540| \n  541|     if not quiet:\n  542|         print(\"Running data audit...\")\n  543| \n  544|     # Load manifest contract\n  545|     mgr = ManifestManager(yaml_path)\n  546|     manifest_data = mgr.load()\n  547|     universe = _get_universe_from_manifest(manifest_data, root=root)\n  548| \n  549|     # Validate each source against its contract\n  550|     source_results: dict[str, SourceAuditResult] = {}\n  551|     for source_name, contract in manifest_data.sources.items():\n  552|         if not quiet:\n  553|             print(f\"  Auditing {source_name}...\")\n  554|         source_universe = universe if \"{symbol}\" in contract.file_pattern else []\n  555|         result = validate_source(source_name, contract, root, universe=source_universe)\n  556|         source_results[source_name] = result\n  557| \n  558|     # Derive layer readiness\n  559|     layer_readiness = derive_layer_readiness(source_results)\n  560| \n  561|     # Legacy layer readiness (for backward compat in journal/reporting)\n  562|     legacy_lr = _legacy_layer_readiness(layer_readiness, source_results)\n  563| \n  564|     # Build legacy manifest dict (for JSON output)\n  565|     ticks_result = source_results.get(\"ticks\")\n  566|     rv_legacy = (\n  567|         _source_result_to_legacy_rv(ticks_result)\n  568|         if ticks_result\n  569|         else {\n  570|             \"found_symbols\": [],\n  571|             \"missing_symbols\": universe,\n  572|             \"symbol_count\": 0,\n  573|             \"rv\": {},\n  574|             \"schema_groups\": [],\n  575|         }\n  576|     )\n  577| \n  578|     manifest: dict[str, Any] = {\n   ...\n  663| @dataclass\n  664| class FixReport:\n  665|     \"\"\"Summary of a gap-fix operation across sources.\"\"\"\n  666| \n  667|     total_missing_days: int = 0\n  668|     total_fixed_days: int = 0\n  669|     total_failed_days: int = 0\n  670|     sources_scanned: int = 0\n  671|     results: list[Any] = field(default_factory=list)\n  672| \n  673| \n  674| def run_audit_fix(\n  675|     *,\n  676|     sources: dict[str, list[str]],\n  677|     start_date: date,\n  678|     end_date: date,\n  679|     confirm: bool = False,\n  680|     project_root: Path | None = None,\n  681|     quiet: bool = False,\n  682| ) -> FixReport:\n   ...\n  769| def main() -> int:\n  770|     \"\"\"CLI entry point.\"\"\"\n  771|     quiet = \"--quiet\" in sys.argv or \"-q\" in sys.argv\n  772|     no_report = \"--no-report\" in sys.argv\n  773|     no_journal = \"--no-journal\" in sys.argv\n  774| \n  775|     try:\n  776|         manifest = run_audit(quiet=quiet, no_report=no_report, no_journal=no_journal)\n  777|         # Exit with non-zero if there are critical issues\n   ...\n  793| def register(subparsers) -> None:\n  794|     \"\"\"Register the audit subcommand.\"\"\"\n  795|     parser = subparsers.add_parser(\n  796|         \"audit\",\n  797|         help=\"Run comprehensive data integrity audit and update manifest\",\n  798|     )\n  799|     parser.add_argument(\"--quiet\", \"-q\", action=\"store_true\", help=\"Suppress progress output\")\n  800|     parser.add_argument(\n  801|         \"--no-report\", action=\"store_true\", help=\"Skip Markdown report generation\"\n   ...\n  829| def handle(args) -> int:\n  830|     \"\"\"Execute audit command. Return exit code.\"\"\"\n  831|     from datetime import date as _date\n  832|     from pathlib import Path\n  833| \n  834|     run_audit(quiet=args.quiet, no_report=args.no_report)\n  835| \n  836|     if args.fix:\n  837|         # Determine sources to scan\n\nTASK: How this codebase is written\nWrite exactly 4 sentences about the conventions and habits of\nthis codebase: how errors are handled, how modules are laid out, what the\nauthors clearly cared about.\nThese are readings, not facts. Every one of them will be marked inferred and\nshown as such; do not stretch for a quote to make one look verified.",
+  "windows": [
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 23,
+      "end": 31
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 63,
+      "end": 71
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 75,
+      "end": 83
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 95,
+      "end": 103
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 113,
+      "end": 121
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 128,
+      "end": 136
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 451,
+      "end": 459
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 580,
+      "end": 588
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 650,
+      "end": 703
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 729,
+      "end": 737
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 760,
+      "end": 768
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 798,
+      "end": 806
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 891,
+      "end": 899
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 1091,
+      "end": 1099
+    },
+    {
+      "file": "src/tests/unit/test_models.py",
+      "start": 1187,
+      "end": 1195
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 58,
+      "end": 66
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 85,
+      "end": 93
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 106,
+      "end": 114
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 716,
+      "end": 724
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 741,
+      "end": 749
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 926,
+      "end": 934
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 1031,
+      "end": 1039
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 1052,
+      "end": 1060
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 1115,
+      "end": 1174
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 58,
+      "end": 66
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 87,
+      "end": 95
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 127,
+      "end": 135
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 323,
+      "end": 331
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 411,
+      "end": 470
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 496,
+      "end": 504
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 613,
+      "end": 621
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 768,
+      "end": 776
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 810,
+      "end": 818
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 835,
+      "end": 863
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 875,
+      "end": 883
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 904,
+      "end": 912
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 924,
+      "end": 932
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 958,
+      "end": 966
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 978,
+      "end": 986
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 1008,
+      "end": 1016
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 1067,
+      "end": 1075
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 1269,
+      "end": 1277
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 51,
+      "end": 69
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 80,
+      "end": 93
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 102,
+      "end": 110
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 147,
+      "end": 155
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 238,
+      "end": 246
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 351,
+      "end": 359
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 424,
+      "end": 432
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 457,
+      "end": 465
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 519,
+      "end": 578
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 663,
+      "end": 682
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 769,
+      "end": 777
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 793,
+      "end": 801
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 829,
+      "end": 837
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "claims"
+    ],
+    "properties": {
+      "claims": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "status",
+            "cite"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "inferred"
+              ]
+            },
+            "cite": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "focus": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\3b023d5a0c10b4da75b03885d393e965af3783dc1cd14a1c366bd01aefa552b3.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\3b023d5a0c10b4da75b03885d393e965af3783dc1cd14a1c366bd01aefa552b3.json"
+}

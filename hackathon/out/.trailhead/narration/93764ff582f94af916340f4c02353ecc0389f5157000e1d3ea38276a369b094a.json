@@ -1,0 +1,40 @@
+{
+ "role": [
+  "The foundation drawer, imported by ten module groups and importing none of them back. Its centerpiece is `cv.py`, the leakage firewall: purged k-fold deletes observations within a purge gap of each test block so overlapping realized volatility windows cannot leak, blocked k-fold keeps contiguous time blocks, expanding and rolling windows walk forward, and `PanelExpandingWindowCV` splits the panel on unique dates so every symbol on a date lands in the same fold. Random k-fold is banned as look-ahead bias.",
+  "`manifest.py` is the data ledger with two layers, a contract stating what data should exist (expected columns, value bounds, a NaN budget) and a state recording what does exist per symbol. Ingest commands update the state and `vol audit` validates it against the contract, through a typed YAML `ManifestManager` plus legacy JSON wrappers kept alive during migration.",
+  "`persistence.py` is the experiment memory: it writes fitted models, out-of-sample predictions, and a consolidated metrics.json under data/models/, then fingerprints every training-relevant config field plus each symbol's data file so a rerun with nothing changed skips retraining, and `check_fingerprint` names exactly what changed when the hashes disagree."
+ ],
+ "reads": "`ExperimentConfig` objects from the experiment runner, ingestion results handed over by the CLI ingest commands, and cache locations resolved against the repo root by its own `paths.py`.",
+ "feeds": "Ten module groups build on it: ingestion records into the manifest, model training runs inside its CV splits, and evaluation, reporting, and the CLI read the predictions, metrics, and fingerprints it persists.",
+ "key_files": [
+  {
+   "file": "cv.py",
+   "purpose": "The leakage firewall: purged, blocked, expanding, rolling, and panel-aware CV splitters, with random k-fold banned in the docstring."
+  },
+  {
+   "file": "manifest.py",
+   "purpose": "The ingestion contract and state ledger behind `vol status` and `vol audit`: what data should exist versus what actually does."
+  },
+  {
+   "file": "persistence.py",
+   "purpose": "Experiment artifacts and fingerprinting: models, OOS predictions, metrics.json, and the config plus data hash that lets unchanged reruns skip retraining."
+  }
+ ],
+ "concepts": [
+  "purge gap",
+  "embargo",
+  "walk-forward CV",
+  "look-ahead bias",
+  "ingestion manifest",
+  "config fingerprint"
+ ],
+ "cite": {
+  "file": "src/volforecast/utils/cv.py",
+  "quote": "class PurgedKFoldCV(_BaseCVSplitter):\n    \"\"\"Purged k-fold cross-validation for time series.\n\n    Splits data into k contiguous folds and purges observations\n    within a gap window between training and test sets to prevent\n    information leakage from overlapping RV windows.\n\n    ``embargo`` (Phase 2.8): rows in ``[test_end, test_end + embargo)`` are also\n    excluded from the train sets of all SUBSEQUENT folds. Default 0 (no-op).\n    \"\"\"",
+  "focus": [
+   "information leakage from overlapping RV windows",
+   "excluded from the train sets of all SUBSEQUENT folds"
+  ]
+ },
+ "caption": "Purging and embargo, the mechanics that keep overlapping RV windows from leaking across the train and test cut."
+}

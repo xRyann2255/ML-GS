@@ -1,0 +1,88 @@
+{
+ "claims": [
+  {
+   "text": "The cli package is the operator surface of the volatility platform: every `vol run --config` invocation takes the [[tournament]] code path, so even a single-model config produces ranked tables and an interactive Plotly dashboard, with `mode: ingest` the only special case.",
+   "status": "verified",
+   "cite": {
+    "file": "README.md",
+    "quote": "### Primary Command: `vol run --config <yaml>`\n\nEvery `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).",
+    "focus": [
+     "Every `vol run --config` invocation uses the tournament code path"
+    ]
+   }
+  },
+  {
+   "text": "`vol forecast` is the live end product: a config-driven ensemble trains each configured model on full history, predicts next-day realized volatility, compares it to current ATM implied volatility, and emits a weighted LONG, SHORT, or FLAT call on the [[IV-RV gap]].",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/cli/forecast.py",
+    "quote": "def _fetch_live_iv(symbol: str) -> float | None:\n    \"\"\"Attempt to fetch current ATM IV from TSDB.\n\n    Returns IV in vol points (e.g. 18.5 = 18.5%) or None if unavailable.\n    \"\"\"\n    try:\n        from gs_quant.session import GsSession\n\n        GsSession.use()",
+    "focus": [
+     "    \"\"\"Attempt to fetch current ATM IV from TSDB."
+    ]
+   }
+  },
+  {
+   "text": "`vol audit` is the data-quality gate for everything downstream: it checks every cached parquet against its manifest contract, assesses per-layer readiness, and regenerates `data/manifest.json` while syncing `data/manifest.yaml`.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/cli/audit.py",
+    "quote": "def _legacy_layer_readiness(\n    layer_readiness: dict[str, dict[str, Any]],\n    source_results: dict[str, SourceAuditResult],\n) -> dict[str, Any]:\n    \"\"\"Convert new layer readiness to the legacy format expected by report/journal.\"\"\"\n    readiness: dict[str, Any] = {}\n\n    # HAR core (L0): from ticks source\n    ticks_result = source_results.get(\"ticks\")",
+    "focus": [
+     "    # HAR core (L0): from ticks source"
+    ]
+   }
+  },
+  {
+   "text": "The audit deliberately distrusts its own records: the symbol universe is rebuilt each run from the parquets actually on disk merged with `SYMBOL_UNIVERSE`, and the manifest's stale symbol list is ignored.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/cli/audit.py",
+    "quote": "def _get_universe_from_manifest(manifest_data: Any, root: Path | None = None) -> list[str]:\n    \"\"\"Build the audit universe dynamically.\n\n    Uses on-disk discovery merged with SYMBOL_UNIVERSE from constants.\n    The manifest's symbol list is ignored — the audit should discover\n    what actually exists rather than relying on a stale manifest list.\n    \"\"\"\n    if root is not None:\n        return _discover_universe(root)",
+    "focus": [
+     "Uses on-disk discovery merged with SYMBOL_UNIVERSE from constants.",
+     "what actually exists rather than relying on a stale manifest list."
+    ]
+   }
+  },
+  {
+   "text": "Data readiness is machine-checkable: the audit exits 0 only when no source has critical issues, returns 1 when any does, and 2 on outright failure, so agents and CI can gate a training run on data health without parsing the Markdown report.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/cli/audit.py",
+    "quote": "        manifest = run_audit(quiet=quiet, no_report=no_report, no_journal=no_journal)\n        # Exit with non-zero if there are critical issues\n        has_critical = any(\n            r.get(\"has_critical\", False)\n            for r in manifest.get(\"source_results_summary\", {}).values()\n        )\n        if has_critical:\n            if not quiet:\n                print(\"\\nWARNING: Critical issues detected (see report for details)\")\n            return 1\n        return 0\n    except Exception as e:\n        logger.exception(\"Audit failed\")\n        print(f\"ERROR: {e}\", file=sys.stderr)\n        return 2",
+    "focus": [
+     "        has_critical = any(",
+     "            return 1"
+    ]
+   }
+  },
+  {
+   "text": "`vol backfill-rk` retrofits the noise-robust estimator: it finds cached dates where the realized kernel is NaN, refetches ticks from the [[Chunk Store]] in five-day batches, recomputes `realized_kernel` from tick log-prices, and updates each symbol's parquet in place.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/cli/backfill_rk.py",
+    "quote": "    parser = argparse.ArgumentParser(\n        prog=\"volforecast backfill-rk\",\n        description=\"Backfill realized kernel and noise_gap into existing RV parquets\",\n    )",
+    "focus": [
+     "        description=\"Backfill realized kernel and noise_gap into existing RV parquets\","
+    ]
+   }
+  },
+  {
+   "text": "Every audit run also appends a dated data-state summary to `workspace/research/research-journal.md`, so the research journal that orients each new session records data readiness alongside experiment results.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/cli/audit.py",
+    "quote": "def update_research_journal(\n    source_results: dict[str, SourceAuditResult],\n    layer_readiness: dict[str, dict[str, Any]],\n    universe: list[str],\n    root: Path,\n) -> None:\n    \"\"\"Append a data audit summary to the research journal.\"\"\"\n    journal_path = root / \"workspace\" / \"research\" / \"research-journal.md\"",
+    "focus": [
+     "    \"\"\"Append a data audit summary to the research journal.\"\"\"",
+     "    journal_path = root / \"workspace\" / \"research\" / \"research-journal.md\""
+    ]
+   }
+  },
+  {
+   "text": "None of the volatility mathematics lives here: the cli modules orchestrate ingestion, auditing, backfill, and the live signal, but every estimator, model, and statistic they invoke is implemented in `volforecast.data`, `volforecast.models`, and `volforecast.evaluation`.",
+   "status": "inferred"
+  }
+ ]
+}

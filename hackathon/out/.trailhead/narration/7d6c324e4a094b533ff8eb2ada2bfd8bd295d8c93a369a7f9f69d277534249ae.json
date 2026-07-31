@@ -1,0 +1,87 @@
+{
+ "claims": [
+  {
+   "text": "This package supplies the contestants for the repo's tournaments: the same `vol run` configs that fit a single [[HAR]] baseline can field 13 models and compare them with statistical tests, so every design choice here is built to be raced, not admired.",
+   "status": "verified",
+   "cite": {
+    "file": "README.md",
+    "quote": "# Single-model experiment (ingest + train + evaluate + dashboard)\nvol run --config workspace/configs/baseline_har.yaml\n\n# Tournament: 13 models compared with statistical tests\nvol run --config workspace/configs/tournament_full_spy.yaml",
+    "focus": [
+     "# Tournament: 13 models compared with statistical tests"
+    ]
+   }
+  },
+  {
+   "text": "The signature move: training loss equals evaluation loss, LightGBM's custom objective hands the booster the analytic [[QLIKE]] gradient 1 - exp(y_true - y_pred) and hessian exp(y_true - y_pred) in log-RV space, so trees split on the exact metric the tournament scores.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/models/lightgbm.py",
+    "quote": "\ndef qlike_objective(y_pred: np.ndarray, dtrain: Any) -> tuple[np.ndarray, np.ndarray]:\n    \"\"\"Custom QLIKE objective for LightGBM.\n\n    Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n    gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)",
+    "focus": [
+     "    gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)"
+    ]
+   }
+  },
+  {
+   "text": "The objective knows its data: log RV for these assets spans roughly -14 to -4, so the symmetric clip at plus or minus 10 is pure float64 overflow protection, with QLIKE's natural exponential already penalizing under-predicted volatility harder than over-predicted.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/models/lightgbm.py",
+    "quote": "    # Symmetric clip: pure overflow protection. exp(709) overflows float64.\n    # Data range is ~10 (log RV spans -14 to -4), so ±10 covers all cases.\n    # QLIKE's natural exponential already penalizes under-prediction harder.",
+    "focus": [
+     "# Data range is ~10 (log RV spans -14 to -4), so ±10 covers all cases."
+    ]
+   }
+  },
+  {
+   "text": "`xgboost` is the deliberate second opinion: an independent boosting library carrying the identical QLIKE gradient and hessian, so any LightGBM edge that fails to replicate there reads as a library artifact, not signal.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/models/xgboost.py",
+    "quote": "def qlike_objective_xgb(y_pred: np.ndarray, dtrain: Any) -> tuple[np.ndarray, np.ndarray]:\n    \"\"\"Custom QLIKE objective for XGBoost.\n\n    Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n    gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)\n    hessian  (d²L/dy_pred²) = exp(y_true - y_pred)",
+    "focus": [
+     "    \"\"\"Custom QLIKE objective for XGBoost."
+    ]
+   }
+  },
+  {
+   "text": "The graph family reframes forecasting across assets instead of across time: each trading date becomes one graph whose nodes are symbols and whose edges come from rolling correlation, and `requires_graph = True` routes these snapshots to the model instead of tabular features.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/models/gnn.py",
+    "quote": "    Operates on graph snapshots: each date = one graph with N nodes\n    (symbols) and edges from rolling correlation. Integrates with the\n    feature_stack pipeline via extract_features().\n\n    Set ``requires_graph = True`` so the pipeline runner can detect\n    graph-mode and dispatch appropriately.",
+    "focus": [
+     "Operates on graph snapshots: each date = one graph with N nodes",
+     "Set ``requires_graph = True`` so the pipeline runner can detect"
+    ]
+   }
+  },
+  {
+   "text": "The torch side makes the same commitment: graph models train on `_qlike_loss`, exp(y - y_hat) - (y - y_hat) - 1 in log-RV space with the same clamp at 10, so no family in the zoo gets to optimize a friendlier loss than the one it is judged on.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/models/gnn.py",
+    "quote": "def _qlike_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:\n    \"\"\"QLIKE in log-RV space: exp(y - y_hat) - (y - y_hat) - 1.\"\"\"\n    diff = target - pred\n    diff = torch.clamp(diff, min=-10.0, max=10.0)\n    return torch.mean(torch.exp(diff) - diff - 1.0)",
+    "focus": [
+     "QLIKE in log-RV space: exp(y - y_hat) - (y - y_hat) - 1"
+    ]
+   }
+  },
+  {
+   "text": "Hyperparameter search respects time the same way the outer evaluation does: Optuna tunes over ExpandingWindowCV walk-forward splits to prevent look-ahead bias, and each worker process is pinned round-robin to its own GPU so 8 devices run all trials in parallel.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/models/xgboost.py",
+    "quote": "    \"\"\"Tune XGBoost hyperparameters via Optuna with walk-forward CV.\n\n    Uses ExpandingWindowCV (walk-forward) to prevent look-ahead bias.\n    Optimizes QLIKE loss with TPE sampler.\n\n    When gpu_device_ids is provided, each worker is pinned to a separate\n    GPU (round-robin). With 8 GPUs and 8 workers, all trials run in\n    parallel on different devices.",
+    "focus": [
+     "Uses ExpandingWindowCV (walk-forward) to prevent look-ahead bias."
+    ]
+   }
+  },
+  {
+   "text": "What the zoo does not do is judge itself: a model only emits log-RV predictions under the shared base contract, while fold construction, the Duan retransformation, QLIKE ranking and Diebold-Mariano testing all live outside this package.",
+   "status": "inferred",
+   "cite": {}
+  }
+ ]
+}

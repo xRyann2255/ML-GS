@@ -1,0 +1,43 @@
+{
+ "role": [
+  "The ingestion and caching tier of the pipeline: it turns GS internal market data services into per-symbol parquet caches that everything downstream consumes. `chunk_store.py` pulls raw L1 trade and quote ticks for the 34 symbol universe from Chunk Store via pytickclient, plus L2 order book depth for the E-mini S&P 500, and rolls the front ES futures contract on the Thursday before the third Friday of each expiry month.",
+  "`rv_panel.py` distills those ticks into the daily [[realized variance]] panel through a streaming batch pipeline: trading calendar, batched fetch, per-day RV computation, checkpoint to parquet, release. Peak memory stays bounded to one sub-batch of tick data at a time, so a multi-year backfill survives on a workstation and resumes from its checkpoint instead of starting over.",
+  "`micro.py` works below the daily grain: server-classified ticks become 10 second signed-volume bars, from which it computes daily aggregates, signed volume ratio, order flow imbalance, and [[VPIN]] per Easley, Lopez de Prado and O'Hara 2012, plus per-bar sequences for the LSTM and TCN models. Cache writes are atomic and merging, never destructive, and a staging directory lets an interrupted ingest resume where it stopped."
+ ],
+ "reads": "Raw L1 and L2 ticks and server-aggregated 5-min bars from Chunk Store via pytickclient, a GS internal tick service reachable only with a live pyslang session.",
+ "feeds": "Daily RV panels feed the feature layers, 10 second bar sequences feed the LSTM and TCN models, and the CLI ingest commands drive its caches; at fan-in 8 it is one of the most imported modules in the repo.",
+ "key_files": [
+  {
+   "file": "chunk_store.py",
+   "purpose": "the Chunk Store client: L1 trades and quotes, 5-min bars via server-side AggGroupBy, ES futures roll logic, timeout-guarded batched queries"
+  },
+  {
+   "file": "rv_panel.py",
+   "purpose": "streaming, checkpointed builder that turns tick batches into the per-symbol daily RV panel cache"
+  },
+  {
+   "file": "micro.py",
+   "purpose": "10 second signed-volume bars, BVC classification, VPIN and order-flow aggregates, LSTM and TCN sequences with resumable staging"
+  },
+  {
+   "file": "__init__.py",
+   "purpose": "one line stating the package charter: data access for tick data, daily OHLCV, and IV surfaces"
+  }
+ ],
+ "concepts": [
+  "realized variance",
+  "VPIN",
+  "Chunk Store",
+  "ES futures roll",
+  "atomic parquet caches",
+  "BVC tick rule"
+ ],
+ "cite": {
+  "file": "src/volforecast/data/chunk_store.py",
+  "quote": "def fetch_trades_batch(\n    symbol: str,\n    dates: list[date],\n    batch_size: int = 5,\n    timeout_s: float = 120.0,\n    retries: int = 2,\n    on_fetch: Callable[[str, list[date], int, float], None] | None = None,\n) -> dict[date, pd.DataFrame]:\n    \"\"\"Fetch trades for multiple dates using batched API calls.\n\n    Groups dates into contiguous runs and issues one ``chunk_query`` per\n    batch (up to *batch_size* days), reducing total API calls.",
+  "focus": [
+   "def fetch_trades_batch("
+  ]
+ },
+ "caption": "Ticks arrive in batched chunk queries: contiguous day runs, one API call per batch."
+}

@@ -1,0 +1,147 @@
+{
+  "unit": "node:src-volforecast-graphs",
+  "kind": "node",
+  "title": "Drawer: graphs",
+  "max_claims": 1,
+  "key": "32776efc92b6fa5966f8106ae1c0cdd214e0152881c03590d900e6e9f298327d",
+  "system": "You are the narration stage of Trailhead, a tool that generates a verified walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Any\nquote you return is searched for verbatim in the file on disk; anything not\nfound exactly is deleted and counted on screen. Fields that fail their checks\nare dropped, and a malformed answer is discarded whole, so answer the schema\nexactly.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else. An unknown key\n   anywhere discards the whole answer.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. Where the schema allows a `cite`, its `quote` is a VERBATIM, CONTIGUOUS copy\n   of 3-24 lines from ONE file shown below, lines joined with newlines,\n   indentation copied exactly. `focus` is an array of exact substrings of your\n   own quote. A cite is optional: omitting one is honest, inventing one is not.\n4. Prose fields are plain sentences. Backticks may mark code identifiers and\n   [[term]] or [[id|label]] may mark a glossary term. No newlines inside a\n   field, no markdown links, no `<`. Use commas instead of dashes.\n5. State substantive domain facts: what a thing is FOR, what flows through it,\n   what would surprise a newcomer. Never restate code mechanics the reader can\n   see, and never present argument parsing or CLI wiring as a purpose. When the\n   README or a package docstring states the purpose, that purpose is the story.\n6. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"appears to\", say what it is.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/volforecast/graphs/base.py ---\n    1| \"\"\"Graph snapshot container, builder protocol, and point-in-time scheduling.\n    2| \n    3| Numpy-first by design: linear models (GHAR) consume dense adjacency matrices\n    4| without importing torch; neural models call ``GraphSnapshot.to_torch()``.\n    5| \n    6| Point-in-time protocol (Zhang et al. 2025): a graph used to forecast date t\n    7| is estimated on data <= t only, re-estimated every ``refit_every`` trading\n    8| days on the trailing ``window``, and frozen between refits.\n    9| \"\"\"\n   10| from __future__ import annotations\n   11| \n   12| from dataclasses import dataclass\n   ...\n   19| @dataclass(frozen=True)\n   20| class GraphSnapshot:\n   21|     \"\"\"Immutable graph for one estimation date.\n   22| \n   23|     edge_index : (2, E) int64 COO indices into ``symbols`` order.\n   24|         Undirected graphs store both (i, j) and (j, i).\n   25|     edge_weight : (E,) float32 non-negative weights.\n   26|     \"\"\"\n   27| \n   ...\n   75|     def to_torch(self):\n   76|         \"\"\"Return (edge_index long, edge_weight float32) torch tensors.\"\"\"\n   77|         import torch\n   78| \n   79|         return (\n   80|             torch.from_numpy(np.ascontiguousarray(self.edge_index)).long(),\n   81|             torch.from_numpy(np.ascontiguousarray(self.edge_weight)).float(),\n   82|         )\n   83| \n   84| \n   85| def empty_snapshot(symbols: list[str], date: Any, method: str = \"\") -> GraphSnapshot:\n   86|     return GraphSnapshot(\n   87|         edge_index=np.zeros((2, 0), dtype=np.int64),\n   88|         edge_weight=np.zeros(0, dtype=np.float32),\n   89|         symbols=tuple(symbols), date=date, method=method,\n   90|     )\n   91| \n   92| \n   93| @runtime_checkable\n   94| class GraphBuilder(Protocol):\n   95|     \"\"\"A graph builder. ``returns`` is the pre-sliced estimation window (rows <= date).\"\"\"\n   96| \n   97|     name: str\n   98|     directed: bool\n   99| \n  100|     def build(\n  101|         self, returns: pd.DataFrame, date: Any, symbols: list[str]\n  102|     ) -> GraphSnapshot: ...\n  103| \n  104| \n  105| def build_graph_schedule(\n  106|     returns: pd.DataFrame,\n  107|     dates: list[Any],\n  108|     builder: GraphBuilder,\n  109|     *,\n  110|     window: int = 252,\n  111|     refit_every: int = 21,\n  112|     min_history: int = 60,\n  113|     on_progress: Any | None = None,\n\n--- src/volforecast/graphs/diagnostics.py ---\n    1| \"\"\"Graph diagnostics: density/degree stats, edge-set Jaccard, schedule stability.\n    2| \n    3| Monitors two published failure modes: crisis density explosion of thresholded\n    4| correlation graphs (Wade 2026, Table 2) and GLASSO edge instability across\n    5| refits (O Nuallain 2025, section 5.5: consecutive-refit Jaccard dipping below 0.8).\n    6| \n    7| Also provides the magnetic Laplacian (Chi, Gao & Wang 2024, arXiv 2410.22706,\n    8| eqs. 6-9; Shubin 1994) and graph signal energy diagnostics for GSP-HAR.\n    9| \"\"\"\n   10| from __future__ import annotations\n   11| \n   12| from typing import Any\n   13| \n   14| import numpy as np\n   15| import pandas as pd\n   16| \n   17| from volforecast.graphs.base import GraphSnapshot\n   18| \n   19| \n   20| # ---------------------------------------------------------------------------\n   21| # Magnetic Laplacian (Chi, Gao & Wang 2024, eqs. 6-9)\n   22| # ---------------------------------------------------------------------------\n   23| \n   24| \n   25| def magnetic_laplacian(w: np.ndarray, q: float = 0.25) -> np.ndarray:\n   26|     \"\"\"Magnetic Laplacian L^(q) for a directed weighted adjacency matrix.\n   27| \n   28|     L^(q) = I - (D_s^{-1/2} W_s D_s^{-1/2}) * exp(i 2 pi q (W - W^T))\n   29| \n   30|     where W_s = (W + W^T) / 2, D_s = diag(W_s @ 1).\n   31|     Hermitian PSD with real non-negative eigenvalues.\n   32| \n   33|     Parameters\n   34|     ----------\n   35|     w : (N, N) non-negative adjacency matrix (possibly directed/asymmetric).\n   36|     q : float >= 0, coupling between direction and phase. q=0 gives standard\n   37|         symmetric normalized Laplacian on W_s.\n   38| \n   39|     Returns\n   40|     -------\n   41|     (N, N) complex128 Hermitian matrix.\n   42|     \"\"\"\n   43|     n = w.shape[0]\n   44|     ws = 0.5 * (w + w.T)\n   45|     d = ws.sum(axis=1)\n   46|     inv_sqrt = np.where(d > 0, 1.0 / np.sqrt(np.where(d > 0, d, 1.0)), 0.0)\n   47|     norm = inv_sqrt[:, None] * ws * inv_sqrt[None, :]\n   48|     phase = np.exp(1j * 2.0 * np.pi * q * (w - w.T))\n   49|     lap = np.eye(n, dtype=np.complex128) - norm * phase\n   50|     return lap\n   51| \n   52| \n   53| def graph_signal_energy(snapshot: GraphSnapshot, x: np.ndarray, q: float = 0.0) -> float:\n   54|     \"\"\"Graph signal energy (roughness) E(x) = Re(x^H L x).\n   55| \n   56|     Measures how much the signal x varies across graph edges. Spikes in\n   57|     crises on informative spillover graphs; stays flat on uninformative ones.\n   58|     \"\"\"\n   59|     w = snapshot.dense_adjacency()\n   60|     lap = magnetic_laplacian(w, q)\n   61|     xc = x.astype(np.complex128)\n   ...\n   65| def energy_series(\n   66|     schedule: dict[Any, GraphSnapshot], panel: pd.DataFrame, q: float = 0.0\n   67| ) -> pd.Series:\n   68|     \"\"\"Per-date roughness of the cross-section over its point-in-time graph.\n   69| \n   70|     Parameters\n   71|     ----------\n   72|     schedule : {date -> GraphSnapshot} mapping from build_graph_schedule.\n   73|     panel : DataFrame with DatetimeIndex and columns = symbols; values = log-RV.\n   ...\n   92| def _edge_set(s: GraphSnapshot) -> set[tuple[int, int]]:\n   93|     return {(int(i), int(j)) for i, j in zip(*s.edge_index)}\n   94| \n   95| \n   96| def snapshot_stats(s: GraphSnapshot) -> dict[str, Any]:\n   97|     out_deg = np.zeros(s.n_nodes, dtype=np.int64)\n   98|     if s.n_edges:\n   99|         out_deg = np.bincount(s.edge_index[0], minlength=s.n_nodes)\n  100|     return {\n  101|         \"date\": s.date,\n  102|         \"method\": s.method,\n  103|         \"n_nodes\": s.n_nodes,\n  104|         \"n_edges\": s.n_edges,\n   ...\n  111| def edge_jaccard(a: GraphSnapshot, b: GraphSnapshot) -> float:\n  112|     ea, eb = _edge_set(a), _edge_set(b)\n  113|     union = ea | eb\n  114|     if not union:\n  115|         return 1.0\n  116|     return len(ea & eb) / len(union)\n  117| \n  118| \n  119| def schedule_stability(schedule: dict[Any, GraphSnapshot]) -> pd.DataFrame:\n  120|     \"\"\"One row per unique snapshot (refit), with Jaccard vs the previous refit.\"\"\"\n  121|     rows: list[dict[str, Any]] = []\n  122|     prev: GraphSnapshot | None = None\n  123|     seen: set[int] = set()\n  124|     for date in sorted(schedule):\n  125|         snap = schedule[date]\n  126|         if id(snap) in seen:\n  127|             continue\n\n--- src/volforecast/graphs/simple.py ---\n    1| \"\"\"Structural graph builders that need no estimation: identity, full, sector.\"\"\"\n    2| from __future__ import annotations\n    3| \n    4| from typing import Any\n    5| \n    6| import numpy as np\n    7| import pandas as pd\n    8| \n    9| from volforecast.graphs.base import GraphSnapshot, empty_snapshot\n   10| from volforecast.registry import register_graph\n   11| \n   12| #: GICS sector map for SYMBOL_UNIVERSE (GICS 2023: V/MA/PYPL are Financials).\n   ...\n   49|     # Utilities\n   50|     \"NEE\": \"utilities\", \"SO\": \"utilities\",\n   51|     # Real Estate\n   52|     \"PLD\": \"real_estate\",\n   53|     # Broad-market index products share one sector (they co-move by construction)\n   54|     \"SPY\": \"index\", \"QQQ\": \"index\", \"IWM\": \"index\", \"DIA\": \"index\",\n   55|     \"ES\": \"index\", \"SPX\": \"index\",\n   56| }\n   57| \n   58| \n   59| @register_graph(\"identity\")\n   60| class IdentityGraphBuilder:\n   61|     \"\"\"No edges — the no-graph control. GHAR(identity) == plain pooled HAR.\"\"\"\n   62| \n   63|     directed = False\n   64| \n   65|     def build(self, returns: pd.DataFrame, date: Any, symbols: list[str]) -> GraphSnapshot:\n   66|         return empty_snapshot(symbols, date, method=\"identity\")\n   67| \n   68| \n   69| @register_graph(\"full\")\n   70| class FullGraphBuilder:\n   71|     \"\"\"Complete graph, uniform weight 1/(N-1): neighbor aggregate = mean of the others.\"\"\"\n   72| \n   73|     directed = False\n   74| \n   75|     def build(self, returns: pd.DataFrame, date: Any, symbols: list[str]) -> GraphSnapshot:\n   76|         n = len(symbols)\n   77|         if n < 2:\n   78|             return empty_snapshot(symbols, date, method=\"full\")\n   ...\n   87| @register_graph(\"sector\")\n   88| class SectorGraphBuilder:\n   89|     \"\"\"Binary edges between same-GICS-sector symbols; unknown symbols stay isolated.\"\"\"\n   90| \n   91|     directed = False\n   92| \n   93|     def __init__(self, sector_map: dict[str, str] | None = None) -> None:\n   94|         self.sector_map = dict(sector_map or SECTOR_MAP)\n   95| \n\n--- src/volforecast/graphs/__init__.py ---\n    1| \"\"\"Point-in-time graph construction for graph-based volatility models.\"\"\"\n    2| from volforecast.graphs.base import (  # noqa: F401\n    3|     GraphBuilder,\n    4|     GraphSnapshot,\n    5|     build_graph_schedule,\n    6|     empty_snapshot,\n    7| )\n\n--- README.md ---\n    1| # ml-vol-estimator\n    2| \n    3| ML realized volatility forecasting — signal discovery. Progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to produce statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.\n    4| \n    5| **Timeline:** ~20-week internship, May–Sep 2026.\n    6| \n    7| ---\n    8| \n    9| ## Quick Start\n   10| \n   11| 1. Open `ml-vol-estimator.code-workspace` in VS Code.\n   12| 2. Boot protocol loads automatically: `memory/person/user.md` + `memory/INDEX.md`.\n   13| 3. Use `/bootup` to start a session — it reads the research journal and orients you.\n   14| 4. Drive work with slash commands: `/research`, `/feature`, `/experiment`, `/backtest`.\n   15| \n   16| See [AGENTS.md](AGENTS.md) for the full project spec, and [workspace/docs/user-manual.md](workspace/docs/user-manual.md) for all commands.\n   17| \n   18| ---\n   19| \n   20| ## CLI\n   21| \n   22| The `vol` wrapper handles uv, PATH, and working directory internally.\n   23| \n   24| ### Wrapper Commands\n   25| \n   26| ```\n   27| vol test [args]               # pytest (extra args forwarded: -k, -v, --tb=short)\n   28| vol testlf [args]             # re-run last-failed tests only\n   29| vol run --config <yaml>       # primary entry point (see below)\n   30| vol status                    # show data ingestion manifest\n   31| vol lint                      # ruff check (read-only)\n   32| vol fmt                       # ruff auto-format\n   33| vol typecheck                 # mypy\n   34| vol sync                      # install/update deps\n   35| vol shell                     # REPL with volforecast importable\n   36| vol notebook                  # jupyter\n   37| vol help                      # usage\n   38| ```\n   39| \n   40| ### Primary Command: `vol run --config <yaml>`\n   41| \n   42| Every `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).\n   43| \n   44| Optional overrides: `--symbols SPY,AAPL` (override YAML universe), `--skip-ingest` (skip data fetch), `--workers 8` (thread count).\n   45| \n   46| ### Examples\n   47| \n   48| ```bash\n   49| # Single-model experiment (ingest + train + evaluate + dashboard)\n   50| vol run --config workspace/configs/baseline_har.yaml\n   51| \n   52| # Tournament: 13 models compared with statistical tests\n   53| vol run --config workspace/configs/tournament_full_spy.yaml\n   54| \n   55| # Skip ingestion (data already cached), subset of symbols\n   56| vol run --config workspace/configs/tournament_har_dev.yaml --skip-ingest --symbols SPY,AAPL\n   57| \n   58| # Ingest only\n   59| vol run --config workspace/configs/ingest_full_universe.yaml --workers 8\n   60| \n\nTASK: Drawer: graphs\nFill the drawer for this module group. Return a JSON object with:\n  role: 2 or 3 short paragraphs saying what this group IS and DOES in\n        domain terms, and what is distinctive about how it does it.\n  reads: one sentence, what this group consumes and where it comes from.\n  feeds: one sentence, what depends on this group's output.\n  key_files: 3 to 6 entries; 'file' is copied exactly from the FILES\n        list below and 'purpose' is one line saying why a newcomer\n        would open that file.\n  concepts: 3 to 6 short terms a newcomer should recognise here.\n  cite (optional): one verbatim quote of 3-24 contiguous lines from\n        the source shown above that best captures this group, with an\n        optional one-line caption.\n\nGROUP: graphs at src/volforecast/graphs: 9 files, 826 loc.\nFILES you may name in key_files (copy the name exactly):\n  - base.py (src/volforecast/graphs/base.py)\n  - diagnostics.py (src/volforecast/graphs/diagnostics.py)\n  - simple.py (src/volforecast/graphs/simple.py)\n  - __init__.py (src/volforecast/graphs/__init__.py)",
+  "windows": [
+    {
+      "file": "src/volforecast/graphs/base.py",
+      "start": 19,
+      "end": 27
+    },
+    {
+      "file": "src/volforecast/graphs/base.py",
+      "start": 75,
+      "end": 113
+    },
+    {
+      "file": "src/volforecast/graphs/diagnostics.py",
+      "start": 13,
+      "end": 61
+    },
+    {
+      "file": "src/volforecast/graphs/diagnostics.py",
+      "start": 65,
+      "end": 73
+    },
+    {
+      "file": "src/volforecast/graphs/diagnostics.py",
+      "start": 92,
+      "end": 104
+    },
+    {
+      "file": "src/volforecast/graphs/diagnostics.py",
+      "start": 111,
+      "end": 127
+    },
+    {
+      "file": "src/volforecast/graphs/simple.py",
+      "start": 49,
+      "end": 78
+    },
+    {
+      "file": "src/volforecast/graphs/simple.py",
+      "start": 87,
+      "end": 95
+    },
+    {
+      "file": "README.md",
+      "start": 13,
+      "end": 60
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "role",
+      "reads",
+      "feeds",
+      "key_files",
+      "concepts"
+    ],
+    "properties": {
+      "role": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 3,
+        "items": {
+          "type": "string",
+          "maxLength": 600
+        }
+      },
+      "reads": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "feeds": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "key_files": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file",
+            "purpose"
+          ],
+          "properties": {
+            "file": {
+              "type": "string",
+              "enum": [
+                "base.py",
+                "diagnostics.py",
+                "simple.py",
+                "__init__.py"
+              ]
+            },
+            "purpose": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "concepts": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "string",
+          "maxLength": 60
+        }
+      },
+      "cite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "caption": {
+        "type": "string",
+        "maxLength": 200
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\32776efc92b6fa5966f8106ae1c0cdd214e0152881c03590d900e6e9f298327d.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\32776efc92b6fa5966f8106ae1c0cdd214e0152881c03590d900e6e9f298327d.json"
+}

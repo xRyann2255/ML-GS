@@ -1,0 +1,32 @@
+{
+  "role": [
+    "The model zoo of `volforecast`: every forecaster the tournament can run, registered under a string name in `MODEL_REGISTRY` so a YAML config picks models by name alone. The families span nine naive baselines that set the [[QLIKE]] floor, the linear [[HAR]] family (its registration file is missing from this snapshot), gradient boosting via LightGBM, its DART dropout variant, and XGBoost, a seven-model graph suite, and five ensembles from seed bagging to a regime-dependent blend.",
+    "The signature move is that training loss equals evaluation loss. LightGBM and XGBoost train on a hand-derived QLIKE custom objective, gradient 1 - exp(y_true - y_pred) and hessian exp(y_true - y_pred) in log RV space, and the torch graph models share a `_qlike_loss` of the same form, so trees split and gradients descend on the exact metric the tournament ranks by, one that penalizes under-predicting volatility harder than over-predicting it.",
+    "Tuning is industrial: Optuna searches run under walk-forward expanding-window CV to prevent look-ahead bias, with parallel worker processes coordinated through journal storage and, for XGBoost, each worker pinned round-robin to its own GPU. The `gnn` model treats every trading date as one graph snapshot, symbols as nodes and rolling-correlation edges, learning cross-asset volatility spillovers with GATv2 attention and flagging `requires_graph = True` so the pipeline runner dispatches graph data instead of tabular features."
+  ],
+  "reads": "Feature matrices from the layers each model declares in REQUIRED_LAYERS, plus per-date graph snapshots built from rolling realized correlations for the graph models.",
+  "feeds": "Out-of-sample log RV predictions per fold into `evaluation`, where the tournament ranks every model by QLIKE and backs the ranking with statistical tests.",
+  "key_files": [
+    { "file": "lightgbm.py", "purpose": "The workhorse: custom QLIKE objective with analytic gradient and hessian, parallel Optuna tuning, and the `lightgbm_dart` dropout variant for less overconfident predictions." },
+    { "file": "xgboost.py", "purpose": "Independent cross-check of LightGBM with the same QLIKE objective, plus a multi-GPU Optuna harness that pins each worker round-robin to its own device." },
+    { "file": "gnn.py", "purpose": "GATv2 attention over per-date correlation graphs, plus the shared QLIKE loss and device and precision helpers the torch graph models use." },
+    { "file": "__init__.py", "purpose": "The package's public surface: re-exports `MODEL_REGISTRY` and `register_model`, and points at `ensure_registered()`, the call that fires every model's registration decorator." }
+  ],
+  "concepts": [
+    "QLIKE custom objective",
+    "log RV space",
+    "MODEL_REGISTRY",
+    "naive floor",
+    "graph snapshots",
+    "walk-forward tuning"
+  ],
+  "cite": {
+    "file": "src/volforecast/models/lightgbm.py",
+    "quote": "def qlike_objective(y_pred: np.ndarray, dtrain: Any) -> tuple[np.ndarray, np.ndarray]:\n    \"\"\"Custom QLIKE objective for LightGBM.\n\n    Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n    gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)\n    hessian  (d²L/dy_pred²) = exp(y_true - y_pred)",
+    "focus": [
+      "gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)",
+      "hessian  (d²L/dy_pred²) = exp(y_true - y_pred)"
+    ]
+  },
+  "caption": "The hand-derived QLIKE gradient and hessian LightGBM splits on: training loss equals the tournament's metric."
+}

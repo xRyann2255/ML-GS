@@ -1,0 +1,169 @@
+{
+  "unit": "dive:src-volforecast-models",
+  "kind": "dive",
+  "title": "Inside models",
+  "max_claims": 8,
+  "key": "7d6c324e4a094b533ff8eb2ada2bfd8bd295d8c93a369a7f9f69d277534249ae",
+  "system": "You are the narration stage of Trailhead, a tool that generates a walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Every\nquote you return is searched for verbatim in the file on disk; anything that is\nnot found exactly is deleted and counted on screen. You cannot talk your way\npast the checker, so do not try: an honest \"inferred\" sentence survives, an\ninvented quote does not.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. `cite.quote` is a VERBATIM, CONTIGUOUS copy of 3-24 lines from ONE file,\n   lines joined with newlines. Copy the leading indentation exactly, character\n   for character. Do not reflow, re-indent, elide, or add an ellipsis.\n4. Quote only code you were shown below. Quoting something you inferred exists\n   is the single most expensive thing you can do here.\n5. `cite.focus` is an array of exact substrings of your own `cite.quote`, the\n   one or two lines that actually carry the point.\n6. If you cannot support a sentence with a quote, set `\"status\": \"inferred\"` and\n   omit `cite` entirely. That is a legitimate, visible answer, not a failure.\n7. `text` is one plain sentence, at most 280 characters. Backticks may mark\n   code identifiers and [[term]] or [[id|label]] may mark a glossary term.\n   No newlines, no markdown links, no `<`. Use commas instead of dashes.\n8. Say what the system DOES in its own domain's terms. When the README or a\n   package docstring states the project's purpose, that purpose is the story;\n   argument parsing, CLI wiring, and directory layout are never what a repo\n   is for.\n9. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"this codebase appears to\", say what it does.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/volforecast/models/gnn.py ---\n    1| \"\"\"Graph Attention Network (GAT) for multi-symbol realized volatility forecasting.\n    2| \n    3| Architecture (Zhang, Pu, Cucuringu & Dong 2025):\n    4|   - Each training sample = one graph snapshot (N nodes × F features)\n    5|   - Nodes = symbols in the universe\n    6|   - Edges = rolling correlation above threshold (from gnn_adjacency module)\n    7|   - 2-layer GATv2Conv with multi-head attention\n    8|   - Per-node MLP head → log-RV prediction\n    9| \n   10| Key design choices:\n   11|   - One-hop only (multi-hop adds noise per Zhang et al.)\n   12|   - QLIKE loss (substantially outperforms MSE per Zhang et al.)\n   ...\n   44| def _mse_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:\n   45|     return torch.mean((pred - target) ** 2)\n   46| \n   47| \n   48| def _qlike_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:\n   49|     \"\"\"QLIKE in log-RV space: exp(y - y_hat) - (y - y_hat) - 1.\"\"\"\n   50|     diff = target - pred\n   51|     diff = torch.clamp(diff, min=-10.0, max=10.0)\n   52|     return torch.mean(torch.exp(diff) - diff - 1.0)\n   ...\n   65| def _resolve_device(device: str) -> str:\n   66|     if device != \"auto\":\n   67|         return device\n   68|     if torch.cuda.is_available():\n   69|         return \"cuda\"\n   70|     if getattr(torch.backends, \"mps\", None) and torch.backends.mps.is_available():\n   71|         return \"mps\"\n   72|     return \"cpu\"\n   73| \n   74| \n   75| def _resolve_precision(precision: str, device: str) -> torch.dtype | None:\n   76|     if precision == \"fp32\" or device == \"cpu\":\n   77|         return None\n   78|     if precision == \"bf16\":\n   79|         return torch.bfloat16\n   80|     if precision == \"fp16\":\n   81|         return torch.float16\n   82|     if precision == \"auto\":\n   83|         if device == \"cuda\":\n   ...\n   94| class _GNNModule(nn.Module):\n   95|     \"\"\"2-layer GATv2 or TransformerConv + per-node MLP head.\"\"\"\n   96| \n   97|     def __init__(\n   98|         self,\n   99|         input_dim: int,\n  100|         hidden_dim: int = 32,\n  101|         n_heads: int = 4,\n  102|         dropout: float = 0.1,\n   ...\n  186|         if return_embedding:\n  187|             return out, attn_weights, h\n  188|         return out, attn_weights\n  189| \n  190| \n  191| # ---------------------------------------------------------------------------\n  192| # Registered model class\n  193| # ---------------------------------------------------------------------------\n  194| \n  195| \n  196| @register_model(\"gnn\")\n  197| class GNNVolModel(_BaseModel):\n  198|     \"\"\"Graph Attention Network for multi-symbol RV forecasting.\n  199| \n  200|     Operates on graph snapshots: each date = one graph with N nodes\n  201|     (symbols) and edges from rolling correlation. Integrates with the\n  202|     feature_stack pipeline via extract_features().\n  203| \n  204|     Set ``requires_graph = True`` so the pipeline runner can detect\n  205|     graph-mode and dispatch appropriately.\n  206|     \"\"\"\n  207| \n  208|     REQUIRED_LAYERS: list[str] = []\n  209|     requires_sequences: bool = False  # Does NOT use SequenceTensor\n  210|     requires_graph: bool = True  # New flag for pipeline detection\n  211|     supports_tuning: bool = True\n  212|     name = \"gnn\"\n  213|     family = \"gnn\"\n  214|     description = \"Graph Attention Network with cross-asset spillover learning\"\n  215| \n  216|     def __init__(\n  217|         self,\n  218|         *,\n  219|         input_dim: int,\n  220|         hidden_dim: int = 32,\n  221|         n_heads: int = 4,\n  222|         n_layers: int = 2,\n  223|         dropout: float = 0.1,\n  224|         learning_rate: float = 1e-3,\n  225|         weight_decay: float = 1e-4,\n  226|         max_epochs: int = 200,\n  227|         batch_size: int = 32,\n  228|         val_fraction: float = 0.15,\n  229|         early_stopping_rounds: int = 15,\n  230|         loss: str = \"qlike\",\n  231|         adj_window: int = 60,\n  232|         adj_threshold: float = 0.3,\n  233|         device: str = \"auto\",\n  234|         precision: str = \"auto\",\n  235|         seed: int = 42,\n  236|         use_scheduler: bool = True,\n  237|         grad_accumulation_steps: int = 1,\n  238|         compile: bool = False,  # PyG ops are dynamic; compile causes CUDA Graph warnings\n  239|         conv_type: str = \"gatv2\",\n  240|     ) -> None:\n  241|         if loss not in _LOSSES:\n  242|             raise ValueError(f\"Unknown loss {loss!r}; expected one of {list(_LOSSES)}\")\n  243|         if conv_type not in (\"gatv2\", \"transformer\"):\n  244|             raise ValueError(f\"Unknown conv_type: {conv_type!r}; expected 'gatv2' or 'transformer'\")\n  245| \n\n--- src/volforecast/models/lightgbm.py ---\n    1| \"\"\"LightGBM model with QLIKE custom objective (gradient boosting).\n    2| \n    3| Implements LightGBM for tabular volatility forecasting with:\n    4| - Custom QLIKE objective function (gradient and hessian)\n    5| - Custom QLIKE evaluation metric\n    6| - Feature importance via built-in gain/split\n    7| - Hyperparameter tuning with purged k-fold CV\n    8| \"\"\"\n    9| \n   10| from __future__ import annotations\n   11| \n   12| import logging\n   ...\n   62|         \"n_estimators\",\n   63|         \"gpu_device_id\",\n   64|         \"drop_features\",\n   65|         \"monotone_constraints_named\",\n   66|         \"residual_scale\",\n   67|         \"sample_reweight\",\n   68|     }\n   69| )\n   70| \n   71| \n   72| def qlike_objective(y_pred: np.ndarray, dtrain: Any) -> tuple[np.ndarray, np.ndarray]:\n   73|     \"\"\"Custom QLIKE objective for LightGBM.\n   74| \n   75|     Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n   76|     gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)\n   77|     hessian  (d²L/dy_pred²) = exp(y_true - y_pred)\n   78| \n   79|     Parameters\n   80|     ----------\n   81|     y_pred : np.ndarray\n   82|         Current predictions (log-RV space).\n   83|     dtrain : lgb.Dataset\n   84|         Training dataset (labels accessed via get_label()).\n   85| \n   86|     Returns\n   87|     -------\n   88|     tuple[np.ndarray, np.ndarray]\n   89|         (gradient, hessian) pair.\n   90|     \"\"\"\n   91|     y_true = dtrain.get_label()\n   92|     # Symmetric clip: pure overflow protection. exp(709) overflows float64.\n   93|     # Data range is ~10 (log RV spans -14 to -4), so ±10 covers all cases.\n   94|     # QLIKE's natural exponential already penalizes under-prediction harder.\n   95|     diff = np.clip(y_true - y_pred, -10.0, 10.0)\n   96|     exp_diff = np.exp(diff)\n   97|     grad = 1.0 - exp_diff\n   98|     hess = np.maximum(exp_diff, 1e-6)\n   99|     return grad, hess\n  100| \n  101| \n  102| def _make_weighted_qlike_objective(\n  103|     weights: np.ndarray,\n  104| ) -> callable:\n  105|     \"\"\"Create a QLIKE objective with per-sample weights baked in.\n  106| \n  107|     LightGBM ignores Dataset.weight when a custom objective is used.\n  108|     This closure multiplies grad and hess by the weight vector, which\n  109|     changes the split gain criterion (weighted samples influence splits more).\n  110|     \"\"\"\n   ...\n  125| def qlike_eval(y_pred: np.ndarray, dtrain: Any) -> tuple[str, float, bool]:\n  126|     \"\"\"Custom QLIKE evaluation metric for LightGBM.\n  127| \n  128|     Parameters\n  129|     ----------\n  130|     y_pred : np.ndarray\n  131|         Current predictions.\n  132|     dtrain : lgb.Dataset\n  133|         Training dataset.\n   ...\n  147| @register_model(\"lightgbm\")\n  148| class LightGBMVolModel(_BaseModel):\n  149|     \"\"\"LightGBM model for realized volatility forecasting.\n  150| \n  151|     Optimizes QLIKE loss via custom objective. Supports feature\n  152|     importance analysis and hyperparameter tuning.\n  153| \n  154|     Parameters are accepted as flat kwargs (consistent with HAR models):\n  155|         num_leaves, learning_rate, feature_fraction, etc.\n   ...\n  748| def _trial_callback(on_trial_complete):\n  749|     \"\"\"Create an Optuna callback that fires on_trial_complete(trial_num, n_trials).\"\"\"\n  750| \n  751|     def _callback(study, trial):  # noqa: ARG001 — Optuna callback signature\n  752|         n_complete = len([t for t in study.trials if t.state.is_finished()])\n  753|         on_trial_complete(n_complete)\n  754| \n  755|     return _callback\n  756| \n  757| \n  758| def _make_objective(\n  759|     X: pd.DataFrame,\n  760|     y: pd.Series,\n  761|     cv_config: Any,\n  762|     seed: int,\n  763|     base_params: dict[str, Any] | None,\n  764|     threads_per_trial: int,\n  765| ):\n  766|     \"\"\"Build an Optuna objective closure for QLIKE-optimized LightGBM tuning.\"\"\"\n   ...\n  834| def _optuna_worker(\n  835|     worker_id: int,\n  836|     n_trials_per_worker: int,\n  837|     X_path_or_data: Any,\n  838|     y_path_or_data: Any,\n  839|     cv_config_dict: dict,\n  840|     timeout: int | None,\n  841|     journal_path: str,\n  842|     seed: int,\n   ...\n  889| def tune_hyperparameters(\n  890|     X: pd.DataFrame,\n  891|     y: pd.Series,\n  892|     cv_config: Any | None = None,\n  893|     n_trials: int = 50,\n  894|     timeout: int | None = 3600,\n  895|     storage_path: Path | None = None,\n  896|     seed: int = 42,\n  897|     on_trial_complete: Any | None = None,\n   ...\n 1164| @register_model(\"lightgbm_dart\")\n 1165| class DARTVolModel(LightGBMVolModel):\n 1166|     \"\"\"LightGBM DART variant: dropout regularization for less overconfident predictions.\"\"\"\n 1167| \n 1168|     name = \"lightgbm_dart\"\n 1169| \n 1170|     def __init__(\n 1171|         self,\n 1172|         n_estimators: int = 200,\n\n--- src/volforecast/models/xgboost.py ---\n    1| \"\"\"XGBoost model with QLIKE custom objective (gradient boosting).\n    2| \n    3| Implements XGBoost for tabular volatility forecasting with:\n    4| - Custom QLIKE objective function (gradient and hessian)\n    5| - Custom QLIKE evaluation metric\n    6| - Feature importance via built-in gain/split\n    7| \"\"\"\n    8| \n    9| from __future__ import annotations\n   10| \n   11| import logging\n   12| import os\n   ...\n   58| def qlike_objective_xgb(y_pred: np.ndarray, dtrain: Any) -> tuple[np.ndarray, np.ndarray]:\n   59|     \"\"\"Custom QLIKE objective for XGBoost.\n   60| \n   61|     Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n   62|     gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)\n   63|     hessian  (d²L/dy_pred²) = exp(y_true - y_pred)\n   64| \n   65|     Parameters\n   66|     ----------\n   ...\n   85| def qlike_eval_xgb(y_pred: np.ndarray, dtrain: Any) -> list[tuple[str, float]]:\n   86|     \"\"\"Custom QLIKE evaluation metric for XGBoost.\n   87| \n   88|     Parameters\n   89|     ----------\n   90|     y_pred : np.ndarray\n   91|         Current predictions.\n   92|     dtrain : xgb.DMatrix\n   93|         Training dataset.\n   ...\n  106| @register_model(\"xgboost\")\n  107| class XGBoostVolModel(_BaseModel):\n  108|     \"\"\"XGBoost model for realized volatility forecasting.\n  109| \n  110|     Optimizes QLIKE loss via custom objective. Supports feature\n  111|     importance analysis.\n  112| \n  113|     Parameters are accepted as flat kwargs:\n  114|         max_leaves, learning_rate, colsample_bytree, etc.\n   ...\n  716| def _make_study_name_xgb(base_params: dict[str, Any] | None) -> str:\n  717|     \"\"\"Build a deterministic study name that includes a hash of relevant params.\n  718| \n  719|     This ensures that when model params change (e.g. search ranges, base_model,\n  720|     feature config), old trials from a prior config are not reused.\n  721| \n  722|     Excludes 'seed' from the hash since seed doesn't change model semantics.\n  723|     \"\"\"\n  724|     import hashlib\n   ...\n  741| def _prebuild_cv_folds_xgb(\n  742|     X: pd.DataFrame,\n  743|     y: pd.Series,\n  744|     cv_config: Any,\n  745|     val_fraction: float = 0.15,\n  746|     purge_gap: int = 10,\n  747|     base_model: Any | None = None,\n  748| ):\n  749|     \"\"\"Pre-build DMatrix objects and CV fold indices once (reused across all trials).\n   ...\n  926| def _make_objective_xgb(\n  927|     X: pd.DataFrame,\n  928|     y: pd.Series,\n  929|     cv_config: Any,\n  930|     seed: int,\n  931|     base_params: dict[str, Any] | None,\n  932|     device: str,\n  933|     prebuilt_folds: list | None = None,\n  934|     base_model: Any | None = None,\n   ...\n 1031| def _make_trial_done_callback_xgb(progress_queue: Any | None, device_id: int):\n 1032|     \"\"\"Create an Optuna callback that emits trial-complete events via queue.\"\"\"\n 1033| \n 1034|     def callback(study, frozen_trial) -> None:  # noqa: ANN001\n 1035|         if progress_queue is None:\n 1036|             return\n 1037|         params = frozen_trial.params\n 1038|         state = frozen_trial.state.name  # COMPLETE, PRUNED, FAIL\n 1039|         qlike = frozen_trial.value if frozen_trial.value is not None else float(\"inf\")\n   ...\n 1052| def _optuna_worker_xgb(\n 1053|     worker_id: int,\n 1054|     n_trials_per_worker: int,\n 1055|     X_path_or_data: Any,\n 1056|     y_path_or_data: Any,\n 1057|     cv_config_dict: dict,\n 1058|     timeout: int | None,\n 1059|     journal_path: str,\n 1060|     seed: int,\n   ...\n 1115|         objective,\n 1116|         n_trials=n_trials_per_worker,\n 1117|         timeout=timeout,\n 1118|         n_jobs=1,\n 1119|         catch=(Exception,),\n 1120|         callbacks=[_make_trial_done_callback_xgb(progress_queue, device_id)],\n 1121|     )\n 1122|     return n_trials_per_worker\n 1123| \n 1124| \n 1125| def tune_hyperparameters_xgb(\n 1126|     X: pd.DataFrame,\n 1127|     y: pd.Series,\n 1128|     cv_config: Any | None = None,\n 1129|     n_trials: int = 50,\n 1130|     timeout: int | None = 3600,\n 1131|     storage_path: Path | None = None,\n 1132|     seed: int = 42,\n 1133|     on_trial_complete: Any | None = None,\n 1134|     on_hpo_event: Any | None = None,\n 1135|     base_params: dict[str, Any] | None = None,\n 1136|     n_workers: int = 1,\n 1137|     gpu_device_ids: list[int] | None = None,\n 1138|     base_model: Any | None = None,\n 1139| ) -> dict[str, Any]:\n 1140|     \"\"\"Tune XGBoost hyperparameters via Optuna with walk-forward CV.\n 1141| \n 1142|     Uses ExpandingWindowCV (walk-forward) to prevent look-ahead bias.\n 1143|     Optimizes QLIKE loss with TPE sampler.\n 1144| \n 1145|     When gpu_device_ids is provided, each worker is pinned to a separate\n 1146|     GPU (round-robin). With 8 GPUs and 8 workers, all trials run in\n 1147|     parallel on different devices.\n 1148| \n 1149|     Parameters\n 1150|     ----------\n 1151|     X : pd.DataFrame\n 1152|         Full training features.\n 1153|     y : pd.Series\n 1154|         Full training target (log RV).\n 1155|     cv_config : CVConfig, optional\n 1156|         CV configuration. Defaults to expanding window.\n 1157|     n_trials : int\n 1158|         Total number of Optuna trials (default: 50).\n 1159|     timeout : int, optional\n 1160|         Maximum seconds for optimization (default: 3600).\n 1161|     storage_path : Path, optional\n 1162|         Path for study storage (enables resume).\n 1163|     seed : int\n 1164|         Random seed for reproducibility (default: 42).\n 1165|     on_trial_complete : callable, optional\n 1166|         Progress callback, called with total completed trial count.\n 1167|     base_params : dict, optional\n 1168|         Fixed params to merge into every trial.\n 1169|     n_workers : int\n 1170|         Number of parallel worker processes (default: 1).\n 1171|     gpu_device_ids : list[int], optional\n 1172|         GPU device indices for multi-GPU training. When provided,\n 1173|         worker i uses device cuda:{gpu_device_ids[i % len(gpu_device_ids)]}.\n 1174| \n\n--- src/volforecast/models/__init__.py ---\n    1| \"\"\"Volatility forecasting models: HAR baselines, LightGBM, LSTM, ensemble.\n    2| \n    3| Access registered models via ``MODEL_REGISTRY`` dict.\n    4| Call ``volforecast.registry.ensure_registered()`` to populate registries.\n    5| \"\"\"\n    6| \n    7| from volforecast.registry import MODEL_REGISTRY, register_model\n    8| \n    9| __all__ = [\"MODEL_REGISTRY\", \"register_model\"]\n\n--- README.md ---\n    1| # ml-vol-estimator\n    2| \n    3| ML realized volatility forecasting — signal discovery. Progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to produce statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.\n    4| \n    5| **Timeline:** ~20-week internship, May–Sep 2026.\n    6| \n    7| ---\n    8| \n    9| ## Quick Start\n   10| \n   11| 1. Open `ml-vol-estimator.code-workspace` in VS Code.\n   12| 2. Boot protocol loads automatically: `memory/person/user.md` + `memory/INDEX.md`.\n   13| 3. Use `/bootup` to start a session — it reads the research journal and orients you.\n   14| 4. Drive work with slash commands: `/research`, `/feature`, `/experiment`, `/backtest`.\n   15| \n   16| See [AGENTS.md](AGENTS.md) for the full project spec, and [workspace/docs/user-manual.md](workspace/docs/user-manual.md) for all commands.\n   17| \n   18| ---\n   19| \n   20| ## CLI\n   21| \n   22| The `vol` wrapper handles uv, PATH, and working directory internally.\n   23| \n   24| ### Wrapper Commands\n   25| \n   26| ```\n   27| vol test [args]               # pytest (extra args forwarded: -k, -v, --tb=short)\n   28| vol testlf [args]             # re-run last-failed tests only\n   29| vol run --config <yaml>       # primary entry point (see below)\n   30| vol status                    # show data ingestion manifest\n   31| vol lint                      # ruff check (read-only)\n   32| vol fmt                       # ruff auto-format\n   33| vol typecheck                 # mypy\n   34| vol sync                      # install/update deps\n   35| vol shell                     # REPL with volforecast importable\n   36| vol notebook                  # jupyter\n   37| vol help                      # usage\n   38| ```\n   39| \n   40| ### Primary Command: `vol run --config <yaml>`\n   41| \n   42| Every `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).\n   43| \n   44| Optional overrides: `--symbols SPY,AAPL` (override YAML universe), `--skip-ingest` (skip data fetch), `--workers 8` (thread count).\n   45| \n   46| ### Examples\n   47| \n   48| ```bash\n   49| # Single-model experiment (ingest + train + evaluate + dashboard)\n   50| vol run --config workspace/configs/baseline_har.yaml\n   51| \n   52| # Tournament: 13 models compared with statistical tests\n   53| vol run --config workspace/configs/tournament_full_spy.yaml\n   54| \n   55| # Skip ingestion (data already cached), subset of symbols\n   56| vol run --config workspace/configs/tournament_har_dev.yaml --skip-ingest --symbols SPY,AAPL\n   57| \n   58| # Ingest only\n   59| vol run --config workspace/configs/ingest_full_universe.yaml --workers 8\n   60| \n\nTASK: Inside models\nWrite 6 to 8 sentences that take a new joiner INSIDE this\npart of the repo: what it is for in domain terms, what flows in and out,\nthe mechanism that makes it work, how you can tell it is correct, and\nanything a newcomer would not guess. Substantive facts only; never\nrestate code mechanics the reader can see in the excerpt.\nQuote from the files shown above wherever a sentence can be anchored,\nand mark honest readings 'inferred'. One inferred sentence about what\nthis part does NOT do is welcome.\n\nGROUP: models at src/volforecast/models: 22 files, 9802 loc.",
+  "windows": [
+    {
+      "file": "src/volforecast/models/gnn.py",
+      "start": 44,
+      "end": 52
+    },
+    {
+      "file": "src/volforecast/models/gnn.py",
+      "start": 65,
+      "end": 83
+    },
+    {
+      "file": "src/volforecast/models/gnn.py",
+      "start": 94,
+      "end": 102
+    },
+    {
+      "file": "src/volforecast/models/gnn.py",
+      "start": 186,
+      "end": 245
+    },
+    {
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 62,
+      "end": 110
+    },
+    {
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 125,
+      "end": 133
+    },
+    {
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 147,
+      "end": 155
+    },
+    {
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 748,
+      "end": 766
+    },
+    {
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 834,
+      "end": 842
+    },
+    {
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 889,
+      "end": 897
+    },
+    {
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 1164,
+      "end": 1172
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 58,
+      "end": 66
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 85,
+      "end": 93
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 106,
+      "end": 114
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 716,
+      "end": 724
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 741,
+      "end": 749
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 926,
+      "end": 934
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 1031,
+      "end": 1039
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 1052,
+      "end": 1060
+    },
+    {
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 1115,
+      "end": 1174
+    },
+    {
+      "file": "README.md",
+      "start": 13,
+      "end": 60
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "claims"
+    ],
+    "properties": {
+      "claims": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "status",
+            "cite"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "inferred"
+              ]
+            },
+            "cite": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "focus": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\7d6c324e4a094b533ff8eb2ada2bfd8bd295d8c93a369a7f9f69d277534249ae.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\7d6c324e4a094b533ff8eb2ada2bfd8bd295d8c93a369a7f9f69d277534249ae.json"
+}

@@ -1,0 +1,217 @@
+{
+  "unit": "node:src-volforecast-utils",
+  "kind": "node",
+  "title": "Drawer: utils",
+  "max_claims": 1,
+  "key": "93764ff582f94af916340f4c02353ecc0389f5157000e1d3ea38276a369b094a",
+  "system": "You are the narration stage of Trailhead, a tool that generates a verified walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Any\nquote you return is searched for verbatim in the file on disk; anything not\nfound exactly is deleted and counted on screen. Fields that fail their checks\nare dropped, and a malformed answer is discarded whole, so answer the schema\nexactly.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else. An unknown key\n   anywhere discards the whole answer.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. Where the schema allows a `cite`, its `quote` is a VERBATIM, CONTIGUOUS copy\n   of 3-24 lines from ONE file shown below, lines joined with newlines,\n   indentation copied exactly. `focus` is an array of exact substrings of your\n   own quote. A cite is optional: omitting one is honest, inventing one is not.\n4. Prose fields are plain sentences. Backticks may mark code identifiers and\n   [[term]] or [[id|label]] may mark a glossary term. No newlines inside a\n   field, no markdown links, no `<`. Use commas instead of dashes.\n5. State substantive domain facts: what a thing is FOR, what flows through it,\n   what would surprise a newcomer. Never restate code mechanics the reader can\n   see, and never present argument parsing or CLI wiring as a purpose. When the\n   README or a package docstring states the purpose, that purpose is the story.\n6. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"appears to\", say what it is.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/volforecast/utils/cv.py ---\n    1| \"\"\"Time-series cross-validation utilities.\n    2| \n    3| Implements proper CV protocols for time-series forecasting:\n    4| - Purged k-fold CV (with gap to prevent leakage)\n    5| - Blocked k-fold CV (contiguous blocks, no shuffling)\n    6| - Expanding window (walk-forward) CV\n    7| - Rolling window CV\n    8| \n    9| CRITICAL: Never use random k-fold on time-series data.\n   10| Random k-fold causes catastrophic look-ahead bias.\n   11| \n   12| Key classes:\n   ...\n   27| class _BaseCVSplitter:\n   28|     \"\"\"Common interface for time-series CV splitters.\"\"\"\n   29| \n   30|     def split(\n   31|         self,\n   32|         X: pd.DataFrame,\n   33|         y: pd.Series | None = None,\n   34|     ) -> Generator[tuple[np.ndarray, np.ndarray], None, None]:\n   35|         \"\"\"Generate train/test index arrays.\"\"\"\n   36|         n = len(X)\n   37|         for train_idx, test_idx in self._generate_splits(n):\n   38|             if len(train_idx) > 0 and len(test_idx) > 0:\n   39|                 yield train_idx, test_idx\n   40| \n   41|     def _generate_splits(self, n: int) -> Generator[tuple[np.ndarray, np.ndarray], None, None]:\n   42|         raise NotImplementedError\n   43| \n   44| \n   45| class PurgedKFoldCV(_BaseCVSplitter):\n   46|     \"\"\"Purged k-fold cross-validation for time series.\n   47| \n   48|     Splits data into k contiguous folds and purges observations\n   49|     within a gap window between training and test sets to prevent\n   50|     information leakage from overlapping RV windows.\n   51| \n   52|     ``embargo`` (Phase 2.8): rows in ``[test_end, test_end + embargo)`` are also\n   53|     excluded from the train sets of all SUBSEQUENT folds. Default 0 (no-op).\n   54|     \"\"\"\n   55| \n   56|     def __init__(\n   57|         self,\n   58|         n_splits: int = 5,\n   59|         purge_gap: int = 5,\n   60|         embargo: int = 0,\n   61|     ) -> None:\n   62|         self.n_splits = n_splits\n   63|         self.purge_gap = purge_gap\n   64|         self.embargo = embargo\n   65| \n   66|     def _generate_splits(self, n: int) -> Generator[tuple[np.ndarray, np.ndarray], None, None]:\n   67|         indices = np.arange(n)\n   68|         fold_size = n // self.n_splits\n   69|         embargo_mask = np.zeros(n, dtype=bool)\n   70| \n   71|         for i in range(self.n_splits):\n   72|             test_start = i * fold_size\n   73|             test_end = (i + 1) * fold_size if i < self.n_splits - 1 else n\n   74|             test_idx = indices[test_start:test_end]\n   75| \n   76|             # Purge: remove observations within purge_gap of test boundaries\n   77|             train_mask = np.ones(n, dtype=bool)\n   78|             train_mask[test_start:test_end] = False\n   79|             purge_start = max(0, test_start - self.purge_gap)\n   80|             train_mask[purge_start:test_start] = False\n   81|             purge_end = min(n, test_end + self.purge_gap)\n   82|             train_mask[test_end:purge_end] = False\n   83| \n   84|             # Embargo: drop indices that fell in the post-test window of any\n   85|             # prior fold from this fold's train set.\n   86|             if self.embargo > 0:\n   87|                 train_mask &= ~embargo_mask\n   88| \n   89|             train_idx = indices[train_mask]\n   90|             yield train_idx, test_idx\n   91| \n   92|             if self.embargo > 0:\n   93|                 embargo_end = min(n, test_end + self.embargo)\n   94|                 embargo_mask[test_end:embargo_end] = True\n   95| \n   96| \n   97| class BlockedKFoldCV(_BaseCVSplitter):\n   98|     \"\"\"Blocked k-fold CV (contiguous blocks, no shuffling).\n   99| \n  100|     Each fold is a contiguous time block. Training uses all\n  101|     blocks except the test block. No purge gap (simpler but\n  102|     may have mild leakage at boundaries).\n  103| \n  104|     ``embargo`` (Phase 2.8): rows in ``[test_end, test_end + embargo)`` are also\n  105|     excluded from the train sets of all SUBSEQUENT folds. Default 0 (no-op).\n   ...\n  134| class ExpandingWindowCV(_BaseCVSplitter):\n  135|     \"\"\"Expanding window (walk-forward) cross-validation.\n  136| \n  137|     Training window starts at the beginning and expands forward.\n  138|     Test window is a fixed-size block following the training end.\n  139| \n  140|     ``embargo`` (Phase 2.8): rows in ``[test_end, test_end + embargo)`` are also\n  141|     excluded from the train sets of all SUBSEQUENT folds. Default 0 (no-op).\n  142|     \"\"\"\n   ...\n  204| class PanelExpandingWindowCV:\n  205|     \"\"\"Expanding window CV for panel (multi-symbol) DataFrames.\n  206| \n  207|     Splits are defined on **unique dates** in the index, then mapped\n  208|     to all rows sharing those dates. This ensures all symbols for a\n  209|     given date land in the same fold, preventing cross-temporal leakage.\n  210| \n  211|     ``embargo`` (Phase 2.8): dates in ``[test_end, test_end + embargo)``\n  212|     (positions in the unique-date sequence) are excluded from the train sets\n   ...\n  298| class RollingWindowCV(_BaseCVSplitter):\n  299|     \"\"\"Fixed-size rolling window cross-validation.\n  300| \n  301|     Both training and test windows have fixed sizes.\n  302|     The window rolls forward by step_size each iteration.\n  303| \n  304|     ``embargo`` (Phase 2.8): rows in ``[test_end, test_end + embargo)`` are also\n  305|     excluded from the train sets of all SUBSEQUENT folds. Default 0 (no-op).\n  306|     \"\"\"\n\n--- src/volforecast/utils/manifest.py ---\n    1| \"\"\"Data ingestion manifest — YAML contract + state.\n    2| \n    3| Two layers:\n    4| - **Contract** — what data SHOULD exist (expected_columns, value_bounds, nan_budget)\n    5| - **State** — what DOES exist (per-symbol ingestion metadata, integrity audit results)\n    6| \n    7| Ingest commands update state.  ``vol audit`` validates state against contract.\n    8| \n    9| Provides both:\n   10| - ``ManifestManager`` — new typed API (YAML, dataclasses)\n   11| - Legacy functions (``record_ingestion``, ``summary_table``, etc.) — thin wrappers\n   12|   over the old JSON manifest for backward compat during migration.\n   ...\n   44| def _dict_to_lineage(d: dict[str, Any] | None) -> Lineage:\n   45|     if not d:\n   46|         return Lineage()\n   47|     return Lineage(\n   48|         code_version=d.get(\"code_version\", \"\"),\n   49|         formula_version=d.get(\"formula_version\", \"\"),\n   50|         source_query=d.get(\"source_query\", \"\"),\n   51|     )\n   52| \n   53| \n   54| def _dict_to_integrity(d: dict[str, Any] | None) -> Integrity:\n   55|     if not d:\n   56|         return Integrity()\n   57|     return Integrity(\n   58|         nan_pct_max=d.get(\"nan_pct_max\", 0.0),\n   59|         nan_columns=d.get(\"nan_columns\", {}),\n   60|         date_gaps=d.get(\"date_gaps\", []),\n   61|         issues=d.get(\"issues\", []),\n   62|         last_validated=d.get(\"last_validated\", \"\"),\n   ...\n   66| def _dict_to_symbol_state(d: dict[str, Any]) -> SymbolState:\n   67|     raw_status = d.get(\"status\", \"missing\")\n   68|     try:\n   69|         status = SymbolStatus(raw_status)\n   70|     except ValueError:\n   71|         status = SymbolStatus.MISSING\n   72|     return SymbolState(\n   73|         status=status,\n   74|         rows=d.get(\"rows\", 0),\n   ...\n   84| def _dict_to_source(d: dict[str, Any]) -> SourceContract:\n   85|     symbols_raw = d.get(\"symbols\", {})\n   86|     symbols = {\n   87|         name: _dict_to_symbol_state(sdata)\n   88|         for name, sdata in symbols_raw.items()\n   89|         if isinstance(sdata, dict)\n   90|     }\n   91|     return SourceContract(\n   92|         description=d.get(\"description\", \"\"),\n   ...\n  109| def _dict_to_manifest(raw: dict[str, Any]) -> ManifestData:\n  110|     meta_raw = raw.get(\"meta\", {})\n  111|     uni_raw = meta_raw.get(\"universe\", {})\n  112|     dr_raw = meta_raw.get(\"date_range\", {})\n  113|     from volforecast.utils.manifest_schema import DateRange\n  114| \n  115|     meta = ManifestMeta(\n  116|         schema_version=meta_raw.get(\"schema_version\", 2),\n  117|         last_full_audit=meta_raw.get(\"last_full_audit\", \"\"),\n   ...\n  137| def _symbol_status_representer(dumper: yaml.Dumper, data: SymbolStatus) -> Any:\n  138|     return dumper.represent_str(data.value)\n   ...\n  144| def _manifest_to_dict(data: ManifestData) -> dict[str, Any]:\n  145|     \"\"\"Convert ManifestData to a plain dict suitable for YAML serialization.\"\"\"\n  146|     return asdict(data)\n  147| \n  148| \n  149| class ManifestManager:\n  150|     \"\"\"Typed YAML manifest with contract + state.\n  151| \n  152|     Parameters\n  153|     ----------\n  154|     path : Path\n  155|         Path to the manifest YAML file.\n  156|     \"\"\"\n  157| \n   ...\n  284| def _yaml_manifest_path() -> Path:\n  285|     \"\"\"Path to the YAML manifest: data/manifest.yaml.\"\"\"\n  286|     return paths.resolve_project_root() / \"data\" / \"manifest.yaml\"\n  287| \n  288| \n  289| def record_ingestion_yaml(\n  290|     data_type: str,\n  291|     symbol: str,\n  292|     start_date: date,\n  293|     end_date: date,\n  294|     rows: int,\n  295|     file_size_bytes: int = 0,\n  296| ) -> None:\n  297|     \"\"\"Record a successful ingestion in the YAML manifest.\n   ...\n  321| # ══════════════════════════════════════════════════════════════════════════\n  322| #  Legacy JSON-based functions (backward compat — will be removed)\n  323| # ══════════════════════════════════════════════════════════════════════════\n  324| \n  325| \n  326| def _manifest_path() -> Path:\n  327|     \"\"\"Path to the legacy manifest file: data/manifest.json.\"\"\"\n  328|     return paths.resolve_project_root() / \"data\" / \"manifest.json\"\n  329| \n  330| \n  331| def load_manifest() -> dict[str, Any]:\n  332|     \"\"\"Load the legacy JSON manifest from disk.\"\"\"\n  333|     path = _manifest_path()\n  334|     if not path.exists():\n  335|         return {}\n  336|     with open(path) as f:\n  337|         return json.load(f)\n  338| \n  339| \n  340| def save_manifest(manifest: dict[str, Any]) -> Path:\n  341|     \"\"\"Write the legacy JSON manifest to disk.\"\"\"\n  342|     path = _manifest_path()\n  343|     path.parent.mkdir(parents=True, exist_ok=True)\n  344|     with open(path, \"w\") as f:\n  345|         json.dump(manifest, f, indent=2, default=str)\n  346|     return path\n  347| \n  348| \n  349| def record_ingestion(\n  350|     data_type: str,\n  351|     symbol: str,\n  352|     start_date: date,\n  353|     end_date: date,\n  354|     rows: int,\n  355|     skipped_dates: list[tuple[date, str]] | None = None,\n  356| ) -> None:\n  357|     \"\"\"Record a successful ingestion in the legacy JSON manifest.\"\"\"\n   ...\n  393| def get_ingested_symbols(data_type: str) -> dict[str, dict[str, Any]]:\n  394|     \"\"\"Return all symbols ingested for a given data type (legacy JSON).\"\"\"\n  395|     manifest = load_manifest()\n  396|     return manifest.get(data_type, {})\n  397| \n  398| \n  399| def get_missing_symbols(data_type: str, target_universe: set[str]) -> set[str]:\n  400|     \"\"\"Return symbols not yet ingested for a data type (legacy JSON).\"\"\"\n  401|     ingested = set(get_ingested_symbols(data_type).keys())\n  402|     return target_universe - ingested\n  403| \n  404| \n  405| def summary_table(data_type: str | None = None) -> str:\n  406|     \"\"\"Human-readable summary of ingestion status (legacy JSON).\"\"\"\n  407|     manifest = load_manifest()\n  408|     if not manifest:\n  409|         return \"No data ingested yet.\"\n  410| \n  411|     _META_KEYS = {\"generated_at\", \"universe\", \"schema_groups\", \"layer_readiness\"}\n  412|     if data_type:\n  413|         types_to_show = [data_type]\n\n--- src/volforecast/utils/persistence.py ---\n    1| \"\"\"Experiment result persistence: models, predictions, metrics, config.\n    2| \n    3| Saves experiment artifacts to a structured directory under data/models/.\n    4| Includes fingerprinting to detect config/data changes and skip retraining.\n    5| \"\"\"\n    6| \n    7| from __future__ import annotations\n    8| \n    9| import dataclasses\n   10| import hashlib\n   11| import json\n   12| from pathlib import Path\n   13| from typing import Any\n   14| \n   15| import numpy as np\n   16| import pandas as pd\n   17| \n   18| from volforecast.config import ExperimentConfig\n   19| from volforecast.utils.paths import models_dir\n   20| \n   21| \n   22| def experiment_dir(config: ExperimentConfig) -> Path:\n   23|     \"\"\"Return the experiment output directory (absolute).\"\"\"\n   24|     return models_dir() / config.name\n   25| \n   26| \n   27| def save_experiment_results(\n   28|     results: dict[int, Any],\n   29|     config: ExperimentConfig,\n   30|     symbol: str,\n   31| ) -> Path:\n   32|     \"\"\"Persist pipeline results for one symbol.\n   33| \n   34|     Writes:\n   35|       - {experiment_dir}/{symbol}/{model}_h{horizon}.joblib (fitted model)\n   36|       - {experiment_dir}/{symbol}/predictions_h{horizon}.csv (OOS preds + actuals)\n   37|       - Updates {experiment_dir}/metrics.json with this symbol's metrics\n   38| \n   39|     Parameters\n   40|     ----------\n   41|     results : dict[int, Any]\n   ...\n   91| def load_predictions(config: ExperimentConfig, symbol: str, horizon: int) -> pd.DataFrame:\n   92|     \"\"\"Load saved OOS predictions for a symbol/horizon.\n   93| \n   94|     Returns DataFrame with 'prediction' and 'actual' columns and date index.\n   95|     \"\"\"\n   96|     path = experiment_dir(config) / symbol / f\"predictions_h{horizon}.csv\"\n   97|     if not path.exists():\n   98|         raise FileNotFoundError(f\"No predictions found at {path}\")\n   99|     df = pd.read_csv(path, index_col=\"date\", parse_dates=True)\n   ...\n  103| def load_all_metrics(config: ExperimentConfig) -> dict[str, dict[str, dict[str, float]]]:\n  104|     \"\"\"Load the consolidated metrics.json for an experiment.\"\"\"\n  105|     return _load_metrics(experiment_dir(config))\n  106| \n  107| \n  108| def _load_metrics(exp_dir: Path) -> dict[str, dict[str, dict[str, float]]]:\n  109|     \"\"\"Load metrics.json or return empty dict.\"\"\"\n  110|     metrics_path = exp_dir / \"metrics.json\"\n  111|     if metrics_path.exists():\n  112|         with open(metrics_path) as f:\n  113|             return json.load(f)\n  114|     return {}\n  115| \n  116| \n  117| def _save_metrics(metrics: dict, exp_dir: Path) -> None:\n  118|     \"\"\"Write metrics.json with pretty formatting.\"\"\"\n  119|     exp_dir.mkdir(parents=True, exist_ok=True)\n  120|     with open(exp_dir / \"metrics.json\", \"w\") as f:\n  121|         json.dump(metrics, f, indent=2, default=_json_default)\n  122| \n  123| \n  124| def _json_default(obj):\n  125|     \"\"\"Handle numpy types in JSON serialization.\"\"\"\n  126|     if isinstance(obj, (np.floating, np.integer)):\n  127|         return float(obj)\n  128|     if isinstance(obj, np.ndarray):\n  129|         return obj.tolist()\n  130|     raise TypeError(f\"Object of type {type(obj)} is not JSON serializable\")\n   ...\n  136| def _canon_sequences(sequences) -> dict | None:\n  137|     \"\"\"Canonical representation of SequenceConfig (or raw dict / None) for hashing.\"\"\"\n  138|     if sequences is None:\n  139|         return None\n  140|     if isinstance(sequences, dict):\n  141|         # Raw-dict path (occasionally seen in older tests): normalise keys.\n  142|         return {\n  143|             \"features\": list(sequences.get(\"features\", []) or []),\n  144|             \"max_bars\": int(sequences.get(\"max_bars\", 0) or 0),\n   ...\n  152| def _canon_base_model(base_model) -> dict | None:\n  153|     \"\"\"Canonical representation of BaseModelConfig for hashing.\"\"\"\n  154|     if base_model is None:\n  155|         return None\n  156|     return {\n  157|         \"name\": str(base_model.name),\n  158|         \"feature_layers\": sorted(base_model.feature_layers or []),\n  159|         \"params\": dict(base_model.params or {}),\n  160|     }\n  161| \n  162| \n  163| def _canon_horizon_overrides(overrides: dict) -> dict:\n  164|     \"\"\"Canonical representation of horizon_overrides (preserve nested structure).\"\"\"\n  165|     canon: dict = {}\n  166|     for h, ov in sorted((overrides or {}).items(), key=lambda kv: int(kv[0])):\n  167|         entry: dict = {}\n  168|         if \"model\" in ov:\n  169|             entry[\"model\"] = {\n  170|                 \"params\": dict((ov[\"model\"] or {}).get(\"params\", {}) or {}),\n  171|             }\n   ...\n  185| def _config_fingerprint(config: ExperimentConfig) -> str:\n  186|     \"\"\"Compute a stable hash of all training-relevant config fields.\n  187| \n  188|     Excludes output_dir, ingest, and cache-control settings since they don't\n  189|     affect model training. Includes sequence spec, base model, and horizon\n  190|     overrides so sequence-model and stacked-model runs invalidate the cache\n  191|     correctly.\n  192|     \"\"\"\n  193|     # Build a canonical dict of training-relevant fields\n   ...\n  222| def _data_fingerprint(symbol: str) -> str:\n  223|     \"\"\"Compute a hash of a symbol's data file (size + mtime + first/last bytes).\n  224| \n  225|     Uses file metadata + content sample for speed (avoids hashing multi-MB files).\n  226|     \"\"\"\n  227|     from volforecast.utils.paths import rv_cache_path\n  228| \n  229|     path = rv_cache_path(symbol)\n  230|     if not path.exists():\n   ...\n  244| def compute_fingerprint(config: ExperimentConfig, symbols: list[str]) -> dict[str, str]:\n  245|     \"\"\"Compute a full experiment fingerprint (config + per-symbol data).\n  246| \n  247|     Returns a dict with 'config' hash and per-symbol data hashes.\n  248|     \"\"\"\n  249|     fp: dict[str, str] = {\"config\": _config_fingerprint(config)}\n  250|     for sym in sorted(symbols):\n  251|         fp[f\"data:{sym}\"] = _data_fingerprint(sym)\n  252|     return fp\n  253| \n  254| \n  255| def save_fingerprint(config: ExperimentConfig, symbols: list[str]) -> Path:\n  256|     \"\"\"Save fingerprint to the experiment directory.\"\"\"\n  257|     exp_dir = experiment_dir(config)\n  258|     exp_dir.mkdir(parents=True, exist_ok=True)\n  259|     fp = compute_fingerprint(config, symbols)\n  260|     fp_path = exp_dir / \"fingerprint.json\"\n  261|     with open(fp_path, \"w\") as f:\n  262|         json.dump(fp, f, indent=2)\n  263|     return fp_path\n  264| \n  265| \n  266| def load_fingerprint(config: ExperimentConfig) -> dict[str, str] | None:\n  267|     \"\"\"Load a previously saved fingerprint, or None if not found.\"\"\"\n  268|     fp_path = experiment_dir(config) / \"fingerprint.json\"\n  269|     if not fp_path.exists():\n  270|         return None\n  271|     with open(fp_path) as f:\n  272|         return json.load(f)\n  273| \n  274| \n  275| def check_fingerprint(config: ExperimentConfig, symbols: list[str]) -> tuple[bool, str]:\n  276|     \"\"\"Check if the current config+data matches the saved fingerprint.\n  277| \n  278|     Returns\n  279|     -------\n  280|     (matches, reason) : tuple[bool, str]\n  281|         matches=True if fingerprints are identical.\n  282|         reason explains what changed if matches=False.\n  283|     \"\"\"\n   ...\n  310| def has_trained_artifacts(config: ExperimentConfig, symbol: str) -> bool:\n  311|     \"\"\"Check if a symbol has complete trained artifacts (predictions for all horizons).\"\"\"\n  312|     exp_dir = experiment_dir(config)\n  313|     sym_dir = exp_dir / symbol\n  314|     if not sym_dir.exists():\n  315|         return False\n  316|     for h in config.horizons:\n  317|         if not (sym_dir / f\"predictions_h{h}.csv\").exists():\n  318|             return False\n\n--- src/volforecast/utils/__init__.py ---\n    1| \"\"\"Utilities: time-series CV splits, data helpers.\"\"\"\n\n--- README.md ---\n    1| # ml-vol-estimator\n    2| \n    3| ML realized volatility forecasting — signal discovery. Progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to produce statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.\n    4| \n    5| **Timeline:** ~20-week internship, May–Sep 2026.\n    6| \n    7| ---\n    8| \n    9| ## Quick Start\n   10| \n   11| 1. Open `ml-vol-estimator.code-workspace` in VS Code.\n   12| 2. Boot protocol loads automatically: `memory/person/user.md` + `memory/INDEX.md`.\n   13| 3. Use `/bootup` to start a session — it reads the research journal and orients you.\n   14| 4. Drive work with slash commands: `/research`, `/feature`, `/experiment`, `/backtest`.\n   15| \n   16| See [AGENTS.md](AGENTS.md) for the full project spec, and [workspace/docs/user-manual.md](workspace/docs/user-manual.md) for all commands.\n   17| \n   18| ---\n   19| \n   20| ## CLI\n   21| \n   22| The `vol` wrapper handles uv, PATH, and working directory internally.\n   23| \n   24| ### Wrapper Commands\n   25| \n   26| ```\n   27| vol test [args]               # pytest (extra args forwarded: -k, -v, --tb=short)\n   28| vol testlf [args]             # re-run last-failed tests only\n   29| vol run --config <yaml>       # primary entry point (see below)\n   30| vol status                    # show data ingestion manifest\n   31| vol lint                      # ruff check (read-only)\n   32| vol fmt                       # ruff auto-format\n   33| vol typecheck                 # mypy\n   34| vol sync                      # install/update deps\n   35| vol shell                     # REPL with volforecast importable\n   36| vol notebook                  # jupyter\n   37| vol help                      # usage\n   38| ```\n   39| \n   40| ### Primary Command: `vol run --config <yaml>`\n   41| \n   42| Every `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).\n   43| \n   44| Optional overrides: `--symbols SPY,AAPL` (override YAML universe), `--skip-ingest` (skip data fetch), `--workers 8` (thread count).\n   45| \n   46| ### Examples\n   47| \n   48| ```bash\n   49| # Single-model experiment (ingest + train + evaluate + dashboard)\n   50| vol run --config workspace/configs/baseline_har.yaml\n   51| \n   52| # Tournament: 13 models compared with statistical tests\n   53| vol run --config workspace/configs/tournament_full_spy.yaml\n   54| \n   55| # Skip ingestion (data already cached), subset of symbols\n   56| vol run --config workspace/configs/tournament_har_dev.yaml --skip-ingest --symbols SPY,AAPL\n   57| \n   58| # Ingest only\n   59| vol run --config workspace/configs/ingest_full_universe.yaml --workers 8\n   60| \n\nTASK: Drawer: utils\nFill the drawer for this module group. Return a JSON object with:\n  role: 2 or 3 short paragraphs saying what this group IS and DOES in\n        domain terms, and what is distinctive about how it does it.\n  reads: one sentence, what this group consumes and where it comes from.\n  feeds: one sentence, what depends on this group's output.\n  key_files: 3 to 6 entries; 'file' is copied exactly from the FILES\n        list below and 'purpose' is one line saying why a newcomer\n        would open that file.\n  concepts: 3 to 6 short terms a newcomer should recognise here.\n  cite (optional): one verbatim quote of 3-24 contiguous lines from\n        the source shown above that best captures this group, with an\n        optional one-line caption.\n\nGROUP: utils at src/volforecast/utils: 7 files, 1552 loc.\nFILES you may name in key_files (copy the name exactly):\n  - cv.py (src/volforecast/utils/cv.py)\n  - manifest.py (src/volforecast/utils/manifest.py)\n  - persistence.py (src/volforecast/utils/persistence.py)\n  - __init__.py (src/volforecast/utils/__init__.py)",
+  "windows": [
+    {
+      "file": "src/volforecast/utils/cv.py",
+      "start": 27,
+      "end": 105
+    },
+    {
+      "file": "src/volforecast/utils/cv.py",
+      "start": 134,
+      "end": 142
+    },
+    {
+      "file": "src/volforecast/utils/cv.py",
+      "start": 204,
+      "end": 212
+    },
+    {
+      "file": "src/volforecast/utils/cv.py",
+      "start": 298,
+      "end": 306
+    },
+    {
+      "file": "src/volforecast/utils/manifest.py",
+      "start": 44,
+      "end": 62
+    },
+    {
+      "file": "src/volforecast/utils/manifest.py",
+      "start": 66,
+      "end": 74
+    },
+    {
+      "file": "src/volforecast/utils/manifest.py",
+      "start": 84,
+      "end": 92
+    },
+    {
+      "file": "src/volforecast/utils/manifest.py",
+      "start": 109,
+      "end": 117
+    },
+    {
+      "file": "src/volforecast/utils/manifest.py",
+      "start": 137,
+      "end": 138
+    },
+    {
+      "file": "src/volforecast/utils/manifest.py",
+      "start": 144,
+      "end": 157
+    },
+    {
+      "file": "src/volforecast/utils/manifest.py",
+      "start": 284,
+      "end": 297
+    },
+    {
+      "file": "src/volforecast/utils/manifest.py",
+      "start": 321,
+      "end": 357
+    },
+    {
+      "file": "src/volforecast/utils/manifest.py",
+      "start": 393,
+      "end": 413
+    },
+    {
+      "file": "src/volforecast/utils/persistence.py",
+      "start": 13,
+      "end": 41
+    },
+    {
+      "file": "src/volforecast/utils/persistence.py",
+      "start": 91,
+      "end": 99
+    },
+    {
+      "file": "src/volforecast/utils/persistence.py",
+      "start": 103,
+      "end": 130
+    },
+    {
+      "file": "src/volforecast/utils/persistence.py",
+      "start": 136,
+      "end": 144
+    },
+    {
+      "file": "src/volforecast/utils/persistence.py",
+      "start": 152,
+      "end": 171
+    },
+    {
+      "file": "src/volforecast/utils/persistence.py",
+      "start": 185,
+      "end": 193
+    },
+    {
+      "file": "src/volforecast/utils/persistence.py",
+      "start": 222,
+      "end": 230
+    },
+    {
+      "file": "src/volforecast/utils/persistence.py",
+      "start": 244,
+      "end": 283
+    },
+    {
+      "file": "src/volforecast/utils/persistence.py",
+      "start": 310,
+      "end": 318
+    },
+    {
+      "file": "README.md",
+      "start": 13,
+      "end": 60
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "role",
+      "reads",
+      "feeds",
+      "key_files",
+      "concepts"
+    ],
+    "properties": {
+      "role": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 3,
+        "items": {
+          "type": "string",
+          "maxLength": 600
+        }
+      },
+      "reads": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "feeds": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "key_files": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file",
+            "purpose"
+          ],
+          "properties": {
+            "file": {
+              "type": "string",
+              "enum": [
+                "cv.py",
+                "manifest.py",
+                "persistence.py",
+                "__init__.py"
+              ]
+            },
+            "purpose": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "concepts": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "string",
+          "maxLength": 60
+        }
+      },
+      "cite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "caption": {
+        "type": "string",
+        "maxLength": 200
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\93764ff582f94af916340f4c02353ecc0389f5157000e1d3ea38276a369b094a.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\93764ff582f94af916340f4c02353ecc0389f5157000e1d3ea38276a369b094a.json"
+}

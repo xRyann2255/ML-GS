@@ -1,0 +1,207 @@
+{
+  "unit": "tour",
+  "kind": "tour",
+  "title": "Guided tour",
+  "max_claims": 11,
+  "key": "14f4c4f7230c3071128d2312a146d037f6d1e2d3e15b9bd1c83eeb072f4147a2",
+  "system": "You are the narration stage of Trailhead, a tool that generates a verified walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Any\nquote you return is searched for verbatim in the file on disk; anything not\nfound exactly is deleted and counted on screen. Fields that fail their checks\nare dropped, and a malformed answer is discarded whole, so answer the schema\nexactly.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else. An unknown key\n   anywhere discards the whole answer.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. Where the schema allows a `cite`, its `quote` is a VERBATIM, CONTIGUOUS copy\n   of 3-24 lines from ONE file shown below, lines joined with newlines,\n   indentation copied exactly. `focus` is an array of exact substrings of your\n   own quote. A cite is optional: omitting one is honest, inventing one is not.\n4. Prose fields are plain sentences. Backticks may mark code identifiers and\n   [[term]] or [[id|label]] may mark a glossary term. No newlines inside a\n   field, no markdown links, no `<`. Use commas instead of dashes.\n5. State substantive domain facts: what a thing is FOR, what flows through it,\n   what would surprise a newcomer. Never restate code mechanics the reader can\n   see, and never present argument parsing or CLI wiring as a purpose. When the\n   README or a package docstring states the purpose, that purpose is the story.\n6. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"appears to\", say what it is.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/volforecast/cli/audit.py ---\n    1| \"\"\"Data integrity audit and manifest generation.\n    2| \n    3| Audits all cached parquet files against their manifest contracts,\n    4| validates integrity, detects issues, assesses per-layer readiness,\n    5| and regenerates data/manifest.json + syncs data/manifest.yaml.\n    6| \n    7| Usage:\n    8|     python -m volforecast.cli.audit [--quiet] [--no-report] [--no-journal]\n    9| \"\"\"\n   10| \n   11| from __future__ import annotations\n   12| \n   ...\n   51| def _find_project_root() -> Path:\n   52|     \"\"\"Walk up from this file to find the project root (contains data/).\"\"\"\n   53|     p = Path(__file__).resolve()\n   54|     for parent in [p] + list(p.parents):\n   55|         if (parent / \"data\" / \"raw\" / \"ticks\").is_dir():\n   56|             return parent\n   57|     # Fallback\n   58|     return Path(\"/home/developer/ml-vol-estimator\")\n   59| \n   60| \n   61| def _discover_universe(root: Path) -> list[str]:\n   62|     \"\"\"Discover the symbol universe from on-disk parquets + constants.\n   63| \n   64|     Scans source directories for parquet files and merges with\n   65|     SYMBOL_UNIVERSE from constants.py.  Excludes underscore-prefixed\n   66|     files (e.g. _MARKET.parquet, _VIX.parquet).\n   67|     \"\"\"\n   68|     on_disk: set[str] = set()\n   69|     for subdir in _SYMBOL_SOURCE_DIRS:\n   ...\n   80| def _get_universe_fallback() -> list[str]:\n   81|     \"\"\"Fallback universe when manifest has no symbols: use SYMBOL_UNIVERSE.\"\"\"\n   82|     return sorted(SYMBOL_UNIVERSE)\n   83| \n   84| \n   85| def _get_universe_from_manifest(manifest_data: Any, root: Path | None = None) -> list[str]:\n   86|     \"\"\"Build the audit universe dynamically.\n   87| \n   88|     Uses on-disk discovery merged with SYMBOL_UNIVERSE from constants.\n   89|     The manifest's symbol list is ignored — the audit should discover\n   90|     what actually exists rather than relying on a stale manifest list.\n   91|     \"\"\"\n   92|     if root is not None:\n   93|         return _discover_universe(root)\n   ...\n  102| def _source_result_to_legacy_rv(result: SourceAuditResult) -> dict[str, Any]:\n  103|     \"\"\"Convert SourceAuditResult for ticks to legacy rv manifest format.\"\"\"\n  104|     rv_manifest: dict[str, Any] = {}\n  105|     schema_groups: dict[tuple, list[str]] = {}\n  106| \n  107|     for sym, fr in result.file_results.items():\n  108|         if not fr.exists:\n  109|             continue\n  110|         cols_key = tuple(sorted(fr.columns))\n   ...\n  147| def _legacy_layer_readiness(\n  148|     layer_readiness: dict[str, dict[str, Any]],\n  149|     source_results: dict[str, SourceAuditResult],\n  150| ) -> dict[str, Any]:\n  151|     \"\"\"Convert new layer readiness to the legacy format expected by report/journal.\"\"\"\n  152|     readiness: dict[str, Any] = {}\n  153| \n  154|     # HAR core (L0): from ticks source\n  155|     ticks_result = source_results.get(\"ticks\")\n   ...\n  228|     }\n  229| \n  230|     return readiness\n  231| \n  232| \n  233| # ══════════════════════════════════════════════════════════════════════════\n  234| #  Report generation\n  235| # ══════════════════════════════════════════════════════════════════════════\n  236| \n  237| \n  238| def generate_report(\n  239|     source_results: dict[str, SourceAuditResult],\n  240|     layer_readiness: dict[str, dict[str, Any]],\n  241|     universe: list[str],\n  242| ) -> str:\n  243|     \"\"\"Generate human-readable Markdown audit report from new-style results.\"\"\"\n  244|     lines = [\n  245|         \"# Data Audit Report\",\n  246|         \"\",\n  247|         f\"**Generated:** {datetime.utcnow().isoformat()}Z\",\n  248|         f\"**Reference date:** {date.today().isoformat()}\",\n  249|         \"\",\n  250|         \"## Source Status Matrix\",\n  251|         \"\",\n  252|         \"| Source | Layers | Found | Missing | Stale | Violations | Status |\",\n  253|         \"|--------|--------|-------|---------|-------|------------|--------|\",\n  254|     ]\n  255| \n  256|     for name, result in sorted(source_results.items()):\n  257|         layers = \", \".join(result.serves_layers)\n  258|         n_violations = len(result.violations)\n  259|         status = \"CRITICAL\" if result.has_critical else (\"OK\" if n_violations == 0 else \"WARN\")\n  260| \n  261|         if result.expected_symbols > 0:\n  262|             found_str = f\"{result.found_symbols}/{result.expected_symbols}\"\n  263|             missing_str = str(len(result.missing_symbols))\n  264|         else:\n  265|             # Named file source\n  266|             n_files = len(result.named_file_results)\n  267|             n_present = sum(1 for fr in result.named_file_results.values() if fr.exists)\n  268|             found_str = f\"{n_present}/{n_files} files\"\n  269|             missing_str = str(n_files - n_present)\n  270| \n  271|         lines.append(\n  272|             f\"| {name} | {layers} | {found_str} | {missing_str} \"\n  273|             f\"| {result.stale_symbols} | {n_violations} | {status} |\"\n  274|         )\n  275| \n  276|     # Layer Readiness\n  277|     lines.extend(\n  278|         [\n  279|             \"\",\n  280|             \"## Layer Readiness\",\n  281|             \"\",\n  282|             \"| Layer | Sources | Ready | Blocked | Action |\",\n  283|             \"|-------|---------|-------|---------|--------|\",\n  284|         ]\n  285|     )\n  286|     for layer, info in sorted(layer_readiness.items()):\n  287|         sources_str = \", \".join(info[\"sources\"])\n   ...\n  351| def generate_journal_entry(\n  352|     source_results: dict[str, SourceAuditResult],\n  353|     layer_readiness: dict[str, dict[str, Any]],\n  354|     universe: list[str],\n  355| ) -> str:\n  356|     \"\"\"Generate a research journal entry summarizing data state.\"\"\"\n  357|     from datetime import date\n  358| \n  359|     today = date.today().isoformat()\n   ...\n  424| def update_research_journal(\n  425|     source_results: dict[str, SourceAuditResult],\n  426|     layer_readiness: dict[str, dict[str, Any]],\n  427|     universe: list[str],\n  428|     root: Path,\n  429| ) -> None:\n  430|     \"\"\"Append a data audit summary to the research journal.\"\"\"\n  431|     journal_path = root / \"workspace\" / \"research\" / \"research-journal.md\"\n  432|     if not journal_path.exists():\n   ...\n  457| def _sync_audit_to_yaml(\n  458|     source_results: dict[str, SourceAuditResult],\n  459|     root: Path,\n  460|     *,\n  461|     universe: list[str] | None = None,\n  462|     quiet: bool = False,\n  463| ) -> None:\n  464|     \"\"\"Sync audit results into data/manifest.yaml integrity entries.\"\"\"\n  465|     yaml_path = root / \"data\" / \"manifest.yaml\"\n   ...\n  529| def run_audit(\n  530|     *, quiet: bool = False, no_report: bool = False, no_journal: bool = False\n  531| ) -> dict[str, Any]:\n  532|     \"\"\"Run the full data audit and update manifest.\n  533| \n  534|     Returns the manifest dict (legacy format for backward compatibility).\n  535|     \"\"\"\n  536|     root = _find_project_root()\n  537|     yaml_path = root / \"data\" / \"manifest.yaml\"\n   ...\n  663| @dataclass\n  664| class FixReport:\n  665|     \"\"\"Summary of a gap-fix operation across sources.\"\"\"\n  666| \n  667|     total_missing_days: int = 0\n  668|     total_fixed_days: int = 0\n  669|     total_failed_days: int = 0\n  670|     sources_scanned: int = 0\n  671|     results: list[Any] = field(default_factory=list)\n  672| \n  673| \n  674| def run_audit_fix(\n  675|     *,\n  676|     sources: dict[str, list[str]],\n  677|     start_date: date,\n  678|     end_date: date,\n  679|     confirm: bool = False,\n  680|     project_root: Path | None = None,\n  681|     quiet: bool = False,\n  682| ) -> FixReport:\n   ...\n  769| def main() -> int:\n  770|     \"\"\"CLI entry point.\"\"\"\n  771|     quiet = \"--quiet\" in sys.argv or \"-q\" in sys.argv\n  772|     no_report = \"--no-report\" in sys.argv\n  773|     no_journal = \"--no-journal\" in sys.argv\n  774| \n  775|     try:\n  776|         manifest = run_audit(quiet=quiet, no_report=no_report, no_journal=no_journal)\n  777|         # Exit with non-zero if there are critical issues\n   ...\n  793| def register(subparsers) -> None:\n  794|     \"\"\"Register the audit subcommand.\"\"\"\n  795|     parser = subparsers.add_parser(\n  796|         \"audit\",\n  797|         help=\"Run comprehensive data integrity audit and update manifest\",\n  798|     )\n  799|     parser.add_argument(\"--quiet\", \"-q\", action=\"store_true\", help=\"Suppress progress output\")\n  800|     parser.add_argument(\n  801|         \"--no-report\", action=\"store_true\", help=\"Skip Markdown report generation\"\n   ...\n  829| def handle(args) -> int:\n  830|     \"\"\"Execute audit command. Return exit code.\"\"\"\n  831|     from datetime import date as _date\n  832|     from pathlib import Path\n  833| \n  834|     run_audit(quiet=args.quiet, no_report=args.no_report)\n  835| \n  836|     if args.fix:\n  837|         # Determine sources to scan\n\n--- src/volforecast/cli/__init__.py ---\n    1| \"\"\"CLI entry points for volforecast skills.\n    2| \n    3| Each module corresponds to one skill's command-line interface:\n    4| - ingest: DATA_INGEST skill\n    5| - build_features: FEATURE_BUILD skill\n    6| - train: MODEL_TRAIN skill\n    7| - evaluate: EVALUATE skill\n    8| - report: HTML report generation\n    9| - notebook: NOTEBOOK skill\n   10| - research: RESEARCH skill\n   11| \"\"\"\n\n--- src/volforecast/models/gnn.py ---\n    1| \"\"\"Graph Attention Network (GAT) for multi-symbol realized volatility forecasting.\n    2| \n    3| Architecture (Zhang, Pu, Cucuringu & Dong 2025):\n    4|   - Each training sample = one graph snapshot (N nodes × F features)\n    5|   - Nodes = symbols in the universe\n    6|   - Edges = rolling correlation above threshold (from gnn_adjacency module)\n    7|   - 2-layer GATv2Conv with multi-head attention\n    8|   - Per-node MLP head → log-RV prediction\n    9| \n   10| Key design choices:\n   11|   - One-hop only (multi-hop adds noise per Zhang et al.)\n   12|   - QLIKE loss (substantially outperforms MSE per Zhang et al.)\n   ...\n   44| def _mse_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:\n   45|     return torch.mean((pred - target) ** 2)\n   46| \n   47| \n   48| def _qlike_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:\n   49|     \"\"\"QLIKE in log-RV space: exp(y - y_hat) - (y - y_hat) - 1.\"\"\"\n   50|     diff = target - pred\n   51|     diff = torch.clamp(diff, min=-10.0, max=10.0)\n   52|     return torch.mean(torch.exp(diff) - diff - 1.0)\n   ...\n   65| def _resolve_device(device: str) -> str:\n   66|     if device != \"auto\":\n   67|         return device\n   68|     if torch.cuda.is_available():\n   69|         return \"cuda\"\n   70|     if getattr(torch.backends, \"mps\", None) and torch.backends.mps.is_available():\n   71|         return \"mps\"\n   72|     return \"cpu\"\n   73| \n   74| \n   75| def _resolve_precision(precision: str, device: str) -> torch.dtype | None:\n   76|     if precision == \"fp32\" or device == \"cpu\":\n   77|         return None\n   78|     if precision == \"bf16\":\n   79|         return torch.bfloat16\n   80|     if precision == \"fp16\":\n   81|         return torch.float16\n   82|     if precision == \"auto\":\n   83|         if device == \"cuda\":\n   ...\n   94| class _GNNModule(nn.Module):\n   95|     \"\"\"2-layer GATv2 or TransformerConv + per-node MLP head.\"\"\"\n   96| \n   97|     def __init__(\n   98|         self,\n   99|         input_dim: int,\n  100|         hidden_dim: int = 32,\n  101|         n_heads: int = 4,\n  102|         dropout: float = 0.1,\n   ...\n  186|         if return_embedding:\n  187|             return out, attn_weights, h\n  188|         return out, attn_weights\n  189| \n  190| \n  191| # ---------------------------------------------------------------------------\n  192| # Registered model class\n  193| # ---------------------------------------------------------------------------\n  194| \n  195| \n  196| @register_model(\"gnn\")\n  197| class GNNVolModel(_BaseModel):\n  198|     \"\"\"Graph Attention Network for multi-symbol RV forecasting.\n  199| \n  200|     Operates on graph snapshots: each date = one graph with N nodes\n  201|     (symbols) and edges from rolling correlation. Integrates with the\n  202|     feature_stack pipeline via extract_features().\n  203| \n  204|     Set ``requires_graph = True`` so the pipeline runner can detect\n  205|     graph-mode and dispatch appropriately.\n  206|     \"\"\"\n  207| \n  208|     REQUIRED_LAYERS: list[str] = []\n  209|     requires_sequences: bool = False  # Does NOT use SequenceTensor\n  210|     requires_graph: bool = True  # New flag for pipeline detection\n  211|     supports_tuning: bool = True\n  212|     name = \"gnn\"\n  213|     family = \"gnn\"\n  214|     description = \"Graph Attention Network with cross-asset spillover learning\"\n  215| \n  216|     def __init__(\n  217|         self,\n  218|         *,\n  219|         input_dim: int,\n  220|         hidden_dim: int = 32,\n  221|         n_heads: int = 4,\n  222|         n_layers: int = 2,\n  223|         dropout: float = 0.1,\n  224|         learning_rate: float = 1e-3,\n  225|         weight_decay: float = 1e-4,\n  226|         max_epochs: int = 200,\n  227|         batch_size: int = 32,\n  228|         val_fraction: float = 0.15,\n  229|         early_stopping_rounds: int = 15,\n  230|         loss: str = \"qlike\",\n  231|         adj_window: int = 60,\n  232|         adj_threshold: float = 0.3,\n  233|         device: str = \"auto\",\n  234|         precision: str = \"auto\",\n  235|         seed: int = 42,\n  236|         use_scheduler: bool = True,\n  237|         grad_accumulation_steps: int = 1,\n  238|         compile: bool = False,  # PyG ops are dynamic; compile causes CUDA Graph warnings\n  239|         conv_type: str = \"gatv2\",\n  240|     ) -> None:\n  241|         if loss not in _LOSSES:\n  242|             raise ValueError(f\"Unknown loss {loss!r}; expected one of {list(_LOSSES)}\")\n  243|         if conv_type not in (\"gatv2\", \"transformer\"):\n  244|             raise ValueError(f\"Unknown conv_type: {conv_type!r}; expected 'gatv2' or 'transformer'\")\n  245| \n\n--- src/volforecast/models/__init__.py ---\n    1| \"\"\"Volatility forecasting models: HAR baselines, LightGBM, LSTM, ensemble.\n    2| \n    3| Access registered models via ``MODEL_REGISTRY`` dict.\n    4| Call ``volforecast.registry.ensure_registered()`` to populate registries.\n    5| \"\"\"\n    6| \n    7| from volforecast.registry import MODEL_REGISTRY, register_model\n    8| \n    9| __all__ = [\"MODEL_REGISTRY\", \"register_model\"]\n\n--- src/volforecast/features/calendar.py ---\n    1| \"\"\"Calendar and event features (Layer 5).\n    2| \n    3| Captures scheduled macro events and calendar effects on volatility:\n    4| - FOMC meeting proximity\n    5| - Non-Farm Payrolls (NFP) proximity\n    6| - Options expiration (OpEx) effects\n    7| - Day-of-week and month effects\n    8| \n    9| Calendar features are KNOWN IN ADVANCE — no .shift(1) applied.\n   10| day_of_week and month are CATEGORICAL (integer dtype for LightGBM).\n   11| \n   12| Key functions:\n   ...\n  153| def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:\n  154|     \"\"\"Return the nth occurrence of weekday in month.\n  155| \n  156|     Parameters\n  157|     ----------\n  158|     year : int\n  159|     month : int\n  160|     weekday : int\n  161|         0=Monday, 4=Friday.\n   ...\n  180| def _next_fomc(target: date) -> date | None:\n  181|     \"\"\"Find next FOMC date on or after target.\"\"\"\n  182|     for d in _FOMC_DATES:\n  183|         if d >= target:\n  184|             return d\n  185|     return None\n  186| \n  187| \n  188| def _next_nfp(target: date) -> date:\n  189|     \"\"\"Find next NFP date on or after target. NFP = first Friday of month.\"\"\"\n  190|     year, month = target.year, target.month\n  191|     nfp = _nth_weekday(year, month, 4, 1)  # First Friday\n  192|     if nfp < target:\n  193|         # Move to next month\n  194|         if month == 12:\n  195|             year += 1\n  196|             month = 1\n   ...\n  203| def _next_opex(target: date) -> date:\n  204|     \"\"\"Find next OpEx date on or after target. OpEx = third Friday of month.\"\"\"\n  205|     year, month = target.year, target.month\n  206|     opex = _nth_weekday(year, month, 4, 3)  # Third Friday\n  207|     if opex < target:\n  208|         # Move to next month\n  209|         if month == 12:\n  210|             year += 1\n  211|             month = 1\n   ...\n  218| def _busday_count(start: date, end: date) -> int:\n  219|     \"\"\"Count business days between start (exclusive) and end (inclusive).\"\"\"\n  220|     return int(np.busday_count(start, end))\n  221| \n  222| \n  223| # ---------------------------------------------------------------------------\n  224| # Public compute functions\n  225| # ---------------------------------------------------------------------------\n  226| \n  227| \n  228| def compute_fomc_proximity(dates: pd.DatetimeIndex) -> pd.DataFrame:\n  229|     \"\"\"Compute FOMC proximity features for a date index.\n  230| \n  231|     Returns\n  232|     -------\n  233|     pd.DataFrame\n  234|         Columns: days_to_fomc (trading days), fomc_week (bool->int), fomc_day (bool->int).\n  235|     \"\"\"\n  236|     days_to = []\n  237|     fomc_week = []\n  238|     fomc_day = []\n  239| \n  240|     for dt in dates:\n  241|         d = dt.date() if hasattr(dt, \"date\") else dt\n  242|         is_fomc = d in _FOMC_SET\n  243|         nxt = _next_fomc(d)\n  244|         if nxt is None:\n  245|             dist = 30  # fallback for dates beyond 2026\n  246|         elif nxt == d:\n  247|             dist = 0\n  248|         else:\n  249|             dist = _busday_count(d, nxt)\n  250| \n  251|         days_to.append(dist)\n  252|         fomc_week.append(1 if dist <= 5 else 0)\n  253|         fomc_day.append(1 if is_fomc else 0)\n  254| \n  255|     return pd.DataFrame(\n  256|         {\"days_to_fomc\": days_to, \"fomc_week\": fomc_week, \"fomc_day\": fomc_day},\n  257|         index=dates,\n  258|     )\n  259| \n  260| \n  261| def compute_nfp_proximity(dates: pd.DatetimeIndex) -> pd.DataFrame:\n  262|     \"\"\"Compute NFP proximity features for a date index.\n  263| \n  264|     Returns\n  265|     -------\n  266|     pd.DataFrame\n  267|         Columns: days_to_nfp (trading days), nfp_week (bool->int).\n  268|     \"\"\"\n  269|     days_to = []\n   ...\n  285| def compute_opex_proximity(dates: pd.DatetimeIndex) -> pd.DataFrame:\n  286|     \"\"\"Compute options expiration proximity features for a date index.\n  287| \n  288|     Returns\n  289|     -------\n  290|     pd.DataFrame\n  291|         Columns: days_to_opex (trading days), opex_week (bool->int).\n  292|     \"\"\"\n  293|     days_to = []\n   ...\n  309| def compute_calendar_dummies(dates: pd.DatetimeIndex) -> pd.DataFrame:\n  310|     \"\"\"Compute calendar dummy features.\n  311| \n  312|     Returns\n  313|     -------\n  314|     pd.DataFrame\n  315|         Columns: day_of_week (0-4, int), month (1-12, int),\n  316|         quarter_end (1 if in last 5 trading days of quarter),\n  317|         year_end (1 if in last 10 trading days of December).\n   ...\n  362| @register_feature_layer(\"calendar\")\n  363| class CalendarLayer:\n  364|     \"\"\"Calendar/event feature layer (Layer 5).\n  365| \n  366|     Calendar features are known in advance — no shift(1) applied.\n  367|     Context is accepted but ignored.\n  368|     \"\"\"\n  369| \n  370|     name = \"calendar\"\n\n--- src/volforecast/features/__init__.py ---\n    1| \"\"\"Feature engineering layers 0-6 for realized volatility forecasting.\n    2| \n    3| Access registered layers via ``FEATURE_REGISTRY`` dict.\n    4| Call ``volforecast.registry.ensure_registered()`` to populate registries.\n    5| \"\"\"\n    6| \n    7| from volforecast.registry import FEATURE_REGISTRY, register_feature_layer\n    8| \n    9| __all__ = [\"FEATURE_REGISTRY\", \"register_feature_layer\"]\n\n--- src/volforecast/reporting/html_report.py ---\n    1| \"\"\"Main report orchestrator: loads experiment artifacts and assembles HTML.\n    2| \n    3| See workspace/plans/html-report.md for the full implementation plan.\n    4| \"\"\"\n    5| \n    6| from __future__ import annotations\n    7| \n    8| from pathlib import Path\n    9| \n   10| from volforecast.config import ExperimentConfig\n   11| \n   12| \n   13| def generate_report(\n   14|     config: ExperimentConfig,\n   15|     output_path: Path | None = None,\n   16| ) -> Path:\n   17|     \"\"\"Generate an interactive HTML report for a completed experiment.\n   18| \n   19|     Loads metrics, predictions, and config from the experiment output directory,\n   20|     renders each report section, and assembles the final HTML file.\n   21| \n   22|     Parameters\n   23|     ----------\n   24|     config : ExperimentConfig\n   25|         The experiment configuration (used to locate saved artifacts).\n   26|     output_path : Path, optional\n   27|         Override output path. Defaults to ``{experiment_dir}/report.html``.\n   28| \n   29|     Returns\n   30|     -------\n   31|     Path\n   32|         Absolute path to the generated ``.html`` report file.\n   33|     \"\"\"\n   34|     # TODO: implement — full plan in workspace/plans/html-report.md\n   35|     #\n   36|     # Implementation steps:\n   37|     # 1. Load metrics via persistence.load_all_metrics(config)\n   38|     # 2. Load predictions via persistence.load_predictions(config, symbol, horizon)\n   39|     #    for each symbol/horizon combination\n   40|     # 3. Load config snapshot from experiment_dir(config) / \"config.yaml\"\n   41|     # 4. Call each section renderer from reporting.sections (summary, forecast_vs_actual,\n   42|     #    qlike_analysis, statistical_tests, economic_value, diagnostics)\n   43|     # 5. Render base.html Jinja2 template with all section HTML fragments\n   44|     # 6. Write assembled HTML to output_path\n   45|     # 7. Return output_path\n   46|     raise NotImplementedError(\"TODO: implement report generation\")\n\n--- src/volforecast/reporting/__init__.py ---\n    1| \"\"\"Interactive HTML experiment reporting.\n    2| \n    3| Generates self-contained HTML reports with Plotly charts for each experiment.\n    4| \"\"\"\n    5| \n    6| from volforecast.reporting.html_report import generate_report\n    7| \n    8| __all__ = [\"generate_report\"]\n\n--- src/volforecast/visualization/lineage.py ---\n    1| \"\"\"Mermaid flowchart generator for model lineage visualization.\"\"\"\n    2| \n    3| from __future__ import annotations\n    4| \n    5| \n    6| def _truncate_list(items: list[str], max_items: int = 3) -> str:\n    7|     \"\"\"Join list items, truncating with '...' if too many.\"\"\"\n    8|     if len(items) <= max_items:\n    9|         return \", \".join(items)\n   10|     return \", \".join(items[:max_items]) + \", ...\"\n   11| \n   12| \n   13| def lineage_to_mermaid(\n   14|     lineage: dict,\n   15|     *,\n   16|     n_daily_features: int | None = None,\n   17|     main_model_label: str = \"Main Model\",\n   18| ) -> str:\n   19|     \"\"\"Convert a model lineage spec to a Mermaid flowchart LR string.\n   20| \n   21|     Parameters\n   22|     ----------\n   23|     lineage : dict\n   24|         Keys: \"base_model\" (dict|None), \"feature_stack\" (dict|None).\n   25|     n_daily_features : int, optional\n   26|         Number of daily tabular features for the DAILY node label.\n   27|     main_model_label : str\n   28|         Display label for the main model node (e.g., \"LightGBM<br/>5000 trees\").\n   29| \n   30|     Returns\n   31|     -------\n   32|     str\n   33|         Mermaid flowchart markup, or \"\" if no lineage to display.\n   34|     \"\"\"\n   35|     base_model = lineage.get(\"base_model\")\n   36|     feature_stack = lineage.get(\"feature_stack\")\n   37| \n   38|     if not base_model and not feature_stack:\n   39|         return \"\"\n   40| \n   41|     lines: list[str] = [\"flowchart LR\"]\n   42| \n   43|     # DAILY node (always present)\n   44|     if n_daily_features is not None:\n   45|         daily_label = f\"Daily Features<br/>{n_daily_features} columns\"\n   46|     else:\n   47|         daily_label = \"Daily Features\"\n   48| \n   49|     # MODEL node\n   50|     model_label = main_model_label\n   51| \n   52|     # Build feature_stack nodes if present\n   53|     if feature_stack:\n   54|         source = feature_stack.get(\"source_model\", \"LSTM\").upper()\n   55|         outputs = feature_stack.get(\"outputs\", [])\n   56|         seq_features = feature_stack.get(\"sequence_features\", [])\n   57|         params = feature_stack.get(\"model_params\", {})\n   58| \n   59|         # SEQ node\n   60|         seq_label = f\"Sequence Features<br/>{_truncate_list(seq_features)}\"\n   61|         lines.append(f'    SEQ[\"{seq_label}\"] --> {source}[\"{_build_model_sublabel(source, params)}\"]')\n   62| \n   ...\n   87| def _build_model_sublabel(source: str, params: dict) -> str:\n   88|     \"\"\"Build a descriptive label for the sequence model node.\"\"\"\n   89|     parts = [source]\n   90|     sublabel_parts = []\n   91|     if \"hidden_dim\" in params:\n   92|         sublabel_parts.append(f\"hidden={params['hidden_dim']}\")\n   93|     if \"n_layers\" in params:\n   94|         sublabel_parts.append(f\"{params['n_layers']} layers\")\n   95|     if sublabel_parts:\n\n--- src/volforecast/visualization/__init__.py ---\n    1| \"\"\"Visualization utilities for ML vol forecasting.\n    2| \n    3| Provides plotting functions for research exploration and results reporting.\n    4| All plots use matplotlib/seaborn and return Figure objects for notebook display.\n    5| \"\"\"\n\n--- src/volforecast/pipeline/conditional_duan.py ---\n    1| \"\"\"Conditional (heteroscedastic) Duan correction — two-stage pipeline.\n    2| \n    3| Replaces the global Duan scalar with per-sample corrections estimated\n    4| from a lightweight variance model trained on OOS residuals.\n    5| \n    6| Walk-forward protocol:\n    7|   For fold k, the variance model trains on OOS residuals from folds 1..k-1.\n    8|   This ensures no information leakage — the variance estimate for a sample\n    9|   uses only temporally prior data.\n   10| \n   11| Usage:\n   12|   Called as a post-processing step AFTER all folds complete and OOS\n   ...\n   39| @dataclass\n   40| class ConditionalDuanConfig:\n   41|     \"\"\"Configuration for the conditional Duan correction stage.\"\"\"\n   42| \n   43|     enabled: bool = False\n   44|     # Variance model hyperparameters (lightweight XGBoost)\n   45|     n_estimators: int = 500\n   46|     max_leaves: int = 8\n   47|     max_depth: int = 3\n   ...\n   72|             min_child_weight=int(raw.get(\"min_child_weight\", 200)),\n   73|             subsample=float(raw.get(\"subsample\", 0.8)),\n   74|             colsample_bytree=float(raw.get(\"colsample_bytree\", 0.8)),\n   75|             reg_lambda=float(raw.get(\"reg_lambda\", 5.0)),\n   76|             max_var=float(raw.get(\"max_var\", 1.0)),\n   77|             min_folds_for_training=int(raw.get(\"min_folds_for_training\", 2)),\n   78|             use_vvix_proxy=bool(raw.get(\"use_vvix_proxy\", False)),\n   79|         )\n   80| \n   81| \n   82| def apply_conditional_duan(\n   83|     all_preds: pd.Series,\n   84|     y: pd.Series,\n   85|     X: pd.DataFrame,\n   86|     fold_splits: list[tuple[np.ndarray, np.ndarray]],\n   87|     config: ConditionalDuanConfig,\n   88| ) -> pd.Series:\n   89|     \"\"\"Apply conditional Duan correction using walk-forward variance estimation.\n   90| \n   91|     For each fold k, trains a variance model on squared OOS residuals from\n   92|     folds 1..k-1, then predicts σ²(x) for fold k's test samples and applies:\n   93| \n   94|         pred_corrected = pred_original + σ²_hat(x) / 2\n   95| \n   96|     This redistributes the correction across samples based on estimated\n   97|     conditional variance: high-uncertainty days get more, calm days get less.\n   98| \n   99|     Parameters\n  100|     ----------\n  101|     all_preds : pd.Series\n  102|         OOS predictions (already with global Duan applied). Index aligned with y.\n  103|     y : pd.Series\n  104|         Actual log-RV values.\n  105|     X : pd.DataFrame\n  106|         Feature matrix (same index as y). Used as input to variance model.\n  107|         If VVIX proxy mode is enabled, must contain a 'vvix' column.\n  108|     fold_splits : list of (train_idx, test_idx)\n  109|         The CV fold splits used in Stage 1.\n  110|     config : ConditionalDuanConfig\n  111|         Variance model configuration.\n  112| \n  113|     Returns\n  114|     -------\n  115|     pd.Series\n  116|         Corrected predictions (same index as input all_preds, NaN where\n  117|         original was NaN).\n  118|     \"\"\"\n  119|     import xgboost as xgb\n  120| \n  121|     logger.info(\n  122|         \"Conditional Duan: enabled=%s, use_vvix_proxy=%s, \"\n  123|         \"n_folds=%d, X_shape=%s, n_preds_valid=%d\",\n  124|         config.enabled, config.use_vvix_proxy,\n  125|         len(fold_splits), X.shape,\n  126|         int(all_preds.notna().sum()),\n  127|     )\n  128| \n  129|     # VVIX direct proxy mode: skip second model, use VVIX as σ² proxy\n  130|     if config.use_vvix_proxy:\n  131|         # Look for vvix column (raw or decimal)\n   ...\n  292| def _apply_vvix_proxy(\n  293|     all_preds: pd.Series,\n  294|     y: pd.Series,\n  295|     X: pd.DataFrame,\n  296|     fold_splits: list[tuple[np.ndarray, np.ndarray]],\n  297|     config: ConditionalDuanConfig,\n  298|     vvix_col: str = \"vvix\",\n  299| ) -> pd.Series:\n  300|     \"\"\"VVIX direct proxy mode: use VVIX as conditional variance estimate.\n\n--- src/volforecast/pipeline/__init__.py ---\n    1| \"\"\"Pipeline orchestration for ML vol forecasting.\n    2| \n    3| CLI entry points have moved to volforecast.cli.\n    4| This package retains only the orchestration runner.\n    5| \"\"\"\n\nTASK: Guided tour\nWrite the guided tour of the module map: exactly 11 steps,\none per node id listed below, in the order given. Each step is 'id'\n(copied exactly from the list) and 'text' (at most 340 characters):\nwhat the reader is looking at, why it matters, and why it comes next.\nName real files and symbols.\n\nTOUR NODES, in order. One step per id, ids copied exactly:\n  1. n-src-volforecast-cli: cli at src/volforecast/cli, 7342 loc\n  2. n-src-volforecast-models: models at src/volforecast/models, 9802 loc\n  3. n-src-volforecast-features: features at src/volforecast/features, 3110 loc\n  4. n-src-volforecast-reporting: reporting at src/volforecast/reporting, 461 loc\n  5. n-src-volforecast-visualization: visualization at src/volforecast/visualization, 102 loc\n  6. n-src-volforecast-pipeline: pipeline at src/volforecast/pipeline, 1307 loc\n  7. n-src-volforecast-data: data at src/volforecast/data, 9195 loc\n  8. n-src-volforecast: volforecast at src/volforecast, 1013 loc\n  9. n-src-volforecast-evaluation: evaluation at src/volforecast/evaluation, 7031 loc\n  10. n-src-volforecast-graphs: graphs at src/volforecast/graphs, 826 loc\n  11. n-src-volforecast-utils: utils at src/volforecast/utils, 1552 loc",
+  "windows": [
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 51,
+      "end": 69
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 80,
+      "end": 93
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 102,
+      "end": 110
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 147,
+      "end": 155
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 228,
+      "end": 287
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 351,
+      "end": 359
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 424,
+      "end": 432
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 457,
+      "end": 465
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 529,
+      "end": 537
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 663,
+      "end": 682
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 769,
+      "end": 777
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 793,
+      "end": 801
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 829,
+      "end": 837
+    },
+    {
+      "file": "src/volforecast/models/gnn.py",
+      "start": 44,
+      "end": 52
+    },
+    {
+      "file": "src/volforecast/models/gnn.py",
+      "start": 65,
+      "end": 83
+    },
+    {
+      "file": "src/volforecast/models/gnn.py",
+      "start": 94,
+      "end": 102
+    },
+    {
+      "file": "src/volforecast/models/gnn.py",
+      "start": 186,
+      "end": 245
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 153,
+      "end": 161
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 180,
+      "end": 196
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 203,
+      "end": 211
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 218,
+      "end": 269
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 285,
+      "end": 293
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 309,
+      "end": 317
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 362,
+      "end": 370
+    },
+    {
+      "file": "src/volforecast/reporting/html_report.py",
+      "start": 13,
+      "end": 46
+    },
+    {
+      "file": "src/volforecast/visualization/lineage.py",
+      "start": 13,
+      "end": 62
+    },
+    {
+      "file": "src/volforecast/visualization/lineage.py",
+      "start": 87,
+      "end": 95
+    },
+    {
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "start": 39,
+      "end": 47
+    },
+    {
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "start": 72,
+      "end": 131
+    },
+    {
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "start": 292,
+      "end": 300
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "steps"
+    ],
+    "properties": {
+      "steps": {
+        "type": "array",
+        "minItems": 11,
+        "maxItems": 11,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "text"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "enum": [
+                "n-src-volforecast-cli",
+                "n-src-volforecast-models",
+                "n-src-volforecast-features",
+                "n-src-volforecast-reporting",
+                "n-src-volforecast-visualization",
+                "n-src-volforecast-pipeline",
+                "n-src-volforecast-data",
+                "n-src-volforecast",
+                "n-src-volforecast-evaluation",
+                "n-src-volforecast-graphs",
+                "n-src-volforecast-utils"
+              ]
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 340
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\14f4c4f7230c3071128d2312a146d037f6d1e2d3e15b9bd1c83eeb072f4147a2.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\14f4c4f7230c3071128d2312a146d037f6d1e2d3e15b9bd1c83eeb072f4147a2.json"
+}

@@ -1,0 +1,91 @@
+{
+  "claims": [
+    {
+      "text": "The features package is the design matrix factory: eighteen modules organized as feature layers 0-6 that turn daily realized-variance panels and merged market columns into model inputs, each layer a class registered into `FEATURE_REGISTRY` and stacked by name from config.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/features/__init__.py",
+        "quote": "\"\"\"Feature engineering layers 0-6 for realized volatility forecasting.\n\nAccess registered layers via ``FEATURE_REGISTRY`` dict.\nCall ``volforecast.registry.ensure_registered()`` to populate registries.\n\"\"\"",
+        "focus": [
+          "\"\"\"Feature engineering layers 0-6 for realized volatility forecasting.",
+          "Access registered layers via ``FEATURE_REGISTRY`` dict."
+        ]
+      }
+    },
+    {
+      "text": "Layer 2 carries the project's punchline: `OptionsLayer` reads IV columns pre-merged upstream by `IVSurfaceLayer` and derives the forward-looking set, VRP, skew, term slope, and the IV-RV gap the README promises to make tradeable.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/features/options.py",
+        "quote": "@register_feature_layer(\"options\")\nclass OptionsLayer:\n    \"\"\"Options-implied feature layer (Layer 2).\n\n    Reads IV columns from daily_data (pre-merged by IVSurfaceLayer) or from\n    the legacy context[\"iv_surface\"] path. Computes derived features:\n    VRP, skew, term slope, IV-RV gap, VVIX-derived, VIX interaction.",
+        "focus": [
+          "@register_feature_layer(\"options\")",
+          "    VRP, skew, term slope, IV-RV gap, VVIX-derived, VIX interaction."
+        ]
+      }
+    },
+    {
+      "text": "`compute_vrp` prices the volatility insurance premium as the Carr and Wu 2009 ex-post proxy, VRP = (atm_iv/100)^2 - rv*252, while the conditional Bollerslev, Tauchen and Zhou variant lives in `build_iv_feature_panel` with a HAR-CJ forecast of future RV.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/features/options.py",
+        "quote": "    \"\"\"Compute ex-post variance risk premium (Carr & Wu 2009 proxy).\n\n    VRP = (atm_iv_pct / 100)^2 - rv_daily * 252\n\n    This is the \"realized\" or \"ex-post\" VRP proxy that uses contemporaneous\n    realized variance. For the conditional VRP (Bollerslev, Tauchen & Zhou\n    2009, RFS), use iv_features.build_iv_feature_panel which substitutes\n    E_t[RV_{t+1:t+22}] from a HAR-CJ model.",
+        "focus": [
+          "    VRP = (atm_iv_pct / 100)^2 - rv_daily * 252"
+        ]
+      }
+    },
+    {
+      "text": "The IV term structure doubles as a regime gauge: `compute_term_slope` returns ATM_3m minus ATM_1m, positive in normal contango markets and negative in backwardation, which is the stress signature.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/features/options.py",
+        "quote": "def compute_term_slope(atm_short: pd.Series, atm_long: pd.Series) -> pd.Series:\n    \"\"\"Compute IV term structure slope.\n\n    Slope = ATM_3m - ATM_1m.\n    Positive = contango (normal). Negative = backwardation (stress).",
+        "focus": [
+          "    Slope = ATM_3m - ATM_1m.",
+          "    Positive = contango (normal). Negative = backwardation (stress)."
+        ]
+      }
+    },
+    {
+      "text": "Layer 3 never touches a live feed: `MicrostructureLayer` loads per-symbol daily aggregates and intraday bar sequences from cache, requires a symbol in its context, and emits order-flow features like the log signed volume ratio at daily and 5 day horizons.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/features/microstructure.py",
+        "quote": "@register_feature_layer(\"microstructure\")\nclass MicrostructureLayer:\n    \"\"\"Microstructure feature layer (Layer 3).\n\n    Loads per-symbol daily aggregates and intraday sequences from cache,\n    then computes rolling and derived features. Requires context[\"symbol\"].\n\n    Output features:\n    - log_svr_d, log_svr_w: log signed volume ratio (daily + 5d)",
+        "focus": [
+          "    Loads per-symbol daily aggregates and intraday sequences from cache,",
+          "    then computes rolling and derived features. Requires context[\"symbol\"]."
+        ]
+      }
+    },
+    {
+      "text": "Price impact is measured the textbook way: Kyle's lambda is the OLS slope of per-bar price changes on signed net flow, Cov(dP, Q) / Var(Q), and a higher lambda means each unit of signed volume moves price more, which reads as informed trading or thin liquidity.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/features/microstructure.py",
+        "quote": "    \"\"\"Compute Kyle's lambda (price impact coefficient).\n\n    OLS regression: Δprice_i = λ * net_flow_i + ε_i\n    λ = Cov(Δp, Q) / Var(Q)\n\n    Higher λ indicates more price impact per unit of signed volume,\n    implying more informed trading or less liquidity.",
+        "focus": [
+          "    λ = Cov(Δp, Q) / Var(Q)",
+          "    Higher λ indicates more price impact per unit of signed volume,"
+        ]
+      }
+    },
+    {
+      "text": "Calendar is the one layer allowed to see its own day, FOMC, NFP, and OpEx timing is known in advance, and its event math is auditable: a meeting day scores `days_to_fomc` of 0, distances count business days, and dates beyond the hardcoded 2026 list fall back to 30, not NaN.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/features/calendar.py",
+        "quote": "    for dt in dates:\n        d = dt.date() if hasattr(dt, \"date\") else dt\n        is_fomc = d in _FOMC_SET\n        nxt = _next_fomc(d)\n        if nxt is None:\n            dist = 30  # fallback for dates beyond 2026\n        elif nxt == d:\n            dist = 0\n        else:\n            dist = _busday_count(d, nxt)\n\n        days_to.append(dist)\n        fomc_week.append(1 if dist <= 5 else 0)\n        fomc_day.append(1 if is_fomc else 0)",
+        "focus": [
+          "            dist = 30  # fallback for dates beyond 2026",
+          "            dist = _busday_count(d, nxt)"
+        ]
+      }
+    },
+    {
+      "text": "What the package does not do is fit anything: no layer trains a model, scores QLIKE, or fetches raw data, the layers only assemble columns from caches the data stage wrote, and a missing cache degrades a layer to empty or NaN output rather than failing the run.",
+      "status": "inferred"
+    }
+  ]
+}

@@ -1,0 +1,252 @@
+{
+  "unit": "node:src-volforecast-cli",
+  "kind": "node",
+  "title": "Drawer: cli",
+  "max_claims": 1,
+  "key": "ea74e111d7f9fd6ad20878f3698f8467562f2a63ebe70328c6a5685ee71483c6",
+  "system": "You are the narration stage of Trailhead, a tool that generates a verified walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Any\nquote you return is searched for verbatim in the file on disk; anything not\nfound exactly is deleted and counted on screen. Fields that fail their checks\nare dropped, and a malformed answer is discarded whole, so answer the schema\nexactly.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else. An unknown key\n   anywhere discards the whole answer.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. Where the schema allows a `cite`, its `quote` is a VERBATIM, CONTIGUOUS copy\n   of 3-24 lines from ONE file shown below, lines joined with newlines,\n   indentation copied exactly. `focus` is an array of exact substrings of your\n   own quote. A cite is optional: omitting one is honest, inventing one is not.\n4. Prose fields are plain sentences. Backticks may mark code identifiers and\n   [[term]] or [[id|label]] may mark a glossary term. No newlines inside a\n   field, no markdown links, no `<`. Use commas instead of dashes.\n5. State substantive domain facts: what a thing is FOR, what flows through it,\n   what would surprise a newcomer. Never restate code mechanics the reader can\n   see, and never present argument parsing or CLI wiring as a purpose. When the\n   README or a package docstring states the purpose, that purpose is the story.\n6. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"appears to\", say what it is.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/volforecast/cli/audit.py ---\n    1| \"\"\"Data integrity audit and manifest generation.\n    2| \n    3| Audits all cached parquet files against their manifest contracts,\n    4| validates integrity, detects issues, assesses per-layer readiness,\n    5| and regenerates data/manifest.json + syncs data/manifest.yaml.\n    6| \n    7| Usage:\n    8|     python -m volforecast.cli.audit [--quiet] [--no-report] [--no-journal]\n    9| \"\"\"\n   10| \n   11| from __future__ import annotations\n   12| \n   ...\n   51| def _find_project_root() -> Path:\n   52|     \"\"\"Walk up from this file to find the project root (contains data/).\"\"\"\n   53|     p = Path(__file__).resolve()\n   54|     for parent in [p] + list(p.parents):\n   55|         if (parent / \"data\" / \"raw\" / \"ticks\").is_dir():\n   56|             return parent\n   57|     # Fallback\n   58|     return Path(\"/home/developer/ml-vol-estimator\")\n   59| \n   60| \n   61| def _discover_universe(root: Path) -> list[str]:\n   62|     \"\"\"Discover the symbol universe from on-disk parquets + constants.\n   63| \n   64|     Scans source directories for parquet files and merges with\n   65|     SYMBOL_UNIVERSE from constants.py.  Excludes underscore-prefixed\n   66|     files (e.g. _MARKET.parquet, _VIX.parquet).\n   67|     \"\"\"\n   68|     on_disk: set[str] = set()\n   69|     for subdir in _SYMBOL_SOURCE_DIRS:\n   ...\n   80| def _get_universe_fallback() -> list[str]:\n   81|     \"\"\"Fallback universe when manifest has no symbols: use SYMBOL_UNIVERSE.\"\"\"\n   82|     return sorted(SYMBOL_UNIVERSE)\n   83| \n   84| \n   85| def _get_universe_from_manifest(manifest_data: Any, root: Path | None = None) -> list[str]:\n   86|     \"\"\"Build the audit universe dynamically.\n   87| \n   88|     Uses on-disk discovery merged with SYMBOL_UNIVERSE from constants.\n   89|     The manifest's symbol list is ignored — the audit should discover\n   90|     what actually exists rather than relying on a stale manifest list.\n   91|     \"\"\"\n   92|     if root is not None:\n   93|         return _discover_universe(root)\n   ...\n  102| def _source_result_to_legacy_rv(result: SourceAuditResult) -> dict[str, Any]:\n  103|     \"\"\"Convert SourceAuditResult for ticks to legacy rv manifest format.\"\"\"\n  104|     rv_manifest: dict[str, Any] = {}\n  105|     schema_groups: dict[tuple, list[str]] = {}\n  106| \n  107|     for sym, fr in result.file_results.items():\n  108|         if not fr.exists:\n  109|             continue\n  110|         cols_key = tuple(sorted(fr.columns))\n   ...\n  147| def _legacy_layer_readiness(\n  148|     layer_readiness: dict[str, dict[str, Any]],\n  149|     source_results: dict[str, SourceAuditResult],\n  150| ) -> dict[str, Any]:\n  151|     \"\"\"Convert new layer readiness to the legacy format expected by report/journal.\"\"\"\n  152|     readiness: dict[str, Any] = {}\n  153| \n  154|     # HAR core (L0): from ticks source\n  155|     ticks_result = source_results.get(\"ticks\")\n   ...\n  238| def generate_report(\n  239|     source_results: dict[str, SourceAuditResult],\n  240|     layer_readiness: dict[str, dict[str, Any]],\n  241|     universe: list[str],\n  242| ) -> str:\n  243|     \"\"\"Generate human-readable Markdown audit report from new-style results.\"\"\"\n  244|     lines = [\n  245|         \"# Data Audit Report\",\n  246|         \"\",\n   ...\n  351| def generate_journal_entry(\n  352|     source_results: dict[str, SourceAuditResult],\n  353|     layer_readiness: dict[str, dict[str, Any]],\n  354|     universe: list[str],\n  355| ) -> str:\n  356|     \"\"\"Generate a research journal entry summarizing data state.\"\"\"\n  357|     from datetime import date\n  358| \n  359|     today = date.today().isoformat()\n   ...\n  424| def update_research_journal(\n  425|     source_results: dict[str, SourceAuditResult],\n  426|     layer_readiness: dict[str, dict[str, Any]],\n  427|     universe: list[str],\n  428|     root: Path,\n  429| ) -> None:\n  430|     \"\"\"Append a data audit summary to the research journal.\"\"\"\n  431|     journal_path = root / \"workspace\" / \"research\" / \"research-journal.md\"\n  432|     if not journal_path.exists():\n   ...\n  457| def _sync_audit_to_yaml(\n  458|     source_results: dict[str, SourceAuditResult],\n  459|     root: Path,\n  460|     *,\n  461|     universe: list[str] | None = None,\n  462|     quiet: bool = False,\n  463| ) -> None:\n  464|     \"\"\"Sync audit results into data/manifest.yaml integrity entries.\"\"\"\n  465|     yaml_path = root / \"data\" / \"manifest.yaml\"\n   ...\n  529| def run_audit(\n  530|     *, quiet: bool = False, no_report: bool = False, no_journal: bool = False\n  531| ) -> dict[str, Any]:\n  532|     \"\"\"Run the full data audit and update manifest.\n  533| \n  534|     Returns the manifest dict (legacy format for backward compatibility).\n  535|     \"\"\"\n  536|     root = _find_project_root()\n  537|     yaml_path = root / \"data\" / \"manifest.yaml\"\n   ...\n  663| @dataclass\n  664| class FixReport:\n  665|     \"\"\"Summary of a gap-fix operation across sources.\"\"\"\n  666| \n  667|     total_missing_days: int = 0\n  668|     total_fixed_days: int = 0\n  669|     total_failed_days: int = 0\n  670|     sources_scanned: int = 0\n  671|     results: list[Any] = field(default_factory=list)\n  672| \n  673| \n  674| def run_audit_fix(\n  675|     *,\n  676|     sources: dict[str, list[str]],\n  677|     start_date: date,\n  678|     end_date: date,\n  679|     confirm: bool = False,\n  680|     project_root: Path | None = None,\n  681|     quiet: bool = False,\n  682| ) -> FixReport:\n   ...\n  759|             )\n  760|         else:\n  761|             print(\n  762|                 f\"\\n{report.total_missing_days} total missing days detected. \"\n  763|                 f\"Run with --confirm to fill gaps.\"\n  764|             )\n  765| \n  766|     return report\n  767| \n  768| \n  769| def main() -> int:\n  770|     \"\"\"CLI entry point.\"\"\"\n  771|     quiet = \"--quiet\" in sys.argv or \"-q\" in sys.argv\n  772|     no_report = \"--no-report\" in sys.argv\n  773|     no_journal = \"--no-journal\" in sys.argv\n  774| \n  775|     try:\n  776|         manifest = run_audit(quiet=quiet, no_report=no_report, no_journal=no_journal)\n  777|         # Exit with non-zero if there are critical issues\n  778|         has_critical = any(\n  779|             r.get(\"has_critical\", False)\n  780|             for r in manifest.get(\"source_results_summary\", {}).values()\n  781|         )\n  782|         if has_critical:\n  783|             if not quiet:\n  784|                 print(\"\\nWARNING: Critical issues detected (see report for details)\")\n  785|             return 1\n  786|         return 0\n  787|     except Exception as e:\n  788|         logger.exception(\"Audit failed\")\n  789|         print(f\"ERROR: {e}\", file=sys.stderr)\n  790|         return 2\n  791| \n  792| \n  793| def register(subparsers) -> None:\n  794|     \"\"\"Register the audit subcommand.\"\"\"\n  795|     parser = subparsers.add_parser(\n  796|         \"audit\",\n  797|         help=\"Run comprehensive data integrity audit and update manifest\",\n  798|     )\n  799|     parser.add_argument(\"--quiet\", \"-q\", action=\"store_true\", help=\"Suppress progress output\")\n  800|     parser.add_argument(\n  801|         \"--no-report\", action=\"store_true\", help=\"Skip Markdown report generation\"\n   ...\n  829| def handle(args) -> int:\n  830|     \"\"\"Execute audit command. Return exit code.\"\"\"\n  831|     from datetime import date as _date\n  832|     from pathlib import Path\n  833| \n  834|     run_audit(quiet=args.quiet, no_report=args.no_report)\n  835| \n  836|     if args.fix:\n  837|         # Determine sources to scan\n\n--- src/volforecast/cli/backfill_rk.py ---\n    1| \"\"\"Backfill realized kernel (RK) and noise_gap for all cached symbols.\n    2| \n    3| Reads existing parquet cache, identifies dates where rk is NaN, fetches raw\n    4| ticks from Chunk Store for those dates, computes realized_kernel from tick\n    5| log-prices, and updates the parquet in-place.\n    6| \n    7| Optimizations\n    8| -------------\n    9| - Multi-day batching: fetches 5 days per API call (5x fewer round-trips).\n   10| - Symbol-level parallelism: ``--symbol-workers N`` processes N symbols concurrently.\n   11| - Minimal field fetch: only requests TRDPRC_1 (not full L1) — ~3x less data.\n   12| - Uses existing ``rv`` from panel for noise_gap denominator (no tick resample).\n   ...\n   41| def parse_args(argv: list[str] | None = None) -> argparse.Namespace:\n   42|     parser = argparse.ArgumentParser(\n   43|         prog=\"volforecast backfill-rk\",\n   44|         description=\"Backfill realized kernel and noise_gap into existing RV parquets\",\n   45|     )\n   46|     parser.add_argument(\n   47|         \"--symbols\",\n   48|         type=str,\n   49|         default=None,\n   ...\n   85| def _discover_symbols(cache_dir: Path) -> list[str]:\n   86|     \"\"\"Find all symbols with existing .parquet cache files.\"\"\"\n   87|     return sorted(p.stem for p in cache_dir.glob(\"*.parquet\") if p.stat().st_size > 0)\n   88| \n   89| \n   90| def _get_nan_rk_dates(panel: pd.DataFrame) -> list[date]:\n   91|     \"\"\"Return sorted list of dates where rk is NaN (needs backfill).\"\"\"\n   92|     if \"rk\" not in panel.columns:\n   93|         return sorted(panel.index.tolist())\n   94|     mask = panel[\"rk\"].isna()\n   95|     return sorted(panel.index[mask].tolist())\n   96| \n   97| \n   98| def _fetch_and_compute_rk_one_day(\n   99|     symbol: str,\n  100|     day: date,\n  101|     rv_5min: float | None,\n  102|     timeout_s: float = 120.0,\n  103| ) -> dict | None:\n  104|     \"\"\"Fetch raw ticks for one day and compute RK + noise_gap.\n  105| \n  106|     Parameters\n   ...\n  195| def _fetch_and_compute_rk_batch(\n  196|     symbol: str,\n  197|     days: list[date],\n  198|     rv_lookup: dict[date, float | None],\n  199|     timeout_s: float = 120.0,\n  200| ) -> list[dict]:\n  201|     \"\"\"Fetch raw ticks for multiple days in ONE chunk_query and compute RK per day.\n  202| \n  203|     Batching N days into a single API call eliminates N-1 round-trips worth of\n   ...\n  329| def backfill_symbol(\n  330|     symbol: str,\n  331|     cache_dir: Path,\n  332|     workers: int = 4,\n  333|     batch_days: int = 10,\n  334|     timeout_s: float = 120.0,\n  335|     progress: object | None = None,\n  336| ) -> int:\n  337|     \"\"\"Backfill RK for one symbol. Returns number of days filled.\n   ...\n  495| def _backfill_symbol_wrapper(\n  496|     symbol: str,\n  497|     cache_dir: Path,\n  498|     workers: int,\n  499|     batch_days: int,\n  500|     timeout_s: float,\n  501|     progress: object | None,\n  502|     lock: threading.Lock,\n  503|     sym_task_key: str | None,\n   ...\n  518| def run(\n  519|     symbols: list[str] | None = None,\n  520|     symbol_workers: int = 1,\n  521|     workers: int = 4,\n  522|     batch_days: int = 10,\n  523|     timeout_s: float = 120.0,\n  524|     dry_run: bool = False,\n  525| ) -> dict[str, int]:\n  526|     \"\"\"Run RK backfill for all symbols.\n   ...\n  653|         total_errors = total_nan - total_filled\n  654| \n  655|         sp.finish(\n  656|             f\"{total_filled:,} days filled across {len(target)} symbols, \"\n  657|             f\"{total_errors:,} errors [{_format_elapsed(overall_elapsed)}]\"\n  658|         )\n  659| \n  660|     return results\n  661| \n  662| \n  663| def main(argv: list[str] | None = None) -> int:\n  664|     \"\"\"CLI entry point.\"\"\"\n  665|     from volforecast.cli.console import setup_logging\n  666| \n  667|     setup_logging()\n  668| \n  669|     args = parse_args(argv)\n  670|     symbols = args.symbols.split(\",\") if args.symbols else None\n  671| \n  672|     try:\n  673|         run(\n  674|             symbols=symbols,\n  675|             symbol_workers=args.symbol_workers,\n  676|             workers=args.workers,\n  677|             batch_days=args.batch_days,\n  678|             timeout_s=args.timeout,\n  679|             dry_run=args.dry_run,\n  680|         )\n  681|     except ConnectionError as e:\n  682|         from volforecast.cli.console import console\n  683| \n  684|         console.print(f\"[red bold]ERROR:[/] {e}\")\n  685|         return 1\n  686|     except KeyboardInterrupt:\n  687|         from volforecast.cli.console import console\n  688| \n  689|         console.print(\"\\n[yellow]Interrupted by user. Progress has been checkpointed.[/yellow]\")\n  690|         return 130\n  691| \n  692|     return 0\n  693| \n  694| \n  695| def register(subparsers) -> None:\n  696|     \"\"\"Register the backfill-rk subcommand.\"\"\"\n  697|     parser = subparsers.add_parser(\n  698|         \"backfill-rk\",\n  699|         help=\"Backfill realized kernel (RK) and noise_gap from raw ticks\",\n  700|     )\n  701|     parser.add_argument(\n  702|         \"--symbols\", type=str, default=None, help=\"Comma-separated symbols (default: all cached)\"\n  703|     )\n   ...\n  725| def handle(args) -> int:\n  726|     \"\"\"Execute backfill-rk command. Return exit code.\"\"\"\n  727|     symbols = args.symbols.split(\",\") if args.symbols else None\n  728|     run(\n  729|         symbols=symbols,\n  730|         symbol_workers=args.symbol_workers,\n  731|         workers=args.workers,\n  732|         batch_days=args.batch_days,\n  733|         timeout_s=args.timeout,\n\n--- src/volforecast/cli/forecast.py ---\n    1| \"\"\"CLI entry point for live RV forecast and IV-RV gap signal.\n    2| \n    3| Config-driven multi-model ensemble. Loads a YAML config specifying which\n    4| models to run, trains each on full available history, predicts next-day\n    5| RV, compares to current ATM IV, and outputs weighted LONG/SHORT/FLAT.\n    6| \n    7| Usage:\n    8|     vol forecast\n    9|     vol forecast --config workspace/configs/forecast_live.yaml\n   10|     vol forecast --symbol SPY --horizon 1,5\n   11|     vol forecast --live-iv 18.5\n   12|     vol forecast --threshold 1.0\n   ...\n   39| def _load_rv_data(symbol: str) -> pd.DataFrame:\n   40|     \"\"\"Load tick-derived RV panel from cache.\"\"\"\n   41|     from volforecast.utils.paths import ticks_cache_path\n   42| \n   43|     path = ticks_cache_path(symbol)\n   44|     if not path.exists():\n   45|         raise FileNotFoundError(f\"No RV data for {symbol} at {path}\")\n   46|     df = pd.read_parquet(path)\n   47|     df.index = pd.DatetimeIndex(df.index)\n   ...\n   52| def _fetch_live_iv(symbol: str) -> float | None:\n   53|     \"\"\"Attempt to fetch current ATM IV from TSDB.\n   54| \n   55|     Returns IV in vol points (e.g. 18.5 = 18.5%) or None if unavailable.\n   56|     \"\"\"\n   57|     try:\n   58|         from gs_quant.session import GsSession\n   59| \n   60|         GsSession.use()\n   ...\n   98| def load_forecast_config(config_path: str | None = None) -> dict[str, Any]:\n   99|     \"\"\"Load forecast YAML config.\"\"\"\n  100|     from volforecast.utils.paths import resolve_project_root\n  101| \n  102|     if config_path is None:\n  103|         config_path = _DEFAULT_CONFIG\n  104| \n  105|     path = Path(config_path)\n  106|     if not path.is_absolute():\n   ...\n  121| def _build_features_for_symbol(\n  122|     symbol: str,\n  123|     feature_layers: list[str],\n  124| ) -> tuple[pd.DataFrame, pd.DataFrame]:\n  125|     \"\"\"Build full feature matrix for a single symbol using pipeline layers.\n  126| \n  127|     Returns (daily_data, X) where X is the feature matrix.\n  128|     \"\"\"\n  129|     from volforecast.registry import FEATURE_REGISTRY, ensure_registered\n   ...\n  171| def _train_and_predict_model(\n  172|     model_name: str,\n  173|     model_type: str,\n  174|     model_params: dict[str, Any],\n  175|     X_train: pd.DataFrame,\n  176|     y_train: pd.Series,\n  177|     X_predict: pd.DataFrame,\n  178| ) -> float | None:\n  179|     \"\"\"Train a single model on full data and predict the last row.\n   ...\n  210| def run(\n  211|     symbol: str = \"SPY\",\n  212|     horizons: list[int] | None = None,\n  213|     threshold: float = 0.0,\n  214|     live_iv: float | None = None,\n  215|     config_path: str | None = None,\n  216| ) -> dict[str, dict]:\n  217|     \"\"\"Run multi-model forecast ensemble and produce signal.\n  218| \n   ...\n  416| def display_results(results: dict[str, dict], symbol: str) -> None:\n  417|     \"\"\"Pretty-print forecast results to console.\"\"\"\n  418|     print(f\"\\n{'=' * 60}\")\n  419|     print(f\"  VOL FORECAST: {symbol}\")\n  420|     print(f\"  Date: {date.today()} (signal for afternoon session)\")\n  421|     print(f\"{'=' * 60}\")\n  422| \n  423|     if not results:\n  424|         print(\"  No valid forecasts produced.\")\n   ...\n  443|             )\n  444| \n  445|     print(f\"\\n{'=' * 60}\\n\")\n  446| \n  447| \n  448| # ---------------------------------------------------------------------------\n  449| # CLI entry\n  450| # ---------------------------------------------------------------------------\n  451| \n  452| \n  453| def main(\n  454|     symbol: str = \"SPY\",\n  455|     horizons_str: str = \"1,5\",\n  456|     threshold: float = 0.0,\n  457|     live_iv: float | None = None,\n  458|     config: str | None = None,\n  459| ) -> int:\n  460|     \"\"\"CLI entry point.\"\"\"\n  461|     from volforecast.cli.console import setup_logging\n  462| \n  463|     setup_logging()\n  464| \n  465|     horizons = [int(h.strip()) for h in horizons_str.split(\",\")]\n  466| \n  467|     results = run(\n  468|         symbol=symbol,\n  469|         horizons=horizons,\n  470|         threshold=threshold,\n  471|         live_iv=live_iv,\n  472|         config_path=config,\n  473|     )\n  474|     display_results(results, symbol)\n  475|     return 0\n  476| \n  477| \n  478| def register(subparsers) -> None:\n  479|     \"\"\"Register the forecast subcommand.\"\"\"\n  480|     parser = subparsers.add_parser(\n  481|         \"forecast\",\n  482|         help=\"Generate live RV forecast and IV-RV gap signal (LONG/SHORT/FLAT)\",\n  483|     )\n  484|     parser.add_argument(\n  485|         \"--symbol\", type=str, default=\"SPY\", help=\"Target symbol (default: SPY)\"\n  486|     )\n   ...\n  514| def handle(args) -> int:\n  515|     \"\"\"Execute forecast command. Return exit code.\"\"\"\n  516|     return main(\n  517|         symbol=args.symbol,\n  518|         horizons_str=args.horizon,\n  519|         threshold=args.threshold,\n  520|         live_iv=getattr(args, \"live_iv\", None),\n  521|         config=getattr(args, \"config\", None),\n  522|     )\n\n--- src/volforecast/cli/__init__.py ---\n    1| \"\"\"CLI entry points for volforecast skills.\n    2| \n    3| Each module corresponds to one skill's command-line interface:\n    4| - ingest: DATA_INGEST skill\n    5| - build_features: FEATURE_BUILD skill\n    6| - train: MODEL_TRAIN skill\n    7| - evaluate: EVALUATE skill\n    8| - report: HTML report generation\n    9| - notebook: NOTEBOOK skill\n   10| - research: RESEARCH skill\n   11| \"\"\"\n\n--- README.md ---\n    1| # ml-vol-estimator\n    2| \n    3| ML realized volatility forecasting — signal discovery. Progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to produce statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.\n    4| \n    5| **Timeline:** ~20-week internship, May–Sep 2026.\n    6| \n    7| ---\n    8| \n    9| ## Quick Start\n   10| \n   11| 1. Open `ml-vol-estimator.code-workspace` in VS Code.\n   12| 2. Boot protocol loads automatically: `memory/person/user.md` + `memory/INDEX.md`.\n   13| 3. Use `/bootup` to start a session — it reads the research journal and orients you.\n   14| 4. Drive work with slash commands: `/research`, `/feature`, `/experiment`, `/backtest`.\n   15| \n   16| See [AGENTS.md](AGENTS.md) for the full project spec, and [workspace/docs/user-manual.md](workspace/docs/user-manual.md) for all commands.\n   17| \n   18| ---\n   19| \n   20| ## CLI\n   21| \n   22| The `vol` wrapper handles uv, PATH, and working directory internally.\n   23| \n   24| ### Wrapper Commands\n   25| \n   26| ```\n   27| vol test [args]               # pytest (extra args forwarded: -k, -v, --tb=short)\n   28| vol testlf [args]             # re-run last-failed tests only\n   29| vol run --config <yaml>       # primary entry point (see below)\n   30| vol status                    # show data ingestion manifest\n   31| vol lint                      # ruff check (read-only)\n   32| vol fmt                       # ruff auto-format\n   33| vol typecheck                 # mypy\n   34| vol sync                      # install/update deps\n   35| vol shell                     # REPL with volforecast importable\n   36| vol notebook                  # jupyter\n   37| vol help                      # usage\n   38| ```\n   39| \n   40| ### Primary Command: `vol run --config <yaml>`\n   41| \n   42| Every `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).\n   43| \n   44| Optional overrides: `--symbols SPY,AAPL` (override YAML universe), `--skip-ingest` (skip data fetch), `--workers 8` (thread count).\n   45| \n   46| ### Examples\n   47| \n   48| ```bash\n   49| # Single-model experiment (ingest + train + evaluate + dashboard)\n   50| vol run --config workspace/configs/baseline_har.yaml\n   51| \n   52| # Tournament: 13 models compared with statistical tests\n   53| vol run --config workspace/configs/tournament_full_spy.yaml\n   54| \n   55| # Skip ingestion (data already cached), subset of symbols\n   56| vol run --config workspace/configs/tournament_har_dev.yaml --skip-ingest --symbols SPY,AAPL\n   57| \n   58| # Ingest only\n   59| vol run --config workspace/configs/ingest_full_universe.yaml --workers 8\n   60| \n\nTASK: Drawer: cli\nFill the drawer for this module group. Return a JSON object with:\n  role: 2 or 3 short paragraphs saying what this group IS and DOES in\n        domain terms, and what is distinctive about how it does it.\n  reads: one sentence, what this group consumes and where it comes from.\n  feeds: one sentence, what depends on this group's output.\n  key_files: 3 to 6 entries; 'file' is copied exactly from the FILES\n        list below and 'purpose' is one line saying why a newcomer\n        would open that file.\n  concepts: 3 to 6 short terms a newcomer should recognise here.\n  cite (optional): one verbatim quote of 3-24 contiguous lines from\n        the source shown above that best captures this group, with an\n        optional one-line caption.\n\nGROUP: cli at src/volforecast/cli: 28 files, 7342 loc.\nFILES you may name in key_files (copy the name exactly):\n  - audit.py (src/volforecast/cli/audit.py)\n  - backfill_rk.py (src/volforecast/cli/backfill_rk.py)\n  - forecast.py (src/volforecast/cli/forecast.py)\n  - __init__.py (src/volforecast/cli/__init__.py)",
+  "windows": [
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 51,
+      "end": 69
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 80,
+      "end": 93
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 102,
+      "end": 110
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 147,
+      "end": 155
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 238,
+      "end": 246
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 351,
+      "end": 359
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 424,
+      "end": 432
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 457,
+      "end": 465
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 529,
+      "end": 537
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 663,
+      "end": 682
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 759,
+      "end": 801
+    },
+    {
+      "file": "src/volforecast/cli/audit.py",
+      "start": 829,
+      "end": 837
+    },
+    {
+      "file": "src/volforecast/cli/backfill_rk.py",
+      "start": 41,
+      "end": 49
+    },
+    {
+      "file": "src/volforecast/cli/backfill_rk.py",
+      "start": 85,
+      "end": 106
+    },
+    {
+      "file": "src/volforecast/cli/backfill_rk.py",
+      "start": 195,
+      "end": 203
+    },
+    {
+      "file": "src/volforecast/cli/backfill_rk.py",
+      "start": 329,
+      "end": 337
+    },
+    {
+      "file": "src/volforecast/cli/backfill_rk.py",
+      "start": 495,
+      "end": 503
+    },
+    {
+      "file": "src/volforecast/cli/backfill_rk.py",
+      "start": 518,
+      "end": 526
+    },
+    {
+      "file": "src/volforecast/cli/backfill_rk.py",
+      "start": 653,
+      "end": 703
+    },
+    {
+      "file": "src/volforecast/cli/backfill_rk.py",
+      "start": 725,
+      "end": 733
+    },
+    {
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 39,
+      "end": 47
+    },
+    {
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 52,
+      "end": 60
+    },
+    {
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 98,
+      "end": 106
+    },
+    {
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 121,
+      "end": 129
+    },
+    {
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 171,
+      "end": 179
+    },
+    {
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 210,
+      "end": 218
+    },
+    {
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 416,
+      "end": 424
+    },
+    {
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 443,
+      "end": 486
+    },
+    {
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 514,
+      "end": 522
+    },
+    {
+      "file": "README.md",
+      "start": 13,
+      "end": 60
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "role",
+      "reads",
+      "feeds",
+      "key_files",
+      "concepts"
+    ],
+    "properties": {
+      "role": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 3,
+        "items": {
+          "type": "string",
+          "maxLength": 600
+        }
+      },
+      "reads": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "feeds": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "key_files": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file",
+            "purpose"
+          ],
+          "properties": {
+            "file": {
+              "type": "string",
+              "enum": [
+                "audit.py",
+                "backfill_rk.py",
+                "forecast.py",
+                "__init__.py"
+              ]
+            },
+            "purpose": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "concepts": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "string",
+          "maxLength": 60
+        }
+      },
+      "cite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "caption": {
+        "type": "string",
+        "maxLength": 200
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\ea74e111d7f9fd6ad20878f3698f8467562f2a63ebe70328c6a5685ee71483c6.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\ea74e111d7f9fd6ad20878f3698f8467562f2a63ebe70328c6a5685ee71483c6.json"
+}

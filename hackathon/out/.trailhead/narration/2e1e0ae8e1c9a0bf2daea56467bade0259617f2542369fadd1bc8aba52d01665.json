@@ -1,0 +1,46 @@
+{
+  "role": [
+    "The experiment report layer, and the most honestly unfinished corner of the repo: `generate_report` in `html_report.py` is a documented stub whose comment block spells out the full assembly plan, load metrics and predictions from the experiment directory, render six section fragments, pour them into a Jinja2 `base.html` template, write one self-contained HTML file, then raises `NotImplementedError`. Five of the six section renderers (summary, forecast vs actual, QLIKE analysis, statistical tests, diagnostics) are stubs pointing at workspace/plans/html-report.md for their specs.",
+    "The one section that actually runs is economic value: `sections/economic_value.py` joins stored per-symbol, per-horizon prediction frames with market data carrying `iv_1m_atm` and `close`, and hands each pair to `realistic_delta_hedged_sharpe`, the Phase 1 analytic straddle engine with tenor-decayed gamma and vanna and volga terms. It renders Sharpe, [[DSR]], 95% CI and cumulative P&L tables plus a cost-band sensitivity table at 0.5, 1.0 and 1.5 vol point option spreads, and degrades to a plain placeholder when the IV columns are missing."
+  ],
+  "reads": "A finished experiment directory, stored predictions, metrics and the config snapshot, plus daily market data with `iv_1m_atm` and `close` columns for the economic value section.",
+  "feeds": "One self-contained `report.html` per experiment once the orchestrator is implemented; today only the economic value fragment can actually be produced.",
+  "key_files": [
+    {
+      "file": "html_report.py",
+      "purpose": "The orchestrator stub: its comment block is the clearest statement of what the finished report will contain and in what order."
+    },
+    {
+      "file": "economic_value.py",
+      "purpose": "The only implemented section: runs the realistic delta-hedged straddle engine per symbol and horizon and renders Sharpe, DSR and cost-band tables."
+    },
+    {
+      "file": "forecast_vs_actual.py",
+      "purpose": "The planned centerpiece chart, predicted vs realized log-RV with horizon and symbol dropdowns and COVID shading, still a stub."
+    },
+    {
+      "file": "statistical_tests.py",
+      "purpose": "Stub for the Diebold-Mariano, Model Confidence Set and Mincer-Zarnowitz tables, designed to show a placeholder when the underlying tests raise."
+    },
+    {
+      "file": "__init__.py",
+      "purpose": "Exports `generate_report`, the package's single public entry point."
+    }
+  ],
+  "concepts": [
+    "section renderers",
+    "realistic straddle engine",
+    "cost-band sensitivity",
+    "deflated Sharpe ratio",
+    "graceful placeholders"
+  ],
+  "cite": {
+    "file": "src/volforecast/reporting/html_report.py",
+    "quote": "    # Implementation steps:\n    # 1. Load metrics via persistence.load_all_metrics(config)\n    # 2. Load predictions via persistence.load_predictions(config, symbol, horizon)\n    #    for each symbol/horizon combination\n    # 3. Load config snapshot from experiment_dir(config) / \"config.yaml\"\n    # 4. Call each section renderer from reporting.sections (summary, forecast_vs_actual,\n    #    qlike_analysis, statistical_tests, economic_value, diagnostics)\n    # 5. Render base.html Jinja2 template with all section HTML fragments\n    # 6. Write assembled HTML to output_path\n    # 7. Return output_path\n    raise NotImplementedError(\"TODO: implement report generation\")",
+    "focus": [
+      "qlike_analysis, statistical_tests, economic_value, diagnostics",
+      "raise NotImplementedError(\"TODO: implement report generation\")"
+    ]
+  },
+  "caption": "The whole report, specified in a comment: the stub documents exactly what it will become."
+}

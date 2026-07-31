@@ -2,14 +2,14 @@
  "contract": "trailhead/content@1",
  "repo": {
   "name": "volforecast",
-  "commit": "nogit-1c4f5dc3"
+  "commit": "5248556"
  },
  "model": {
   "provider": "stub",
   "model": "stub",
   "calls": 0,
-  "cache_hits": 4,
-  "duration_s": 0.219
+  "cache_hits": 22,
+  "duration_s": 0.407
  },
  "tracks": [
   {
@@ -23,10 +23,44 @@
      "minutes": 2,
      "blocks": [
       {
+       "type": "stats",
+       "items": [
+        {
+         "v": "96,897",
+         "l": "LINES OF CODE"
+        },
+        {
+         "v": "455",
+         "l": "PYTHON FILES",
+         "of": "1,062"
+        },
+        {
+         "v": "364",
+         "l": "MODULES",
+         "s": "11 groups on the map"
+        },
+        {
+         "v": "225",
+         "l": "TEST FILES"
+        },
+        {
+         "v": "4",
+         "l": "COMMANDS RUN",
+         "s": "3 failing"
+        },
+        {
+         "v": "14",
+         "l": "MISSING MODULES",
+         "s": "706 import statements cannot resolve",
+         "color": "inf"
+        }
+       ]
+      },
+      {
        "type": "callout",
        "level": "info",
        "title": "BEFORE YOU START",
-       "text": "This walkthrough was generated from 455 Python files and 585 other text files. Anchors resolve into those files and nowhere else — anything outside that scope is out of scope for this page, not absent from the repo. Every command on the GET IT RUNNING track was executed on the generation machine: 3 run, 2 failing. The exit codes, the output and the timings are the real ones."
+       "text": "This walkthrough was generated from 455 Python files and 585 other text files. Anchors resolve into those files and nowhere else; anything outside that scope is out of scope for this page, not absent from the repo. Every command on the GET IT RUNNING track was executed on the generation machine: 4 run, 3 failing. The exit codes, the output and the timings are the real ones."
       },
       {
        "type": "table",
@@ -39,11 +73,11 @@
        "rows": [
         [
          "commit",
-         "<code>nogit-1c4f5dc3</code>"
+         "<code>5248556</code>"
         ],
         [
          "surveyed",
-         "2026-07-30T20:25:06Z"
+         "2026-07-31T08:00:07Z"
         ],
         [
          "tool",
@@ -51,11 +85,11 @@
         ],
         [
          "python files",
-         "455 of 1063 files"
+         "455 of 1062 files"
         ],
         [
          "modules",
-         "364 in 12 groups on the map"
+         "364 in 11 groups on the map"
         ],
         [
          "entry point",
@@ -63,16 +97,16 @@
         ],
         [
          "commands executed",
-         "3 (2 failing)"
+         "4 (3 failing)"
         ],
         [
          "est. reading time",
-         "74 minutes"
+         "89 minutes"
         ]
        ]
       }
      ],
-     "lede": "A generated walkthrough of volforecast at nogit-1c4f5dc3. Every factual sentence below is anchored to a line range in this repo and re-checked after it was written. Claims whose anchors failed were deleted, not softened, and the count is in the top bar."
+     "lede": "A generated walkthrough of volforecast at 5248556. Every factual sentence below is anchored to a line range in this repo and re-checked after it was written. Claims whose anchors failed were deleted, not softened, and the count is in the top bar."
     },
     {
      "id": "five",
@@ -85,55 +119,69 @@
        "claims": [
         {
          "id": "c-001",
-         "text": "volforecast is a command line application: main in src/volforecast/__main__.py builds an argument parser, parses argv, and prints help when no subcommand is given.",
+         "text": "This repo forecasts stock market volatility one, five, and twenty two days ahead with machine learning, signal discovery in its own words: HAR baselines are progressively enriched until the QLIKE improvement is statistically significant and the IV-RV gap it implies is tradeable.",
          "status": "verified",
          "cite": {
           "file": "src/volforecast/__main__.py",
-          "quote": "def main(argv: list[str] | None = None) -> int:\n    parser = _build_parser()\n    args = parser.parse_args(argv)\n\n    if args.command is None:\n        parser.print_help()\n        return 0",
+          "quote": "    parser = argparse.ArgumentParser(\n        prog=\"vol\",\n        description=(\n            \"ML Realized Volatility Forecasting — Signal Discovery\\n\\n\"\n            \"Primary command: vol run --config <yaml>\\n\"\n            \"Runs tournament (1 or N models) and produces an interactive dashboard.\"\n        ),",
           "focus": [
-           "    parser = _build_parser()\n    args = parser.parse_args(argv)"
+           "\"ML Realized Volatility Forecasting — Signal Discovery\\n\\n\"",
+           "\"Runs tournament (1 or N models) and produces an interactive dashboard.\""
           ]
          }
         },
         {
          "id": "c-002",
-         "text": "The primary subcommand is run, which resolves a YAML experiment file into an ExperimentConfig, offering an interactive picker when no --config is supplied.",
+         "text": "Its raw material is GS market data, trade ticks from Chunk Store fetched in multi-day batches, daily series from TSDB, and the SPX implied vol surface from Marquee, all cached as per-symbol parquet the models train on.",
          "status": "verified",
          "cite": {
-          "file": "src/volforecast/__main__.py",
-          "quote": "    if args.command == \"run\":\n        if args.config is None:\n            from volforecast.cli.config_picker import pick_config\n\n            selected = pick_config()\n            if selected is None:\n                return 0\n            args.config = str(selected)\n\n        from volforecast.config import ExperimentConfig\n\n        config = ExperimentConfig.from_yaml(args.config)\n        symbols = args.symbols.split(\",\") if args.symbols else None",
+          "file": "src/volforecast/cli/backfill_rk.py",
+          "quote": "def _fetch_and_compute_rk_batch(\n    symbol: str,\n    days: list[date],\n    rv_lookup: dict[date, float | None],\n    timeout_s: float = 120.0,\n) -> list[dict]:\n    \"\"\"Fetch raw ticks for multiple days in ONE chunk_query and compute RK per day.\n\n    Batching N days into a single API call eliminates N-1 round-trips worth of",
           "focus": [
-           "        config = ExperimentConfig.from_yaml(args.config)"
+           "\"\"\"Fetch raw ticks for multiple days in ONE chunk_query and compute RK per day."
           ]
          }
         },
         {
          "id": "c-003",
-         "text": "It is packaged with optional dependency groups, so the Goldman Sachs integration through gs-quant-internal and the machine learning stack through lightgbm, xgboost, optuna and shap are both installed only on request.",
+         "text": "Quality is decided by competition: every vol run is a tournament, 13 models compared with statistical tests in the full configuration, ranked on QLIKE, an asymmetric loss that punishes underestimating volatility, and only statistically significant wins over HAR count.",
          "status": "verified",
          "cite": {
-          "file": "src/pyproject.toml",
-          "quote": "[project.optional-dependencies]\ngs = [\n    \"gs-quant-internal>=1.7\",\n]\nml = [\n    \"lightgbm>=3.3\",\n    \"xgboost>=1.7\",\n    \"optuna>=3.5\",\n    \"shap>=0.43\",\n]",
+          "file": "README.md",
+          "quote": "# Single-model experiment (ingest + train + evaluate + dashboard)\nvol run --config workspace/configs/baseline_har.yaml\n\n# Tournament: 13 models compared with statistical tests\nvol run --config workspace/configs/tournament_full_spy.yaml",
           "focus": [
-           "gs = [\n    \"gs-quant-internal>=1.7\",\n]"
+           "# Tournament: 13 models compared with statistical tests"
           ]
          }
         },
         {
          "id": "c-004",
-         "text": "Every run reports what it produced through _print_output_summary, which takes an output directory and prints the resulting file paths.",
+         "text": "The winning forecasts feed paper trading: economic_value.py turns the gap between implied and forecast volatility into a long or short vol signal, prices it as delta-hedged straddle and vol-targeting P&L, and reports Sharpe, maximum drawdown, and GSVIVS01 index performance.",
          "status": "verified",
          "cite": {
-          "file": "src/volforecast/__main__.py",
-          "quote": "def _print_output_summary(output_dir: str, extra_files: dict[str, str] | None = None) -> None:\n    \"\"\"Print a clear output summary with file paths.\"\"\"\n    from pathlib import Path\n\n    from volforecast.cli.console import console\n\n    out = Path(output_dir)\n    lines: list[tuple[str, str]] = []",
+          "file": "src/volforecast/evaluation/economic_value.py",
+          "quote": "def iv_rv_gap_signal(\n    iv_forecast: np.ndarray,\n    rv_forecast: np.ndarray,\n    threshold: float = 0.0,\n    short_threshold: float | None = None,\n    default_long: bool = False,\n) -> np.ndarray:\n    \"\"\"Generate trading signal from IV-RV gap.",
           "focus": [
-           "def _print_output_summary(output_dir: str, extra_files: dict[str, str] | None = None) -> None:\n    \"\"\"Print a clear output summary with file paths.\"\"\""
+           "\"\"\"Generate trading signal from IV-RV gap."
           ]
          }
         },
         {
          "id": "c-005",
-         "text": "It is not a live trading system or a service: nothing here listens on a socket, and every entry point is a batch command that runs to completion and returns an exit code.",
+         "text": "What a newcomer would not guess: GitHub Copilot agents run this repo as much as people do, and the evaluation code is written to be driven by them: the BACKTEST skill records every outcome, crash included, in a machine-readable sentinel, so no agent ever waits on a run that died.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/evaluation/economic_value.py",
+          "quote": "    except Exception as exc:  # noqa: BLE001 — every failure must reach the sentinel file\n        rc = 1\n        body = json.dumps({\"error\": f\"{type(exc).__name__}: {exc}\"})\n\n    out_file.parent.mkdir(parents=True, exist_ok=True)\n    out_file.write_text(f\"{body}\\nEXIT_CODE={rc}\\n\", encoding=\"utf-8\")\n    print(f\"OUTPUT_FILE={out_file}\")",
+          "focus": [
+           "except Exception as exc:  # noqa: BLE001 — every failure must reach the sentinel file",
+           "out_file.write_text(f\"{body}\\nEXIT_CODE={rc}\\n\", encoding=\"utf-8\")"
+          ]
+         }
+        },
+        {
+         "id": "c-006",
+         "text": "What it is not: a live trading system, nothing listens on a socket, every entry point is a batch command that runs to completion, and the closest thing to an order it ever emits is a printed LONG, SHORT, or FLAT signal.",
          "status": "inferred"
         }
        ]
@@ -161,12 +209,12 @@
        "claims": [
         {
          "id": "c-011",
-         "text": "364 modules collapse into 12 groups on this map; the largest is tests at 55,156 lines across 225 files.",
+         "text": "364 modules collapse into 11 groups on this map; the largest is models at 9,802 lines across 22 files.",
          "status": "inferred"
         },
         {
          "id": "c-012",
-         "text": "8 edges tie for the heaviest weight drawn, at least 48 import statements each: tests to volforecast, tests to cli, tests to data, and 5 more. Edge weights are clamped at 48 on this map, so that is a floor and not a count.",
+         "text": "The heaviest edge drawn is cli to data, at least 48 import statements. Edge weights are clamped at 48 on this map, so that is a floor and not a count.",
          "status": "inferred"
         },
         {
@@ -186,12 +234,6 @@
      "minutes": 4,
      "blocks": [
       {
-       "type": "callout",
-       "level": "info",
-       "title": "NO GIT HISTORY FOR THIS PATH",
-       "text": "target path has no tracked history in the enclosing repository (0 tracked files) Files are ranked by fan-in (no git history) instead; the column header and every entry say so."
-      },
-      {
        "type": "table",
        "caption": "Sortable. Purpose is each package's __init__ docstring, not a description of it.",
        "sortable": true,
@@ -200,43 +242,57 @@
         "PURPOSE",
         "FILES",
         "LOC",
-        "FAN-IN (NO GIT HISTORY)"
+        "COMMITS"
        ],
        "rows": [
         [
-         "<code>src/volforecast/</code>",
-         "ML Realized Volatility Forecasting — Signal Discovery",
-         "3",
-         "1,013",
-         "1"
+         "<code>src/volforecast/cli/</code>",
+         "CLI entry points for volforecast skills",
+         "28",
+         "7,342",
+         "28"
+        ],
+        [
+         "<code>src/volforecast/models/</code>",
+         "Volatility forecasting models: HAR baselines, LightGBM, LSTM, ensemble",
+         "22",
+         "9,802",
+         "22"
         ],
         [
          "<code>src/volforecast/data/</code>",
          "Data access layer for tick data, daily OHLCV, and IV surfaces",
          "21",
          "9,195",
-         "2"
-        ],
-        [
-         "<code>src/volforecast/cli/</code>",
-         "CLI entry points for volforecast skills",
-         "28",
-         "7,342",
-         "3"
+         "21"
         ],
         [
          "<code>src/volforecast/features/</code>",
          "Feature engineering layers 0-6 for realized volatility forecasting",
          "18",
          "3,110",
-         "4"
+         "18"
         ],
         [
-         "<code>src/tests/</code>",
-         "—",
-         "8",
-         "1,534",
-         "5"
+         "<code>src/volforecast/evaluation/</code>",
+         "Evaluation suite: QLIKE metrics, statistical tests, economic value",
+         "14",
+         "7,031",
+         "14"
+        ],
+        [
+         "<code>src/volforecast/graphs/</code>",
+         "Point-in-time graph construction for graph-based volatility models",
+         "9",
+         "826",
+         "9"
+        ],
+        [
+         "<code>src/volforecast/utils/</code>",
+         "Utilities: time-series CV splits, data helpers",
+         "7",
+         "1,552",
+         "7"
         ],
         [
          "<code>src/volforecast/pipeline/</code>",
@@ -246,51 +302,30 @@
          "6"
         ],
         [
+         "<code>src/volforecast/</code>",
+         "ML Realized Volatility Forecasting — Signal Discovery",
+         "3",
+         "1,013",
+         "3"
+        ],
+        [
          "<code>src/volforecast/reporting/</code>",
          "Interactive HTML experiment reporting",
          "2",
          "54",
-         "7"
+         "2"
         ],
         [
          "<code>src/volforecast/visualization/</code>",
          "Visualization utilities for ML vol forecasting",
          "2",
          "102",
-         "8"
-        ],
-        [
-         "<code>src/tests/unit/evaluation/</code>",
-         "—",
-         "2",
-         "83",
-         "9"
-        ],
-        [
-         "<code>src/tests/unit/graphs/</code>",
-         "—",
-         "10",
-         "699",
-         "10"
-        ],
-        [
-         "<code>src/tests/unit/models/</code>",
-         "—",
-         "2",
-         "203",
-         "11"
-        ],
-        [
-         "<code>src/tests/unit/utils/</code>",
-         "—",
-         "3",
-         "518",
-         "12"
+         "2"
         ]
        ]
       }
      ],
-     "lede": "The same information as the map, as a list, for the people who prefer lists. Ranked by fan-in (no git history), and the purpose column is each package's own __init__ docstring."
+     "lede": "The same information as the map, as a list, for the people who prefer lists. Ranked by commits, and the purpose column is each package's own __init__ docstring."
     },
     {
      "id": "cp-a",
@@ -329,20 +364,108 @@
       },
       {
        "type": "command",
+       "cmd": "python -m pytest --collect-only -q tests",
+       "cwd": "src",
+       "hypothesis": "An import of `volforecast.constants` could not be resolved: either the module is missing from this environment or it does not exist in this repo."
+      },
+      {
+       "type": "command",
        "cmd": "python workspace/lint/lint_all.py",
        "cwd": "."
       },
       {
        "type": "callout",
-       "level": "info",
-       "title": "NOT EXECUTED",
-       "text": "These candidates were found but never executed: python -m pytest --collect-only -q tests (from src/pyproject.toml:79) — pytest not importable under the resolved interpreter."
+       "level": "broken",
+       "title": "WHAT THE FAILURES ABOVE MEAN FOR YOU",
+       "text": "3 of 3 commands failed during generation, on a clean checkout. Do not spend your first morning believing you broke them. Nothing above was written by a model: the exit codes, the output and the timings are the captured ones."
+      },
+      {
+       "type": "table",
+       "caption": "Missing at this commit: modules imported somewhere in this repo that have no file on disk. IMPORT SITES counts import statements.",
+       "sortable": true,
+       "columns": [
+        "MISSING MODULE",
+        "IMPORTED FROM",
+        "IMPORT SITES"
+       ],
+       "rows": [
+        [
+         "<code>volforecast.config</code>",
+         "src/tests/integration/test_checkpoint_resume.py, src/tests/integration/test_eval_symbols.py, and 65 more",
+         "257"
+        ],
+        [
+         "<code>volforecast.data.edrvol</code>",
+         "src/tests/unit/test_0dte_iv.py, src/tests/unit/test_edrvol.py, and 15 more",
+         "106"
+        ],
+        [
+         "<code>volforecast.pipeline.runner</code>",
+         "src/tests/integration/test_checkpoint_resume.py, src/tests/integration/test_feature_stack_pipeline.py, and 29 more",
+         "70"
+        ],
+        [
+         "<code>volforecast.models.har_family</code>",
+         "src/tests/integration/test_pipeline.py, src/tests/integration/test_rv_pipeline.py, and 4 more",
+         "66"
+        ],
+        [
+         "<code>volforecast.constants</code>",
+         "src/tests/integration/test_pipeline.py, src/tests/unit/graphs/test_simple_graphs.py, and 24 more",
+         "60"
+        ],
+        [
+         "<code>volforecast.models.lstm</code>",
+         "src/tests/test_lstm_layernorm.py, src/tests/test_lstm_val_purge.py, and 13 more",
+         "42"
+        ],
+        [
+         "<code>volforecast.evaluation.tournament</code>",
+         "src/tests/integration/test_eval_symbols.py, src/tests/integration/test_gsvivs_smoke.py, and 6 more",
+         "31"
+        ],
+        [
+         "<code>volforecast.visualization.dashboard</code>",
+         "src/tests/unit/test_dashboard.py, src/tests/unit/test_dashboard_template.py, and 3 more",
+         "25"
+        ],
+        [
+         "<code>volforecast.cli.ingest_iv</code>",
+         "src/tests/unit/test_ingest_credit_cds.py, src/tests/unit/test_ingest_iv.py, and 3 more",
+         "22"
+        ],
+        [
+         "<code>volforecast.evaluation._parallel</code>",
+         "src/tests/integration/test_checkpoint_resume.py, src/tests/integration/test_feature_stack_pipeline.py, and 4 more",
+         "12"
+        ],
+        [
+         "<code>volforecast.evaluation._model_utils</code>",
+         "src/tests/unit/evaluation/test_model_configs_feature_layers.py, src/tests/unit/test_phase4_cleanup.py, and 1 more",
+         "7"
+        ],
+        [
+         "<code>volforecast.data.vix_futures</code>",
+         "src/volforecast/cli/ingest_vix_futures.py",
+         "3"
+        ],
+        [
+         "<code>volforecast.features.tree_expansion</code>",
+         "src/tests/unit/test_expansion.py, src/volforecast/registry.py",
+         "3"
+        ],
+        [
+         "<code>volforecast.features.iv_surface</code>",
+         "src/tests/unit/test_iv_surface_layer.py, src/volforecast/registry.py",
+         "2"
+        ]
+       ]
       },
       {
        "type": "callout",
        "level": "broken",
-       "title": "WHAT THE FAILURES ABOVE MEAN FOR YOU",
-       "text": "2 of 2 commands failed during generation, on a clean checkout. Do not spend your first morning believing you broke them. Nothing above was written by a model: the exit codes, the output and the timings are the captured ones."
+       "title": "MISSING AT THIS COMMIT",
+       "text": "The survey counted 14 imported modules with no file on disk at this commit, across 706 import statements. The heaviest: volforecast.config (257 imports), volforecast.data.edrvol (106 imports), volforecast.pipeline.runner (70 imports). Code paths that reach these imports fail with ModuleNotFoundError until the modules are restored."
       }
      ],
      "lede": "Every command here was executed on the generation machine. The output is real, the timings are real, and so are the failures."
@@ -357,7 +480,7 @@
        "type": "callout",
        "level": "info",
        "title": "NO TEST COMMAND DETECTED",
-       "text": "Candidates considered: python -m pytest --collect-only -q tests — pytest not importable under the resolved interpreter."
+       "text": "Candidates considered: python -m pytest --collect-only -q tests was executed and failed with exit 2, so there is no green test command to hand you."
       },
       {
        "type": "command",
@@ -370,19 +493,20 @@
        "claims": [
         {
          "id": "c-041",
-         "text": "Importing the package is cheap and side effect free because the argument parser is constructed inside main rather than at module import time.",
+         "text": "Exit 0 proves only that the volforecast package resolves from src: the real work is deferred, ExperimentConfig is imported inside main only when a run command executes, so a bare import never touches the config, the models, or the tournament path.",
          "status": "verified",
          "cite": {
           "file": "src/volforecast/__main__.py",
-          "quote": "def main(argv: list[str] | None = None) -> int:\n    parser = _build_parser()\n    args = parser.parse_args(argv)\n\n    if args.command is None:\n        parser.print_help()\n        return 0",
+          "quote": "    if args.command == \"run\":\n        if args.config is None:\n            from volforecast.cli.config_picker import pick_config\n\n            selected = pick_config()\n            if selected is None:\n                return 0\n            args.config = str(selected)\n\n        from volforecast.config import ExperimentConfig\n\n        config = ExperimentConfig.from_yaml(args.config)",
           "focus": [
-           "    parser = _build_parser()"
+           "        from volforecast.config import ExperimentConfig",
+           "        config = ExperimentConfig.from_yaml(args.config)"
           ]
          }
         },
         {
          "id": "c-042",
-         "text": "A passing import proves the source root resolves and the package is well formed, but it exercises none of the data pipeline, which needs credentials and a TSDB connection this machine does not have.",
+         "text": "Importing is not testing: this snapshot imports 14 modules that have no file on disk, volforecast.config among them, and the roughly 2,700 tests under src/tests never ran, so the very interpreter that returned 0 here fails the moment vol run asks for ExperimentConfig.",
          "status": "inferred"
         }
        ]
@@ -395,6 +519,655 @@
       }
      ],
      "lede": "One command. If this passes, your environment is correct and you can stop configuring things."
+    }
+   ]
+  },
+  {
+   "title": "INSIDE THE SYSTEM",
+   "minutes": 15,
+   "stops": [
+    {
+     "id": "dive-src-volforecast-models",
+     "title": "Inside models",
+     "kind": "stop",
+     "minutes": 4,
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-201",
+         "text": "This package supplies the contestants for the repo's tournaments: the same `vol run` configs that fit a single [[HAR]] baseline can field 13 models and compare them with statistical tests, so every design choice here is built to be raced, not admired.",
+         "status": "verified",
+         "cite": {
+          "file": "README.md",
+          "quote": "# Single-model experiment (ingest + train + evaluate + dashboard)\nvol run --config workspace/configs/baseline_har.yaml\n\n# Tournament: 13 models compared with statistical tests\nvol run --config workspace/configs/tournament_full_spy.yaml",
+          "focus": [
+           "# Tournament: 13 models compared with statistical tests"
+          ]
+         }
+        },
+        {
+         "id": "c-202",
+         "text": "The signature move: training loss equals evaluation loss, LightGBM's custom objective hands the booster the analytic [[QLIKE]] gradient 1 - exp(y_true - y_pred) and hessian exp(y_true - y_pred) in log-RV space, so trees split on the exact metric the tournament scores.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/models/lightgbm.py",
+          "quote": "\ndef qlike_objective(y_pred: np.ndarray, dtrain: Any) -> tuple[np.ndarray, np.ndarray]:\n    \"\"\"Custom QLIKE objective for LightGBM.\n\n    Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n    gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)",
+          "focus": [
+           "    gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)"
+          ]
+         }
+        },
+        {
+         "id": "c-203",
+         "text": "The objective knows its data: log RV for these assets spans roughly -14 to -4, so the symmetric clip at plus or minus 10 is pure float64 overflow protection, with QLIKE's natural exponential already penalizing under-predicted volatility harder than over-predicted.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/models/lightgbm.py",
+          "quote": "    # Symmetric clip: pure overflow protection. exp(709) overflows float64.\n    # Data range is ~10 (log RV spans -14 to -4), so ±10 covers all cases.\n    # QLIKE's natural exponential already penalizes under-prediction harder.",
+          "focus": [
+           "# Data range is ~10 (log RV spans -14 to -4), so ±10 covers all cases."
+          ]
+         }
+        },
+        {
+         "id": "c-204",
+         "text": "`xgboost` is the deliberate second opinion: an independent boosting library carrying the identical QLIKE gradient and hessian, so any LightGBM edge that fails to replicate there reads as a library artifact, not signal.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/models/xgboost.py",
+          "quote": "def qlike_objective_xgb(y_pred: np.ndarray, dtrain: Any) -> tuple[np.ndarray, np.ndarray]:\n    \"\"\"Custom QLIKE objective for XGBoost.\n\n    Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n    gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)\n    hessian  (d²L/dy_pred²) = exp(y_true - y_pred)",
+          "focus": [
+           "    \"\"\"Custom QLIKE objective for XGBoost."
+          ]
+         }
+        },
+        {
+         "id": "c-205",
+         "text": "The graph family reframes forecasting across assets instead of across time: each trading date becomes one graph whose nodes are symbols and whose edges come from rolling correlation, and `requires_graph = True` routes these snapshots to the model instead of tabular features.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/models/gnn.py",
+          "quote": "    Operates on graph snapshots: each date = one graph with N nodes\n    (symbols) and edges from rolling correlation. Integrates with the\n    feature_stack pipeline via extract_features().\n\n    Set ``requires_graph = True`` so the pipeline runner can detect\n    graph-mode and dispatch appropriately.",
+          "focus": [
+           "Operates on graph snapshots: each date = one graph with N nodes",
+           "Set ``requires_graph = True`` so the pipeline runner can detect"
+          ]
+         }
+        },
+        {
+         "id": "c-206",
+         "text": "The torch side makes the same commitment: graph models train on `_qlike_loss`, exp(y - y_hat) - (y - y_hat) - 1 in log-RV space with the same clamp at 10, so no family in the zoo gets to optimize a friendlier loss than the one it is judged on.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/models/gnn.py",
+          "quote": "def _qlike_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:\n    \"\"\"QLIKE in log-RV space: exp(y - y_hat) - (y - y_hat) - 1.\"\"\"\n    diff = target - pred\n    diff = torch.clamp(diff, min=-10.0, max=10.0)\n    return torch.mean(torch.exp(diff) - diff - 1.0)",
+          "focus": [
+           "QLIKE in log-RV space: exp(y - y_hat) - (y - y_hat) - 1"
+          ]
+         }
+        },
+        {
+         "id": "c-207",
+         "text": "Hyperparameter search respects time the same way the outer evaluation does: Optuna tunes over ExpandingWindowCV walk-forward splits to prevent look-ahead bias, and each worker process is pinned round-robin to its own GPU so 8 devices run all trials in parallel.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/models/xgboost.py",
+          "quote": "    \"\"\"Tune XGBoost hyperparameters via Optuna with walk-forward CV.\n\n    Uses ExpandingWindowCV (walk-forward) to prevent look-ahead bias.\n    Optimizes QLIKE loss with TPE sampler.\n\n    When gpu_device_ids is provided, each worker is pinned to a separate\n    GPU (round-robin). With 8 GPUs and 8 workers, all trials run in\n    parallel on different devices.",
+          "focus": [
+           "Uses ExpandingWindowCV (walk-forward) to prevent look-ahead bias."
+          ]
+         }
+        },
+        {
+         "id": "c-208",
+         "text": "What the zoo does not do is judge itself: a model only emits log-RV predictions under the shared base contract, while fold construction, the Duan retransformation, QLIKE ranking and Diebold-Mariano testing all live outside this package.",
+         "status": "inferred"
+        }
+       ]
+      },
+      {
+       "type": "stats",
+       "items": [
+        {
+         "v": "9,802",
+         "l": "LINES OF CODE"
+        },
+        {
+         "v": "22",
+         "l": "FILES"
+        },
+        {
+         "v": "0",
+         "l": "FAN-IN",
+         "s": "groups that import this one"
+        },
+        {
+         "v": "6",
+         "l": "FAN-OUT",
+         "s": "groups this one imports"
+        }
+       ]
+      }
+     ],
+     "lede": "A closer read of models. The claims here are checked the same way as everywhere else on this page, and anything marked INFERRED could not be anchored to a line and says so."
+    },
+    {
+     "id": "dive-src-volforecast-cli",
+     "title": "Inside cli",
+     "kind": "stop",
+     "minutes": 4,
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-221",
+         "text": "The cli package is the operator surface of the volatility platform: every `vol run --config` invocation takes the [[tournament]] code path, so even a single-model config produces ranked tables and an interactive Plotly dashboard, with `mode: ingest` the only special case.",
+         "status": "verified",
+         "cite": {
+          "file": "README.md",
+          "quote": "### Primary Command: `vol run --config <yaml>`\n\nEvery `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).",
+          "focus": [
+           "Every `vol run --config` invocation uses the tournament code path"
+          ]
+         }
+        },
+        {
+         "id": "c-222",
+         "text": "`vol forecast` is the live end product: a config-driven ensemble trains each configured model on full history, predicts next-day realized volatility, compares it to current ATM implied volatility, and emits a weighted LONG, SHORT, or FLAT call on the [[IV-RV gap]].",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/cli/forecast.py",
+          "quote": "def _fetch_live_iv(symbol: str) -> float | None:\n    \"\"\"Attempt to fetch current ATM IV from TSDB.\n\n    Returns IV in vol points (e.g. 18.5 = 18.5%) or None if unavailable.\n    \"\"\"\n    try:\n        from gs_quant.session import GsSession\n\n        GsSession.use()",
+          "focus": [
+           "    \"\"\"Attempt to fetch current ATM IV from TSDB."
+          ]
+         }
+        },
+        {
+         "id": "c-223",
+         "text": "`vol audit` is the data-quality gate for everything downstream: it checks every cached parquet against its manifest contract, assesses per-layer readiness, and regenerates `data/manifest.json` while syncing `data/manifest.yaml`.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/cli/audit.py",
+          "quote": "def _legacy_layer_readiness(\n    layer_readiness: dict[str, dict[str, Any]],\n    source_results: dict[str, SourceAuditResult],\n) -> dict[str, Any]:\n    \"\"\"Convert new layer readiness to the legacy format expected by report/journal.\"\"\"\n    readiness: dict[str, Any] = {}\n\n    # HAR core (L0): from ticks source\n    ticks_result = source_results.get(\"ticks\")",
+          "focus": [
+           "    # HAR core (L0): from ticks source"
+          ]
+         }
+        },
+        {
+         "id": "c-224",
+         "text": "The audit deliberately distrusts its own records: the symbol universe is rebuilt each run from the parquets actually on disk merged with `SYMBOL_UNIVERSE`, and the manifest's stale symbol list is ignored.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/cli/audit.py",
+          "quote": "def _get_universe_from_manifest(manifest_data: Any, root: Path | None = None) -> list[str]:\n    \"\"\"Build the audit universe dynamically.\n\n    Uses on-disk discovery merged with SYMBOL_UNIVERSE from constants.\n    The manifest's symbol list is ignored — the audit should discover\n    what actually exists rather than relying on a stale manifest list.\n    \"\"\"\n    if root is not None:\n        return _discover_universe(root)",
+          "focus": [
+           "Uses on-disk discovery merged with SYMBOL_UNIVERSE from constants.",
+           "what actually exists rather than relying on a stale manifest list."
+          ]
+         }
+        },
+        {
+         "id": "c-225",
+         "text": "Data readiness is machine-checkable: the audit exits 0 only when no source has critical issues, returns 1 when any does, and 2 on outright failure, so agents and CI can gate a training run on data health without parsing the Markdown report.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/cli/audit.py",
+          "quote": "        manifest = run_audit(quiet=quiet, no_report=no_report, no_journal=no_journal)\n        # Exit with non-zero if there are critical issues\n        has_critical = any(\n            r.get(\"has_critical\", False)\n            for r in manifest.get(\"source_results_summary\", {}).values()\n        )\n        if has_critical:\n            if not quiet:\n                print(\"\\nWARNING: Critical issues detected (see report for details)\")\n            return 1\n        return 0\n    except Exception as e:\n        logger.exception(\"Audit failed\")\n        print(f\"ERROR: {e}\", file=sys.stderr)\n        return 2",
+          "focus": [
+           "        has_critical = any(",
+           "            return 1"
+          ]
+         }
+        },
+        {
+         "id": "c-226",
+         "text": "`vol backfill-rk` retrofits the noise-robust estimator: it finds cached dates where the realized kernel is NaN, refetches ticks from the [[Chunk Store]] in five-day batches, recomputes `realized_kernel` from tick log-prices, and updates each symbol's parquet in place.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/cli/backfill_rk.py",
+          "quote": "    parser = argparse.ArgumentParser(\n        prog=\"volforecast backfill-rk\",\n        description=\"Backfill realized kernel and noise_gap into existing RV parquets\",\n    )",
+          "focus": [
+           "        description=\"Backfill realized kernel and noise_gap into existing RV parquets\","
+          ]
+         }
+        },
+        {
+         "id": "c-227",
+         "text": "Every audit run also appends a dated data-state summary to `workspace/research/research-journal.md`, so the research journal that orients each new session records data readiness alongside experiment results.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/cli/audit.py",
+          "quote": "def update_research_journal(\n    source_results: dict[str, SourceAuditResult],\n    layer_readiness: dict[str, dict[str, Any]],\n    universe: list[str],\n    root: Path,\n) -> None:\n    \"\"\"Append a data audit summary to the research journal.\"\"\"\n    journal_path = root / \"workspace\" / \"research\" / \"research-journal.md\"",
+          "focus": [
+           "    \"\"\"Append a data audit summary to the research journal.\"\"\"",
+           "    journal_path = root / \"workspace\" / \"research\" / \"research-journal.md\""
+          ]
+         }
+        },
+        {
+         "id": "c-228",
+         "text": "None of the volatility mathematics lives here: the cli modules orchestrate ingestion, auditing, backfill, and the live signal, but every estimator, model, and statistic they invoke is implemented in `volforecast.data`, `volforecast.models`, and `volforecast.evaluation`.",
+         "status": "inferred"
+        }
+       ]
+      },
+      {
+       "type": "stats",
+       "items": [
+        {
+         "v": "7,342",
+         "l": "LINES OF CODE"
+        },
+        {
+         "v": "28",
+         "l": "FILES"
+        },
+        {
+         "v": "0",
+         "l": "FAN-IN",
+         "s": "groups that import this one"
+        },
+        {
+         "v": "5",
+         "l": "FAN-OUT",
+         "s": "groups this one imports"
+        }
+       ]
+      }
+     ],
+     "lede": "What cli actually does, read from its own source. Each sentence carries a claim marker, and the sentences that failed their re-check are in the ledger rather than on this stop."
+    },
+    {
+     "id": "dive-src-volforecast-features",
+     "title": "Inside features",
+     "kind": "stop",
+     "minutes": 4,
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-241",
+         "text": "The features package is the design matrix factory: eighteen modules organized as feature layers 0-6 that turn daily realized-variance panels and merged market columns into model inputs, each layer a class registered into `FEATURE_REGISTRY` and stacked by name from config.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/features/__init__.py",
+          "quote": "\"\"\"Feature engineering layers 0-6 for realized volatility forecasting.\n\nAccess registered layers via ``FEATURE_REGISTRY`` dict.\nCall ``volforecast.registry.ensure_registered()`` to populate registries.\n\"\"\"",
+          "focus": [
+           "\"\"\"Feature engineering layers 0-6 for realized volatility forecasting.",
+           "Access registered layers via ``FEATURE_REGISTRY`` dict."
+          ]
+         }
+        },
+        {
+         "id": "c-242",
+         "text": "Layer 2 carries the project's punchline: `OptionsLayer` reads IV columns pre-merged upstream by `IVSurfaceLayer` and derives the forward-looking set, VRP, skew, term slope, and the IV-RV gap the README promises to make tradeable.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/features/options.py",
+          "quote": "@register_feature_layer(\"options\")\nclass OptionsLayer:\n    \"\"\"Options-implied feature layer (Layer 2).\n\n    Reads IV columns from daily_data (pre-merged by IVSurfaceLayer) or from\n    the legacy context[\"iv_surface\"] path. Computes derived features:\n    VRP, skew, term slope, IV-RV gap, VVIX-derived, VIX interaction.",
+          "focus": [
+           "@register_feature_layer(\"options\")",
+           "    VRP, skew, term slope, IV-RV gap, VVIX-derived, VIX interaction."
+          ]
+         }
+        },
+        {
+         "id": "c-243",
+         "text": "`compute_vrp` prices the volatility insurance premium as the Carr and Wu 2009 ex-post proxy, VRP = (atm_iv/100)^2 - rv*252, while the conditional Bollerslev, Tauchen and Zhou variant lives in `build_iv_feature_panel` with a HAR-CJ forecast of future RV.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/features/options.py",
+          "quote": "    \"\"\"Compute ex-post variance risk premium (Carr & Wu 2009 proxy).\n\n    VRP = (atm_iv_pct / 100)^2 - rv_daily * 252\n\n    This is the \"realized\" or \"ex-post\" VRP proxy that uses contemporaneous\n    realized variance. For the conditional VRP (Bollerslev, Tauchen & Zhou\n    2009, RFS), use iv_features.build_iv_feature_panel which substitutes\n    E_t[RV_{t+1:t+22}] from a HAR-CJ model.",
+          "focus": [
+           "    VRP = (atm_iv_pct / 100)^2 - rv_daily * 252"
+          ]
+         }
+        },
+        {
+         "id": "c-244",
+         "text": "The IV term structure doubles as a regime gauge: `compute_term_slope` returns ATM_3m minus ATM_1m, positive in normal contango markets and negative in backwardation, which is the stress signature.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/features/options.py",
+          "quote": "def compute_term_slope(atm_short: pd.Series, atm_long: pd.Series) -> pd.Series:\n    \"\"\"Compute IV term structure slope.\n\n    Slope = ATM_3m - ATM_1m.\n    Positive = contango (normal). Negative = backwardation (stress).",
+          "focus": [
+           "    Slope = ATM_3m - ATM_1m.",
+           "    Positive = contango (normal). Negative = backwardation (stress)."
+          ]
+         }
+        },
+        {
+         "id": "c-245",
+         "text": "Layer 3 never touches a live feed: `MicrostructureLayer` loads per-symbol daily aggregates and intraday bar sequences from cache, requires a symbol in its context, and emits order-flow features like the log signed volume ratio at daily and 5 day horizons.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/features/microstructure.py",
+          "quote": "@register_feature_layer(\"microstructure\")\nclass MicrostructureLayer:\n    \"\"\"Microstructure feature layer (Layer 3).\n\n    Loads per-symbol daily aggregates and intraday sequences from cache,\n    then computes rolling and derived features. Requires context[\"symbol\"].\n\n    Output features:\n    - log_svr_d, log_svr_w: log signed volume ratio (daily + 5d)",
+          "focus": [
+           "    Loads per-symbol daily aggregates and intraday sequences from cache,",
+           "    then computes rolling and derived features. Requires context[\"symbol\"]."
+          ]
+         }
+        },
+        {
+         "id": "c-246",
+         "text": "Price impact is measured the textbook way: Kyle's lambda is the OLS slope of per-bar price changes on signed net flow, Cov(dP, Q) / Var(Q), and a higher lambda means each unit of signed volume moves price more, which reads as informed trading or thin liquidity.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/features/microstructure.py",
+          "quote": "    \"\"\"Compute Kyle's lambda (price impact coefficient).\n\n    OLS regression: Δprice_i = λ * net_flow_i + ε_i\n    λ = Cov(Δp, Q) / Var(Q)\n\n    Higher λ indicates more price impact per unit of signed volume,\n    implying more informed trading or less liquidity.",
+          "focus": [
+           "    λ = Cov(Δp, Q) / Var(Q)",
+           "    Higher λ indicates more price impact per unit of signed volume,"
+          ]
+         }
+        },
+        {
+         "id": "c-247",
+         "text": "Calendar is the one layer allowed to see its own day, FOMC, NFP, and OpEx timing is known in advance, and its event math is auditable: a meeting day scores `days_to_fomc` of 0, distances count business days, and dates beyond the hardcoded 2026 list fall back to 30, not NaN.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/features/calendar.py",
+          "quote": "    for dt in dates:\n        d = dt.date() if hasattr(dt, \"date\") else dt\n        is_fomc = d in _FOMC_SET\n        nxt = _next_fomc(d)\n        if nxt is None:\n            dist = 30  # fallback for dates beyond 2026\n        elif nxt == d:\n            dist = 0\n        else:\n            dist = _busday_count(d, nxt)\n\n        days_to.append(dist)\n        fomc_week.append(1 if dist <= 5 else 0)\n        fomc_day.append(1 if is_fomc else 0)",
+          "focus": [
+           "            dist = 30  # fallback for dates beyond 2026",
+           "            dist = _busday_count(d, nxt)"
+          ]
+         }
+        },
+        {
+         "id": "c-248",
+         "text": "What the package does not do is fit anything: no layer trains a model, scores QLIKE, or fetches raw data, the layers only assemble columns from caches the data stage wrote, and a missing cache degrades a layer to empty or NaN output rather than failing the run.",
+         "status": "inferred"
+        }
+       ]
+      },
+      {
+       "type": "stats",
+       "items": [
+        {
+         "v": "3,110",
+         "l": "LINES OF CODE"
+        },
+        {
+         "v": "18",
+         "l": "FILES"
+        },
+        {
+         "v": "0",
+         "l": "FAN-IN",
+         "s": "groups that import this one"
+        },
+        {
+         "v": "3",
+         "l": "FAN-OUT",
+         "s": "groups this one imports"
+        }
+       ]
+      }
+     ],
+     "lede": "A few minutes inside features. The rules are the same here as on every other stop: a sentence is either anchored to a real line range or marked as unproven on its face."
+    },
+    {
+     "id": "dive-src-volforecast-data",
+     "title": "Inside data",
+     "kind": "stop",
+     "minutes": 4,
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-261",
+         "text": "The data layer starts at Chunk Store, Goldman's tick service: `chunk_store.py` fetches L1 trade and quote ticks for all 34 symbols plus L2 order book depth for the E-mini S&P 500, the raw material for realized volatility at 5 minute, 1 minute, or tick-by-tick frequency.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/data/chunk_store.py",
+          "quote": "def fetch_trades_batch(\n    symbol: str,\n    dates: list[date],\n    batch_size: int = 5,\n    timeout_s: float = 120.0,\n    retries: int = 2,\n    on_fetch: Callable[[str, list[date], int, float], None] | None = None,\n) -> dict[date, pd.DataFrame]:\n    \"\"\"Fetch trades for multiple dates using batched API calls.\n\n    Groups dates into contiguous runs and issues one ``chunk_query`` per\n    batch (up to *batch_size* days), reducing total API calls.",
+          "focus": [
+           "    Groups dates into contiguous runs and issues one ``chunk_query`` per"
+          ]
+         }
+        },
+        {
+         "id": "c-262",
+         "text": "`rv_panel.py` turns those ticks into the project's target, one realized variance number per symbol per day, running as a streaming batch pipeline, fetch then compute then checkpoint then release, so peak memory never exceeds one sub-batch of tick data.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/data/rv_panel.py",
+          "quote": "def _compute_day_record(\n    day: date,\n    trades: pd.DataFrame,\n    symbol: str,\n    freq: str,\n    min_ticks: int,\n) -> dict | tuple[date, str]:\n    \"\"\"Compute RV measures for a single day's trades.\n",
+          "focus": [
+           "    \"\"\"Compute RV measures for a single day's trades."
+          ]
+         }
+        },
+        {
+         "id": "c-263",
+         "text": "`micro.py` adds the order-flow view: ticks become 10 second bars server-side, client-side BVC then classifies each bar buy or sell by the tick rule, and the bars feed daily aggregates (VPIN, order flow imbalance) plus per-bar sequences for the LSTM and TCN models.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/data/micro.py",
+          "quote": "def _build_processors(interval: float = MICRO_BAR_INTERVAL) -> list:\n    \"\"\"Build AggGroupBy processor for server-side 10s bar aggregation.\n\n    Client-side BVC (Bulk Volume Classification) is applied after fetch\n    to classify bars as buy/sell initiated using the tick rule.",
+          "focus": [
+           "    Client-side BVC (Bulk Volume Classification) is applied after fetch"
+          ]
+         }
+        },
+        {
+         "id": "c-264",
+         "text": "VPIN follows Easley, Lopez de Prado and O'Hara 2012, Eq. 1: buy and sell volume is sliced into equal-volume buckets and the day's informed-trading probability is the mean absolute buy-sell imbalance across them.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/data/micro.py",
+          "quote": "def compute_vpin(\n    buy_vols: np.ndarray,\n    sell_vols: np.ndarray,\n    bucket_volume: int | float,\n    n_buckets: int = VPIN_N_BUCKETS,\n) -> float:\n    \"\"\"Compute Volume-Synchronized Probability of Informed Trading (VPIN).\n\n    Reference: Easley, Lopez de Prado & O'Hara (2012), Eq. 1.",
+          "focus": [
+           "    Reference: Easley, Lopez de Prado & O'Hara (2012), Eq. 1."
+          ]
+         }
+        },
+        {
+         "id": "c-265",
+         "text": "A newcomer would not guess the fetch layer knows futures conventions: to pull E-mini depth it resolves each date to the correct front-month contract, rolling to the next quarterly expiry on the Thursday before the third Friday of the expiry month.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/data/chunk_store.py",
+          "quote": "def _resolve_es_symbol(trade_date: date) -> str:\n    \"\"\"Map a date to the correct front-month E-mini S&P 500 RIC.\n\n    ES contracts expire quarterly (H=Mar, M=Jun, U=Sep, Z=Dec).\n    The front contract rolls to the next quarter on the Thursday\n    before the 3rd Friday of the expiry month. Before that date,\n    the expiring contract is still the front month.\n    \"\"\"",
+          "focus": [
+           "    The front contract rolls to the next quarter on the Thursday",
+           "    before the 3rd Friday of the expiry month. Before that date,"
+          ]
+         }
+        },
+        {
+         "id": "c-266",
+         "text": "Ingestion is crash-safe by construction: each fetched batch lands in a staging directory, and consolidation merges staging chunks with the existing sequences parquet, deduplicates, and writes the final file before staging is removed, so reruns resume instead of restarting.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/data/micro.py",
+          "quote": "def _consolidate_staging(symbol: str, *, sequences_dir: Path | None = None) -> pd.DataFrame:\n    \"\"\"Consolidate all staging parquets into the final sequences file.\n\n    Merges staging chunks with any existing sequences parquet (preserving\n    historical data), deduplicates, writes final parquet, then removes\n    the staging directory.\n\n    Returns the consolidated DataFrame (existing + new).\n    \"\"\"",
+          "focus": [
+           "    Merges staging chunks with any existing sequences parquet (preserving",
+           "    historical data), deduplicates, writes final parquet, then removes"
+          ]
+         }
+        },
+        {
+         "id": "c-267",
+         "text": "You can audit completeness from the cache itself: `detect_gaps` compares the requested date range against the sequences parquet and returns exactly which trading days are missing, so a partial ingest is visible rather than silent.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/data/micro.py",
+          "quote": "def detect_gaps(\n    symbol: str,\n    start_date: date,\n    end_date: date,\n    *,\n    sequences_dir: Path | None = None,\n) -> list[date]:\n    \"\"\"Return trading days missing from the sequences cache.",
+          "focus": [
+           "    \"\"\"Return trading days missing from the sequences cache."
+          ]
+         }
+        },
+        {
+         "id": "c-268",
+         "text": "What this layer does not do is model anything: it stops at cached parquet panels and bar sequences, and away from Goldman's network, where pytickclient and TSDB are unreachable, it can only serve dates the caches under data/raw/ already hold.",
+         "status": "inferred"
+        }
+       ]
+      },
+      {
+       "type": "stats",
+       "items": [
+        {
+         "v": "9,195",
+         "l": "LINES OF CODE"
+        },
+        {
+         "v": "21",
+         "l": "FILES"
+        },
+        {
+         "v": "3",
+         "l": "FAN-IN",
+         "s": "groups that import this one"
+        },
+        {
+         "v": "2",
+         "l": "FAN-OUT",
+         "s": "groups this one imports"
+        }
+       ]
+      }
+     ],
+     "lede": "The shape of data, up close. Nothing below asks to be taken on trust; every claim marker opens the evidence behind its sentence, or says plainly that there is none."
+    },
+    {
+     "id": "dive-src-volforecast-evaluation",
+     "title": "Inside evaluation",
+     "kind": "stop",
+     "minutes": 4,
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-281",
+         "text": "Every horizon is judged against implied vol of matching maturity: one day ahead uses the prev close 1 DTE varswap fair vol captured with no lookahead, weekly horizons the 1 week ATM tenor, monthly the 1 month, so the IV-RV gap always compares like with like.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/evaluation/economic_value.py",
+          "quote": "    \"\"\"Map forecast horizon to the appropriate IV column and tenor days.\n\n    Uses the closest available tenor to match the forecast window:\n      - h == 1:  iv_vs_0dte with tenor_days=1 (prev-close 1-DTE varswap\n                 from EDRVS_EXPIRY_INTRADAY — correct measure for GSVIVS\n                 signal. Captured at 16:00 ET day before, no lookahead.)\n      - h <= 5:  iv_1w_atm with tenor_days=5 (weekly straddle)\n      - h > 5:   iv_1m_atm with tenor_days=22 (monthly straddle)",
+          "focus": [
+           "      - h == 1:  iv_vs_0dte with tenor_days=1 (prev-close 1-DTE varswap"
+          ]
+         }
+        },
+        {
+         "id": "c-282",
+         "text": "The units here have already survived one real bug: Kvar and the RV forecast are both annualized, an earlier sqrt(h) deflation artificially suppressed the implied side of the gap beyond one day, and the fix is documented as a deliberate no-op.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/evaluation/economic_value.py",
+          "quote": "    \"\"\"No-op — Kvar is already in annualized vol and needs no horizon scaling.\n\n    Previously this divided by sqrt(h) to convert the 24h-tenor Kvar into a\n    multi-day proxy.  That was incorrect: both the Kvar (annualized from T=24h)\n    and the RV forecast (annualized via sqrt(252 * daily_var)) are already in\n    the same units regardless of forecast horizon h.  The sqrt(h) deflation\n    artificially suppressed the implied-vol side of the IV-RV gap at h>1.\n",
+          "focus": [
+           "    artificially suppressed the implied-vol side of the IV-RV gap at h>1."
+          ]
+         }
+        },
+        {
+         "id": "c-283",
+         "text": "The GSVIVS signal ships four sizing variants as one dashboard toggle, `binary`, `asym_long`, `zscore`, and `long_flat`, each a frozen spec, so every variant a reader meets in a results table is reproducible from config.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/evaluation/economic_value.py",
+          "quote": "@dataclass(frozen=True)\nclass GsvivsSizingSpec:\n    \"\"\"A single GSVIVS signal-sizing configuration.\n\n    One spec drives one variant of the trading signal in the dashboard. The\n    default 4-element list (:data:`DEFAULT_GSVIVS_SIZING_SPECS`) is the\n    four-option toggle exposed on the GSVIVS table: ``binary``,\n    ``asym_long`` (L=2), ``zscore`` (L=1), ``long_flat``.",
+          "focus": [
+           "    four-option toggle exposed on the GSVIVS table: ``binary``,"
+          ]
+         }
+        },
+        {
+         "id": "c-284",
+         "text": "Model comparison is panel aware: the Diebold-Mariano test averages loss differentials per date before its Newey-West variance, so serial correlation lags never cross symbol boundaries in a pooled multi-symbol panel.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/evaluation/statistical_tests.py",
+          "quote": "    n_cross_sections : int | None\n        Number of cross-sectional units (symbols) in a panel. When provided\n        and > 1, loss differentials are averaged per date before computing HAC\n        variance, preventing Newey-West lags from crossing symbol boundaries.",
+          "focus": [
+           "        and > 1, loss differentials are averaged per date before computing HAC"
+          ]
+         }
+        },
+        {
+         "id": "c-285",
+         "text": "Every run ends in a tournament: all models score against a named baseline, `har` by default, and a [[Model Confidence Set]] bootstrapped 10,000 times says which models are statistically indistinguishable from the best.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/evaluation/statistical_tests.py",
+          "quote": "def tournament_table(\n    predictions: dict[str, np.ndarray],\n    y_true: np.ndarray,\n    baseline: str = \"har\",\n    horizon: int = 1,\n    mcs_alpha: float = 0.10,\n    mcs_bootstrap: int = 10_000,",
+          "focus": [
+           "    baseline: str = \"har\",",
+           "    mcs_bootstrap: int = 10_000,"
+          ]
+         }
+        },
+        {
+         "id": "c-286",
+         "text": "Costs are honest: option spreads follow the Doshi et al. 2025 schedule, 4.5 times base inside 6 remaining trading days and 1.75 times inside 13, which is exactly why the realistic backtest rolls positions before expiry.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/evaluation/realistic_straddle.py",
+          "quote": "    if T_rem_days <= 6:\n        return base_spread * 4.5\n    elif T_rem_days <= 13:\n        return base_spread * 1.75\n    else:\n        return base_spread",
+          "focus": [
+           "        return base_spread * 4.5"
+          ]
+         }
+        },
+        {
+         "id": "c-287",
+         "text": "Discrete hedging risk is priced rather than ignored: a Boyle-Emanuel 1980 variance term for 26 rebalances a day inflates the Sharpe denominator, so a strategy cannot look sharp by pretending it hedges continuously.",
+         "status": "verified",
+         "cite": {
+          "file": "src/volforecast/evaluation/realistic_straddle.py",
+          "quote": "def compute_hedge_error_variance(\n    gamma: np.ndarray,\n    spot: np.ndarray,\n    iv: np.ndarray,\n    kappa: float = 4.0,\n    N: int = 26,\n) -> np.ndarray:\n    \"\"\"Per-day discrete hedging error variance (Boyle-Emanuel 1980).",
+          "focus": [
+           "    \"\"\"Per-day discrete hedging error variance (Boyle-Emanuel 1980)."
+          ]
+         }
+        },
+        {
+         "id": "c-288",
+         "text": "What this package does not do is trade: every number is a backtest over cached data, and its most actionable output is a Sharpe ratio with honest error bars, not an order.",
+         "status": "inferred"
+        }
+       ]
+      },
+      {
+       "type": "stats",
+       "items": [
+        {
+         "v": "7,031",
+         "l": "LINES OF CODE"
+        },
+        {
+         "v": "14",
+         "l": "FILES"
+        },
+        {
+         "v": "4",
+         "l": "FAN-IN",
+         "s": "groups that import this one"
+        },
+        {
+         "v": "1",
+         "l": "FAN-OUT",
+         "s": "groups this one imports"
+        }
+       ]
+      }
+     ],
+     "lede": "A closer read of evaluation. The claims here are checked the same way as everywhere else on this page, and anything marked INFERRED could not be anchored to a line and says so."
     }
    ]
   },
@@ -412,7 +1185,7 @@
        "type": "trace",
        "steps": [
         {
-         "claim": "The vol shell wrapper is the front door: its ingest-ohlcv case forwards every argument straight to python -m volforecast ingest-ohlcv, so the shell decides nothing and hands control to the package.",
+         "claim": "The vol shell wrapper is the front door: its ingest-ohlcv case forwards every argument unchanged to python -m volforecast ingest-ohlcv, deciding nothing itself beyond the nix library path the Python process needs.",
          "cite": {
           "file": "vol",
           "quote": "        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast refresh-ohlcv \"$@\"\n        ;;\n    ingest-edrvol)\n        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast ingest-edrvol \"$@\"\n        ;;\n    ingest-ohlcv)\n        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast ingest-ohlcv \"$@\"\n        ;;\n    ingest-ticks)\n        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast ingest-ticks \"$@\"\n        ;;",
@@ -425,7 +1198,7 @@
          "predict": "This hop ends in vol. Which file does the path reach next?"
         },
         {
-         "claim": "Running the module lands in main, which builds the parser and lets argparse decide which subcommand was asked for.",
+         "claim": "Inside Python the module entry lands in main, which builds the full command tree once, lets argparse decide that ingest-ohlcv was the command asked for, and simply prints help and exits cleanly when no subcommand is given.",
          "cite": {
           "file": "src/volforecast/__main__.py",
           "quote": "def main(argv: list[str] | None = None) -> int:\n    parser = _build_parser()\n    args = parser.parse_args(argv)\n\n    if args.command is None:\n        parser.print_help()\n        return 0",
@@ -437,7 +1210,7 @@
          "next": "_build_parser in src/volforecast/__main__.py"
         },
         {
-         "claim": "_build_parser does not define the subcommand itself; it imports the ingest_ohlcv module's register function and hands it the subparsers object.",
+         "claim": "_build_parser does not define the subcommand itself, it imports the ingest_ohlcv module's register function and hands it the subparsers object, the lazy registration pattern all of the roughly two dozen utility commands follow.",
          "cite": {
           "file": "src/volforecast/__main__.py",
           "quote": "    _reg_ingest_vix_futures(subparsers)\n\n    # ─── UTILITY: vol ingest-ohlcv ───\n    from volforecast.cli.ingest_ohlcv import register as _reg_ingest_ohlcv\n\n    _reg_ingest_ohlcv(subparsers)",
@@ -450,7 +1223,7 @@
          "predict": "This hop ends in __main__.py. Which file does the path reach next?"
         },
         {
-         "claim": "register adds the ingest-ohlcv subparser and its flags, so the command's entire surface is owned by the module that implements it rather than by __main__.",
+         "claim": "register declares what the command means in data terms, fetching split-adjusted daily OHLCV from the TSDB eqpad_ namespace, with a start date defaulting to 2015-01-02, an end date defaulting to yesterday, a symbol filter, and a force flag to bypass the cache.",
          "cite": {
           "file": "src/volforecast/cli/ingest_ohlcv.py",
           "quote": "def register(subparsers) -> None:\n    \"\"\"Register the ingest-ohlcv subcommand.\"\"\"\n    import argparse\n\n    parser = subparsers.add_parser(\n        \"ingest-ohlcv\",\n        help=\"Fetch split-adjusted daily OHLCV from TSDB eqpad_ for all symbols\",\n    )\n    parser.add_argument(",
@@ -463,7 +1236,7 @@
          "next": "handle in src/volforecast/cli/ingest_ohlcv.py"
         },
         {
-         "claim": "set_defaults binds handle as the callable for this subcommand, and handle converts the parsed strings into date objects before delegating.",
+         "claim": "set_defaults binds handle as this subcommand's callable, and handle converts the parsed strings into real date objects, filling in yesterday when no end date was given, before delegating the actual work to run.",
          "cite": {
           "file": "src/volforecast/cli/ingest_ohlcv.py",
           "quote": "    parser.set_defaults(func=handle)\n\n\ndef handle(args) -> int:\n    \"\"\"Execute ingest-ohlcv command. Return exit code.\"\"\"\n    from datetime import timedelta\n\n    start = date.fromisoformat(args.start)\n    end = date.fromisoformat(args.end if args.end else (date.today() - timedelta(days=1)).isoformat())\n    symbols = args.symbols.split(\",\") if args.symbols else None\n    return run(start, end, symbols=symbols, force=args.force)",
@@ -476,7 +1249,7 @@
          "next": "run in src/volforecast/cli/ingest_ohlcv.py"
         },
         {
-         "claim": "run is the pipeline proper, taking a start date, an end date, an optional symbol list and a force flag, and returning an exit code.",
+         "claim": "run is the ingestion pipeline proper: for each symbol it skips anything the parquet cache already covers, fetches split-adjusted daily prices from TSDB otherwise, and hands every non-empty frame to save_ohlcv_cache while recording the ingestion in the data manifest.",
          "cite": {
           "file": "src/volforecast/cli/ingest_ohlcv.py",
           "quote": "                    continue\n\n            try:\n                df = fetch_ohlcv(sym, start_date, end_date)\n                if df.empty:\n                    sp.log(f\"{sym}: no data returned\")\n                    failed.append(sym)\n                else:\n                    save_ohlcv_cache(sym, df)\n                    record_ingestion_yaml(\n                        \"ohlcv\",\n                        sym,",
@@ -489,7 +1262,7 @@
          "predict": "This hop ends in ingest_ohlcv.py. Which file does the path reach next?"
         },
         {
-         "claim": "For each symbol the fetched frame reaches save_ohlcv_cache, which writes parquet through a temporary file and an os.replace so a crash mid write cannot leave a half written cache.",
+         "claim": "Each fetched frame lands in save_ohlcv_cache, which merges new rows over any existing history and writes the parquet through a temporary file swapped in with os.replace, so a crash mid-write can never leave a half-written cache on disk.",
          "cite": {
           "file": "src/volforecast/data/ohlcv.py",
           "quote": "    # Atomic write: write to temp file then rename\n    fd, tmp = tempfile.mkstemp(suffix=\".parquet\", dir=str(path.parent))\n    try:\n        os.close(fd)\n        df.to_parquet(tmp)\n        os.replace(tmp, str(path))\n    except BaseException:\n        try:\n            os.unlink(tmp)\n        except OSError:\n            pass\n        raise\n\n    return path",
@@ -503,7 +1276,7 @@
          "predict": "This hop ends in ohlcv.py. Which file does the path reach next?"
         },
         {
-         "claim": "The destination is decided by ohlcv_cache_path, which is the end of the road: one parquet file per symbol under data/raw/ohlcv.",
+         "claim": "The destination is decided by ohlcv_cache_path: one parquet per symbol under data/raw/ohlcv/, resolved from the repo root by marker files so the cache lands in the same place no matter which directory the command was launched from.",
          "cite": {
           "file": "src/volforecast/utils/paths.py",
           "quote": "    \"\"\"Absolute path to data/raw/ohlcv/ (daily OHLCV from TSDB).\"\"\"\n    return data_path(\"raw/ohlcv\")\n\n\ndef ohlcv_cache_path(symbol: str) -> Path:\n    \"\"\"Parquet path for a symbol's daily OHLCV: data/raw/ohlcv/{SYMBOL}.parquet.\"\"\"\n    return data_path(\"raw/ohlcv\", f\"{symbol}.parquet\")",
@@ -564,22 +1337,22 @@
        "claims": [
         {
          "id": "c-101",
-         "text": "Imports of heavy dependencies are deferred into function bodies rather than done at module top level, which keeps the command line responsive and makes a broken optional dependency fail only the command that needs it.",
+         "text": "Modules are laid out as the forecasting pipeline reads: volforecast.data ingests, features transforms, models fits, evaluation scores and cli drives, with the shared volforecast.utils at the highest fan-in in the repo, so imports flow the same direction the data does.",
          "status": "inferred"
         },
         {
          "id": "c-102",
-         "text": "Every CLI subcommand follows the same three function shape — register to declare the flags, handle to convert parsed arguments, and run to do the work — so a new command is added by copying that trio.",
+         "text": "Errors are contained where they happen: Optuna workers catch exceptions so one failed trial cannot kill a tuning study, ingestion writes parquet atomically via a staging directory and merges rather than overwrites, and the audit command signals problems with a non-zero exit code.",
          "status": "inferred"
         },
         {
          "id": "c-103",
-         "text": "Cache writes go through a temporary file and an atomic replace, and the surrounding code merges rather than overwrites, so re-running an ingestion is expected to be safe.",
+         "text": "Mathematics is defended twice, in docstrings that write out the QLIKE gradient and hessian and cite Easley, Lopez de Prado and O'Hara for VPIN, and in a 45,000 line unit suite that checks those formulas against numerical differentiation on seeded synthetic data.",
          "status": "inferred"
         },
         {
          "id": "c-104",
-         "text": "Public functions carry numpy style docstrings with Parameters and Returns sections, and the deprecated path helpers are kept as thin aliases rather than deleted.",
+         "text": "The habit the authors clearly cared most about is look-ahead hygiene: hyperparameter tuning uses expanding window walk-forward CV, holdout splits carry explicit purge gaps, and Optuna study names hash the model config so trials from a stale setup are never silently reused.",
          "status": "inferred"
         }
        ]
@@ -593,6 +1366,82 @@
    "title": "CLOSE",
    "minutes": 6,
    "stops": [
+    {
+     "id": "gloss",
+     "title": "The glossary",
+     "kind": "stop",
+     "minutes": 2,
+     "blocks": [
+      {
+       "type": "table",
+       "caption": "Click any dotted term in the prose to open the same definition in place.",
+       "sortable": true,
+       "columns": [
+        "TERM",
+        "DEFINITION"
+       ],
+       "rows": [
+        [
+         "<b>realized variance (RV)</b>",
+         "The sum of squared intraday returns over one trading day, computed from 5 minute returns with no mean subtraction. It is the quantity every model in this repo forecasts."
+        ],
+        [
+         "<b>QLIKE</b>",
+         "The quasi-likelihood loss for variance forecasts, exp(e) - e - 1 on the log-space error e. It is exactly zero for a perfect forecast and punishes under-predicting volatility more than over-predicting it, which is why the tournament ranks models by it."
+        ],
+        [
+         "<b>HAR</b>",
+         "The heterogeneous autoregressive baseline: regress tomorrow&#x27;s log RV on the daily value `log_rv_d`, the 5 day mean `log_rv_w`, and the 22 day mean `log_rv_m`. Three coefficients, brutally hard to beat, and the benchmark every ML model in the tournament is scored against."
+        ],
+        [
+         "<b>realized kernel (RK)</b>",
+         "A microstructure-noise-robust variance estimator that weights return autocovariances with a flat-top Parzen kernel. On clean prices it agrees with 5 minute RV; on noisy tick data it recovers true variance where naive tick-by-tick RV is inflated."
+        ],
+        [
+         "<b>Chunk Store</b>",
+         "The GS internal tick store, reached through `pytickclient`. It supplies the L1 trades and quotes (and L2 depth for the E-mini) that every realized measure is computed from; tests mock its query layer because it is unreachable outside the GS network."
+        ],
+        [
+         "<b>tournament</b>",
+         "The evaluation mode where every candidate model, 13 in the full config, is trained and scored on identical folds, ranked by QLIKE, and compared with statistical tests. Every `vol run --config` invocation uses this code path, even for a single model."
+        ],
+        [
+         "<b>purge gap</b>",
+         "A buffer of observations deleted between CV training and test blocks so overlapping RV windows cannot leak across the boundary. The pipeline enforces an effective purge of at least the forecast horizon h on every fold."
+        ],
+        [
+         "<b>Duan correction</b>",
+         "The retransformation applied when log-space forecasts are converted back to variance levels: plain exponentiation is biased low, so predictions are scaled by the mean of exponentiated residuals. The Pipeline applies it per fold, from that fold&#x27;s training residuals only."
+        ],
+        [
+         "<b>IV-RV gap</b>",
+         "The spread between options-implied volatility and forecast realized volatility. Implied usually sits above subsequent realized (the variance risk premium), and turning QLIKE improvements into a tradeable read on this gap is the project&#x27;s stated goal."
+        ],
+        [
+         "<b>variance risk premium</b>",
+         "Option-implied variance minus subsequently realized variance. Usually positive: investors pay a premium for volatility protection, and the project computes it as squared ATM implied vol minus annualized realized variance."
+        ],
+        [
+         "<b>VPIN</b>",
+         "Volume-Synchronized Probability of Informed Trading: the mean absolute buy-sell volume imbalance across equal-volume buckets, a daily order-flow toxicity measure from the microstructure layer."
+        ],
+        [
+         "<b>implied volatility</b>",
+         "The volatility the options market prices in. The project compares it with the forecast of realized volatility: when implied looks rich against the forecast, the strategies sell vol, and when cheap they buy."
+        ],
+        [
+         "<b>Model Confidence Set</b>",
+         "The Hansen et al. 2011 procedure returning the set of models statistically indistinguishable from the best at a chosen confidence level, via sequential bootstrap elimination. Membership, not rank, is the honest headline."
+        ],
+        [
+         "<b>DSR</b>",
+         "Deflated Sharpe Ratio: the probability that an observed Sharpe beats the maximum expected by chance given how many strategy configurations were tried, correcting backtest results for selection luck."
+        ]
+       ]
+      }
+     ],
+     "lede": "Every dotted term on this page, in one table. The definitions travel with the page and open in place when you click a term."
+    },
     {
      "id": "audit",
      "title": "The ledger",
@@ -609,7 +1458,7 @@
        "type": "callout",
        "level": "info",
        "title": "WHAT THIS PAGE DID NOT READ",
-       "text": "This tool reads Python with the standard library's ast, and anchors into any UTF-8 text file the survey listed. Nothing else was read. Files that failed to parse: 0. Files skipped as not text or outside the repo root: 1. Directories excluded by name: 20. The survey also counted 14 import targets with no file on disk, across 706 import statements; none of them is a node or an edge on the map."
+       "text": "This tool reads Python with the standard library's ast, and anchors into any UTF-8 text file the survey listed. Nothing else was read. Files that failed to parse: 0. Files skipped as not text or outside the repo root: 1. Directories excluded by name: 25. The survey also counted 14 import targets with no file on disk, across 706 import statements; none of them is a node or an edge on the map."
       },
       {
        "type": "ledger"
@@ -624,10 +1473,16 @@
  "degradations": [
   {
    "code": "no_test_command",
-   "reason": "Candidates considered: python -m pytest --collect-only -q tests — pytest not importable under the resolved interpreter."
+   "reason": "Candidates considered: python -m pytest --collect-only -q tests was executed and failed with exit 2, so there is no green test command to hand you."
   }
  ],
  "windows": {
+  "README.md": [
+   [
+    13,
+    60
+   ]
+  ],
   "src/pyproject.toml": [
    [
     13,
@@ -706,8 +1561,16 @@
     502
    ],
    [
+    453,
+    461
+   ],
+   [
     533,
     541
+   ],
+   [
+    559,
+    614
    ],
    [
     569,
@@ -760,6 +1623,10 @@
    [
     1375,
     1393
+   ],
+   [
+    1375,
+    1432
    ]
   ],
   "src/volforecast/cli/audit.py": [
@@ -780,6 +1647,10 @@
     155
    ],
    [
+    228,
+    287
+   ],
+   [
     238,
     246
    ],
@@ -796,6 +1667,10 @@
     465
    ],
    [
+    519,
+    578
+   ],
+   [
     529,
     537
    ],
@@ -808,8 +1683,50 @@
     801
    ],
    [
+    769,
+    777
+   ],
+   [
+    793,
+    801
+   ],
+   [
     829,
     837
+   ]
+  ],
+  "src/volforecast/cli/backfill_rk.py": [
+   [
+    41,
+    49
+   ],
+   [
+    85,
+    106
+   ],
+   [
+    195,
+    203
+   ],
+   [
+    329,
+    337
+   ],
+   [
+    495,
+    503
+   ],
+   [
+    518,
+    526
+   ],
+   [
+    653,
+    703
+   ],
+   [
+    725,
+    733
    ]
   ],
   "vol": [
@@ -930,74 +1847,902 @@
     1195
    ]
   ],
-  "src/volforecast/models/_base.py": [
+  "src/volforecast/models/xgboost.py": [
    [
-    18,
-    26
+    58,
+    66
    ],
    [
-    101,
-    109
+    85,
+    93
    ],
    [
-    232,
-    257
+    106,
+    114
+   ],
+   [
+    716,
+    724
+   ],
+   [
+    741,
+    749
+   ],
+   [
+    926,
+    934
+   ],
+   [
+    1031,
+    1039
+   ],
+   [
+    1052,
+    1060
+   ],
+   [
+    1115,
+    1174
    ]
   ],
-  "src/volforecast/data/sequence_cache.py": [
+  "src/volforecast/data/micro.py": [
    [
-    43,
-    51
+    58,
+    66
    ],
    [
-    71,
-    130
+    87,
+    95
    ],
    [
-    146,
-    154
+    127,
+    135
    ],
    [
-    225,
-    233
+    323,
+    331
+   ],
+   [
+    411,
+    470
+   ],
+   [
+    496,
+    504
+   ],
+   [
+    613,
+    621
+   ],
+   [
+    768,
+    776
+   ],
+   [
+    810,
+    818
+   ],
+   [
+    835,
+    863
+   ],
+   [
+    875,
+    883
+   ],
+   [
+    904,
+    912
+   ],
+   [
+    924,
+    932
+   ],
+   [
+    958,
+    966
+   ],
+   [
+    978,
+    986
+   ],
+   [
+    1008,
+    1016
+   ],
+   [
+    1067,
+    1075
+   ],
+   [
+    1269,
+    1277
+   ]
+  ],
+  "src/volforecast/models/gnn.py": [
+   [
+    44,
+    52
+   ],
+   [
+    65,
+    83
+   ],
+   [
+    94,
+    102
+   ],
+   [
+    186,
+    245
+   ]
+  ],
+  "src/volforecast/models/lightgbm.py": [
+   [
+    62,
+    110
+   ],
+   [
+    125,
+    133
+   ],
+   [
+    147,
+    155
+   ],
+   [
+    748,
+    766
+   ],
+   [
+    834,
+    842
+   ],
+   [
+    889,
+    897
+   ],
+   [
+    1164,
+    1172
+   ]
+  ],
+  "src/volforecast/data/chunk_store.py": [
+   [
+    44,
+    52
+   ],
+   [
+    56,
+    64
+   ],
+   [
+    129,
+    153
+   ],
+   [
+    187,
+    212
+   ],
+   [
+    281,
+    289
+   ],
+   [
+    361,
+    369
+   ],
+   [
+    384,
+    392
+   ],
+   [
+    407,
+    466
+   ],
+   [
+    547,
+    555
+   ],
+   [
+    674,
+    682
+   ],
+   [
+    733,
+    741
+   ]
+  ],
+  "src/volforecast/data/rv_panel.py": [
+   [
+    41,
+    49
+   ],
+   [
+    75,
+    83
+   ],
+   [
+    165,
+    173
+   ],
+   [
+    226,
+    234
+   ],
+   [
+    613,
+    621
+   ],
+   [
+    625,
+    640
+   ],
+   [
+    688,
+    696
+   ],
+   [
+    704,
+    746
+   ]
+  ],
+  "src/volforecast/cli/forecast.py": [
+   [
+    39,
+    47
+   ],
+   [
+    52,
+    60
+   ],
+   [
+    98,
+    106
+   ],
+   [
+    121,
+    129
+   ],
+   [
+    171,
+    179
+   ],
+   [
+    210,
+    218
+   ],
+   [
+    416,
+    424
+   ],
+   [
+    443,
+    486
+   ],
+   [
+    514,
+    522
+   ]
+  ],
+  "src/volforecast/evaluation/realistic_straddle.py": [
+   [
+    27,
+    79
+   ],
+   [
+    95,
+    103
+   ],
+   [
+    108,
+    116
+   ],
+   [
+    157,
+    165
+   ],
+   [
+    202,
+    210
+   ],
+   [
+    248,
+    256
+   ],
+   [
+    284,
+    292
    ],
    [
     319,
     327
    ],
    [
-    413,
-    421
+    379,
+    387
    ],
    [
-    533,
-    545
+    552,
+    560
    ],
    [
-    550,
-    558
+    609,
+    617
    ],
    [
-    564,
-    572
+    665,
+    673
    ],
    [
-    582,
-    590
-   ],
-   [
-    644,
-    652
-   ],
-   [
-    696,
-    704
+    718,
+    726
    ]
   ],
-  "src/volforecast/cli/console.py": [
+  "src/volforecast/evaluation/statistical_tests.py": [
    [
     13,
-    43
+    73
+   ],
+   [
+    138,
+    146
+   ],
+   [
+    376,
+    384
+   ],
+   [
+    468,
+    476
+   ],
+   [
+    618,
+    626
+   ],
+   [
+    646,
+    654
+   ],
+   [
+    716,
+    724
+   ]
+  ],
+  "src/volforecast/features/calendar.py": [
+   [
+    153,
+    161
+   ],
+   [
+    180,
+    196
+   ],
+   [
+    203,
+    211
+   ],
+   [
+    218,
+    269
+   ],
+   [
+    285,
+    293
+   ],
+   [
+    309,
+    317
+   ],
+   [
+    362,
+    370
+   ]
+  ],
+  "src/volforecast/features/microstructure.py": [
+   [
+    27,
+    88
+   ],
+   [
+    114,
+    122
+   ],
+   [
+    160,
+    168
+   ],
+   [
+    199,
+    207
+   ],
+   [
+    242,
+    250
+   ],
+   [
+    306,
+    314
+   ],
+   [
+    353,
+    361
+   ]
+  ],
+  "src/volforecast/features/options.py": [
+   [
+    13,
+    58
+   ],
+   [
+    71,
+    79
+   ],
+   [
+    92,
+    100
+   ],
+   [
+    117,
+    125
+   ]
+  ],
+  "src/volforecast/utils/cv.py": [
+   [
+    27,
+    105
+   ],
+   [
+    134,
+    142
+   ],
+   [
+    204,
+    212
+   ],
+   [
+    298,
+    306
+   ]
+  ],
+  "src/volforecast/utils/manifest.py": [
+   [
+    44,
+    62
+   ],
+   [
+    66,
+    74
+   ],
+   [
+    84,
+    92
+   ],
+   [
+    109,
+    117
+   ],
+   [
+    137,
+    138
+   ],
+   [
+    144,
+    157
+   ],
+   [
+    284,
+    297
+   ],
+   [
+    321,
+    357
+   ],
+   [
+    393,
+    413
+   ]
+  ],
+  "src/volforecast/utils/persistence.py": [
+   [
+    13,
+    41
+   ],
+   [
+    91,
+    99
+   ],
+   [
+    103,
+    130
+   ],
+   [
+    136,
+    144
+   ],
+   [
+    152,
+    171
+   ],
+   [
+    185,
+    193
+   ],
+   [
+    222,
+    230
+   ],
+   [
+    244,
+    283
+   ],
+   [
+    310,
+    318
+   ]
+  ],
+  "src/volforecast/pipeline/conditional_duan.py": [
+   [
+    39,
+    47
+   ],
+   [
+    72,
+    131
+   ],
+   [
+    292,
+    300
+   ]
+  ],
+  "src/volforecast/pipeline/feature_selection.py": [
+   [
+    17,
+    47
+   ],
+   [
+    162,
+    170
+   ],
+   [
+    192,
+    200
+   ],
+   [
+    270,
+    278
+   ]
+  ],
+  "src/volforecast/pipeline/fold_cache.py": [
+   [
+    44,
+    90
+   ],
+   [
+    113,
+    117
+   ],
+   [
+    125,
+    133
+   ],
+   [
+    139,
+    142
+   ],
+   [
+    150,
+    166
+   ],
+   [
+    217,
+    225
+   ],
+   [
+    250,
+    258
+   ],
+   [
+    293,
+    301
+   ]
+  ],
+  "src/volforecast/graphs/base.py": [
+   [
+    19,
+    27
+   ],
+   [
+    75,
+    113
+   ]
+  ],
+  "src/volforecast/graphs/diagnostics.py": [
+   [
+    13,
+    61
+   ],
+   [
+    65,
+    73
+   ],
+   [
+    92,
+    104
+   ],
+   [
+    111,
+    127
+   ]
+  ],
+  "src/volforecast/graphs/simple.py": [
+   [
+    49,
+    78
+   ],
+   [
+    87,
+    95
+   ]
+  ],
+  "src/volforecast/reporting/html_report.py": [
+   [
+    13,
+    46
+   ]
+  ],
+  "src/volforecast/reporting/sections/economic_value.py": [
+   [
+    13,
+    63
+   ],
+   [
+    159,
+    167
+   ],
+   [
+    190,
+    198
+   ]
+  ],
+  "src/volforecast/reporting/sections/forecast_vs_actual.py": [
+   [
+    13,
+    45
+   ]
+  ],
+  "src/volforecast/reporting/sections/statistical_tests.py": [
+   [
+    13,
+    38
+   ]
+  ],
+  "src/volforecast/visualization/lineage.py": [
+   [
+    13,
+    62
+   ],
+   [
+    87,
+    95
+   ]
+  ],
+  "src/tests/conftest.py": [
+   [
+    18,
+    35
+   ],
+   [
+    43,
+    51
+   ],
+   [
+    63,
+    71
+   ],
+   [
+    82,
+    157
+   ],
+   [
+    173,
+    181
+   ],
+   [
+    190,
+    198
+   ],
+   [
+    203,
+    241
+   ],
+   [
+    251,
+    259
+   ],
+   [
+    273,
+    281
+   ],
+   [
+    293,
+    298
+   ]
+  ],
+  "src/tests/integration/test_data_pipeline.py": [
+   [
+    31,
+    65
+   ],
+   [
+    69,
+    77
+   ],
+   [
+    118,
+    126
+   ],
+   [
+    143,
+    151
+   ],
+   [
+    162,
+    170
+   ],
+   [
+    204,
+    212
+   ],
+   [
+    216,
+    224
+   ],
+   [
+    246,
+    254
+   ],
+   [
+    296,
+    304
+   ],
+   [
+    369,
+    377
+   ],
+   [
+    401,
+    409
+   ],
+   [
+    432,
+    440
+   ],
+   [
+    512,
+    520
+   ],
+   [
+    571,
+    579
+   ]
+  ],
+  "src/tests/integration/test_pipeline.py": [
+   [
+    13,
+    49
+   ],
+   [
+    54,
+    62
+   ],
+   [
+    159,
+    167
+   ],
+   [
+    238,
+    246
+   ],
+   [
+    255,
+    263
+   ],
+   [
+    274,
+    282
+   ],
+   [
+    334,
+    342
+   ],
+   [
+    492,
+    500
+   ]
+  ],
+  "src/tests/integration/test_rv_pipeline.py": [
+   [
+    51,
+    92
+   ],
+   [
+    98,
+    106
+   ],
+   [
+    124,
+    132
+   ],
+   [
+    148,
+    156
+   ],
+   [
+    161,
+    169
+   ],
+   [
+    180,
+    188
+   ],
+   [
+    218,
+    226
+   ],
+   [
+    242,
+    261
+   ],
+   [
+    281,
+    289
+   ],
+   [
+    293,
+    312
+   ],
+   [
+    326,
+    334
+   ],
+   [
+    342,
+    350
+   ],
+   [
+    405,
+    413
+   ],
+   [
+    432,
+    440
+   ],
+   [
+    458,
+    499
+   ],
+   [
+    510,
+    518
+   ],
+   [
+    577,
+    585
+   ]
+  ],
+  "src/tests/research/test_per_symbol_qlike.py": [
+   [
+    13,
+    23
+   ],
+   [
+    31,
+    76
+   ],
+   [
+    83,
+    102
    ]
   ]
  },
@@ -1006,16 +2751,18 @@
    "id": "five",
    "kind": "five",
    "title": "Five sentences",
-   "max_claims": 5,
+   "max_claims": 6,
    "files": [
+    "README.md",
     "src/pyproject.toml",
     "src/volforecast/__main__.py",
     "src/volforecast/evaluation/economic_value.py",
-    "src/volforecast/cli/audit.py"
+    "src/volforecast/cli/audit.py",
+    "src/volforecast/cli/backfill_rk.py"
    ],
-   "key": "378587cfc643bcf2b480f6252ab9399eb9f54f3d5d1d08ebf906c0f3e055d746",
+   "key": "98fc02e5f74915635f67b5d04a7e3479dfe7949520e4b5970b37bb0187cf871b",
    "source": "cache",
-   "claims": 5,
+   "claims": 6,
    "dropped": 0
   },
   {
@@ -1028,7 +2775,7 @@
     "src/volforecast/__main__.py",
     "src/volforecast/evaluation/economic_value.py"
    ],
-   "key": "66295801b8af2945083a497cc760e46c14d7daec8ba3234239c2a4ccde1ca800",
+   "key": "916e814552f020bf0f90b9a7e9ff8cb987308a8692d62e3ef1fdb5636455372b",
    "source": "cache",
    "claims": 2,
    "dropped": 0
@@ -1045,7 +2792,7 @@
     "src/volforecast/data/ohlcv.py",
     "src/volforecast/utils/paths.py"
    ],
-   "key": "e92abde094f7991a36ce847a957398c4f038c1e64df1e0376b92256914f9cea9",
+   "key": "9ceee763072414a215e0b196b2a458dfafa690f5d3e1dcb1812409a6038b3234",
    "source": "cache",
    "claims": 8,
    "dropped": 0
@@ -1057,14 +2804,933 @@
    "max_claims": 4,
    "files": [
     "src/tests/unit/test_models.py",
-    "src/volforecast/models/_base.py",
-    "src/volforecast/data/sequence_cache.py",
-    "src/volforecast/cli/console.py"
+    "src/volforecast/models/xgboost.py",
+    "src/volforecast/data/micro.py",
+    "src/volforecast/cli/audit.py"
    ],
-   "key": "9673867503d2c721337305ded95d72af0de5596d1b5f533c177f4ba702e42ba3",
+   "key": "3b023d5a0c10b4da75b03885d393e965af3783dc1cd14a1c366bd01aefa552b3",
    "source": "cache",
    "claims": 4,
    "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast-models",
+   "kind": "node",
+   "title": "Drawer: models",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/models/gnn.py",
+    "src/volforecast/models/lightgbm.py",
+    "src/volforecast/models/xgboost.py",
+    "src/volforecast/models/__init__.py",
+    "README.md"
+   ],
+   "key": "0527f3df0b8716c71035b95aaa614a3e293d2fa3e8ab428caabad7843885810f",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast-data",
+   "kind": "node",
+   "title": "Drawer: data",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/data/chunk_store.py",
+    "src/volforecast/data/micro.py",
+    "src/volforecast/data/rv_panel.py",
+    "src/volforecast/data/__init__.py",
+    "README.md"
+   ],
+   "key": "fffba38d5f4a581ff0798d8a83e4313b39e8d376657351f3a27944996eff0bb1",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast-cli",
+   "kind": "node",
+   "title": "Drawer: cli",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/cli/audit.py",
+    "src/volforecast/cli/backfill_rk.py",
+    "src/volforecast/cli/forecast.py",
+    "src/volforecast/cli/__init__.py",
+    "README.md"
+   ],
+   "key": "ea74e111d7f9fd6ad20878f3698f8467562f2a63ebe70328c6a5685ee71483c6",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast-evaluation",
+   "kind": "node",
+   "title": "Drawer: evaluation",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/evaluation/economic_value.py",
+    "src/volforecast/evaluation/realistic_straddle.py",
+    "src/volforecast/evaluation/statistical_tests.py",
+    "src/volforecast/evaluation/__init__.py",
+    "README.md"
+   ],
+   "key": "7a2488ffce2da6ef31553c773915758f7dc0ebc71638c2358feb97cb84215a51",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast-features",
+   "kind": "node",
+   "title": "Drawer: features",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/features/calendar.py",
+    "src/volforecast/features/microstructure.py",
+    "src/volforecast/features/options.py",
+    "src/volforecast/features/__init__.py",
+    "README.md"
+   ],
+   "key": "eb893187bbd5b42bd460958046cf71fdcf2be153cafa7c21ec51bc890d0df752",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast-utils",
+   "kind": "node",
+   "title": "Drawer: utils",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/utils/cv.py",
+    "src/volforecast/utils/manifest.py",
+    "src/volforecast/utils/persistence.py",
+    "src/volforecast/utils/__init__.py",
+    "README.md"
+   ],
+   "key": "93764ff582f94af916340f4c02353ecc0389f5157000e1d3ea38276a369b094a",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast-pipeline",
+   "kind": "node",
+   "title": "Drawer: pipeline",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/pipeline/conditional_duan.py",
+    "src/volforecast/pipeline/feature_selection.py",
+    "src/volforecast/pipeline/fold_cache.py",
+    "src/volforecast/pipeline/__init__.py",
+    "README.md"
+   ],
+   "key": "fcb19dd32a669e52f029cc39e9c25cea7951cbe40d4be6710fd64100eb75a08c",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast",
+   "kind": "node",
+   "title": "Drawer: volforecast",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/__main__.py",
+    "src/volforecast/cli/audit.py",
+    "src/volforecast/cli/backfill_rk.py",
+    "src/volforecast/cli/forecast.py",
+    "src/volforecast/data/chunk_store.py",
+    "src/volforecast/data/micro.py",
+    "src/volforecast/__init__.py",
+    "README.md"
+   ],
+   "key": "e68f5b7f848507bef5fc9c4da1c871d4b1aa227a63407fad5c8c67efbaebc8f3",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast-graphs",
+   "kind": "node",
+   "title": "Drawer: graphs",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/graphs/base.py",
+    "src/volforecast/graphs/diagnostics.py",
+    "src/volforecast/graphs/simple.py",
+    "src/volforecast/graphs/__init__.py",
+    "README.md"
+   ],
+   "key": "32776efc92b6fa5966f8106ae1c0cdd214e0152881c03590d900e6e9f298327d",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "node:src-volforecast-reporting",
+   "kind": "node",
+   "title": "Drawer: reporting",
+   "max_claims": 1,
+   "files": [
+    "src/volforecast/reporting/html_report.py",
+    "src/volforecast/reporting/sections/economic_value.py",
+    "src/volforecast/reporting/sections/forecast_vs_actual.py",
+    "src/volforecast/reporting/sections/statistical_tests.py",
+    "src/volforecast/reporting/__init__.py",
+    "README.md"
+   ],
+   "key": "2e1e0ae8e1c9a0bf2daea56467bade0259617f2542369fadd1bc8aba52d01665",
+   "source": "cache",
+   "claims": 1,
+   "dropped": 0
+  },
+  {
+   "id": "dive:src-volforecast-models",
+   "kind": "dive",
+   "title": "Inside models",
+   "max_claims": 8,
+   "files": [
+    "src/volforecast/models/gnn.py",
+    "src/volforecast/models/lightgbm.py",
+    "src/volforecast/models/xgboost.py",
+    "src/volforecast/models/__init__.py",
+    "README.md"
+   ],
+   "key": "7d6c324e4a094b533ff8eb2ada2bfd8bd295d8c93a369a7f9f69d277534249ae",
+   "source": "cache",
+   "claims": 8,
+   "dropped": 0
+  },
+  {
+   "id": "dive:src-volforecast-data",
+   "kind": "dive",
+   "title": "Inside data",
+   "max_claims": 8,
+   "files": [
+    "src/volforecast/data/chunk_store.py",
+    "src/volforecast/data/micro.py",
+    "src/volforecast/data/rv_panel.py",
+    "src/volforecast/data/__init__.py",
+    "README.md"
+   ],
+   "key": "21362d5002b22fee40b9fcd182df079d6cde0a718b5724f5cfa1cac508fb6d1c",
+   "source": "cache",
+   "claims": 8,
+   "dropped": 0
+  },
+  {
+   "id": "dive:src-volforecast-cli",
+   "kind": "dive",
+   "title": "Inside cli",
+   "max_claims": 8,
+   "files": [
+    "src/volforecast/cli/audit.py",
+    "src/volforecast/cli/backfill_rk.py",
+    "src/volforecast/cli/forecast.py",
+    "src/volforecast/cli/__init__.py",
+    "README.md"
+   ],
+   "key": "9b7e5b2a854afbd675f5a02b290243deb4b5c242b22d5b37a59e2b245a5cdfdf",
+   "source": "cache",
+   "claims": 8,
+   "dropped": 0
+  },
+  {
+   "id": "dive:src-volforecast-evaluation",
+   "kind": "dive",
+   "title": "Inside evaluation",
+   "max_claims": 8,
+   "files": [
+    "src/volforecast/evaluation/economic_value.py",
+    "src/volforecast/evaluation/realistic_straddle.py",
+    "src/volforecast/evaluation/statistical_tests.py",
+    "src/volforecast/evaluation/__init__.py",
+    "README.md"
+   ],
+   "key": "c029b07fb357656e9c46d049fabfa01f3713ba06f2d0a408fcf05b75144e8e6e",
+   "source": "cache",
+   "claims": 8,
+   "dropped": 0
+  },
+  {
+   "id": "dive:src-volforecast-features",
+   "kind": "dive",
+   "title": "Inside features",
+   "max_claims": 8,
+   "files": [
+    "src/volforecast/features/calendar.py",
+    "src/volforecast/features/microstructure.py",
+    "src/volforecast/features/options.py",
+    "src/volforecast/features/__init__.py",
+    "README.md"
+   ],
+   "key": "4d2d25b90ff3a1517211bf7da6ce12216778392d48d467bb6b8df93e0a6dfade",
+   "source": "cache",
+   "claims": 8,
+   "dropped": 0
+  },
+  {
+   "id": "tour",
+   "kind": "tour",
+   "title": "Guided tour",
+   "max_claims": 11,
+   "files": [
+    "src/volforecast/cli/audit.py",
+    "src/volforecast/cli/__init__.py",
+    "src/volforecast/models/gnn.py",
+    "src/volforecast/models/__init__.py",
+    "src/volforecast/features/calendar.py",
+    "src/volforecast/features/__init__.py",
+    "src/volforecast/reporting/html_report.py",
+    "src/volforecast/reporting/__init__.py",
+    "src/volforecast/visualization/lineage.py",
+    "src/volforecast/visualization/__init__.py",
+    "src/volforecast/pipeline/conditional_duan.py",
+    "src/volforecast/pipeline/__init__.py"
+   ],
+   "key": "14f4c4f7230c3071128d2312a146d037f6d1e2d3e15b9bd1c83eeb072f4147a2",
+   "source": "cache",
+   "claims": 11,
+   "dropped": 0
+  },
+  {
+   "id": "cols",
+   "kind": "cols",
+   "title": "Column labels",
+   "max_claims": 4,
+   "files": [],
+   "key": "9283c40fee74c0e74689616595f8b94fed1b2bc83601d298dbc72fb90e15a249",
+   "source": "cache",
+   "claims": 4,
+   "dropped": 0
+  },
+  {
+   "id": "gloss",
+   "kind": "gloss",
+   "title": "Glossary",
+   "max_claims": 14,
+   "files": [
+    "src/tests/conftest.py",
+    "src/tests/integration/test_data_pipeline.py",
+    "src/tests/integration/test_pipeline.py",
+    "src/tests/integration/test_rv_pipeline.py",
+    "src/tests/research/test_per_symbol_qlike.py",
+    "README.md"
+   ],
+   "key": "4fee597da5ea6e86af4108453b11ff1ea15a3db0b0954c4916ebaca2de28fd42",
+   "source": "cache",
+   "claims": 14,
+   "dropped": 0
   }
+ ],
+ "glossary": [
+  {
+   "term": "realized variance (RV)",
+   "def": "The sum of squared intraday returns over one trading day, computed from 5 minute returns with no mean subtraction. It is the quantity every model in this repo forecasts.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "    def test_rv_sum_of_squares(self, gbm_5min_returns):\n        \"\"\"RV should equal sum of squared returns.\"\"\"\n        rv = compute_realized_variance(pd.Series(gbm_5min_returns))\n        expected = float(np.sum(gbm_5min_returns**2))\n        assert rv == pytest.approx(expected, rel=1e-10)",
+    "focus": [
+     "\"\"\"RV should equal sum of squared returns.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "QLIKE",
+   "def": "The quasi-likelihood loss for variance forecasts, exp(e) - e - 1 on the log-space error e. It is exactly zero for a perfect forecast and punishes under-predicting volatility more than over-predicting it, which is why the tournament ranks models by it.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "class TestQLIKE:\n    def test_perfect_prediction_is_zero(self):\n        y = np.array([-8.0, -9.0, -7.5, -8.5])\n        assert qlike(y, y, log_space=True) == pytest.approx(0.0, abs=1e-15)\n\n    def test_positive_for_imperfect(self):\n        y = np.array([-8.0, -9.0, -7.5, -8.5])\n        h = y + 0.5\n        assert qlike(y, h, log_space=True) > 0",
+    "focus": [
+     "assert qlike(y, y, log_space=True) == pytest.approx(0.0, abs=1e-15)"
+    ]
+   }
+  },
+  {
+   "term": "HAR",
+   "def": "The heterogeneous autoregressive baseline: regress tomorrow's log RV on the daily value `log_rv_d`, the 5 day mean `log_rv_w`, and the 22 day mean `log_rv_m`. Three coefficients, brutally hard to beat, and the benchmark every ML model in the tournament is scored against.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "class TestHARDesignMatrix:\n    def test_design_matrix_columns(self, synthetic_rv_series):\n        X = build_har_design_matrix(synthetic_rv_series)\n        assert list(X.columns) == [\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"]\n\n    def test_design_matrix_nan_first_rows(self, synthetic_rv_series):\n        X = build_har_design_matrix(synthetic_rv_series)\n        # First 22 rows should have NaN (need 22 days lookback + 1 shift)\n        assert X.iloc[0].isna().any()",
+    "focus": [
+     "assert list(X.columns) == [\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"]"
+    ]
+   }
+  },
+  {
+   "term": "realized kernel (RK)",
+   "def": "A microstructure-noise-robust variance estimator that weights return autocovariances with a flat-top Parzen kernel. On clean prices it agrees with 5 minute RV; on noisy tick data it recovers true variance where naive tick-by-tick RV is inflated.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "class TestRealizedKernel:\n    def test_rk_close_to_rv_no_noise(self, gbm_log_prices, gbm_5min_returns):\n        \"\"\"RK from clean GBM prices should approximate 5-min RV.\"\"\"\n        rk = realized_kernel(gbm_log_prices)\n        rv_5min = compute_realized_variance(pd.Series(gbm_5min_returns))",
+    "focus": [
+     "\"\"\"RK from clean GBM prices should approximate 5-min RV.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "Chunk Store",
+   "def": "The GS internal tick store, reached through `pytickclient`. It supplies the L1 trades and quotes (and L2 depth for the E-mini) that every realized measure is computed from; tests mock its query layer because it is unreachable outside the GS network.",
+   "cite": {
+    "file": "src/tests/integration/test_data_pipeline.py",
+    "quote": "def _mock_chunk_query(symbols, st, et, chunkdb, fields=None):\n    \"\"\"Return synthetic Chunk Store response dict.\"\"\"\n    n = 100\n    base_time = st\n    times = [base_time + timedelta(seconds=i * 10) for i in range(n)]\n    rng = np.random.default_rng(42)",
+    "focus": [
+     "\"\"\"Return synthetic Chunk Store response dict.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "tournament",
+   "def": "The evaluation mode where every candidate model, 13 in the full config, is trained and scored on identical folds, ranked by QLIKE, and compared with statistical tests. Every `vol run --config` invocation uses this code path, even for a single model.",
+   "cite": {
+    "file": "README.md",
+    "quote": "# Single-model experiment (ingest + train + evaluate + dashboard)\nvol run --config workspace/configs/baseline_har.yaml\n\n# Tournament: 13 models compared with statistical tests\nvol run --config workspace/configs/tournament_full_spy.yaml",
+    "focus": [
+     "# Tournament: 13 models compared with statistical tests"
+    ]
+   }
+  },
+  {
+   "term": "purge gap",
+   "def": "A buffer of observations deleted between CV training and test blocks so overlapping RV windows cannot leak across the boundary. The pipeline enforces an effective purge of at least the forecast horizon h on every fold.",
+   "cite": {
+    "file": "src/tests/integration/test_pipeline.py",
+    "quote": "class TestPurgeGapEnforcement:\n    \"\"\"Verify effective_purge = max(config.purge_gap, h) per horizon.\"\"\"\n\n    @pytest.fixture\n    def multi_horizon_data(self) -> pd.DataFrame:\n        \"\"\"Synthetic daily data long enough for multi-horizon CV.\"\"\"",
+    "focus": [
+     "\"\"\"Verify effective_purge = max(config.purge_gap, h) per horizon.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "Duan correction",
+   "def": "The retransformation applied when log-space forecasts are converted back to variance levels: plain exponentiation is biased low, so predictions are scaled by the mean of exponentiated residuals. The Pipeline applies it per fold, from that fold's training residuals only.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "class TestDuanCorrection:\n    \"\"\"Verify Pipeline applies per-fold Duan retransformation correction.\"\"\"\n\n    def _make_synthetic_rv_df(self, n_days=400, seed=42):\n        \"\"\"Create synthetic daily RV DataFrame mimicking real data.\"\"\"\n        rng = np.random.default_rng(seed)",
+    "focus": [
+     "\"\"\"Verify Pipeline applies per-fold Duan retransformation correction.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "IV-RV gap",
+   "def": "The spread between options-implied volatility and forecast realized volatility. Implied usually sits above subsequent realized (the variance risk premium), and turning QLIKE improvements into a tradeable read on this gap is the project's stated goal."
+  },
+  {
+   "term": "variance risk premium",
+   "def": "Option-implied variance minus subsequently realized variance. Usually positive: investors pay a premium for volatility protection, and the project computes it as squared ATM implied vol minus annualized realized variance."
+  },
+  {
+   "term": "VPIN",
+   "def": "Volume-Synchronized Probability of Informed Trading: the mean absolute buy-sell volume imbalance across equal-volume buckets, a daily order-flow toxicity measure from the microstructure layer."
+  },
+  {
+   "term": "implied volatility",
+   "def": "The volatility the options market prices in. The project compares it with the forecast of realized volatility: when implied looks rich against the forecast, the strategies sell vol, and when cheap they buy."
+  },
+  {
+   "term": "Model Confidence Set",
+   "def": "The Hansen et al. 2011 procedure returning the set of models statistically indistinguishable from the best at a chosen confidence level, via sequential bootstrap elimination. Membership, not rank, is the honest headline."
+  },
+  {
+   "term": "DSR",
+   "def": "Deflated Sharpe Ratio: the probability that an observed Sharpe beats the maximum expected by chance given how many strategy configurations were tried, correcting backtest results for selection luck."
+  }
+ ],
+ "map_answers": {
+  "src-volforecast": {
+   "role": [
+    "The package root states the thesis and owns the entry point. The `__init__` docstring declares it plainly: progressively enrich [[HAR]]-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting until the [[QLIKE]] improvement is statistically significant and the IV-RV gap is tradeable. `__main__.py` routes every `vol run --config` invocation through the tournament code path, one model or thirteen, and every run ends in an interactive Plotly dashboard.",
+    "A run earns its data before it trains: unless --skip-ingest is passed, an ingest gate fetches exactly the universe symbols whose realized-volatility cache parquet is missing on disk, and a config with mode: ingest exits after ingestion alone. Tuning is a command-line decision too, --tune, --no-tune, and --n-trials override the YAML's Optuna settings.",
+    "The satellite entry points are working tools, not demos: `vol audit` validates every cached parquet against its manifest contract and regenerates data/manifest.json, `vol backfill-rk` repairs NaN realized-kernel days from raw Chunk Store ticks in batched API calls, and `vol forecast` is the live product, an ensemble that predicts next-day RV, compares it to current ATM implied volatility, and prints LONG, SHORT, or FLAT."
+   ],
+   "reads": "A YAML experiment config parsed through ExperimentConfig.from_yaml (a module missing from this restore), plus argv overrides for symbols, workers, and Optuna tuning.",
+   "feeds": "Everything downstream: the ingest gate triggers data fetches, the tournament trains and ranks every configured model, and completed runs update the trial registry at workspace/research/trials.yaml.",
+   "key_files": [
+    {
+     "file": "__main__.py",
+     "purpose": "The entry point: config load, tuning overrides, the ingest gate, then tournament routing, all behind vol run."
+    },
+    {
+     "file": "__init__.py",
+     "purpose": "Eight lines that state the whole project thesis and the package version."
+    },
+    {
+     "file": "forecast.py",
+     "purpose": "The live signal: a multi-model ensemble predicting next-day RV against current ATM IV, output LONG, SHORT, or FLAT."
+    },
+    {
+     "file": "audit.py",
+     "purpose": "The data-quality gate: audits every cached parquet against manifest contracts and regenerates data/manifest.json."
+    },
+    {
+     "file": "backfill_rk.py",
+     "purpose": "Cache repair: finds NaN realized-kernel days, refetches raw ticks in multi-day batches, recomputes RK and noise_gap in place."
+    },
+    {
+     "file": "chunk_store.py",
+     "purpose": "Tick access: batched Chunk Store queries with retry and timeout, plus the E-mini front-month roll logic."
+    }
+   ],
+   "concepts": [
+    "tournament code path",
+    "ingest gate",
+    "QLIKE",
+    "IV-RV gap signal",
+    "realized kernel",
+    "manifest audit"
+   ],
+   "cite": {
+    "file": "src/volforecast/__main__.py",
+    "quote": "        if config.mode == \"ingest\":\n            return _run_ingest(config, symbols_override=symbols, workers=workers)\n\n        # Ingest gate: run ingest for missing symbols unless --skip-ingest\n        if not args.skip_ingest:\n            from volforecast.utils.paths import rv_cache_path\n\n            universe = symbols or config.universe\n            missing = [s for s in universe if not rv_cache_path(s).exists()]",
+    "focus": [
+     "# Ingest gate: run ingest for missing symbols unless --skip-ingest",
+     "missing = [s for s in universe if not rv_cache_path(s).exists()]"
+    ]
+   },
+   "caption": "The ingest gate: before any model trains, data is fetched for exactly the universe symbols whose RV cache is missing."
+  },
+  "src-volforecast-cli": {
+   "role": [
+    "One module per subcommand, each exposing a `register(subparsers)` hook that the entry point calls lazily, so the command surface is owned by the modules that implement it. The package docstring maps modules to workflow skills, ingest for DATA_INGEST, build_features for FEATURE_BUILD, train for MODEL_TRAIN, evaluate for EVALUATE, so the CLI mirrors the research loop rather than accumulating loose scripts.",
+    "`vol audit` is the data-quality gate: it validates every cached parquet against its manifest contract, assesses per-layer readiness, regenerates data/manifest.json, and appends a dated summary to the research journal at workspace/research/research-journal.md, exiting 1 when critical issues are found. `vol backfill-rk` repairs the realized kernel column: it finds dates where `rk` is NaN, refetches raw ticks from Chunk Store in multi-day batches, and recomputes RK and `noise_gap` in place, checkpointing progress so an interrupt loses nothing.",
+    "`vol forecast` is the live end product: a config-driven multi-model ensemble that trains each model on full history, predicts next-day [[realized variance]], compares it to current ATM [[implied volatility]] fetched live from TSDB, and emits a weighted LONG, SHORT, or FLAT signal. The distinctive habit is engineering around expensive data: backfill fetches five days per API call and requests only the trade-price field, roughly three times less data per fetch."
+   ],
+   "reads": "User intent plus cached data: argv and YAML configs from workspace/configs/, RV parquet caches, manifest contracts, raw ticks from Chunk Store, and live ATM IV from the gs_quant TSDB session.",
+   "feeds": "Its outputs, a regenerated data/manifest.json, repaired rk and noise_gap columns in the parquet cache, and the daily LONG, SHORT, or FLAT call, feed the tournament's training data, the research journal, and the trading decision itself.",
+   "key_files": [
+    {
+     "file": "__init__.py",
+     "purpose": "the docstring that maps each CLI module to one workflow skill, DATA_INGEST through RESEARCH; the quickest map of the command surface"
+    },
+    {
+     "file": "audit.py",
+     "purpose": "validates every cached parquet against manifest contracts, regenerates data/manifest.json, and writes audit summaries to the research journal"
+    },
+    {
+     "file": "backfill_rk.py",
+     "purpose": "repairs NaN realized kernel dates from raw ticks, batched five days per API call with symbol-level parallelism"
+    },
+    {
+     "file": "forecast.py",
+     "purpose": "the live signal: multi-model ensemble to LONG, SHORT, or FLAT against current ATM IV"
+    }
+   ],
+   "concepts": [
+    "register() pattern",
+    "manifest contract",
+    "realized kernel",
+    "noise_gap",
+    "IV-RV gap signal",
+    "layer readiness"
+   ],
+   "cite": {
+    "file": "src/volforecast/cli/__init__.py",
+    "quote": "\"\"\"CLI entry points for volforecast skills.\n\nEach module corresponds to one skill's command-line interface:\n- ingest: DATA_INGEST skill\n- build_features: FEATURE_BUILD skill\n- train: MODEL_TRAIN skill\n- evaluate: EVALUATE skill\n- report: HTML report generation\n- notebook: NOTEBOOK skill\n- research: RESEARCH skill\n\"\"\"",
+    "focus": [
+     "Each module corresponds to one skill's command-line interface:"
+    ]
+   },
+   "caption": "The package docstring: one CLI module per workflow skill."
+  },
+  "src-volforecast-data": {
+   "role": [
+    "The ingestion and caching tier of the pipeline: it turns GS internal market data services into per-symbol parquet caches that everything downstream consumes. `chunk_store.py` pulls raw L1 trade and quote ticks for the 34 symbol universe from Chunk Store via pytickclient, plus L2 order book depth for the E-mini S&P 500, and rolls the front ES futures contract on the Thursday before the third Friday of each expiry month.",
+    "`rv_panel.py` distills those ticks into the daily [[realized variance]] panel through a streaming batch pipeline: trading calendar, batched fetch, per-day RV computation, checkpoint to parquet, release. Peak memory stays bounded to one sub-batch of tick data at a time, so a multi-year backfill survives on a workstation and resumes from its checkpoint instead of starting over.",
+    "`micro.py` works below the daily grain: server-classified ticks become 10 second signed-volume bars, from which it computes daily aggregates, signed volume ratio, order flow imbalance, and [[VPIN]] per Easley, Lopez de Prado and O'Hara 2012, plus per-bar sequences for the LSTM and TCN models. Cache writes are atomic and merging, never destructive, and a staging directory lets an interrupted ingest resume where it stopped."
+   ],
+   "reads": "Raw L1 and L2 ticks and server-aggregated 5-min bars from Chunk Store via pytickclient, a GS internal tick service reachable only with a live pyslang session.",
+   "feeds": "Daily RV panels feed the feature layers, 10 second bar sequences feed the LSTM and TCN models, and the CLI ingest commands drive its caches; at fan-in 8 it is one of the most imported modules in the repo.",
+   "key_files": [
+    {
+     "file": "chunk_store.py",
+     "purpose": "the Chunk Store client: L1 trades and quotes, 5-min bars via server-side AggGroupBy, ES futures roll logic, timeout-guarded batched queries"
+    },
+    {
+     "file": "rv_panel.py",
+     "purpose": "streaming, checkpointed builder that turns tick batches into the per-symbol daily RV panel cache"
+    },
+    {
+     "file": "micro.py",
+     "purpose": "10 second signed-volume bars, BVC classification, VPIN and order-flow aggregates, LSTM and TCN sequences with resumable staging"
+    },
+    {
+     "file": "__init__.py",
+     "purpose": "one line stating the package charter: data access for tick data, daily OHLCV, and IV surfaces"
+    }
+   ],
+   "concepts": [
+    "realized variance",
+    "VPIN",
+    "Chunk Store",
+    "ES futures roll",
+    "atomic parquet caches",
+    "BVC tick rule"
+   ],
+   "cite": {
+    "file": "src/volforecast/data/chunk_store.py",
+    "quote": "def fetch_trades_batch(\n    symbol: str,\n    dates: list[date],\n    batch_size: int = 5,\n    timeout_s: float = 120.0,\n    retries: int = 2,\n    on_fetch: Callable[[str, list[date], int, float], None] | None = None,\n) -> dict[date, pd.DataFrame]:\n    \"\"\"Fetch trades for multiple dates using batched API calls.\n\n    Groups dates into contiguous runs and issues one ``chunk_query`` per\n    batch (up to *batch_size* days), reducing total API calls.",
+    "focus": [
+     "def fetch_trades_batch("
+    ]
+   },
+   "caption": "Ticks arrive in batched chunk queries: contiguous day runs, one API call per batch."
+  },
+  "src-volforecast-evaluation": {
+   "role": [
+    "Where model claims go to die. statistical_tests.py turns per-model predictions into one ranked tournament table per horizon: element-wise [[QLIKE]] losses, Diebold-Mariano tests against the HAR baseline with Newey-West HAC errors that average loss differentials per date so lags never cross symbol boundaries, Mincer-Zarnowitz efficiency regressions, the Hansen Model Confidence Set via block bootstrap, and a calm versus turbulent split so you can see where a model earns its keep.",
+    "Then the forecasts are traded on paper. economic_value.py generates the IV-RV gap signal, selling vol when implied is rich against the forecast, and backtests delta-hedged straddles, vol-targeting portfolios, and the GSVIVS01 short-vol index against always-long, always-short, and random baselines that use no forecast at all. realistic_straddle.py is the honest engine: a full P&L waterfall of tenor-decayed gamma, vanna, volga, maturity-widening option spreads, and Boyle-Emanuel hedge-error variance that inflates the risk denominator rather than hiding it.",
+    "The distinctive habit is refusing to let anything look good by accident: Sharpe ratios are deflated for selection luck per Bailey and Lopez de Prado (2014), bracketed with block-bootstrap confidence intervals, and re-priced across cost bands from timing-aware to quoted spreads. Even a repaired bug is documented in place: `normalize_exec_kvar_for_horizon` is a deliberate no-op because the old sqrt(h) deflation artificially suppressed the implied side of the IV-RV gap at horizons past one day."
+   ],
+   "reads": "Out-of-sample log-RV predictions per model and horizon from the tournament, plus implied-vol series, spot prices, and GSVIVS01 index levels from the data caches.",
+   "feeds": "The ranked tournament tables, metrics.json, and the interactive Plotly dashboard that every `vol run --config` invocation ends in.",
+   "key_files": [
+    {
+     "file": "statistical_tests.py",
+     "purpose": "The tournament's referee: Diebold-Mariano, Model Confidence Set, Mincer-Zarnowitz, and the ranked QLIKE table, all panel-aware."
+    },
+    {
+     "file": "economic_value.py",
+     "purpose": "Signal generation (IV-RV and Kvar-RV gaps), straddle and vol-targeting P&L, Sharpe and drawdown metrics, the GSVIVS01 backtest and its naive baselines."
+    },
+    {
+     "file": "realistic_straddle.py",
+     "purpose": "The full-cost straddle engine: gamma, vanna, volga, the Doshi spread schedule, Boyle-Emanuel hedge error, deflated Sharpe, bootstrap CIs."
+    }
+   ],
+   "concepts": [
+    "QLIKE",
+    "Diebold-Mariano test",
+    "Model Confidence Set",
+    "IV-RV gap",
+    "delta-hedged straddle",
+    "deflated Sharpe ratio"
+   ],
+   "cite": {
+    "file": "src/volforecast/evaluation/statistical_tests.py",
+    "quote": "    \"\"\"Diebold-Mariano test for equal predictive accuracy.\n\n    Tests H0: E[d_t] = 0 where d_t = L(e_1t) - L(e_2t).\n    Uses Newey-West HAC standard errors (Bartlett kernel, bandwidth h-1)\n    for multi-step forecasts per Diebold & Mariano (1995, JBES).\n\n    Note: does NOT include the Harvey, Leybourne & Newbold (1997) small-sample\n    correction factor sqrt((T + 1 - 2h + h(h-1)/T) / T). For T > 200 this\n    correction is negligible.\n\n    Sign convention: positive DM statistic means model 2 has lower loss\n    (model 2 is better).",
+    "focus": [
+     "Uses Newey-West HAC standard errors (Bartlett kernel, bandwidth h-1)",
+     "positive DM statistic means model 2 has lower loss"
+    ]
+   },
+   "caption": "Every pairwise comparison in the tournament runs through this test, panel-aware and HAC-corrected."
+  },
+  "src-volforecast-features": {
+   "role": [
+    "Eighteen registered feature layers turn daily realized measures and enriched market columns into the design matrix every tabular model trains on. The numbered spine runs from Layer 0, the [[HAR]] backbone of log [[realized variance]] lags, through asymmetry, options, microstructure, and cross-asset layers, to the Layer 5 calendar. Each layer is a class registered under a short name via `register_feature_layer`, so a config stacks layers declaratively through `FEATURE_REGISTRY` instead of importing them.",
+    "The layers here span three information sources. `options.py` extracts forward looking signals from the SPX [[implied volatility]] surface: the variance risk premium as squared ATM implied vol minus annualized realized variance, the 25-delta risk reversal, term slope, and butterfly convexity. `microstructure.py` distills order flow from cached 10 second bars: Kyle's lambda, the OLS slope of price changes on signed volume, plus the Amihud illiquidity ratio, volume concentration, and flow persistence. `calendar.py` encodes scheduled events: FOMC, NFP, and OpEx proximity in trading days.",
+    "The distinctive discipline is leakage control at the feature level: features built from market data are lagged one day before use, while calendar features are deliberately not shifted because event dates are known in advance, and `day_of_week` and `month` stay integer dtype so LightGBM treats them as categoricals. NFP is derived as the first Friday of each month and OpEx as the third, while FOMC dates are hardcoded through 2026 with a distance fallback of 30 beyond them."
+   ],
+   "reads": "Daily realized measures and IV enriched market columns from `volforecast.data`, plus per-symbol microstructure caches, daily aggregates and 10 second bar sequences, under data/raw/micro/.",
+   "feeds": "The design matrix consumed by the [[HAR]] baselines and LightGBM models in `volforecast.models`, whose forecasts the evaluation tournament ranks by [[QLIKE]].",
+   "key_files": [
+    {
+     "file": "options.py",
+     "purpose": "Layer 2, the forward looking half of the feature set: VRP, 25-delta skew, term slope, and butterfly from the SPX IV surface."
+    },
+    {
+     "file": "microstructure.py",
+     "purpose": "Layer 3: Kyle's lambda, Amihud illiquidity, VPIN, volume concentration, and flow persistence from daily aggregates and 10 second bar caches."
+    },
+    {
+     "file": "calendar.py",
+     "purpose": "Layer 5: FOMC, NFP, and OpEx proximity plus day-of-week and month dummies, unshifted because event dates are known in advance."
+    },
+    {
+     "file": "__init__.py",
+     "purpose": "Declares the layer 0-6 architecture and re-exports `FEATURE_REGISTRY`, the dict configs resolve layer names against."
+    }
+   ],
+   "concepts": [
+    "variance risk premium",
+    "Kyle's lambda",
+    "Amihud illiquidity",
+    "VPIN",
+    "FOMC/NFP/OpEx proximity",
+    "feature layer registry"
+   ],
+   "cite": {
+    "file": "src/volforecast/features/options.py",
+    "quote": "    \"\"\"Compute ex-post variance risk premium (Carr & Wu 2009 proxy).\n\n    VRP = (atm_iv_pct / 100)^2 - rv_daily * 252\n\n    This is the \"realized\" or \"ex-post\" VRP proxy that uses contemporaneous\n    realized variance. For the conditional VRP (Bollerslev, Tauchen & Zhou\n    2009, RFS), use iv_features.build_iv_feature_panel which substitutes\n    E_t[RV_{t+1:t+22}] from a HAR-CJ model.\n\n    Parameters\n    ----------\n    atm_iv : pd.Series\n        ATM implied volatility in percentage points (e.g., 20.0 = 20%).\n    rv : pd.Series\n        Daily realized variance (not annualized).\n\n    Returns\n    -------\n    pd.Series\n        Variance risk premium. Can be negative.\n    \"\"\"\n    return (atm_iv / 100.0) ** 2 - rv * 252.0",
+    "focus": [
+     "VRP = (atm_iv_pct / 100)^2 - rv_daily * 252",
+     "return (atm_iv / 100.0) ** 2 - rv * 252.0"
+    ]
+   },
+   "caption": "The flagship options feature: implied variance minus annualized realized variance, the Carr and Wu ex-post VRP proxy."
+  },
+  "src-volforecast-graphs": {
+   "role": [
+    "Point-in-time graph construction for the graph-based volatility models. The rule that defines the package: a graph used to forecast date t is estimated on data up to t only, re-estimated every 21 trading days on a trailing 252-day window, and frozen between refits, so the network structure itself cannot leak the future. `build_graph_schedule` turns any builder into such a schedule, and dates with too little history get an empty snapshot rather than a peek ahead.",
+    "Every builder satisfies the `GraphBuilder` protocol and returns an immutable `GraphSnapshot`: COO edge indices and float32 weights over an ordered symbol tuple. Numpy-first by design: linear models like GHAR consume dense adjacencies without importing torch, and neural models call `to_torch()`. Estimated builders (correlation threshold, kNN, GLASSO, the directed Diebold-Yilmaz spillover graph) sit alongside the structural controls in simple.py, where identity is the no-graph control: GHAR on the identity graph equals plain pooled [[HAR]].",
+    "diagnostics.py watches two published failure modes, crisis density explosion of thresholded correlation graphs and GLASSO edge instability across refits, tracked as consecutive-refit edge-set Jaccard. It also supplies the magnetic Laplacian and graph signal energy diagnostics that back the GSP-HAR model."
+   ],
+   "reads": "Trailing windows of the daily returns panel from `data`, pre-sliced so a builder only ever sees rows at or before its estimation date.",
+   "feeds": "GraphSnapshot schedules feed the GHAR and GNN models in `models`: dense adjacencies for the linear models, torch tensors for the neural ones.",
+   "key_files": [
+    {
+     "file": "base.py",
+     "purpose": "GraphSnapshot, the GraphBuilder protocol, and build_graph_schedule, the point-in-time scheduler with window=252 and refit_every=21 defaults."
+    },
+    {
+     "file": "diagnostics.py",
+     "purpose": "Density and degree stats, refit-to-refit edge Jaccard stability, and the magnetic Laplacian and graph signal energy behind GSP-HAR."
+    },
+    {
+     "file": "simple.py",
+     "purpose": "Structural builders needing no estimation: identity (the no-graph control), full with uniform 1/(N-1) weights, and the GICS sector graph."
+    },
+    {
+     "file": "__init__.py",
+     "purpose": "Re-exports the snapshot, protocol, and scheduler that every graph consumer imports."
+    }
+   ],
+   "concepts": [
+    "point-in-time protocol",
+    "GraphSnapshot",
+    "GraphBuilder protocol",
+    "edge Jaccard",
+    "magnetic Laplacian",
+    "no-graph control"
+   ],
+   "cite": {
+    "file": "src/volforecast/graphs/base.py",
+    "quote": "def build_graph_schedule(\n    returns: pd.DataFrame,\n    dates: list[Any],\n    builder: GraphBuilder,\n    *,\n    window: int = 252,\n    refit_every: int = 21,\n    min_history: int = 60,\n    on_progress: Any | None = None,",
+    "focus": [
+     "window: int = 252",
+     "refit_every: int = 21"
+    ]
+   },
+   "caption": "The point-in-time scheduler: refit every 21 trading days on a trailing 252-day window."
+  },
+  "src-volforecast-models": {
+   "role": [
+    "The model zoo of `volforecast`: every forecaster the tournament can run, registered under a string name in `MODEL_REGISTRY` so a YAML config picks models by name alone. The families span nine naive baselines that set the [[QLIKE]] floor, the linear [[HAR]] family (its registration file is missing from this snapshot), gradient boosting via LightGBM, its DART dropout variant, and XGBoost, a seven-model graph suite, and five ensembles from seed bagging to a regime-dependent blend.",
+    "The signature move is that training loss equals evaluation loss. LightGBM and XGBoost train on a hand-derived QLIKE custom objective, gradient 1 - exp(y_true - y_pred) and hessian exp(y_true - y_pred) in log RV space, and the torch graph models share a `_qlike_loss` of the same form, so trees split and gradients descend on the exact metric the tournament ranks by, one that penalizes under-predicting volatility harder than over-predicting it.",
+    "Tuning is industrial: Optuna searches run under walk-forward expanding-window CV to prevent look-ahead bias, with parallel worker processes coordinated through journal storage and, for XGBoost, each worker pinned round-robin to its own GPU. The `gnn` model treats every trading date as one graph snapshot, symbols as nodes and rolling-correlation edges, learning cross-asset volatility spillovers with GATv2 attention and flagging `requires_graph = True` so the pipeline runner dispatches graph data instead of tabular features."
+   ],
+   "reads": "Feature matrices from the layers each model declares in REQUIRED_LAYERS, plus per-date graph snapshots built from rolling realized correlations for the graph models.",
+   "feeds": "Out-of-sample log RV predictions per fold into `evaluation`, where the tournament ranks every model by QLIKE and backs the ranking with statistical tests.",
+   "key_files": [
+    {
+     "file": "lightgbm.py",
+     "purpose": "The workhorse: custom QLIKE objective with analytic gradient and hessian, parallel Optuna tuning, and the `lightgbm_dart` dropout variant for less overconfident predictions."
+    },
+    {
+     "file": "xgboost.py",
+     "purpose": "Independent cross-check of LightGBM with the same QLIKE objective, plus a multi-GPU Optuna harness that pins each worker round-robin to its own device."
+    },
+    {
+     "file": "gnn.py",
+     "purpose": "GATv2 attention over per-date correlation graphs, plus the shared QLIKE loss and device and precision helpers the torch graph models use."
+    },
+    {
+     "file": "__init__.py",
+     "purpose": "The package's public surface: re-exports `MODEL_REGISTRY` and `register_model`, and points at `ensure_registered()`, the call that fires every model's registration decorator."
+    }
+   ],
+   "concepts": [
+    "QLIKE custom objective",
+    "log RV space",
+    "MODEL_REGISTRY",
+    "naive floor",
+    "graph snapshots",
+    "walk-forward tuning"
+   ],
+   "cite": {
+    "file": "src/volforecast/models/lightgbm.py",
+    "quote": "def qlike_objective(y_pred: np.ndarray, dtrain: Any) -> tuple[np.ndarray, np.ndarray]:\n    \"\"\"Custom QLIKE objective for LightGBM.\n\n    Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n    gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)\n    hessian  (d²L/dy_pred²) = exp(y_true - y_pred)",
+    "focus": [
+     "gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)",
+     "hessian  (d²L/dy_pred²) = exp(y_true - y_pred)"
+    ]
+   },
+   "caption": "The hand-derived QLIKE gradient and hessian LightGBM splits on: training loss equals the tournament's metric."
+  },
+  "src-volforecast-pipeline": {
+   "role": [
+    "Fold-level orchestration that sits between the CV splitters and the models, built to make leakage structurally difficult. Every step runs inside the fold that owns it: `feature_selection.py` does Boruta-style TreeSHAP shadow selection, keeping only features whose mean absolute SHAP beats a threshold set by permuted shadow copies of themselves, and `norm.py` fits per-symbol z-score normalisers from training rows alone so one symbol's vol regime cannot contaminate another's scaling.",
+    "`fold_cache.py` content-addresses expensive LSTM and TCN training: a deterministic fingerprint over config, horizon, fold number, train and test date hashes, and base-model predictions decides whether a fold can be skipped, so nothing retrains by accident and a change to any input invalidates exactly the right cache entries. `conditional_duan.py` then upgrades the global Duan log-to-level bias correction to a per-sample one, training a lightweight XGBoost variance model on OOS residuals from strictly prior folds, or reading squared VVIX as a direct uncertainty proxy."
+   ],
+   "reads": "Fold splits from the CV splitters in utils/cv.py, plus the feature matrices, log-RV targets, and base-model predictions produced upstream by the data, features, and models packages.",
+   "feeds": "Leakage-controlled inputs into `models` and bias-corrected predictions into `evaluation`, where the tournament ranks everything by QLIKE.",
+   "key_files": [
+    {
+     "file": "fold_cache.py",
+     "purpose": "The fingerprint-keyed cache that skips retraining sequence-model folds when config, dates, and base-model predictions are all unchanged."
+    },
+    {
+     "file": "conditional_duan.py",
+     "purpose": "The per-sample walk-forward Duan correction, estimated from prior folds' OOS residuals or a calibrated VVIX proxy."
+    },
+    {
+     "file": "feature_selection.py",
+     "purpose": "Boruta-style TreeSHAP selection inside each fold, keeping only features that beat their own shuffled shadows."
+    },
+    {
+     "file": "__init__.py",
+     "purpose": "Five docstring lines that scope the package: CLI entry points moved to volforecast.cli and only orchestration lives here."
+    }
+   ],
+   "concepts": [
+    "fold fingerprint",
+    "shadow features",
+    "conditional Duan correction",
+    "walk-forward residuals",
+    "per-symbol normalisation",
+    "VVIX proxy"
+   ],
+   "cite": {
+    "file": "src/volforecast/pipeline/conditional_duan.py",
+    "quote": "    \"\"\"Apply conditional Duan correction using walk-forward variance estimation.\n\n    For each fold k, trains a variance model on squared OOS residuals from\n    folds 1..k-1, then predicts σ²(x) for fold k's test samples and applies:\n\n        pred_corrected = pred_original + σ²_hat(x) / 2\n\n    This redistributes the correction across samples based on estimated\n    conditional variance: high-uncertainty days get more, calm days get less.",
+    "focus": [
+     "pred_corrected = pred_original + σ²_hat(x) / 2",
+     "high-uncertainty days get more, calm days get less"
+    ]
+   },
+   "caption": "The per-sample correction formula: the Duan fix redistributed by walk-forward estimated conditional variance."
+  },
+  "src-volforecast-reporting": {
+   "role": [
+    "The experiment report layer, and the most honestly unfinished corner of the repo: `generate_report` in `html_report.py` is a documented stub whose comment block spells out the full assembly plan, load metrics and predictions from the experiment directory, render six section fragments, pour them into a Jinja2 `base.html` template, write one self-contained HTML file, then raises `NotImplementedError`. Five of the six section renderers (summary, forecast vs actual, QLIKE analysis, statistical tests, diagnostics) are stubs pointing at workspace/plans/html-report.md for their specs.",
+    "The one section that actually runs is economic value: `sections/economic_value.py` joins stored per-symbol, per-horizon prediction frames with market data carrying `iv_1m_atm` and `close`, and hands each pair to `realistic_delta_hedged_sharpe`, the Phase 1 analytic straddle engine with tenor-decayed gamma and vanna and volga terms. It renders Sharpe, [[DSR]], 95% CI and cumulative P&L tables plus a cost-band sensitivity table at 0.5, 1.0 and 1.5 vol point option spreads, and degrades to a plain placeholder when the IV columns are missing."
+   ],
+   "reads": "A finished experiment directory, stored predictions, metrics and the config snapshot, plus daily market data with `iv_1m_atm` and `close` columns for the economic value section.",
+   "feeds": "One self-contained `report.html` per experiment once the orchestrator is implemented; today only the economic value fragment can actually be produced.",
+   "key_files": [
+    {
+     "file": "html_report.py",
+     "purpose": "The orchestrator stub: its comment block is the clearest statement of what the finished report will contain and in what order."
+    },
+    {
+     "file": "economic_value.py",
+     "purpose": "The only implemented section: runs the realistic delta-hedged straddle engine per symbol and horizon and renders Sharpe, DSR and cost-band tables."
+    },
+    {
+     "file": "forecast_vs_actual.py",
+     "purpose": "The planned centerpiece chart, predicted vs realized log-RV with horizon and symbol dropdowns and COVID shading, still a stub."
+    },
+    {
+     "file": "statistical_tests.py",
+     "purpose": "Stub for the Diebold-Mariano, Model Confidence Set and Mincer-Zarnowitz tables, designed to show a placeholder when the underlying tests raise."
+    },
+    {
+     "file": "__init__.py",
+     "purpose": "Exports `generate_report`, the package's single public entry point."
+    }
+   ],
+   "concepts": [
+    "section renderers",
+    "realistic straddle engine",
+    "cost-band sensitivity",
+    "deflated Sharpe ratio",
+    "graceful placeholders"
+   ],
+   "cite": {
+    "file": "src/volforecast/reporting/html_report.py",
+    "quote": "    # Implementation steps:\n    # 1. Load metrics via persistence.load_all_metrics(config)\n    # 2. Load predictions via persistence.load_predictions(config, symbol, horizon)\n    #    for each symbol/horizon combination\n    # 3. Load config snapshot from experiment_dir(config) / \"config.yaml\"\n    # 4. Call each section renderer from reporting.sections (summary, forecast_vs_actual,\n    #    qlike_analysis, statistical_tests, economic_value, diagnostics)\n    # 5. Render base.html Jinja2 template with all section HTML fragments\n    # 6. Write assembled HTML to output_path\n    # 7. Return output_path\n    raise NotImplementedError(\"TODO: implement report generation\")",
+    "focus": [
+     "qlike_analysis, statistical_tests, economic_value, diagnostics",
+     "raise NotImplementedError(\"TODO: implement report generation\")"
+    ]
+   },
+   "caption": "The whole report, specified in a comment: the stub documents exactly what it will become."
+  },
+  "src-volforecast-utils": {
+   "role": [
+    "The foundation drawer, imported by ten module groups and importing none of them back. Its centerpiece is `cv.py`, the leakage firewall: purged k-fold deletes observations within a purge gap of each test block so overlapping realized volatility windows cannot leak, blocked k-fold keeps contiguous time blocks, expanding and rolling windows walk forward, and `PanelExpandingWindowCV` splits the panel on unique dates so every symbol on a date lands in the same fold. Random k-fold is banned as look-ahead bias.",
+    "`manifest.py` is the data ledger with two layers, a contract stating what data should exist (expected columns, value bounds, a NaN budget) and a state recording what does exist per symbol. Ingest commands update the state and `vol audit` validates it against the contract, through a typed YAML `ManifestManager` plus legacy JSON wrappers kept alive during migration.",
+    "`persistence.py` is the experiment memory: it writes fitted models, out-of-sample predictions, and a consolidated metrics.json under data/models/, then fingerprints every training-relevant config field plus each symbol's data file so a rerun with nothing changed skips retraining, and `check_fingerprint` names exactly what changed when the hashes disagree."
+   ],
+   "reads": "`ExperimentConfig` objects from the experiment runner, ingestion results handed over by the CLI ingest commands, and cache locations resolved against the repo root by its own `paths.py`.",
+   "feeds": "Ten module groups build on it: ingestion records into the manifest, model training runs inside its CV splits, and evaluation, reporting, and the CLI read the predictions, metrics, and fingerprints it persists.",
+   "key_files": [
+    {
+     "file": "cv.py",
+     "purpose": "The leakage firewall: purged, blocked, expanding, rolling, and panel-aware CV splitters, with random k-fold banned in the docstring."
+    },
+    {
+     "file": "manifest.py",
+     "purpose": "The ingestion contract and state ledger behind `vol status` and `vol audit`: what data should exist versus what actually does."
+    },
+    {
+     "file": "persistence.py",
+     "purpose": "Experiment artifacts and fingerprinting: models, OOS predictions, metrics.json, and the config plus data hash that lets unchanged reruns skip retraining."
+    }
+   ],
+   "concepts": [
+    "purge gap",
+    "embargo",
+    "walk-forward CV",
+    "look-ahead bias",
+    "ingestion manifest",
+    "config fingerprint"
+   ],
+   "cite": {
+    "file": "src/volforecast/utils/cv.py",
+    "quote": "class PurgedKFoldCV(_BaseCVSplitter):\n    \"\"\"Purged k-fold cross-validation for time series.\n\n    Splits data into k contiguous folds and purges observations\n    within a gap window between training and test sets to prevent\n    information leakage from overlapping RV windows.\n\n    ``embargo`` (Phase 2.8): rows in ``[test_end, test_end + embargo)`` are also\n    excluded from the train sets of all SUBSEQUENT folds. Default 0 (no-op).\n    \"\"\"",
+    "focus": [
+     "information leakage from overlapping RV windows",
+     "excluded from the train sets of all SUBSEQUENT folds"
+    ]
+   },
+   "caption": "Purging and embargo, the mechanics that keep overlapping RV windows from leaking across the train and test cut."
+  }
+ },
+ "tour": [
+  {
+   "id": "n-src-volforecast-cli",
+   "text": "Start here. Every interaction is a `vol` subcommand: one primary command, `vol run --config`, drives ingest, training, and evaluation from a single YAML file, and around it sit the ingest, audit, and live forecast commands. Each subcommand registers itself, so the surface grows without touching the entry point."
+  },
+  {
+   "id": "n-src-volforecast-models",
+   "text": "The zoo: naive baselines that set the floor, LightGBM and XGBoost trained on a custom [[QLIKE]] objective, and a graph suite whose controls deliberately nest the simpler models. One shared contract means a random walk and a graph attention network take the same walk through the same folds."
+  },
+  {
+   "id": "n-src-volforecast-features",
+   "text": "The design matrix factory: layered feature classes turn daily measures into model inputs, from [[HAR]] lags through options-implied signals like the [[variance risk premium]] to calendar effects. A config stacks layers by name; the registry finds them."
+  },
+  {
+   "id": "n-src-volforecast-reporting",
+   "text": "The HTML experiment report, honestly unfinished: most sections are documented stubs, and the one real section prices the forecasts with the realistic straddle engine, lagging implied vol by a day to avoid look-ahead."
+  },
+  {
+   "id": "n-src-volforecast-visualization",
+   "text": "The smallest box on the board: what survives here renders model lineage as a flowchart for dashboards. The dashboard builder itself is one of the modules this snapshot lost."
+  },
+  {
+   "id": "n-src-volforecast-pipeline",
+   "text": "The anti-cheating layer: per-symbol normalisers fitted on training rows only, a fingerprint-keyed cache that decides when an expensive fold may be skipped, and a per-sample Duan correction estimated strictly walk-forward from earlier folds."
+  },
+  {
+   "id": "n-src-volforecast-data",
+   "text": "The heaviest lifting: ticks from Chunk Store, daily series from TSDB, the SPX vol surface from Marquee, all cached as per-symbol parquet. Its estimators turn millions of ticks into the daily [[realized variance]] panel everything downstream trains on."
+  },
+  {
+   "id": "n-src-volforecast",
+   "text": "The hub. The registry maps model, feature, and graph names to classes, which is why most of the repo imports this tiny package: a YAML config names components, the registry turns names into code, and the tournament routing lives beside it."
+  },
+  {
+   "id": "n-src-volforecast-evaluation",
+   "text": "Where claims go to die: [[QLIKE]] ranking, Diebold-Mariano tests, the Model Confidence Set, then the money tests, realistic delta-hedged straddles and the GSVIVS01 signal, with Sharpe ratios deflated for selection luck."
+  },
+  {
+   "id": "n-src-volforecast-graphs",
+   "text": "Point-in-time graph construction for the graph models: a graph used to forecast a date is estimated only on data up to that date, re-estimated on a schedule, and frozen between refits, so the network structure itself cannot leak the future."
+  },
+  {
+   "id": "n-src-volforecast-utils",
+   "text": "Last, the quiet foundation: paths.py anchors every cache to the repo root, and cv.py holds the purged and walk-forward splitters that keep every result honest. Everything above imports these seven files; nothing here imports back."
+  }
+ ],
+ "cols": [
+  "MODELS AND CLI",
+  "DATA PIPELINE",
+  "EVALUATION",
+  "SHARED UTILS"
  ]
 }

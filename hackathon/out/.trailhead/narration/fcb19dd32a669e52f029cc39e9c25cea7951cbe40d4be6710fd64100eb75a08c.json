@@ -1,0 +1,43 @@
+{
+  "role": [
+    "Fold-level orchestration that sits between the CV splitters and the models, built to make leakage structurally difficult. Every step runs inside the fold that owns it: `feature_selection.py` does Boruta-style TreeSHAP shadow selection, keeping only features whose mean absolute SHAP beats a threshold set by permuted shadow copies of themselves, and `norm.py` fits per-symbol z-score normalisers from training rows alone so one symbol's vol regime cannot contaminate another's scaling.",
+    "`fold_cache.py` content-addresses expensive LSTM and TCN training: a deterministic fingerprint over config, horizon, fold number, train and test date hashes, and base-model predictions decides whether a fold can be skipped, so nothing retrains by accident and a change to any input invalidates exactly the right cache entries. `conditional_duan.py` then upgrades the global Duan log-to-level bias correction to a per-sample one, training a lightweight XGBoost variance model on OOS residuals from strictly prior folds, or reading squared VVIX as a direct uncertainty proxy."
+  ],
+  "reads": "Fold splits from the CV splitters in utils/cv.py, plus the feature matrices, log-RV targets, and base-model predictions produced upstream by the data, features, and models packages.",
+  "feeds": "Leakage-controlled inputs into `models` and bias-corrected predictions into `evaluation`, where the tournament ranks everything by QLIKE.",
+  "key_files": [
+    {
+      "file": "fold_cache.py",
+      "purpose": "The fingerprint-keyed cache that skips retraining sequence-model folds when config, dates, and base-model predictions are all unchanged."
+    },
+    {
+      "file": "conditional_duan.py",
+      "purpose": "The per-sample walk-forward Duan correction, estimated from prior folds' OOS residuals or a calibrated VVIX proxy."
+    },
+    {
+      "file": "feature_selection.py",
+      "purpose": "Boruta-style TreeSHAP selection inside each fold, keeping only features that beat their own shuffled shadows."
+    },
+    {
+      "file": "__init__.py",
+      "purpose": "Five docstring lines that scope the package: CLI entry points moved to volforecast.cli and only orchestration lives here."
+    }
+  ],
+  "concepts": [
+    "fold fingerprint",
+    "shadow features",
+    "conditional Duan correction",
+    "walk-forward residuals",
+    "per-symbol normalisation",
+    "VVIX proxy"
+  ],
+  "cite": {
+    "file": "src/volforecast/pipeline/conditional_duan.py",
+    "quote": "    \"\"\"Apply conditional Duan correction using walk-forward variance estimation.\n\n    For each fold k, trains a variance model on squared OOS residuals from\n    folds 1..k-1, then predicts σ²(x) for fold k's test samples and applies:\n\n        pred_corrected = pred_original + σ²_hat(x) / 2\n\n    This redistributes the correction across samples based on estimated\n    conditional variance: high-uncertainty days get more, calm days get less.",
+    "focus": [
+      "pred_corrected = pred_original + σ²_hat(x) / 2",
+      "high-uncertainty days get more, calm days get less"
+    ]
+  },
+  "caption": "The per-sample correction formula: the Duan fix redistributed by walk-forward estimated conditional variance."
+}
