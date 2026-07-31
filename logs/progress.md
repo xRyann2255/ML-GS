@@ -229,4 +229,6 @@
 - Overnight incident: 14 of 22 pack-answering agents died on the session cap (reset 2:10am) but several had already written valid answers before dying; a validation sweep separated real gaps (7) from partial writes, and one hash typo in my own workflow args was answered by hand
 - Shipped as 4 commits to main (bc0a5c0, 99ee668, 3670b76, 4ee260c): generator, template+pipeline, regenerated artifact+narration store, skill docs
 
+- Rewrote `hackathon/docs/confluence-trailhead.md` to the shipped state (b4963e3): leads with not-a-single-prompt mechanics, documents the @3 feature set with measured numbers, keeps a plain missing-features table (checkpoint breadth, glossary cap, trace discovery, unnamed AI tool, unmeasured time-saved)
+
 **Next:** demo rehearsal against a genuinely unread repo (generate live on stage), decide the two open CLAUDE.md items (which internal GS tool Narrate names, demo repo choice); after the hackathon, restore CLAUDE.vol-project.md per the header note
