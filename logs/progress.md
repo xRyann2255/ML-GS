@@ -241,6 +241,7 @@
 - Pushed `hackathon` to origin, then renamed all 56 `.py` files to `.py.txt` on that branch (c7f0a9d, pushed) — same GS-transfer guard as docs-only, temporary; pure renames done in a throwaway worktree so the main checkout never moved, undo command recorded in the commit message
 
 - Assembled the pitch recording (8424e99, pushed): lossless ffmpeg concat of the 7 screen-recording mkv parts into `presentation.mp4` (9:27, h264 1080p60), end-trims applied per filename (14s/2s/3s/2s off parts 1/2/5/6), part 4 moved to the end on request; force-added past the `*.mp4` gitignore rule
+- Relocated the video to the `hackathon` submission branch per user call: added as root-level `presentation.mp4` there (2d78891, pushed; throwaway-worktree method after pruning a stale worktree entry left by the deck session), then untracked it on main (681dc7a, pushed) so the `*.mp4` ignore rule applies again — file stays on disk, but the 64 MB blob remains in main history (removable only by a history rewrite, not done)
 - Committed the final pitch deck `hackathon/pitch-deck.html` (7a50c16, pushed) — the surviving variant of the three drafted yesterday; deck screenshot strays left untracked
 - Added the same deck to the `hackathon` submission branch as root-level `pitch-deck.html` (7fadfc6, pushed) — throwaway-worktree method again, main checkout never moved
 
