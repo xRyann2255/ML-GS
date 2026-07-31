@@ -44,12 +44,18 @@ SURVEY = {
     "repo": {"name": "restored", "commit": "nogit-4b17c2e9",
              "surveyed_at": "2026-07-30T18:40:11Z"},
     "stats": {"files": 1125, "py_files": 455, "loc": 96000, "modules": 364},
+    "roots": {"import_roots": ["src"], "test_roots": ["src/tests"],
+              "declared_packages": ["volforecast"]},
     "files": [
         {"path": "src/volforecast/data/__init__.py", "module": "volforecast.data",
          "loc": 8,
          "doc": "Data ingestion and cache layout. Raw parquet lands here."},
         {"path": "src/volforecast/cli/__init__.py", "module": "volforecast.cli",
          "loc": 4},
+        {"path": "src/tests/test_ohlcv.py", "module": None, "loc": 380},
+        {"path": "src/tests/unit/test_paths.py", "module": None, "loc": 120},
+        {"path": "src/tests_extra/not_under_a_test_root.py", "module": None,
+         "loc": 10},
     ],
     "modules": {
         "volforecast.data": {"path": "src/volforecast/data", "files": 21,
@@ -95,7 +101,10 @@ SURVEY = {
               "reason": "This path has no tracked history in the enclosing "
                         "repository.",
               "substitute": "fan_in", "by_file": {}, "committers": {}},
-    "dangling": [{"target": "volforecast.constants", "n": 120, "sites": []}],
+    "dangling": [{"target": "volforecast.constants", "n": 120,
+                  "sites": [{"file": "src/volforecast/__main__.py", "line": 3},
+                            {"file": "src/volforecast/cli/__init__.py",
+                             "line": 2}]}],
     "walk": {"scanned": 1125, "excluded_dirs": 15, "skipped": []},
     "parse_failures": [],
     "text_files": ["src/pyproject.toml", "vol"],
@@ -208,13 +217,15 @@ class StopTable(unittest.TestCase):
 
 
 class BlockVocabulary(unittest.TestCase):
-    """The renderer has nine arms and no default. A tenth type renders nothing."""
+    """The renderer's dispatch has no default arm. An unknown type renders
+    nothing, so the vocabulary here is closed and pinned. `@3` added `stats`.
+    """
 
-    def test_the_vocabulary_is_exactly_the_nine_renderable_types(self):
+    def test_the_vocabulary_is_exactly_the_ten_renderable_types(self):
         self.assertEqual(
             compose.BLOCK_TYPES,
             frozenset(["prose", "excerpt", "command", "graph", "table",
-                       "trace", "checkpoint", "callout", "ledger"]))
+                       "trace", "checkpoint", "callout", "ledger", "stats"]))
 
     def test_a_full_generation_emits_only_known_block_types(self):
         types = {b["type"] for b in blocks_of(compose.build_course(ctx()))}
@@ -422,6 +433,53 @@ class DegradedGeneration(unittest.TestCase):
         self.assertEqual(blocks[1]["type"], "command")
         self.assertIn("NOT A TEST SUITE", blocks[-1]["title"])
 
+    def test_row_2_tells_the_truth_about_an_executed_failing_candidate(self):
+        # The contradiction fix: when the runner actually RAN a test candidate
+        # and it failed, the callout must describe the real result. Calling it
+        # "not executed" while the setup stop shows the same command with a
+        # real exit code is the page contradicting its own evidence.
+        cmds = copy.deepcopy(COMMANDS)
+        cmds["skipped"] = []
+        cmds["runs"].append({"cmd": "python -m pytest --collect-only -q tests",
+                             "cwd": "src", "exit": 2, "kind": "test",
+                             "dur_ms": 912, "dur": "0.9 s", "timed_out": False,
+                             "out": "ERROR: file or directory not found: tests"})
+
+        blocks = compose.build_green(ctx(commands=cmds))
+
+        note = blocks[0]
+        self.assertEqual(note["title"], "NO TEST COMMAND DETECTED")
+        self.assertIn("python -m pytest --collect-only -q tests was executed "
+                      "and failed with exit 2, so there is no green test "
+                      "command to hand you", note["text"])
+        self.assertNotIn("not executed", note["text"])
+
+    def test_a_timed_out_candidate_is_reported_as_executed_and_timed_out(self):
+        # The runner records exit 124 and timed_out on a kill; "not executed"
+        # would be false and "failed with exit 124" would bury the reason.
+        cmds = copy.deepcopy(COMMANDS)
+        cmds["skipped"] = []
+        cmds["runs"].append({"cmd": "python -m pytest --collect-only -q tests",
+                             "cwd": "src", "exit": 124, "kind": "test",
+                             "dur_ms": 10000, "dur": "10.0 s",
+                             "timed_out": True, "out": "(killed)"})
+
+        note = compose.build_green(ctx(commands=cmds))[0]
+
+        self.assertIn("was executed and timed out", note["text"])
+        self.assertNotIn("not executed", note["text"])
+
+    def test_an_unexecuted_candidate_keeps_the_not_executed_wording(self):
+        # Only candidates with NO run record may be described as not executed.
+        sv = copy.deepcopy(SURVEY)
+        sv["command_candidates"].append(
+            {"cmd": "tox -q", "kind": "test", "cwd": "src",
+             "source": "src/tox.ini:1", "confidence": "low"})
+
+        note = compose.build_green(ctx(survey=sv))[0]
+
+        self.assertIn("tox -q: not executed", note["text"])
+
     def test_a_passing_test_command_takes_the_green_stop_without_a_caveat(self):
         # Rule 1, the happy path: an admitted kind=test run that passed.
         cmds = copy.deepcopy(COMMANDS)
@@ -489,20 +547,73 @@ class DegradedGeneration(unittest.TestCase):
         self.assertIn("FAN-IN (NO GIT HISTORY)", tbl["columns"])
         self.assertNotIn("CHURN", tbl["columns"])
         self.assertNotIn("RECENT COMMITTERS", tbl["columns"])
+        # The column prints the metric itself, never the row's 1..n rank.
+        idx = tbl["columns"].index("FAN-IN (NO GIT HISTORY)")
+        self.assertEqual([r[idx] for r in tbl["rows"]], ["34", "12", "5"])
 
-    def test_a_repo_with_git_history_keeps_the_churn_columns(self):
+    def test_a_repo_with_git_history_shows_real_commit_counts(self):
         sv = copy.deepcopy(SURVEY)
         sv["churn"] = {"state": "GIT_OK", "available": True, "reason": "",
                        "by_file": {},
                        "committers": {"src/volforecast/data": ["r.vincent"]}}
-        for m in sv["modules"].values():
-            m["commits"] = 12
+        for commits, m in zip((40, 30, 20), sv["modules"].values()):
+            m["commits"] = commits
 
         blocks = compose.build_where(ctx(survey=sv))
 
         self.assertEqual(len(blocks), 1)
-        self.assertIn("COMMITS", blocks[0]["columns"])
-        self.assertIn("RECENT COMMITTERS", blocks[0]["columns"])
+        tbl = blocks[0]
+        self.assertIn("COMMITS", tbl["columns"])
+        self.assertIn("RECENT COMMITTERS", tbl["columns"])
+        # Actual counts, descending because they RANK the rows — not 1, 2, 3.
+        idx = tbl["columns"].index("COMMITS")
+        self.assertEqual([r[idx] for r in tbl["rows"]], ["40", "30", "20"])
+        lede = compose._lede_where(ctx(survey=sv))
+        self.assertIn("Ranked by commits", lede)
+
+    def test_a_one_commit_snapshot_does_not_fake_a_churn_ranking(self):
+        # Git churn available but degenerate: every module at the same count,
+        # which is what a snapshot committed in one commit looks like, and no
+        # committers anywhere. The old table printed rank numbers under a
+        # COMMITS header and "n/a" down the committers column — history the
+        # repo does not have, fabricated by the one page that promises none.
+        sv = copy.deepcopy(SURVEY)
+        sv["churn"] = {"state": "GIT_OK", "available": True, "reason": "",
+                       "by_file": {}, "committers": {}}
+        for m in sv["modules"].values():
+            m["commits"] = 1
+
+        blocks = compose.build_where(ctx(survey=sv))
+
+        self.assertEqual(len(blocks), 1)
+        tbl = blocks[0]
+        self.assertIn("COMMITS", tbl["columns"])
+        self.assertNotIn("RECENT COMMITTERS", tbl["columns"])
+        idx = tbl["columns"].index("COMMITS")
+        self.assertEqual([r[idx] for r in tbl["rows"]], ["1", "1", "1"])
+        # Identical counts fall back to path order, and the lede says so
+        # instead of promising a ranking the numbers cannot carry.
+        self.assertEqual([r[0] for r in tbl["rows"]],
+                         ["<code>src/volforecast/cli/</code>",
+                          "<code>src/volforecast/data/</code>",
+                          "<code>src/volforecast/utils/</code>"])
+        lede = compose._lede_where(ctx(survey=sv))
+        self.assertNotIn("Ranked by commits", lede)
+        self.assertIn("identical for every module", lede)
+
+    def test_a_committerless_history_drops_the_committers_column(self):
+        # Distinct counts (a real ranking) but no committer data for any row:
+        # the ranking stays, the column of eleven "n/a" cells goes.
+        sv = copy.deepcopy(SURVEY)
+        sv["churn"] = {"state": "GIT_OK", "available": True, "reason": "",
+                       "by_file": {}, "committers": {}}
+        for commits, m in zip((40, 30, 20), sv["modules"].values()):
+            m["commits"] = commits
+
+        tbl = compose.build_where(ctx(survey=sv))[0]
+
+        self.assertIn("COMMITS", tbl["columns"])
+        self.assertNotIn("RECENT COMMITTERS", tbl["columns"])
 
     def test_row_7_labels_a_stop_whose_unit_never_narrated(self):
         blocks = compose.build_five(ctx(narration={}))
@@ -655,11 +766,13 @@ class BuildWhere(unittest.TestCase):
         row = next(r for r in table["rows"] if "data" in r[0])
         self.assertEqual(row[1], "Data ingestion and cache layout")
 
-    def test_purpose_is_an_em_dash_when_the_package_has_no_docstring(self):
+    def test_purpose_is_an_honest_gap_when_the_package_has_no_docstring(self):
+        # `@3`'s dash policy bans the em dash on every authored surface and
+        # `purpose` is on the scanned list, so the gap is spelled out now.
         table = compose.build_where(ctx())[1]
 
         row = next(r for r in table["rows"] if "cli" in r[0])
-        self.assertEqual(row[1], "—")
+        self.assertEqual(row[1], "no docstring")
 
     def test_a_cell_is_escaped_before_it_reaches_the_raw_surface(self):
         # The renderer interpolates table cells without esc().
@@ -756,6 +869,366 @@ class TraceFixture(unittest.TestCase):
         flags = compose._trace_predicts(self.hops)
 
         self.assertEqual([i + 1 for i, f in enumerate(flags) if f], [1, 3, 6, 7])
+
+
+#: Narration with two answered dive units and one that came back empty.
+DIVES = {
+    **NARRATION,
+    "dive:n-data": {"claims": [
+        {"text": "Ticks become parquet caches here.", "status": "verified",
+         "cite": _cite("src/volforecast/data/ohlcv.py",
+                       "def load(symbol):\n    ...")},
+        {"text": "It is the heaviest group on the board.",
+         "status": "inferred"},
+    ]},
+    "dive:n-cli": {"claims": [
+        {"text": "One module per subcommand.", "status": "verified",
+         "cite": _cite("src/volforecast/cli/__init__.py", "import ingest")},
+    ]},
+    "dive:n-utils": {"claims": []},
+}
+
+GLOSSARY = [
+    {"id": "qlike", "term": "QLIKE", "def": "A loss function for vol forecasts."},
+    {"id": "rv", "term": "RV", "def": "Realized volatility."},
+]
+
+
+class StatsBlocks(unittest.TestCase):
+    """`@3`: the cover opens with survey-derived tiles, never model numbers."""
+
+    def tiles(self, blocks):
+        st = blocks[0]
+        self.assertEqual(st["type"], "stats")
+        return {t["l"]: t for t in st["items"]}
+
+    def test_the_cover_opens_with_survey_derived_tiles(self):
+        tiles = self.tiles(compose.build_cover(ctx()))
+
+        self.assertEqual(tiles["LINES OF CODE"]["v"], "96,000")
+        self.assertEqual(tiles["PYTHON FILES"]["v"], "455")
+        self.assertEqual(tiles["PYTHON FILES"]["of"], "1,125")
+        self.assertEqual(tiles["MODULES"]["v"], "364")
+        # Two files under src/tests; src/tests_extra is NOT under a test root.
+        self.assertEqual(tiles["TEST FILES"]["v"], "2")
+        self.assertEqual(tiles["COMMANDS RUN"]["v"], "2")
+        self.assertEqual(tiles["COMMANDS RUN"]["s"], "1 failing")
+
+    def test_the_missing_modules_tile_appears_only_when_something_dangles(self):
+        tiles = self.tiles(compose.build_cover(ctx()))
+        self.assertEqual(tiles["MISSING MODULES"]["v"], "1")
+        self.assertEqual(tiles["MISSING MODULES"]["color"], "inf")
+        self.assertIn("120 import statements", tiles["MISSING MODULES"]["s"])
+
+        sv = copy.deepcopy(SURVEY)
+        sv["dangling"] = []
+        tiles = self.tiles(compose.build_cover(ctx(survey=sv)))
+        self.assertNotIn("MISSING MODULES", tiles)
+
+    def test_every_tile_value_is_a_formatted_figure(self):
+        # `v` and `of` are raw-interpolated by the renderer, so they must be
+        # plain figures, thousands-separated where big.
+        for t in compose.build_cover(ctx())[0]["items"]:
+            self.assertRegex(t["v"], r"^[\d,]+$")
+
+    def test_the_stats_constructor_refuses_markup_and_unknown_colors(self):
+        with self.assertRaises(ValueError):
+            compose.stats([{"v": "<b>1</b>", "l": "TILE"}])
+        with self.assertRaises(ValueError):
+            compose.stats([{"v": "1", "l": "TILE", "color": "warn"}])
+        with self.assertRaises(ValueError):
+            compose.stats([{"v": "1", "l": ""}])
+        with self.assertRaises(ValueError):
+            compose.stats([])
+
+
+class RestoreLedger(unittest.TestCase):
+    """`@3`: dangling imports close the setup stop as a table plus a callout."""
+
+    def test_setup_closes_with_the_missing_module_table_and_callout(self):
+        blocks = compose.build_setup(ctx())
+
+        tbl, note = blocks[-2], blocks[-1]
+        self.assertEqual(tbl["type"], "table")
+        self.assertTrue(tbl["sortable"])
+        self.assertEqual(tbl["columns"],
+                         ["MISSING MODULE", "IMPORTED FROM", "IMPORT SITES"])
+        self.assertEqual(
+            tbl["rows"][0][0], "<code>volforecast.constants</code>")
+        self.assertIn("src/volforecast/__main__.py", tbl["rows"][0][1])
+        self.assertEqual(tbl["rows"][0][2], "120")
+        self.assertIn("Missing at this commit", tbl["caption"])
+
+        self.assertEqual(note["type"], "callout")
+        self.assertEqual(note["level"], "broken")
+        self.assertEqual(note["title"], "MISSING AT THIS COMMIT")
+        self.assertIn("volforecast.constants", note["text"])
+        self.assertIn("ModuleNotFoundError", note["text"])
+
+    def test_the_ledger_appears_even_when_nothing_was_executed(self):
+        blocks = compose.build_setup(ctx(commands={}))
+
+        titles = [b.get("title") for b in blocks]
+        self.assertIn("MISSING AT THIS COMMIT", titles)
+
+    def test_no_restore_ledger_when_nothing_dangles(self):
+        sv = copy.deepcopy(SURVEY)
+        sv["dangling"] = []
+
+        blocks = compose.build_setup(ctx(survey=sv))
+
+        self.assertNotIn("MISSING AT THIS COMMIT",
+                         [b.get("title") for b in blocks])
+        for b in blocks:
+            if b["type"] == "table":
+                self.assertNotIn("MISSING MODULE", b["columns"])
+
+    def test_rows_are_capped_at_twenty_by_import_count(self):
+        sv = copy.deepcopy(SURVEY)
+        sv["dangling"] = [{"target": f"pkg.mod{i:02d}", "n": i, "sites": []}
+                         for i in range(1, 26)]
+
+        blocks = compose.build_setup(ctx(survey=sv))
+        tbl = blocks[-2]
+
+        self.assertEqual(len(tbl["rows"]), 20)
+        self.assertIn("mod25", tbl["rows"][0][0])
+        self.assertIn("top 20 of 25", tbl["caption"])
+        # No site files known: the cell says so instead of going blank.
+        self.assertEqual(tbl["rows"][0][1], "unknown")
+
+
+class DiveStops(unittest.TestCase):
+    """`@3`: one INSIDE THE SYSTEM stop per dive unit that returned claims."""
+
+    def test_dive_stops_form_their_own_track_before_the_trace_track(self):
+        tracks = compose.build_course(ctx(narration=DIVES))
+
+        titles = [t["title"] for t in tracks]
+        self.assertIn("INSIDE THE SYSTEM", titles)
+        self.assertLess(titles.index("INSIDE THE SYSTEM"),
+                        titles.index("FOLLOW ONE PATH"))
+        dive = next(t for t in tracks if t["title"] == "INSIDE THE SYSTEM")
+        # Map order: n-cli is the leftmost node, so its dive leads.
+        self.assertEqual([s["id"] for s in dive["stops"]],
+                         ["dive-n-cli", "dive-n-data"])
+        self.assertEqual([s["title"] for s in dive["stops"]],
+                         ["Inside cli", "Inside data"])
+        for s in dive["stops"]:
+            self.assertTrue(s["lede"], s["id"])
+            self.assertEqual(s["kind"], "stop")
+
+    def test_a_dive_stop_carries_prose_then_group_stats(self):
+        tracks = compose.build_course(ctx(narration=DIVES))
+
+        dive = next(t for t in tracks if t["title"] == "INSIDE THE SYSTEM")
+        data = next(s for s in dive["stops"] if s["id"] == "dive-n-data")
+        self.assertEqual([b["type"] for b in data["blocks"]],
+                         ["prose", "stats"])
+        tiles = {t["l"]: t for t in data["blocks"][1]["items"]}
+        self.assertEqual(tiles["LINES OF CODE"]["v"], "9,195")
+        self.assertEqual(tiles["FILES"]["v"], "21")
+        self.assertEqual(tiles["FAN-IN"]["v"], "1")   # n-cli -> n-data
+        self.assertEqual(tiles["FAN-OUT"]["v"], "1")  # n-data -> n-utils
+
+    def test_dive_claim_ids_do_not_collide_across_stops(self):
+        tracks = compose.build_course(ctx(narration=DIVES))
+
+        ids = [c["id"] for b in blocks_of(tracks) if b["type"] == "prose"
+               for c in b["claims"]]
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_an_empty_dive_unit_is_omitted_silently(self):
+        # Absence-by-default (spec section 4): an unanswered dive unit is
+        # indistinguishable from one never planned, so a cold run must produce
+        # the exact @2 course, with no ledger row and no audit callout. Claims
+        # the parser refused are already in the ledger through that path.
+        c = ctx(narration=DIVES)
+
+        tracks = compose.build_course(c)
+
+        self.assertNotIn("dive-n-utils", [s["id"] for s in stops_of(tracks)])
+        self.assertEqual(
+            [d for d in c.degradations if d["code"] == "dive_empty"], [])
+        audit = next(s for s in stops_of(tracks) if s["id"] == "audit")
+        self.assertNotIn("SUBSYSTEM DIVES NOT GENERATED",
+                         [b.get("title") for b in audit["blocks"]])
+
+    def test_the_dive_excerpt_appears_when_the_node_carries_an_anchor(self):
+        mp = copy.deepcopy(MAP)
+        mp["nodes"][1]["anchor"] = {
+            "file": "src/volforecast/data/__init__.py",
+            "quote": "Data ingestion and cache layout."}
+        mp["nodes"][1]["anchor_caption"] = "The package docstring."
+
+        tracks = compose.build_course(ctx(mp=mp, narration=DIVES))
+
+        data = next(s for s in stops_of(tracks) if s["id"] == "dive-n-data")
+        self.assertEqual([b["type"] for b in data["blocks"]],
+                         ["prose", "excerpt", "stats"])
+        ex = data["blocks"][1]
+        self.assertEqual(ex["cite"]["file"],
+                         "src/volforecast/data/__init__.py")
+        self.assertEqual(ex["caption"], "The package docstring.")
+
+    def test_a_dive_gid_with_no_node_still_renders_prose_only(self):
+        narr = {"dive:mystery": {"claims": [
+            {"text": "It exists.", "status": "inferred"}]}}
+
+        tracks = compose.build_course(ctx(narration=narr))
+
+        stop = next(s for s in stops_of(tracks) if s["id"] == "dive-mystery")
+        self.assertEqual(stop["title"], "Inside mystery")
+        self.assertEqual([b["type"] for b in stop["blocks"]], ["prose"])
+
+    def test_without_dive_narration_the_course_is_unchanged(self):
+        tracks = compose.build_course(ctx())
+
+        self.assertNotIn("INSIDE THE SYSTEM", [t["title"] for t in tracks])
+        self.assertFalse([s for s in stops_of(tracks)
+                          if s["id"].startswith("dive-")])
+
+
+class DiveLedes(unittest.TestCase):
+    """One sentence stamped on every dive stop reads as the template it is.
+
+    The fix is a rotation, not a model: at least four distinct templates,
+    dealt by the stop's position on the DIVE track, so adjacent stops never
+    open identically and a cold rerun deals the same lede to the same stop.
+    """
+
+    def dive_narration(self, gids):
+        narr = copy.deepcopy(NARRATION)
+        for gid in gids:
+            narr[f"dive:{gid}"] = {"claims": [
+                {"text": f"A fact about {gid}.", "status": "inferred"}]}
+        return narr
+
+    def test_at_least_four_distinct_templates_each_naming_the_group(self):
+        self.assertGreaterEqual(len(set(compose.DIVE_LEDES)), 4)
+        for t in compose.DIVE_LEDES:
+            self.assertIn("{label}", t)
+
+    def test_four_dive_stops_get_four_different_ledes(self):
+        narr = self.dive_narration(["n-cli", "n-data", "n-utils", "n-extra"])
+
+        tracks = compose.build_course(ctx(narration=narr))
+
+        dive = next(t for t in tracks if t["title"] == "INSIDE THE SYSTEM")
+        ledes = [s["lede"] for s in dive["stops"]]
+        self.assertEqual(len(ledes), 4)
+        self.assertEqual(len(set(ledes)), 4)
+        for s in dive["stops"]:
+            label = s["title"].removeprefix("Inside ")
+            self.assertIn(label, s["lede"], s["id"])
+
+    def test_adjacent_stops_differ_even_when_an_empty_unit_is_omitted(self):
+        # DIVES has n-utils coming back empty between two answered units: the
+        # rotation is keyed by emitted position, so the two rendered stops
+        # still draw different templates rather than colliding across the gap.
+        tracks = compose.build_course(ctx(narration=DIVES))
+
+        dive = next(t for t in tracks if t["title"] == "INSIDE THE SYSTEM")
+        ledes = [s["lede"] for s in dive["stops"]]
+        self.assertEqual(len(ledes), 2)
+        self.assertNotEqual(ledes[0], ledes[1])
+
+    def test_the_rotation_is_deterministic_across_cold_runs(self):
+        a = compose.build_course(ctx(narration=DIVES))
+        b = compose.build_course(ctx(narration=DIVES))
+
+        self.assertEqual(json.dumps(a), json.dumps(b))
+
+
+class GlossaryStop(unittest.TestCase):
+    """`@3`: the glossary the caller passes becomes a CLOSE stop, else nothing."""
+
+    def test_a_glossary_adds_a_close_stop_before_the_audit(self):
+        tracks = compose.build_course(ctx(), glossary=GLOSSARY)
+
+        close = next(t for t in tracks if t["title"] == "CLOSE")
+        self.assertEqual([s["id"] for s in close["stops"]], ["gloss", "audit"])
+        gloss = close["stops"][0]
+        self.assertTrue(gloss["lede"])
+        tbl = gloss["blocks"][0]
+        self.assertEqual(tbl["type"], "table")
+        self.assertTrue(tbl["sortable"])
+        self.assertEqual(tbl["columns"], ["TERM", "DEFINITION"])
+        self.assertEqual(tbl["rows"][0][0], "<b>QLIKE</b>")
+
+    def test_the_audit_stop_stays_last_with_a_glossary(self):
+        tracks = compose.build_course(ctx(), glossary=GLOSSARY)
+
+        self.assertEqual(stops_of(tracks)[-1]["id"], compose.AUDIT_STOP)
+
+    def test_no_glossary_argument_changes_nothing(self):
+        ids = [s["id"] for s in stops_of(compose.build_course(ctx()))]
+
+        self.assertNotIn("gloss", ids)
+
+    def test_an_empty_or_malformed_glossary_is_omitted(self):
+        self.assertIsNone(compose.build_gloss(None))
+        self.assertIsNone(compose.build_gloss([]))
+        self.assertIsNone(compose.build_gloss([{"term": "", "def": "x"},
+                                               {"term": "y", "def": ""},
+                                               "not a dict"]))
+
+    def test_glossary_cells_are_escaped_with_the_term_in_bold(self):
+        gloss = compose.build_gloss([{"term": "<QLIKE>", "def": "a & b"}])
+
+        row = gloss["blocks"][0]["rows"][0]
+        self.assertEqual(row[0], "<b>&lt;QLIKE&gt;</b>")
+        self.assertEqual(row[1], "a &amp; b")
+
+
+class MapTourLede(unittest.TestCase):
+    def test_the_map_lede_mentions_the_tour_only_when_the_map_has_one(self):
+        toured = copy.deepcopy(MAP)
+        toured["tour"] = [{"id": "n-cli", "text": "Start here."}]
+
+        with_tour = compose._lede_map(ctx(mp=toured))
+        without = compose._lede_map(ctx())
+
+        self.assertIn("guided tour", with_tour)
+        self.assertNotIn("guided tour", without)
+
+
+class DashPolicy(unittest.TestCase):
+    """`@3` spec §1.6: no em or en dash on any authored surface compose owns.
+
+    Quotes and focus strings are the repo's own bytes and exempt, so the scan
+    walks the course skipping them, which is exactly the rule the render gate
+    applies to the finished payload.
+    """
+
+    def _scan(self, obj, path=""):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k in ("quote", "focus"):
+                    continue
+                self._scan(v, f"{path}.{k}")
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj):
+                self._scan(v, f"{path}[{i}]")
+        elif isinstance(obj, str):
+            self.assertNotIn("—", obj, path)
+            self.assertNotIn("–", obj, path)
+
+    def test_no_authored_dash_reaches_the_course(self):
+        c = ctx(narration=DIVES, hops=BuildTrace.HOPS)
+
+        self._scan(compose.build_course(c, glossary=GLOSSARY))
+
+    def test_no_authored_dash_survives_a_degraded_generation(self):
+        sv = copy.deepcopy(SURVEY)
+        sv["entry_points"] = []
+        cmds = copy.deepcopy(COMMANDS)
+        for r in cmds["runs"]:
+            r["exit"] = 1
+
+        c = ctx(survey=sv, commands=cmds, narration={}, hops=[])
+
+        self._scan(compose.build_course(c))
 
 
 if __name__ == "__main__":

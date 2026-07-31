@@ -365,10 +365,13 @@ class Replay(unittest.TestCase):
 class Units(unittest.TestCase):
     """Which units a repo can support — a data question, not a control-flow one."""
 
-    def test_a_repo_with_no_commands_and_no_hops_gets_five_and_conv_only(self):
+    def test_a_repo_with_no_commands_and_no_hops_gets_five_conv_and_gloss(self):
+        # Updated for @3: `gloss` is repo-level (windows come from the survey,
+        # not the map), so it joins the two units every repo supports. The
+        # node/dive/tour/cols units still need map_data.
         units, degradations = narrate.build_units(Replay.SURVEY)
 
-        self.assertEqual([u.id for u in units], ["five", "conv"])
+        self.assertEqual([u.id for u in units], ["five", "conv", "gloss"])
         self.assertEqual(degradations, [])
 
     def test_a_passing_command_earns_the_green_unit_a_failing_one_does_not(self):
@@ -394,8 +397,9 @@ class Units(unittest.TestCase):
 
         self.assertEqual(trace.max_claims, len(hops))
         self.assertEqual(len(trace.regions), len(hops))
+        # Updated for @3: gloss joins the no-map baseline.
         self.assertEqual([u.id for u in narrate.build_units(Replay.SURVEY, None, hops[:1])[0]],
-                         ["five", "conv"])
+                         ["five", "conv", "gloss"])
 
     def test_the_budget_drops_units_in_reverse_priority_and_says_so(self):
         hops = [{"file": "app.py", "start": 14, "end": 15},
@@ -405,9 +409,311 @@ class Units(unittest.TestCase):
 
         units, degradations = narrate.build_units(Replay.SURVEY, commands, hops, max_units=2)
 
+        # Updated for @3: the same repo now also builds `gloss`, so the total
+        # is 5. The reverse priority still ends conv < green < five < trace.
         self.assertEqual([u.id for u in units], ["five", "trace"])
         self.assertEqual(degradations[0]["code"], "narrate_budget")
-        self.assertIn("2 of 4", degradations[0]["reason"])
+        self.assertIn("2 of 5", degradations[0]["reason"])
+
+
+NODE = prompts.Unit(id="node:data", kind="node", title="Drawer: data",
+                    max_claims=1,
+                    files=("data/measures.py", "data/__init__.py"),
+                    choices=("measures.py", "__init__.py"))
+
+GLOSS = prompts.Unit(id="gloss", kind="gloss", title="Glossary",
+                     max_claims=narrate.GLOSS_TERMS_MAX)
+
+TOUR = prompts.Unit(id="tour", kind="tour", title="Guided tour", max_claims=3,
+                    choices=("n-a", "n-b", "n-c"))
+
+COLS = prompts.Unit(id="cols", kind="cols", title="Column labels", max_claims=2)
+
+
+def node_answer(**over):
+    """A valid node drawer answer; keyword overrides poke holes in it."""
+    out = {
+        "role": ["Turns raw ticks into the daily measures every model consumes.",
+                 "Owns the parquet caches and writes them atomically."],
+        "reads": "Raw ticks and daily series from the market data services.",
+        "feeds": "Feature construction and the model training loop.",
+        "key_files": [{"file": "measures.py", "purpose": "the canonical estimators"}],
+        "concepts": ["realized variance", "atomic caches", "estimators"],
+    }
+    out.update(over)
+    return out
+
+
+class StructuredParsers(unittest.TestCase):
+    """Per-kind schema validation: reject whole answers, drop bad slots."""
+
+    def test_a_valid_node_answer_round_trips(self):
+        answer, rows = narrate.parse_structured(node_answer(), NODE)
+
+        self.assertEqual(rows, [])
+        self.assertEqual(len(answer["role"]), 2)
+        self.assertEqual(answer["key_files"][0]["file"], "measures.py")
+        self.assertEqual(answer["concepts"][0], "realized variance")
+
+    def test_an_unknown_key_rejects_the_whole_node_answer(self):
+        with self.assertRaises(narrate.Rejected):
+            narrate.parse_structured(node_answer(extra="x"), NODE)
+
+        bad_item = node_answer(
+            key_files=[{"file": "measures.py", "purpose": "ok", "line": 3}])
+        with self.assertRaises(narrate.Rejected):
+            narrate.parse_structured(bad_item, NODE)
+
+    def test_a_key_files_entry_must_name_a_listed_file(self):
+        # One good entry survives a bad sibling; all-bad rejects the answer.
+        mixed = node_answer(key_files=[
+            {"file": "invented.py", "purpose": "does not exist"},
+            {"file": "measures.py", "purpose": "the canonical estimators"},
+        ])
+        answer, _ = narrate.parse_structured(mixed, NODE)
+        self.assertEqual([k["file"] for k in answer["key_files"]], ["measures.py"])
+
+        with self.assertRaises(narrate.Rejected):
+            narrate.parse_structured(
+                node_answer(key_files=[{"file": "invented.py", "purpose": "x"}]),
+                NODE)
+
+    def test_a_node_cite_with_a_start_key_rejects_like_a_claims_cite(self):
+        raw = node_answer(cite={"file": "data/measures.py", "quote": "def rv():",
+                                "start": 40})
+        with self.assertRaises(narrate.Rejected):
+            narrate.parse_structured(raw, NODE)
+
+    def test_node_role_cardinality_is_strict_but_backticks_are_legal(self):
+        with self.assertRaises(narrate.Rejected):
+            narrate.parse_structured(node_answer(role=["only one paragraph."]), NODE)
+        with self.assertRaises(narrate.Rejected):
+            narrate.parse_structured(node_answer(role=["a <b>tag.", "second."]), NODE)
+
+        ticked = node_answer(role=["`measures.py` computes RV.", "Second paragraph."])
+        answer, _ = narrate.parse_structured(ticked, NODE)
+        self.assertIn("`measures.py`", answer["role"][0])
+
+    def test_the_stub_miss_sentinel_is_absence_for_every_structured_kind(self):
+        for unit in (NODE, GLOSS, TOUR, COLS):
+            answer, rows = narrate.parse_structured({"claims": []}, unit)
+
+            self.assertEqual(answer, {}, unit.kind)
+            self.assertEqual(rows, [], unit.kind)
+
+    def test_gloss_drops_bad_terms_and_keeps_good_ones(self):
+        raw = {"terms": [
+            {"term": "RV", "def": "Realized variance, the daily forecast target."},
+            {"term": "x" * 41, "def": "over the term cap, dropped."},
+            {"term": "BPV", "def": "Jump-robust variance.",
+             "cite": {"file": "data/measures.py", "quote": "   "}},
+        ]}
+        answer, _ = narrate.parse_structured(raw, GLOSS)
+
+        self.assertEqual([t["term"] for t in answer["terms"]], ["RV", "BPV"])
+        self.assertNotIn("cite", answer["terms"][1])  # unusable cite dropped
+
+    def test_an_unknown_key_inside_one_gloss_term_rejects_the_whole_answer(self):
+        raw = {"terms": [{"term": "RV", "def": "fine.", "anchor": {}}]}
+
+        with self.assertRaises(narrate.Rejected):
+            narrate.parse_structured(raw, GLOSS)
+
+    def test_tour_steps_are_filtered_to_the_fixed_ids_and_reordered(self):
+        raw = {"steps": [{"id": "n-b", "text": "B first in the reply."},
+                         {"id": "n-x", "text": "not on the board."},
+                         {"id": "n-a", "text": "A second in the reply."}]}
+        answer, _ = narrate.parse_structured(raw, TOUR)
+
+        self.assertEqual([s["id"] for s in answer["steps"]], ["n-a", "n-b"])
+
+        with self.assertRaises(narrate.Rejected):
+            narrate.parse_structured(
+                {"steps": [{"id": "n-a", "text": "ok", "order": 1}]}, TOUR)
+
+    def test_cols_labels_are_positional_uppercase_and_capped(self):
+        answer, _ = narrate.parse_structured({"labels": ["DATA", "MODELS"]}, COLS)
+        self.assertEqual(answer["labels"], ["DATA", "MODELS"])
+
+        for bad in ([["DATA"]],                       # wrong count
+                    [["DATA", "models"]],             # not uppercase
+                    [["DATA", "X" * 15]]):            # over the label cap
+            with self.assertRaises(narrate.Rejected):
+                narrate.parse_structured({"labels": bad[0]}, COLS)
+
+    def test_dive_claims_allow_backticks_where_five_still_bans_them(self):
+        dive = prompts.Unit(id="dive:core", kind="dive", title="Inside core",
+                            max_claims=narrate.DIVE_MAX_CLAIMS)
+        text = "The `registry` maps names to classes."
+
+        kept, dropped = narrate.parse({"claims": [claim(text=text, cite=CITE)]}, dive)
+        self.assertEqual([c["text"] for c in kept], [text])
+        self.assertEqual(dropped, [])
+
+        kept, dropped = narrate.parse({"claims": [claim(text=text, cite=CITE)]}, FIVE)
+        self.assertEqual(kept, [])
+        self.assertEqual(len(dropped), 1)
+
+
+class MapUnits(unittest.TestCase):
+    """The @3 units a map makes possible, and the exact-or-prefix budget."""
+
+    SURVEY = {
+        "repo": {"name": "three", "commit": "abc1234"},
+        "stats": {"files": 5, "py_files": 4, "loc": 600, "modules": 3},
+        "modules": {
+            "core": {"path": ".", "files": 1, "loc": 300,
+                     "top": [{"path": "core.py", "fan_in": 9}]},
+            "data": {"path": "data", "files": 2, "loc": 200,
+                     "top": [{"path": "data/measures.py", "fan_in": 4}]},
+            "web": {"path": "web", "files": 1, "loc": 100,
+                    "top": [{"path": "web/views.py", "fan_in": 1}]},
+        },
+        "files": [{"path": "README.md"}, {"path": "core.py"},
+                  {"path": "data/measures.py"}, {"path": "web/views.py"}],
+    }
+    MAP = {
+        "nodes": [
+            {"id": "n-core", "label": "core", "path": "", "loc": 300,
+             "files": 1, "x": 40, "y": 40, "w": 150},
+            {"id": "n-data", "label": "data", "path": "data", "loc": 200,
+             "files": 2, "x": 240, "y": 40, "w": 150},
+            {"id": "n-web", "label": "web", "path": "web", "loc": 100,
+             "files": 1, "x": 440, "y": 40, "w": 150},
+            # Off the board: is_test wins even over the biggest loc.
+            {"id": "n-tests", "label": "tests", "path": "tests", "loc": 9999,
+             "is_test": True},
+        ],
+        "columns": [{"label": "LAYER 1", "x": 115}, {"label": "LAYER 2", "x": 315}],
+        "tour_order": ["n-core", "n-data", "n-web"],
+    }
+
+    def test_a_map_earns_node_dive_tour_and_cols_units(self):
+        units, degradations = narrate.build_units(self.SURVEY, map_data=self.MAP)
+
+        self.assertEqual(
+            [u.id for u in units],
+            ["five", "conv", "node:core", "node:data", "node:web",
+             "dive:core", "dive:data", "dive:web", "tour", "cols", "gloss"])
+        self.assertEqual(degradations, [])
+
+        node = next(u for u in units if u.id == "node:data")
+        self.assertIn("data/measures.py", node.files)
+        self.assertIn("measures.py", node.choices)
+        self.assertTrue(any("copy the name exactly" in n for n in node.notes))
+
+        tour = next(u for u in units if u.id == "tour")
+        self.assertEqual(tour.choices, ("n-core", "n-data", "n-web"))
+        self.assertEqual(tour.max_claims, 3)
+
+        cols = next(u for u in units if u.id == "cols")
+        self.assertEqual(cols.max_claims, 2)
+
+    def test_a_test_container_node_never_earns_a_unit(self):
+        units, _ = narrate.build_units(self.SURVEY, map_data=self.MAP)
+
+        self.assertNotIn("node:tests", [u.id for u in units])
+        self.assertNotIn("dive:tests", [u.id for u in units])
+
+    def test_the_budget_drops_prefix_families_smallest_group_first(self):
+        units, degradations = narrate.build_units(self.SURVEY, map_data=self.MAP,
+                                                  max_units=5)
+
+        # 11 built. cols, conv, gloss, tour go whole; the node family then
+        # sheds node:web and node:data (smallest loc first) to reach 5.
+        self.assertEqual(
+            [u.id for u in units],
+            ["five", "node:core", "dive:core", "dive:data", "dive:web"])
+        self.assertIn("5 of 11", degradations[0]["reason"])
+
+    def test_without_a_map_the_unit_list_is_the_at2_list_plus_gloss(self):
+        units, _ = narrate.build_units(self.SURVEY, map_data=None)
+
+        self.assertEqual([u.id for u in units], ["five", "conv", "gloss"])
+
+
+class MapPacks(unittest.TestCase):
+    """Pack emission for the @3 units: per-kind schemas, real windows."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.work = self.root / ".trailhead"
+        body = ("\n".join(f"# header {n}" for n in range(1, 13))
+                + "\n\ndef work(x):\n    '''Do the work.'''\n"
+                + "    if x is None:\n        raise ValueError('no input')\n"
+                + "    return x * 2\n")
+        (self.root / "core.py").write_text(body, encoding="utf-8", newline="\n")
+        (self.root / "data").mkdir()
+        (self.root / "data" / "measures.py").write_text(body, encoding="utf-8",
+                                                        newline="\n")
+        (self.root / "web").mkdir()
+        (self.root / "web" / "views.py").write_text(body, encoding="utf-8",
+                                                    newline="\n")
+        (self.root / "README.md").write_text("# three\n\nA tiny fixture.\n",
+                                             encoding="utf-8", newline="\n")
+        self.addCleanup(self.tmp.cleanup)
+
+    def emit(self):
+        return narrate.emit_prompts(MapUnits.SURVEY, self.root, self.work,
+                                    map_data=MapUnits.MAP)
+
+    def test_each_pack_carries_its_own_kind_schema(self):
+        packs = {p["unit"]: p for p in self.emit()}
+
+        self.assertIn("terms", packs["gloss"]["schema"]["properties"])
+        self.assertIn("steps", packs["tour"]["schema"]["properties"])
+        self.assertIn("labels", packs["cols"]["schema"]["properties"])
+        self.assertIn("role", packs["node:data"]["schema"]["properties"])
+        self.assertEqual(packs["five"]["schema"], provider.SCHEMA)
+
+        # The fixed vocabularies are enums the answering agent can see.
+        node_schema = packs["node:data"]["schema"]
+        file_enum = (node_schema["properties"]["key_files"]["items"]
+                     ["properties"]["file"]["enum"])
+        self.assertIn("measures.py", file_enum)
+        tour_enum = (packs["tour"]["schema"]["properties"]["steps"]["items"]
+                     ["properties"]["id"]["enum"])
+        self.assertEqual(tour_enum, ["n-core", "n-data", "n-web"])
+
+    def test_node_and_dive_packs_show_real_quotable_windows(self):
+        packs = {p["unit"]: p for p in self.emit()}
+
+        for unit_id in ("node:data", "dive:core", "gloss"):
+            windows = packs[unit_id]["windows"]
+            self.assertTrue(windows, unit_id)
+            self.assertTrue(all(w["start"] > prompts.HEAD_LINES for w in windows),
+                            unit_id)
+        self.assertIn("data/measures.py",
+                      [w["file"] for w in packs["node:data"]["windows"]])
+
+    def test_a_structured_answer_replays_and_a_missing_one_degrades(self):
+        packs = {p["unit"]: p for p in self.emit()}
+        Path(packs["gloss"]["out"]).write_text(json.dumps({"terms": [
+            {"term": "RV", "def": "Realized variance, the forecast target."},
+        ]}), encoding="utf-8")
+        Path(packs["cols"]["out"]).write_text(json.dumps(
+            {"labels": ["CORE", "EDGE"]}), encoding="utf-8")
+
+        result = narrate.run(MapUnits.SURVEY, self.root,
+                             provider.StubProvider(self.work / narrate.CACHE_DIRNAME),
+                             work=self.work, map_data=MapUnits.MAP)
+
+        self.assertEqual(result["narration"]["gloss"]["terms"][0]["term"], "RV")
+        self.assertEqual(result["narration"]["cols"]["labels"], ["CORE", "EDGE"])
+        # Unanswered structured units are absent-shaped, never an error ...
+        self.assertEqual(result["narration"]["node:core"], {})
+        self.assertEqual(result["narration"]["tour"], {})
+        # ... and never counted as a silent gap: unit_unnarrated stays scoped
+        # to the claim-shaped kinds (here five and conv, which narrated
+        # nothing while gloss/cols carried content).
+        gaps = [d["unit"] for d in result["degradations"]
+                if d.get("code") == narrate.CODE_UNNARRATED]
+        self.assertEqual(gaps, ["five", "conv"])
+
+        gloss_record = next(u for u in result["units"] if u["id"] == "gloss")
+        self.assertEqual(gloss_record["source"], "cache")
+        self.assertEqual(gloss_record["claims"], 1)
 
 
 class Store(unittest.TestCase):

@@ -606,7 +606,11 @@ class Lineage(Repo):
 
         self.assertEqual(step["status"], "inferred")
         self.assertNotIn("anchor", step)
-        self.assertEqual(payload["dropped"][0]["reason"], verify.REASON_HASH)
+        # @3 sanitisation ships ledger reasons with the ": " join; the em dash
+        # form is internal only. is_known_reason accepts both spellings.
+        self.assertEqual(payload["dropped"][0]["reason"],
+                         "excerpt hash mismatch: file changed after narration")
+        self.assertTrue(verify.is_known_reason(payload["dropped"][0]["reason"]))
 
     def test_a_boundary_can_never_ship_as_verified(self):
         payload, _ = self.assemble([

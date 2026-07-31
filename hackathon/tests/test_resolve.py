@@ -10,12 +10,22 @@ follows asserts that the resolver *refuses* — near misses, repeated snippets,
 dedented quotes and quotes that landed outside what the model was shown all have
 to come back as a reason, never as a guess.
 
+The classes from `DashClippedWindows` down cover the `trailhead/verified@3`
+surfaces (template-parity spec 1.6 and section 5): the dash-avoiding excerpt
+windows, and the glossary / node / tour / cols answers that `verify.assemble`
+resolves with the same machinery as the prose claims. Dash characters appear
+only as escapes, because the house style bars the characters themselves from
+this package's source.
+
 Run:  PYTHONPATH=src py -3.11 -m unittest discover -s tests -v
 """
+import copy
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
-from trailhead import resolve
+from trailhead import resolve, verify
 
 
 #: One synthetic module. Lines 7-10 and 15-18 are byte-identical on purpose —
@@ -543,6 +553,558 @@ class DropReason(unittest.TestCase):
 
         for why in emitted:
             self.assertIn(why, resolve.REASONS)
+
+
+class DashClippedWindows(unittest.TestCase):
+    """Spec 1.6: the padded excerpt window prefers not to show dash-bearing
+    CONTEXT lines. Match lines are the quote and are never touched."""
+
+    #: Ten lines; line 2 carries an em dash, line 8 an en dash. `python=False`
+    #: forces the padded branch, which is the one that clips.
+    PAD = [
+        "a = 1",
+        "b = 'x \u2014 y'",
+        "c = 3",
+        "d = 4",
+        "e = 5",
+        "f = 6",
+        "g = 7",
+        "h = 'x \u2013 y'",
+        "i = 9",
+        "j = 10",
+    ]
+
+    def test_padding_stops_short_of_dash_bearing_context_lines(self):
+        start, end = resolve.expand_anchor(self.PAD, 5, 6, python=False)
+
+        self.assertEqual((start, end), (3, 7))
+
+    def test_a_dash_free_file_pads_exactly_as_before(self):
+        clean = [f"x{n} = {n}" for n in range(1, 11)]
+
+        start, end = resolve.expand_anchor(clean, 5, 6, python=False)
+
+        self.assertEqual((start, end), (1, 10))
+
+    def test_a_dash_on_a_match_line_never_shrinks_the_match(self):
+        # Line 2 is INSIDE the match. The quote ships verbatim (hash integrity
+        # wins), so only the context below is clipped.
+        start, end = resolve.expand_anchor(self.PAD, 2, 3, python=False)
+
+        self.assertLessEqual(start, 2)
+        self.assertGreaterEqual(end, 3)
+        self.assertEqual((start, end), (1, 7))
+
+    def test_the_enclosing_def_branch_is_not_clipped(self):
+        # A definition is a semantic unit; a dash inside it stays.
+        src = [
+            "import math",
+            "",
+            "def f(x):",
+            "    # note \u2014 tricky",
+            "    return x",
+        ]
+
+        start, end = resolve.expand_anchor(src, 3, 5, python=True)
+
+        self.assertEqual((start, end), (3, 5))
+
+
+#: Two synthetic source files for the assemble-level tests. The quotes below
+#: are unique across both files and clear every quality floor.
+PRICING = [
+    '"""Pricing helpers."""',
+    "import math",
+    "",
+    "def price(instrument, curve):",
+    "    rate = curve.rate(instrument.tenor)",
+    "    return instrument.notional * math.exp(-rate * instrument.tenor)",
+]
+LOSS = [
+    '"""Loss functions."""',
+    "import math",
+    "",
+    "def qlike(forecast, realised):",
+    "    ratio = realised / forecast",
+    "    return ratio - math.log(ratio) - 1.0",
+]
+PRICING_QUOTE = "\n".join(PRICING[3:5])
+GLOSS_QUOTE = "\n".join(LOSS[3:5])
+NODE_QUOTE = "\n".join(LOSS[4:6])
+#: Clears the payload floor (63 non-space characters) but appears nowhere.
+ABSENT_QUOTE = ("def missing_function_name(alpha, beta):\n"
+                "    return alpha * beta + alpha - beta")
+
+SURVEY = {"repo": {"name": "demo", "commit": "abc1234"}}
+
+
+def _content(extra=None, claim_text="It prices instruments off a curve."):
+    """A minimal content.json: one verified claim plus the mandatory ledger."""
+    content = {
+        "tracks": [{"title": "ORIENT", "minutes": 5, "stops": [
+            {"id": "cover", "title": "Cover", "minutes": 5, "lede": "A lede.",
+             "blocks": [
+                 {"type": "prose", "claims": [
+                     {"id": "c-001", "text": claim_text, "status": "verified",
+                      "cite": {"file": "src/pricing.py",
+                               "quote": PRICING_QUOTE}}]},
+                 {"type": "ledger"},
+             ]}]}],
+    }
+    content.update(extra or {})
+    return content
+
+
+def _map(columns=True):
+    """Four boards nodes; @3 columns and viewBox only when asked for."""
+    nodes = [{"id": nid, "label": nid[2:], "loc": 100, "files": 2,
+              "x": 10, "y": 10, "w": 150,
+              "why": "2 files, 100 loc.", "top": ["a.py (3)"]}
+             for nid in ("n-core", "n-data", "n-cli", "n-eval")]
+    out = {"nodes": nodes, "edges": []}
+    if columns:
+        out["columns"] = [{"label": "LAYER 1", "x": 100, "line": False},
+                          {"label": "LAYER 2", "x": 300, "line": True}]
+        out["w"] = 1000
+        out["h"] = 300
+    return out
+
+
+def _assemble(extra=None, columns=True, claim_text="It prices instruments off a curve.",
+              **kw):
+    """Run the real `verify.assemble` against a throwaway on-disk repo, so the
+    cited_files -> build_snapshot -> iter_anchors chain is exercised end to
+    end rather than stubbed. Extra keywords go straight to `assemble`."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "src").mkdir()
+        (root / "src" / "pricing.py").write_text(
+            "\n".join(PRICING) + "\n", encoding="utf-8")
+        (root / "src" / "loss.py").write_text(
+            "\n".join(LOSS) + "\n", encoding="utf-8")
+        return verify.assemble(_content(extra, claim_text), SURVEY,
+                               _map(columns), None, root, **kw)
+
+
+class V3Glossary(unittest.TestCase):
+    """Spec 1.1 and section 5: glossary answers become the payload's top-level
+    glossary, anchored and hashed like claims, degrading softly."""
+
+    ENTRY = {"term": "QLIKE", "def": "A loss for variance forecasts.",
+             "cite": {"file": "src/loss.py", "quote": GLOSS_QUOTE}}
+
+    def test_a_resolving_cite_ships_an_anchor_and_bundles_the_file(self):
+        payload, _ = _assemble({"glossary": [dict(self.ENTRY)]})
+
+        entry = payload["glossary"][0]
+        self.assertEqual(entry["id"], "qlike")
+        self.assertEqual(entry["anchor"]["file"], "src/loss.py")
+        self.assertTrue(entry["anchor"]["sha256"])
+        bundled = payload["files"]["src/loss.py"]
+        for n in range(entry["anchor"]["start"], entry["anchor"]["end"] + 1):
+            self.assertIn(str(n), bundled)
+
+    def test_a_failed_cite_keeps_the_definition_and_ledgers_g_slug(self):
+        entry = {"term": "VRP", "def": "Implied minus expected variance.",
+                 "cite": {"file": "src/loss.py", "quote": ABSENT_QUOTE}}
+
+        payload, _ = _assemble({"glossary": [entry]})
+
+        kept = payload["glossary"][0]
+        self.assertEqual(kept["def"], "Implied minus expected variance.")
+        self.assertNotIn("anchor", kept)
+        rows = {row["id"]: row for row in payload["dropped"]}
+        self.assertIn("g-vrp", rows)
+        self.assertEqual(rows["g-vrp"]["reason"],
+                         "snippet not found verbatim in file")
+
+    def test_terms_are_slugged_and_deduped_first_wins(self):
+        entries = [{"term": "QLIKE", "def": "First spelling."},
+                   {"term": "qlike!", "def": "Second spelling."}]
+
+        payload, _ = _assemble({"glossary": entries})
+
+        self.assertEqual([e["id"] for e in payload["glossary"]], ["qlike"])
+        self.assertEqual(payload["glossary"][0]["def"], "First spelling.")
+
+
+class V3SlugStripping(unittest.TestCase):
+    """The glossary id is what a bare `[[marker]]` in prose slugs to, so a
+    trailing parenthetical on the term must never reach the slug: an id of
+    `realized-variance-rv` leaves every bare `[[realized variance]]` marker
+    dead on screen."""
+
+    def test_a_trailing_parenthetical_is_stripped_from_the_id(self):
+        entry = {"term": "realized variance (RV)",
+                 "def": "The sum of squared returns."}
+
+        payload, _ = _assemble({"glossary": [entry]})
+
+        self.assertEqual(payload["glossary"][0]["id"], "realized-variance")
+        # The TERM keeps its parenthetical; only the id is stripped.
+        self.assertEqual(payload["glossary"][0]["term"], "realized variance (RV)")
+
+    def test_an_all_parenthetical_term_falls_back_to_its_full_slug(self):
+        entry = {"term": "(RV)", "def": "An abbreviation, nothing else."}
+
+        payload, _ = _assemble({"glossary": [entry]})
+
+        self.assertEqual(payload["glossary"][0]["id"], "rv")
+
+    def test_a_collision_after_stripping_keeps_the_first_and_ledgers_nothing(self):
+        entries = [{"term": "realized variance (RV)", "def": "First spelling."},
+                   {"term": "realized variance", "def": "Second spelling."}]
+
+        payload, _ = _assemble({"glossary": entries})
+
+        self.assertEqual([e["id"] for e in payload["glossary"]],
+                         ["realized-variance"])
+        self.assertEqual(payload["glossary"][0]["def"], "First spelling.")
+        self.assertFalse([r for r in payload["dropped"]
+                          if str(r.get("id") or "").startswith("g-")])
+
+    def test_a_marker_written_as_the_stripped_slug_survives_sanitise(self):
+        # The whole point of the strip: the marker the prose actually writes
+        # now names a real glossary id and is NOT rewritten to its bare label.
+        payload, audit = _assemble(
+            {"glossary": [{"term": "realized variance (RV)",
+                           "def": "The sum of squared returns."}]},
+            claim_text="Computed as [[realized-variance|realized variance]] daily.")
+
+        claim = payload["tracks"][0]["stops"][0]["blocks"][0]["claims"][0]
+        self.assertIn("[[realized-variance|realized variance]]", claim["text"])
+        self.assertEqual(audit["glossary_markers_rewritten"], [])
+
+    def test_a_mid_term_parenthetical_is_not_stripped(self):
+        # Only a TRAILING parenthetical is noise; one inside the term is part
+        # of its spelling.
+        entry = {"term": "P(0) hedge ratio", "def": "The ratio at zero."}
+
+        payload, _ = _assemble({"glossary": [entry]})
+
+        self.assertEqual(payload["glossary"][0]["id"], "p-0-hedge-ratio")
+
+
+class V3NodeAnswers(unittest.TestCase):
+    """Section 5: `node:<gid>` answers enrich the map node, or the node keeps
+    its deterministic why/top fallback and the failure is ledgered."""
+
+    ANSWER = {"role": ["Para one.", "Para two."],
+              "reads": "YAML configs.", "feeds": "Everything downstream.",
+              "key_files": [{"file": "loss.py", "purpose": "the loss"}],
+              "concepts": ["registry pattern"],
+              "cite": {"file": "src/loss.py", "quote": NODE_QUOTE},
+              "caption": "Where the loss lives."}
+
+    def node(self, payload, nid="n-core"):
+        return next(n for n in payload["map"]["nodes"] if n["id"] == nid)
+
+    def test_an_answer_with_a_resolving_cite_merges_onto_the_node(self):
+        payload, _ = _assemble({"map_answers": {"core": dict(self.ANSWER)}})
+
+        node = self.node(payload)
+        self.assertEqual(node["role"], ["Para one.", "Para two."])
+        self.assertEqual(node["reads"], "YAML configs.")
+        self.assertEqual(node["feeds"], "Everything downstream.")
+        self.assertEqual(node["key_files"],
+                         [{"file": "loss.py", "purpose": "the loss"}])
+        self.assertEqual(node["concepts"], ["registry pattern"])
+        self.assertEqual(node["anchor"]["file"], "src/loss.py")
+        self.assertEqual(node["anchor_caption"], "Where the loss lives.")
+        self.assertIn("src/loss.py", payload["files"])
+
+    def test_a_failed_cite_keeps_the_why_fallback_and_ledgers_n_gid(self):
+        answer = dict(self.ANSWER)
+        answer["cite"] = {"file": "src/loss.py", "quote": ABSENT_QUOTE}
+
+        payload, _ = _assemble({"map_answers": {"core": answer}})
+
+        node = self.node(payload)
+        self.assertNotIn("role", node)
+        self.assertNotIn("anchor", node)
+        self.assertEqual(node["why"], "2 files, 100 loc.")
+        self.assertIn("n-core", {row["id"] for row in payload["dropped"]})
+
+    def test_an_answer_for_a_group_off_the_board_is_ignored(self):
+        payload, _ = _assemble({"map_answers": {"ghost": dict(self.ANSWER)}})
+
+        self.assertNotIn("n-ghost",
+                         {row["id"] for row in payload["dropped"]})
+
+
+#: A dive stop as compose emits it on a cold @3 run: prose only, because the
+#: map node has no anchor until the `node:<gid>` answer resolves one stage
+#: later. The excerpt tests below assert verify closes that gap.
+DIVE_STOP = {
+    "id": "dive-core", "title": "Inside core", "kind": "stop", "minutes": 4,
+    "lede": "A closer read of core.",
+    "blocks": [{"type": "prose", "claims": [
+        {"id": "c-201", "text": "Core owns the loss function.",
+         "status": "verified",
+         "cite": {"file": "src/pricing.py", "quote": PRICING_QUOTE}}]}],
+}
+
+
+class V3DiveExcerpt(unittest.TestCase):
+    """After a `node:<gid>` anchor resolves, the matching dive stop
+    (`dive-<slug(gid)>`) gains the evidence as an excerpt block. Compose could
+    not emit it: at compose time the node had no anchor yet."""
+
+    ANSWER = {"role": ["Core routes everything."],
+              "cite": {"file": "src/loss.py", "quote": NODE_QUOTE},
+              "caption": "Where the loss lives."}
+
+    def build(self, dive_stop=None, answer=None, gid="core"):
+        stop = copy.deepcopy(DIVE_STOP if dive_stop is None else dive_stop)
+        tracks = _content()["tracks"]
+        tracks.append({"title": "DIVE", "minutes": 4, "stops": [stop]})
+        return _assemble({"tracks": tracks,
+                          "map_answers": {gid: copy.deepcopy(
+                              self.ANSWER if answer is None else answer)}})
+
+    def stop(self, payload):
+        return payload["tracks"][1]["stops"][0]
+
+    def test_the_dive_stop_gains_an_excerpt_after_its_prose_block(self):
+        payload, _ = self.build()
+
+        blocks = self.stop(payload)["blocks"]
+        self.assertEqual([b["type"] for b in blocks], ["prose", "excerpt"])
+        node = next(n for n in payload["map"]["nodes"] if n["id"] == "n-core")
+        self.assertEqual(blocks[1]["anchor"], node["anchor"])
+        self.assertEqual(blocks[1]["caption"], "Where the loss lives.")
+
+    def test_the_injected_anchor_lines_are_bundled(self):
+        # `iter_anchors` walks excerpt blocks, so the injected anchor's lines
+        # must be in `files` or the gate fails every one with `file not bundled`.
+        payload, _ = self.build()
+
+        anchor = self.stop(payload)["blocks"][1]["anchor"]
+        bundled = payload["files"][anchor["file"]]
+        for n in range(anchor["start"], anchor["end"] + 1):
+            self.assertIn(str(n), bundled)
+
+    def test_a_captionless_answer_injects_a_blank_caption_not_a_missing_one(self):
+        answer = dict(self.ANSWER)
+        answer.pop("caption")
+
+        payload, _ = self.build(answer=answer)
+
+        self.assertEqual(self.stop(payload)["blocks"][1]["caption"], "")
+
+    def test_a_stop_that_already_carries_an_excerpt_is_left_alone(self):
+        stop = copy.deepcopy(DIVE_STOP)
+        stop["blocks"].append({"type": "excerpt", "caption": "Already here.",
+                               "cite": {"file": "src/pricing.py",
+                                        "quote": PRICING_QUOTE}})
+
+        payload, _ = self.build(dive_stop=stop)
+
+        blocks = self.stop(payload)["blocks"]
+        self.assertEqual([b["type"] for b in blocks].count("excerpt"), 1)
+        self.assertEqual(blocks[-1]["caption"], "Already here.")
+
+    def test_a_failed_node_cite_injects_nothing(self):
+        answer = dict(self.ANSWER)
+        answer["cite"] = {"file": "src/loss.py", "quote": ABSENT_QUOTE}
+
+        payload, _ = self.build(answer=answer)
+
+        self.assertEqual([b["type"] for b in self.stop(payload)["blocks"]],
+                         ["prose"])
+
+    def test_an_answer_with_no_cite_injects_nothing(self):
+        payload, _ = self.build(answer={"role": ["Prose only, no evidence."]})
+
+        self.assertEqual([b["type"] for b in self.stop(payload)["blocks"]],
+                         ["prose"])
+
+    def test_a_missing_dive_stop_is_not_an_error(self):
+        # The node still gets its anchor; there is simply no stop to enrich.
+        payload, _ = _assemble({"map_answers": {"core": dict(self.ANSWER)}})
+
+        node = next(n for n in payload["map"]["nodes"] if n["id"] == "n-core")
+        self.assertIn("anchor", node)
+
+
+class V3Tour(unittest.TestCase):
+    """Section 5: tour steps must name nodes on the board; a tour that cannot
+    guide (under three steps) is dropped whole, in the report not the ledger."""
+
+    def steps(self, *ids):
+        return [{"id": i, "text": f"Step about {i}."} for i in ids]
+
+    def test_an_off_board_step_is_ledgered_and_the_rest_ship(self):
+        payload, _ = _assemble(
+            {"tour": self.steps("n-core", "n-data", "n-cli", "n-ghost")})
+
+        self.assertEqual([s["id"] for s in payload["map"]["tour"]],
+                         ["n-core", "n-data", "n-cli"])
+        rows = {row["id"]: row for row in payload["dropped"]}
+        self.assertEqual(rows["t-n-ghost"]["reason"], verify.REASON_OFF_BOARD)
+
+    def test_the_whole_tour_drops_below_three_surviving_steps(self):
+        payload, audit = _assemble({"tour": self.steps("n-core", "n-data")})
+
+        self.assertNotIn("tour", payload["map"])
+        self.assertTrue(any("map tour dropped" in d
+                            for d in audit["degradations"]))
+
+
+class V3Columns(unittest.TestCase):
+    """Section 5: the `cols` answer renames the mapper's LAYER placeholders in
+    order, and a count mismatch keeps the placeholders."""
+
+    def test_labels_apply_in_order_and_keep_the_geometry(self):
+        payload, _ = _assemble({"cols": ["INTERFACE", "CORE"]})
+
+        columns = payload["map"]["columns"]
+        self.assertEqual([c["label"] for c in columns], ["INTERFACE", "CORE"])
+        self.assertEqual([c["x"] for c in columns], [100, 300])
+
+    def test_a_count_mismatch_keeps_the_placeholders_and_is_reported(self):
+        payload, audit = _assemble({"cols": ["ONLY"]})
+
+        self.assertEqual([c["label"] for c in payload["map"]["columns"]],
+                         ["LAYER 1", "LAYER 2"])
+        self.assertTrue(any("column labels" in d
+                            for d in audit["degradations"]))
+
+
+class V3DashPolicy(unittest.TestCase):
+    """Spec 1.6 at assembly time: authored dashes transliterated, ledger
+    reasons colon-joined, bundled source lines exempt."""
+
+    def test_authored_dashes_become_comma_and_hyphen(self):
+        payload, _ = _assemble(
+            claim_text="Fast \u2014 but risky \u2013 sometimes.")
+
+        claim = payload["tracks"][0]["stops"][0]["blocks"][0]["claims"][0]
+        self.assertEqual(claim["text"], "Fast, but risky - sometimes.")
+
+    def test_a_ledger_reason_detail_is_colon_joined(self):
+        entry = {"term": "VRP", "def": "A premium.",
+                 "cite": {"file": "src/loss.py", "quote": "one line only"}}
+
+        payload, _ = _assemble({"glossary": [entry]})
+
+        rows = {row["id"]: row for row in payload["dropped"]}
+        self.assertEqual(rows["g-vrp"]["reason"],
+                         "quote shorter than two lines: 1 lines")
+        self.assertTrue(verify.is_known_reason(rows["g-vrp"]["reason"]))
+
+    def test_no_dash_characters_survive_outside_the_files_map(self):
+        entry = {"term": "VRP", "def": "Implied \u2014 minus \u2013 expected.",
+                 "cite": {"file": "src/loss.py", "quote": ABSENT_QUOTE}}
+        payload, _ = _assemble({"glossary": [entry]},
+                               claim_text="A claim \u2014 with a dash.")
+
+        outside = {k: v for k, v in payload.items() if k != "files"}
+        text = json.dumps(outside, ensure_ascii=False)
+        self.assertNotIn("\u2014", text)
+        self.assertNotIn("\u2013", text)
+
+    def test_dead_glossary_markers_are_rewritten_to_their_label(self):
+        payload, audit = _assemble(
+            {"glossary": [{"term": "QLIKE", "def": "A loss.",
+                           "cite": {"file": "src/loss.py",
+                                    "quote": GLOSS_QUOTE}}]},
+            claim_text="Ranks by [[qlike|QLIKE]] and [[ghost|spooky]] terms.")
+
+        claim = payload["tracks"][0]["stops"][0]["blocks"][0]["claims"][0]
+        self.assertEqual(claim["text"],
+                         "Ranks by [[qlike|QLIKE]] and spooky terms.")
+        self.assertEqual(audit["glossary_markers_rewritten"], ["ghost"])
+
+
+class V3Contract(unittest.TestCase):
+    """Section 5: the contract names what the payload carries. Barren repos
+    stay bit-stable at @2; any @3 surface bumps it and adds report.anchors."""
+
+    def test_a_barren_payload_stays_at_v2_with_no_anchors_field(self):
+        payload, _ = _assemble(columns=False)
+
+        self.assertEqual(payload["contract"], verify.CONTRACT)
+        self.assertNotIn("anchors", payload["report"])
+        self.assertNotIn("glossary", payload)
+
+    def test_map_columns_alone_bump_the_contract_to_v3(self):
+        payload, _ = _assemble(columns=True)
+
+        self.assertEqual(payload["contract"], verify.CONTRACT_V3)
+        self.assertEqual(payload["report"]["anchors"], 1)
+
+    def test_report_anchors_counts_every_shipped_anchor_surface(self):
+        payload, audit = _assemble({
+            "glossary": [{"term": "QLIKE", "def": "A loss.",
+                          "cite": {"file": "src/loss.py",
+                                   "quote": GLOSS_QUOTE}}],
+            "map_answers": {"core": {"role": ["Para."],
+                                     "cite": {"file": "src/loss.py",
+                                              "quote": NODE_QUOTE}}},
+        })
+
+        # One claim anchor, one glossary anchor, one node anchor.
+        self.assertEqual(payload["report"]["anchors"], 3)
+        self.assertEqual(payload["report"]["anchors"], audit["anchors"])
+        # Anchors are anchors, not claims: the claim math is exactly @2's.
+        self.assertEqual(payload["report"]["claims"], 1)
+        self.assertEqual(payload["report"]["verified"], 1)
+
+
+class RegenProvenance(unittest.TestCase):
+    """`report.regen` is the run's own regeneration command. The renderer's
+    footer prints it verbatim; without it the footer falls back to a neutral
+    sentence, never to a claim of hand-built pedigree."""
+
+    def test_the_regen_kwarg_reaches_the_report_verbatim(self):
+        line = ("Regenerate: PYTHONPATH=src python -m trailhead build restored "
+                "-o out/restored.html --run-commands safe")
+
+        payload, _ = _assemble(regen=line)
+
+        self.assertEqual(payload["report"]["regen"], line)
+
+    def test_no_regen_argument_leaves_the_key_off_the_report(self):
+        # Additive: a direct assemble() call without the kwarg emits the exact
+        # report it always did.
+        payload, _ = _assemble()
+
+        self.assertNotIn("regen", payload["report"])
+
+    def test_a_dash_in_the_regen_line_is_transliterated_to_a_hyphen(self):
+        # A command line reads dashes as flags, so both banned dashes become
+        # plain hyphens rather than prose's comma join.
+        payload, _ = _assemble(
+            regen="Regenerate: build a \u2014 then \u2013 done")
+
+        self.assertEqual(payload["report"]["regen"],
+                         "Regenerate: build a - then - done")
+
+    def test_the_cli_builds_the_line_from_its_own_arguments(self):
+        # The provenance fix itself: the string names THIS run's repo, output
+        # and command policy, not the hand-built template's tooling.
+        from trailhead import cli
+
+        args = cli.build_parser().parse_args(
+            ["build", "restored", "-o", "out/restored.html",
+             "--run-commands", "none"])
+
+        self.assertEqual(
+            cli._regen_line(args),
+            "Regenerate: PYTHONPATH=src python -m trailhead build restored "
+            "-o out/restored.html --run-commands none")
+
+    def test_the_cli_line_uses_forward_slashes_whatever_was_typed(self):
+        from trailhead import cli
+
+        args = cli.build_parser().parse_args(
+            ["build", "repos\\restored", "-o", "out\\restored.html"])
+
+        line = cli._regen_line(args)
+        self.assertIn("build repos/restored", line)
+        self.assertIn("-o out/restored.html", line)
+        self.assertNotIn("\\", line)
 
 
 if __name__ == "__main__":

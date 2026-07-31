@@ -7,16 +7,16 @@
   "degradations": ["no_trace", "no_test_command", "narration_budget", "no_commands", "stop_dropped"],
   "degradations_if_no_churn": ["no_churn"],
   "stop_drops": {
-    "cp-c": "no traceable entry point, so the trace stop was not generated"
+    "cp-c": "fewer than two hops were specified, so the trace stop was not generated"
   },
-  "map_nodes": 4,
+  "map_nodes": 3,
   "notes": [
     "VOCABULARY IS MEASURED, NOT GUESSED -- see hazards/expect.json note 1 for the full reconciliation. no_entry_point -> no_trace, stops_dropped -> stop_dropped, and narration_budget + no_commands are genuinely emitted under the invocation above.",
     "ROW 1 FIRES HERE TOO, and this file used to deny it. It fires on the fewer-than-two-hops half, not the no-entry-point half: entry_points is correctly non-empty (three of them, below), but hops are hand-specified per decision 25 in fixtures/trace.<repo>.json and only restored/ ships one, so ctx.hops is [] for every fixture repo and build_trace degrades to its labelled callout. cp-c drops with it (row 8), because its answer key is a hop.",
     "cp-a SURVIVES here and nowhere else in tests/repos. Both keys are generated -- cp-a1 has >=4 rankable modules with no fan-in tie at the top, cp-a2 has an entry point plus three distinct distractor files -- and compose._needs_checkpoints demands both.",
     "roots: repo_root=<repo>, import_roots=[src], test_roots=[src/tests], pyproject=src/pyproject.toml, declared_packages=[widget]. packages=[\"widget\"] has no directory component, so import_root is the pyproject's parent (3.2 rule 1).",
     "The only fixture repo with three or more map nodes, so it is the only one that exercises 4.2's packing, ordering and placement at all.",
-    "map_nodes=4 assumes adaptive depth settles at 2 -- widget, widget/core, widget/io, tests -- and that no group is a singleton, which is why tests/ has two files. VERIFIED 2026-07-30: the emitted labels are widget, tests, io, core. If collapse legitimately settles elsewhere, fix this number rather than the repo.",
+    "map_nodes=3 assumes adaptive depth settles at 2 -- widget, widget/core, widget/io -- with the tests group taken OFF the board by the @3 off-board rule (>=60% of its files under a test root; it is named in map.note instead). VERIFIED 2026-07-31 against the layered mapper. If collapse legitimately settles elsewhere, fix this number rather than the repo.",
     "Edge direction runs left to right by design: tests and widget import core and io; core imports nothing. That keeps edges_dropped_backward at 0 (4.2 step 7).",
     "Relative imports: widget/core/__init__.py uses level 1 from a package __init__, widget/io/loader.py uses level 2 from a plain module. These are the ONLY exercise those code paths get -- restored has 2560 ImportFrom nodes and every one is level 0.",
     "One dangling target, widget.config, imported inside a function body: dangling must never become a node or an edge (3.4).",

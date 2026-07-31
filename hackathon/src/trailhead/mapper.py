@@ -1,76 +1,93 @@
-"""Stage 2 — MAP. Deterministic. No model.
+"""Stage 2 - MAP. Deterministic. No model.
 
 Reads `survey.json`, collapses every in-scope file down to at most `MAP_CAP`
-node groups, lays those groups out in the renderer's coordinate space, and
-emits `map.json` (`trailhead/map@1`).
+node groups, assigns each group to a pipeline column by longest-path layering
+over the group import graph, stacks the columns on a 1000-unit-wide canvas
+whose height is computed per repo, and emits `map.json` (`trailhead/map@1`
+plus the template-parity additions: `w`, `h`, `columns`, `tour_order`, an
+optional `note`, and explicit per-node `h` and `path`).
 
 Two things make this stage worth testing rather than eyeballing.
 
-**The canvas is hard-coded.** `demo/trailhead-demo.html` draws
-`viewBox="0 0 900 400"` with a decorative ruler at y = 381-392, and it has no
-layout engine, no zoom and no pan (decision #17 cut the dynamic viewBox:
-`.mapbox svg{width:100%}` means a wider viewBox zooms *out* rather than gaining
-space). Every coordinate is final at generation time, so a node that does not
-fit is a node drawn through the ruler in front of the judges.
+**The geometry is final at generation time.** The renderer draws
+`viewBox="0 0 ${map.w} ${map.h}"` and every rect at the emitted `x/y/w/h`;
+there is no layout engine in the page. `node_h` mirrors `template/build.mjs`
+(`42 + min(28, round(sqrt(loc)/6))`) and is the only height definition in the
+project: the stacking and the invariants both call it, so a wrong formula
+fails the build instead of clipping in the browser. The canvas grows downward
+when a column is tall, which is why the old overflow-table mode is gone.
 
-**`node_h` mirrors the renderer.** `H_BASE`/`H_DIV` are copied verbatim from
-`const h=n=>44+Math.sqrt(n.loc)/6;` in the template. The obvious wrong formula,
-`34 + sqrt(loc)/9`, under-reserves the demo repo's twelve nodes by 166 px (+33%)
-— and every invariant asserted against that same wrong formula still passes
-while the browser clips. That is why `node_h` is the only height definition in
-the project, and why the packing *and* the invariants both call it.
+**Columns are meaning, not balance.** A column index is the length of the
+longest import chain that reaches the group (importers leftmost), capped at
+`MAX_COLUMNS` by merging middle layers. `columns[]` carries placeholder
+`LAYER <n>` headers that stage 3 may rename; `tour_order` fixes the walk
+(leftmost column to rightmost; inside a column, groups holding a survey
+entry point file first, then the rest top to bottom) that stage 3 writes
+tour text against. Groups that are mostly test files are left off the
+board entirely and named in `map.note` instead, next to the survey's
+dangling-import count.
 
-Nothing here calls a model: `why` and `top` are deterministic templates over
-`survey.json` (decisions #19 and #20c), which is what makes them legal on a
-surface that has no claim marker.
+Nothing here calls a model: `why`, `top` and `note` are deterministic
+templates over `survey.json` (decisions #19 and #20c), which is what makes
+them legal on a surface that has no claim marker.
 """
 import math
 import re
 
-#: The density cap (decision #16 — 14, not spec §4.4's 40). 900x400 with node
-#: widths around 142 holds five columns of six; 40 nodes is 71% fill on a canvas
-#: with no zoom, no pan and no density collapse in the page.
+#: The density cap (decision #16: 14, not spec §4.4's 40). Fourteen groups is
+#: the most the board can carry before the drawers stop being readable. The
+#: canvas grows downward now, so this is a comprehension bound, not geometry.
 MAP_CAP = 14
 
-W, H = 900.0, 400.0
-X_PAD = 8.0
-Y_TOP, Y_BOT = 10.0, 368.0
-BAND = Y_BOT - Y_TOP                 # 358.0 — the vertical space a column may use
-COL_GAP = 26.0
-ROW_GAP = 13.0
+#: Canvas width in renderer units. The renderer scales the SVG to its box
+#: (`viewBox="0 0 ${map.w} ${map.h}"`), so the width is fixed and the height
+#: is whatever the tallest column needs. Both are emitted on the map.
+W = 1000.0
+
+X_MARGIN = 20.0        #: side margin the column spans divide the rest of W into
+NODE_W = 150           #: every node rect is this wide, per template/build.mjs
+Y_START = 40.0         #: first node top in every column, below the header row
+V_GAP = 26.0           #: vertical gap between nodes stacked in one column
+H_PAD = 8.0            #: canvas padding under the tallest column's cursor
+
+#: Column ceiling. A layering deeper than this merges its middle layers, so
+#: the first and last layers keep their meaning (pure importers, pure
+#: libraries) and the merges land where the chains are longest.
+MAX_COLUMNS = 7
+
 EDGE_CAP = 48
-W_MAX = 300.0                        # node width clamp — see §4.2 step 1
 
-#: THE renderer's rect height, `demo/trailhead-demo.html`'s
-#: `const h=n=>44+Math.sqrt(n.loc)/6;`. Read through `node_h`, never inlined.
-H_BASE, H_DIV = 44.0, 6.0
-
-#: Usable width once both side pads are taken: the number every column-capacity
-#: sum is measured against.
-CANVAS_INNER = W - 2 * X_PAD         # 884.0
-
-#: A gutter wider than this looks like a bug rather than a layout, so §4.2 step 4
-#: widens the column count until the gutter drops under it.
-GUTTER_MAX = 3 * COL_GAP             # 78.0
-
-#: The tightest row gap the packing will accept before it declares a column
-#: overfull and asks for another column (or, failing that, a density merge).
-MIN_ROW_GAP = 2.0
-
-#: Bottom of the drawable area. The ruler lives at y = 381-392, so a rect may
-#: reach 372 and no further.
-Y_CLEAR = 372.0
+#: THE node height, `template/build.mjs`'s
+#: `Math.round(42 + Math.min(28, Math.sqrt(n.loc)/6))`. Read through
+#: `node_h`, never inlined; emitted explicitly as `h` because the renderer
+#: draws `n.h` when present.
+H_BASE, H_CAP, H_DIV = 42, 28, 6.0
 
 #: Below this the generator emits a table and a callout instead of a graph
-#: (§4.4 / §9 row 4). The nodes are still laid out and still shipped — the
-#: renderer does `D.map.nodes.map(...)` unconditionally.
+#: (§4.4 / §9 row 4). The nodes are still laid out and still shipped, since
+#: the renderer does `D.map.nodes.map(...)` unconditionally.
 MIN_GRAPH_NODES = 3
 
 #: Deepest adaptive-depth probe. Nothing measured needs more than 3.
 MAX_DEPTH = 8
 
-#: Longest label that still fits `W_MAX` under `node_w`'s label term.
-LABEL_MAX = int((W_MAX - 22.0) / 6.9)     # 40
+#: Longest label that fits a `NODE_W` rect at the renderer's label font
+#: (600 11.5px mono, about 6.9 units per character, 22 units of padding).
+LABEL_MAX = int((NODE_W - 22.0) / 6.9)    # 18
+
+#: Directory names that mark a file as test-rooted for the off-board rule:
+#: `tests/`, `test/`, and the same names at any depth (`pkg/tests/...`).
+TEST_DIR_NAMES = {"test", "tests"}
+
+#: A group at or above this share of test-rooted member files leaves the
+#: board and is named in `map.note` instead: a test container imports every
+#: column, and its edges bury the structure the board exists to show.
+OFFBOARD_TEST_SHARE = 0.6
+
+#: The two dash characters barred from every authored string that reaches the
+#: artifact (parity spec §1.6). Spelled with `chr` so this source file itself
+#: carries neither.
+EM_DASH, EN_DASH = chr(0x2014), chr(0x2013)
 
 #: The renderer interpolates `n.label` into SVG `<text>` unescaped, so a stray
 #: `<` or `&` breaks the whole map rather than one cell. Whitelist, not blacklist.
@@ -90,33 +107,20 @@ class LayoutError(ValueError):
 
 # ---------------------------------------------------------------- primitives
 
-def node_w(label: str, loc: int, files: int) -> int:
-    """Width of a node's rect, in the renderer's units.
+def node_h(loc: int) -> int:
+    """Height of a node's rect. THE height definition, and there is no other.
 
-    The renderer draws the label at `600 11.5px mono` and the stats line at
-    `10px mono`, both starting at `x+11`, and clips neither — so the width has
-    to cover whichever of the two strings is longer, plus the padding either
-    side. The shipped fixture's `risk` node already overflows by ~5 px under
-    this formula, which is the measurement that produced the constants.
-
-    The `W_MAX` clamp is not decoration. Without it one long label makes
-    `max_w > 442`, no column count satisfies the capacity rule, `Cmax` falls to
-    0, and both the placement walk and the `x + w <= 900` invariant break.
-    `build_map` middle-ellipsises the label when the clamp bites.
+    Identical to `template/build.mjs`'s
+    `Math.round(42 + Math.min(28, Math.sqrt(n.loc)/6))`, with half-up rounding
+    spelled out because JavaScript's `Math.round` rounds half up while
+    Python's `round` rounds half even. Emitted on every node as `h`: the
+    renderer draws `n.h` when present and only derives a height for legacy
+    payloads that carry none. An invariant asserted against a different
+    formula passes in Python while the page clips, which is strictly worse
+    than not asserting at all.
     """
-    stats = f"{loc:,} loc · {files} files"
-    return math.ceil(min(W_MAX, 22 + max(6.9 * len(label), 6.0 * len(stats))))
-
-
-def node_h(loc: int) -> float:
-    """Height of a node's rect. THE height definition — there is no other.
-
-    Identical to the renderer's `h()`. We reserve exactly what the browser
-    draws, never an approximation of it: an invariant asserted against a
-    different formula passes in Python while the page clips, which is strictly
-    worse than not asserting at all.
-    """
-    return H_BASE + math.sqrt(max(0, loc)) / H_DIV
+    scaled = int(math.floor(math.sqrt(max(0, loc)) / H_DIV + 0.5))
+    return H_BASE + min(H_CAP, scaled)
 
 
 def order_nodes(ids, fan_in, fan_out, loc) -> list:
@@ -138,94 +142,87 @@ def order_nodes(ids, fan_in, fan_out, loc) -> list:
     )
 
 
-def pack_columns(order, heights, widths, C: int) -> dict:
-    """Balance `order` into exactly `C` columns. Returns id -> column index.
+def layer_nodes(order, gedges) -> dict:
+    """Longest-path layer per node over the order-oriented graph. id -> int.
 
-    Greedy height-balanced line-break: walk the ordered list and open a new
-    column when the accumulated height would pass `target * 1.02`, where
-    `target = sum(h) / C`. The last column takes whatever is left, which is why
-    the caller checks every column against the band afterwards rather than
-    trusting the average.
-
-    Called once per candidate `C` by the §4.2 step-4 walk. `widths` is accepted
-    and deliberately unused: the balance is by height only — width has already
-    had its say in `Cmax`, which bounds `C`.
+    `order` (importers first) is the tiebreak that turns the group graph into
+    a DAG: an edge running against it would close a cycle, so it is left out
+    of the layering and settled later by the emit-time backward drop. Walking
+    `order` is then a topological sweep of what remains, so a single pass
+    computes the longest path from any source: pure importers sit in layer 0,
+    and every other group sits one past the deepest of its importers. That is
+    the pipeline reading the template hand-placed: interface, then core, then
+    data, and so on to the terminal libraries.
     """
-    ids = list(order)
-    if C <= 1 or not ids:
-        return {i: 0 for i in ids}
+    idx = {nid: i for i, nid in enumerate(order)}
+    ahead = {}
+    for (a, b) in gedges:
+        if a in idx and b in idx and idx[a] < idx[b]:
+            ahead.setdefault(a, []).append(b)
 
-    target = sum(heights[i] for i in ids) / C
-    col, c, acc = {}, 0, 0.0
-    for i in ids:
-        h = heights[i]
-        if acc > 0 and acc + h > target * 1.02 and c < C - 1:
-            c += 1
-            acc = 0.0
-        col[i] = c
-        acc += h
-    return col
+    layer = {nid: 0 for nid in order}
+    for a in order:
+        for b in ahead.get(a, ()):
+            if layer[a] + 1 > layer[b]:
+                layer[b] = layer[a] + 1
+    return layer
 
 
-def place(col, order, widths, heights) -> dict:
-    """Turn a column assignment into coordinates. Returns id -> {x, y, col}.
+def squeeze_layers(layer, max_cols: int = MAX_COLUMNS) -> dict:
+    """Cap the layering at `max_cols` columns by merging middle layers.
 
-    Horizontally: each column is as wide as its widest node, the leftover space
-    is split evenly between the columns, and every node is centred in its own
-    column's width.
+    Proportional and monotone: the first layer stays leftmost, the last stays
+    rightmost, and consecutive layers map to the same or the next column, so
+    no column index is skipped and no layered edge flips direction. Half-up
+    rounding puts the merges in the middle of the run, where the chains are
+    longest and a merge costs the least meaning.
+    """
+    if not layer:
+        return {}
+    top = max(layer.values())
+    if top < max_cols:
+        return dict(layer)
+    return {nid: int(math.floor(lay * (max_cols - 1) / top + 0.5))
+            for nid, lay in layer.items()}
 
-        gap = 0.0 if C < 2 else (W - 2*X_PAD - sum(colw)) / (C - 1)
 
-    The `C - 1` guard is not optional. Any repo whose module graph has no
-    internal edges lays out in a single column — reproduced on `qrt` (7 loose
-    `.py`, 0 internal references), which is a named acceptance repo — and a bare
-    division there raises `ZeroDivisionError` during generation.
+def place_columns(col, order, heights):
+    """Columns to coordinates. Returns `(pos, columns, map_h)`.
 
-    Vertically: the same guard for the same reason. The greedy line-break
-    routinely leaves the last column holding one node, so the row gap divides by
-    `max(1, n - 1)`. When the natural `ROW_GAP` does not fit, the gap shrinks to
-    whatever the band allows, floored at `MIN_ROW_GAP`.
+    Mirrors `template/build.mjs` exactly: the canvas keeps `X_MARGIN` either
+    side, the rest is divided into equal spans, every node is `NODE_W` wide
+    and centred in its span, and each column stacks from `Y_START` with
+    `V_GAP` between rects. The canvas height is computed from the tallest
+    column's cursor plus `H_PAD`, so nothing can spill: a crowded repo gets a
+    taller board, never an overflow mode.
 
-    One deliberate exception to "centre within the column": when there is only
-    one column, the gap is 0 by definition, so the column is centred on the
-    canvas rather than parked against `X_PAD`. Otherwise every small repo — 3
-    nodes is the expected count on a named acceptance repo — renders as a strip
-    hugging the left edge of a 900-unit canvas with 750 units of nothing beside
-    it. The invariants are unaffected: `w <= W_MAX` keeps `x` positive.
+    `columns` carries one header per column, `x` at the span centre and a
+    placeholder `LAYER <n>` label for stage 3 to rename; the first column
+    draws no separator line, matching the template. At seven columns the span
+    (137) is narrower than `NODE_W`, so top-row rects in adjacent columns may
+    kiss by up to 13 units; the shipped hand-built template does exactly the
+    same, and `check_invariants` allows exactly that much and no more.
     """
     ids = [i for i in order if i in col]
     if not ids:
-        return {}
+        return {}, [], int(Y_START + H_PAD)
 
-    used = sorted({col[i] for i in ids})
-    members = [[i for i in ids if col[i] == c] for c in used]
-    colw = [max(widths[i] for i in m) for m in members]
-    n_col = len(used)
-    gap = 0.0 if n_col < 2 else (CANVAS_INNER - sum(colw)) / (n_col - 1)
+    n_col = max(col[i] for i in ids) + 1
+    span = (W - 2 * X_MARGIN) / n_col
+    pos, tallest = {}, Y_START
+    for c in range(n_col):
+        x = int(math.floor(X_MARGIN + span * c + (span - NODE_W) / 2.0 + 0.5))
+        y = Y_START
+        for i in (i for i in ids if col[i] == c):
+            pos[i] = {"x": x, "y": int(math.floor(y + 0.5))}
+            y += heights[i] + V_GAP
+        tallest = max(tallest, y)
 
-    out = {}
-    for k, m in enumerate(members):
-        if n_col == 1:
-            cx = (W - colw[k]) / 2.0
-        else:
-            cx = X_PAD + sum(colw[:k]) + k * gap
-
-        hs = [heights[i] for i in m]
-        n = len(m)
-        total = sum(hs)
-        rg = (ROW_GAP if total + (n - 1) * ROW_GAP <= BAND
-              else max(MIN_ROW_GAP, (BAND - total) / max(1, n - 1)))
-        block = total + (n - 1) * rg
-        y = Y_TOP + max(0.0, (BAND - block) / 2.0)
-
-        for i in m:
-            out[i] = {
-                "x": int(round(cx + (colw[k] - widths[i]) / 2.0)),
-                "y": int(round(y)),
-                "col": k,
-            }
-            y += heights[i] + rg
-    return out
+    columns = [{"label": f"LAYER {c + 1}",
+                "x": int(math.floor(X_MARGIN + span * c + span / 2.0 + 0.5)),
+                "line": c > 0}
+               for c in range(n_col)]
+    return pos, columns, int(math.floor(tallest + H_PAD + 0.5))
 
 
 # ------------------------------------------------------------------ collapse
@@ -682,7 +679,7 @@ def _why(group: dict, out_n: int, in_n: int, ranked, label: str, full: str) -> s
     marker and no anchor.
 
     `label` is what the SVG will draw and `full` is the group's real name. When
-    the `W_MAX` clamp has ellipsised the label, the full name goes here: it is
+    the `LABEL_MAX` clamp has ellipsised the label, the full name goes here: it is
     the only surface left that can carry it, since the drawer's `<h4>` renders
     `n.label` too.
     """
@@ -695,93 +692,111 @@ def _why(group: dict, out_n: int, in_n: int, ranked, label: str, full: str) -> s
     return why
 
 
-# -------------------------------------------------------------------- layout
+def _entry_group_ids(sv: dict, board: dict) -> set:
+    """Ids of board groups that contain a survey entry point file.
 
-def _capacity(max_w: float) -> int:
-    """`Cmax` — the most columns this widest node allows.
-
-    `max C such that (C+1)*max_w + C*COL_GAP <= 884`, floored at 1. The floor is
-    what makes the placement walk total: with `W_MAX = 300` the real answer is
-    never 0, but the floor costs one `max()` and removes a whole failure mode.
+    `entry_points[].file` is repo-relative; a group contains it when the file
+    sits at or under the group's `path` (component-wise, via `_under`). The
+    console-script row can name `pyproject.toml`, which sits in no Python
+    group and simply matches nothing. Used only to anchor `tour_order`: the
+    walk should start at the way in, not wherever the leftmost column's stack
+    happens to begin (on the proving-ground repo the old walk opened the tour
+    mid-zoo instead of at the CLI).
     """
-    best = 1
-    for c in range(1, 21):
-        if (c + 1) * max_w + c * COL_GAP <= CANVAS_INNER:
-            best = c
-        else:
-            break
-    return max(1, best)
+    files = {_norm_dir(e.get("file") or "")
+             for e in (sv.get("entry_points") or []) if isinstance(e, dict)}
+    files.discard("")
+    return {nid for nid, g in board.items()
+            if any(_under(f, g["path"]) for f in files)}
 
 
-def _fits(col, heights) -> bool:
-    """Can every column hold its nodes inside the band at the minimum row gap?"""
-    per = {}
-    for i, c in col.items():
-        per.setdefault(c, []).append(heights[i])
-    for hs in per.values():
-        if sum(hs) + (len(hs) - 1) * MIN_ROW_GAP > BAND:
-            return False
-    return True
+# ----------------------------------------------------- off-board and the note
 
+def _test_rooted(path: str) -> bool:
+    """Is this file under a directory named `test` or `tests` at any depth?
 
-def _gutter(col, widths) -> float:
-    per = {}
-    for i, c in col.items():
-        per.setdefault(c, []).append(widths[i])
-    if len(per) < 2:
-        return 0.0
-    return (CANVAS_INNER - sum(max(v) for v in per.values())) / (len(per) - 1)
-
-
-def _lay_out(order, widths, heights, force: bool = False):
-    """Choose a column count, pack, and place. `None` if nothing fits.
-
-    Walk `C` from `C_min` up to `Cmax` and take the first whose gutter is at
-    most `3 * COL_GAP`; if none qualifies, take the widest that still fits.
-    Without the widening walk the proving-ground repo's twelve nodes give
-    `C_min = 3` and a 223 px gutter between 142 px nodes — technically valid,
-    and it looks like a bug. With it, `C = 4` and the gutter is 103 px.
-
-    `force` spreads the nodes over `Cmax` columns without checking that they
-    fit. It is only used once the graph has already been abandoned for a table,
-    so that the coordinates in `map.json` are still sane numbers rather than
-    a stack running off the bottom of a canvas nobody draws.
+    Directory components only: `tests/test_x.py` and `pkg/tests/x.py` are
+    test-rooted, a loose `test_x.py` at the repo root is not (it sits under
+    no test root, and the rule is about containers, not file names).
     """
-    if not order:
-        return {}, {}, 0
+    if "/" not in path:
+        return False
+    return any(part in TEST_DIR_NAMES for part in path.split("/")[:-1])
 
-    n = len(order)
-    total = sum(heights[i] for i in order)
-    c_min = max(1, math.ceil((total + (n - 1) * ROW_GAP) / BAND))
-    c_max = _capacity(max(widths[i] for i in order))
 
-    if force:
-        col = pack_columns(order, heights, widths, c_max)
-        return col, place(col, order, widths, heights), len({*col.values()})
+def _is_offboard(group: dict) -> bool:
+    """The off-board rule: test containers leave the board.
 
-    chosen = None
-    for c in range(c_min, c_max + 1):
-        col = pack_columns(order, heights, widths, c)
-        if not _fits(col, heights):
-            continue
-        chosen = col
-        if _gutter(col, widths) <= GUTTER_MAX:
-            break
-    if chosen is None:
+    A group pinned to a survey-declared test root is off by definition.
+    Otherwise the group leaves when at least `OFFBOARD_TEST_SHARE` of its
+    member files sit under a `test`/`tests` directory. A group with no file
+    rows (hand-written rollup fixtures) stays on board unless the survey
+    pinned it: absence of evidence is not a test suite.
+    """
+    if group.get("is_test"):
+        return True
+    paths = group.get("paths") or []
+    if not paths:
+        return False
+    hits = sum(1 for p in paths if _test_rooted(p))
+    return hits >= OFFBOARD_TEST_SHARE * len(paths)
+
+
+def _plural(n: int, noun: str) -> str:
+    return f"{n:,} {noun}" + ("" if n == 1 else "s")
+
+
+def _map_note(off_groups, dangling):
+    """The `map.note` callout: what the board deliberately does not draw.
+
+    Deterministic prose over survey facts, like `why` and `top`, so it is
+    legal on a surface that has no claim marker. Returns None when there is
+    nothing to say, and the map then ships no `note` key at all. Contains no
+    dash characters: these strings reach the artifact, and the artifact bans
+    them.
+    """
+    parts = []
+    if off_groups:
+        named = "; ".join(
+            f"{g['path'] or g['label']} ({_plural(g['files'], 'file')}, "
+            f"{g['loc']:,} loc)" for g in off_groups)
+        parts.append(
+            f"Not drawn: {named}. Test containers import every column and "
+            f"their edges bury the structure, so they are listed here "
+            f"instead of on the board.")
+    if dangling:
+        sites = sum(int(d.get("n") or 0) for d in dangling)
+        parts.append(
+            f"The survey also counts "
+            f"{_plural(len(dangling), 'imported module name')} with no file "
+            f"at this commit, across {_plural(sites, 'import site')}.")
+    if not parts:
         return None
-    return chosen, place(chosen, order, widths, heights), len({*chosen.values()})
+    return {"title": "WHAT IS NOT ON THIS BOARD", "text": " ".join(parts)}
 
 
 # ---------------------------------------------------------------- invariants
 
-def check_invariants(nodes, edges) -> None:
-    """Every hard invariant in §4.3, asserted on the emitted payload.
+def check_invariants(nodes, edges, columns=(), canvas_h=None) -> None:
+    """Every hard geometry and content invariant, on the emitted payload.
 
-    Both height checks call `node_h`, never a literal: asserting an inlined
-    formula that under-reserves is worse than not asserting, because it passes
-    in Python while the browser clips.
+    Heights go through the emitted `h`, which must equal `node_h(loc)`:
+    asserting a formula the renderer does not draw is worse than not
+    asserting, because it passes in Python while the page clips. `canvas_h`
+    is the computed `map.h`; when given, nothing may reach past it.
+
+    The overlap check is span-aware. At seven columns the span (137) is
+    narrower than `NODE_W` (150), so top-row rects in adjacent columns kiss
+    by up to 13 units by design, exactly as the hand-built template ships.
+    The effective width used for the pairwise test is therefore capped at one
+    column span (less one unit of rounding slack): a real double-booking
+    still trips it, the sanctioned kiss does not.
+
+    Authored node strings are scanned for the barred dash characters here,
+    at the source, rather than trusting the downstream gate to catch them.
     """
-    fields = ("id", "label", "loc", "files", "x", "y", "w", "why", "top")
+    fields = ("id", "label", "loc", "files", "x", "y", "w", "h", "path",
+              "why", "top")
     ids = set()
     for n in nodes:
         missing = [f for f in fields if f not in n]
@@ -792,25 +807,42 @@ def check_invariants(nodes, edges) -> None:
         ids.add(n["id"])
         if not n["top"]:
             raise LayoutError(f"node {n['id']!r} has an empty top[]")
-        x, y, w = n["x"], n["y"], n["w"]
-        h = node_h(n["loc"])
+        for s in (n["label"], n["path"], n["why"], *n["top"]):
+            if EM_DASH in s or EN_DASH in s:
+                raise LayoutError(
+                    f"node {n['id']!r} carries a barred dash character")
+        x, y, w, h = n["x"], n["y"], n["w"], n["h"]
+        if h != node_h(n["loc"]):
+            raise LayoutError(
+                f"node {n['id']!r} height {h!r} is not node_h({n['loc']})")
         if x < 0 or x + w > W:
             raise LayoutError(f"node {n['id']!r} spills the canvas: x={x} w={w}")
-        if y < 0 or y + h > Y_CLEAR:
+        if y < 0:
+            raise LayoutError(f"node {n['id']!r} sits above the canvas: y={y}")
+        if canvas_h is not None and y + h > canvas_h:
             raise LayoutError(
-                f"node {n['id']!r} spills the band: y={y} h={h:.1f} > {Y_CLEAR}"
-            )
+                f"node {n['id']!r} spills the board: y={y} h={h} > {canvas_h}")
 
+    cols = list(columns)
+    span = cols[1]["x"] - cols[0]["x"] if len(cols) >= 2 else None
     for i, a in enumerate(nodes):
         for b in nodes[i + 1:]:
-            if (a["x"] < b["x"] + b["w"] and b["x"] < a["x"] + a["w"]
-                    and a["y"] < b["y"] + node_h(b["loc"])
-                    and b["y"] < a["y"] + node_h(a["loc"])):
+            aw = a["w"] if span is None else min(a["w"], span - 1)
+            bw = b["w"] if span is None else min(b["w"], span - 1)
+            if (a["x"] < b["x"] + bw and b["x"] < a["x"] + aw
+                    and a["y"] < b["y"] + b["h"] and b["y"] < a["y"] + a["h"]):
                 raise LayoutError(f"nodes {a['id']!r} and {b['id']!r} overlap")
 
     for e in edges:
         if e["a"] not in ids or e["b"] not in ids:
             raise LayoutError(f"edge {e['a']}->{e['b']} names a node that is not emitted")
+
+    for c in cols:
+        if not str(c.get("label") or ""):
+            raise LayoutError("a column header has no label")
+        if not (0 <= c["x"] <= W):
+            raise LayoutError(
+                f"column {c.get('label')!r} sits outside the canvas: x={c['x']}")
 
 
 # ----------------------------------------------------------------- build_map
@@ -818,23 +850,18 @@ def check_invariants(nodes, edges) -> None:
 def _measure(groups, gedges, diag) -> dict:
     """Everything the layout needs, derived from one group set.
 
-    Recomputed from scratch after a density merge, because a merge changes
-    labels, widths, heights and the fan counts all at once — carrying any of
-    them over is how a layout ends up measured against the previous group set.
-
-    The `W_MAX` clamp is handled here, before anything measures a column: a
-    label wide enough to bite the clamp is middle-ellipsised for the SVG and
-    kept in full inside `why`.
+    Width is fixed at `NODE_W` now, so the only clamp left is the label: one
+    longer than `LABEL_MAX` is middle-ellipsised for the SVG and kept in full
+    inside `why`, exactly as before.
     """
-    full_labels, labels, widths, heights, locs = {}, {}, {}, {}, {}
+    full_labels, labels, heights, locs = {}, {}, {}, {}
     for nid, g in groups.items():
         full_labels[nid] = g["label"]
         label = g["label"]
-        if node_w(label, g["loc"], g["files"]) >= W_MAX and len(label) > LABEL_MAX:
+        if len(label) > LABEL_MAX:
             label = _ellipsise(label)
             diag["labels_clamped"] = diag.get("labels_clamped", 0) + 1
         labels[nid] = label
-        widths[nid] = node_w(label, g["loc"], g["files"])
         heights[nid] = node_h(g["loc"])
         locs[nid] = g["loc"]
 
@@ -846,7 +873,6 @@ def _measure(groups, gedges, diag) -> dict:
     return {
         "full_labels": full_labels,
         "labels": labels,
-        "widths": widths,
         "heights": heights,
         "locs": locs,
         "fan_in": fan_in,
@@ -856,17 +882,25 @@ def _measure(groups, gedges, diag) -> dict:
 
 
 def build_map(sv: dict, cap: int = MAP_CAP) -> dict:
-    """`survey.json` -> `map.json` (`trailhead/map@1`). Deterministic, no model.
+    """`survey.json` -> `map.json`. Deterministic, no model.
 
-    `render` is `"table"` below `MIN_GRAPH_NODES`: the generator then emits a
-    table plus an info callout **instead of** a `graph` block (§4.4 / §9 row 4).
-    The nodes and edges are still emitted — `verify-contract.js:167` does
-    `D.map.nodes.map(...)` unconditionally, and the table is built from them.
+    The board is layered, not balanced: a group's column is the length of the
+    longest import chain that reaches it, the canvas height is computed from
+    the tallest column, and groups that are mostly test files are excluded
+    and named in `map.note` instead, next to the survey's dangling-import
+    count. `render` is `"table"` below `MIN_GRAPH_NODES`: the generator then
+    emits a table plus an info callout instead of a `graph` block (§4.4 / §9
+    row 4). The nodes and edges are still emitted, because
+    `verify-contract.js` does `D.map.nodes.map(...)` unconditionally and the
+    table is built from them.
 
-    `diagnostics.columns` is the node column index. It is the provenance of the
-    `cp-c1` answer key ("ordered by fan-in − fan-out over the import DAG"), so
-    it is published rather than left for a consumer to reverse-engineer out of
-    the x coordinates.
+    `diagnostics.columns` is the node column index. It is the provenance of
+    the `cp-c1` answer key, so it is published rather than left for a
+    consumer to reverse-engineer out of the x coordinates. `tour_order` is
+    the walk stage 3 writes tour text against: leftmost column to rightmost;
+    inside a column, groups holding a survey entry point file first, then
+    the rest top to bottom. The entry anchor moves only the walk, never the
+    stacked geometry.
     """
     files_by_path = {}
     for f in sv.get("files") or []:
@@ -875,88 +909,83 @@ def build_map(sv: dict, cap: int = MAP_CAP) -> dict:
     label_of_metric = _rank_label(sv)
 
     groups, gedges, diag = collapse(sv, cap)
-    m = _measure(groups, gedges, diag)
 
-    # §4.2 step 6. Merging is the only path by which build_map may reduce the
-    # node count below what collapse produced, and it must never raise:
-    # MAP_CAP = 14 makes it unreachable on every repo measured, but an
-    # unfamiliar repo at hour 8 is not the place to discover an assertion.
-    density_merges = 0
-    laid = _lay_out(m["order"], m["widths"], m["heights"])
-    while laid is None and len(groups) > MIN_GRAPH_NODES:
-        density_merges += 1
-        groups, gedges, diag = collapse(sv, max(1, len(groups) - 1))
-        m = _measure(groups, gedges, diag)
-        laid = _lay_out(m["order"], m["widths"], m["heights"])
+    # The off-board rule (parity spec §1.3): test containers are excluded
+    # from nodes and edges and named in the note. Largest first, so the note
+    # reads in the order a reader would care.
+    off_ids = sorted((nid for nid in groups if _is_offboard(groups[nid])),
+                     key=lambda nid: (-groups[nid]["loc"], nid))
+    off_set = set(off_ids)
+    board = {nid: g for nid, g in groups.items() if nid not in off_set}
+    bedges = {(a, b): n for (a, b), n in gedges.items()
+              if a in board and b in board}
+    diag["offboard_groups"] = [groups[nid]["path"] or groups[nid]["label"]
+                               for nid in off_ids]
+    diag["edges_offboard"] = len(gedges) - len(bedges)
 
-    overflow = laid is None
-    if overflow:
-        # Merging has stopped helping: node height goes as sqrt(loc), so pouring
-        # groups into one another shrinks the total slowly and can walk all the
-        # way down to a single blob. Give the graph up rather than the content —
-        # restore everything collapse found and let the caller table it. A
-        # fourteen-row table beats one merged rectangle labelled `pkg`.
-        groups, gedges, diag = collapse(sv, cap)
-        m = _measure(groups, gedges, diag)
-        density_merges = 0
-        laid = _lay_out(m["order"], m["widths"], m["heights"], force=True)
-        # Clamp into the canvas anyway. These nodes overlap — that is what
-        # "does not fit" means — but a consumer that keys the substitution off
-        # `len(map.nodes) < 3` (§9 row 4) rather than off `render` would draw
-        # them, and a crowded map inside the frame beats rectangles hanging off
-        # the bottom edge.
-        for i, p in laid[1].items():
-            p["x"] = int(max(0.0, min(p["x"], W - m["widths"][i])))
-            p["y"] = int(max(0.0, min(p["y"], Y_CLEAR - m["heights"][i])))
-    diag["density_merges"] = density_merges
-
-    full_labels, labels = m["full_labels"], m["labels"]
-    widths, heights, order = m["widths"], m["heights"], m["order"]
-    fan_in, fan_out = m["fan_in"], m["fan_out"]
-    col, pos, _ = laid
+    m = _measure(board, bedges, diag)
+    order = m["order"]
+    col = squeeze_layers(layer_nodes(order, bedges))
+    pos, columns, map_h = place_columns(col, order, m["heights"])
 
     nodes = []
     for nid in order:
-        g = groups[nid]
+        g = board[nid]
         ranked = _rank_files(g, sv, files_by_path, label_of_metric)
         nodes.append({
             "id": nid,
-            "label": labels[nid],
+            "label": m["labels"][nid],
             "loc": g["loc"],
             "files": g["files"],
             "x": pos[nid]["x"],
             "y": pos[nid]["y"],
-            "w": widths[nid],
-            "why": _why(g, fan_out.get(nid, 0), fan_in.get(nid, 0), ranked,
-                        labels[nid], full_labels[nid]),
-            "top": [f"{_basename(p)} — {lab} {v}" for p, v, lab in ranked[:3]],
+            "w": NODE_W,
+            "h": m["heights"][nid],
+            "path": g["path"],
+            "why": _why(g, m["fan_out"].get(nid, 0), m["fan_in"].get(nid, 0),
+                        ranked, m["labels"][nid], m["full_labels"][nid]),
+            "top": [f"{_basename(p)} - {lab} {v}" for p, v, lab in ranked[:3]],
         })
 
-    # §4.2 step 7: an edge whose target sits in a column to the LEFT backtracks
-    # across the canvas and reads as a horizontal band, so it is dropped and
-    # counted. Measured on the proving-ground repo: 9 such edges among 14 nodes,
-    # one of them running 626 px right-to-left across a 900 px canvas.
+    # §4.2 step 7, unchanged in meaning: an edge whose target sits in a
+    # column to the LEFT backtracks across the canvas and reads as a band, so
+    # it is dropped and counted. Layered columns make this rare, since only a
+    # cycle-closing edge can still point left.
     edges, dropped_backward = [], 0
-    for (a, b), n in sorted(gedges.items()):
+    for (a, b), n in sorted(bedges.items()):
         if col.get(b, 0) >= col.get(a, 0):
             edges.append({"a": a, "b": b, "n": n})
         else:
             dropped_backward += 1
     diag["edges_dropped_backward"] = dropped_backward
     diag["columns"] = {nid: col.get(nid, 0) for nid in order}
-    if overflow:
-        # The one case where the §4.3 invariants are NOT asserted: no graph
-        # block is emitted, so there is nothing on the canvas to spill off it.
-        # Say so in the diagnostics rather than letting a silent skip look like
-        # a pass.
-        diag["overflow_table"] = len(nodes)
-    else:
-        check_invariants(nodes, edges)
 
-    return {
+    # The tour is a narrative and a narrative starts at the way in: within
+    # each column, groups holding a survey entry point file walk first, then
+    # the rest of the column in stack order. Only the walk changes; the
+    # stacked geometry (every x and y) is exactly what place_columns emitted,
+    # and an entry-less survey sorts identically to the old rule.
+    entry_ids = _entry_group_ids(sv, board)
+    tour_order = sorted(
+        order,
+        key=lambda nid: (col.get(nid, 0), 0 if nid in entry_ids else 1,
+                         pos[nid]["y"], nid))
+    note = _map_note([groups[nid] for nid in off_ids],
+                     sv.get("dangling") or [])
+
+    check_invariants(nodes, edges, columns, map_h)
+
+    out = {
         "contract": "trailhead/map@1",
-        "render": "graph" if (len(nodes) >= MIN_GRAPH_NODES and not overflow) else "table",
+        "render": "graph" if len(nodes) >= MIN_GRAPH_NODES else "table",
+        "w": int(W),
+        "h": map_h,
+        "columns": columns,
+        "tour_order": tour_order,
         "nodes": nodes,
         "edges": edges,
         "diagnostics": diag,
     }
+    if note is not None:
+        out["note"] = note
+    return out

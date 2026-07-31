@@ -43,7 +43,10 @@ from trailhead.textio import armour_json
 DATA_START = "/* ==== TRAILHEAD-DATA-START ==== */"
 DATA_END = "/* ==== TRAILHEAD-DATA-END ==== */"
 BUNDLE_MARKER = "const BUNDLES = {"
-SCRAPE_MARKER = "RENDER — knows only"
+#: The @3 template's banner reads "RENDER: knows only" (colon, not a dash) so
+#: the shipped artifact carries no em dash anywhere outside armoured payload
+#: escapes. The old wording is accepted too so an old template still splices.
+SCRAPE_MARKERS = ("RENDER: knows only", "RENDER — knows only")
 
 #: The complete set. The page's dispatch table is `B[block.type]`, so an unknown
 #: type is not a missing section — it is `undefined is not a function`, which
@@ -51,7 +54,11 @@ SCRAPE_MARKER = "RENDER — knows only"
 BLOCK_TYPES = frozenset({
     "prose", "excerpt", "command", "graph", "table",
     "trace", "checkpoint", "callout", "ledger",
+    # @3 additions, both rendered by the parity template
+    "stats", "lineage",
 })
+
+STAT_COLORS = frozenset({"ok", "inf", "bad"})
 
 CALLOUT_LEVELS = frozenset({"info", "inferred", "broken"})
 CLAIM_STATUSES = frozenset({"verified", "inferred"})
@@ -109,11 +116,12 @@ def check_template(template: str) -> None:
                 f"template marker {marker!r} appears {n} times, expected exactly 1 — "
                 "verify-contract.js keys off it and exits 2 when it cannot"
             )
-    if SCRAPE_MARKER not in template:
-        raise RenderError(f"template lost the {SCRAPE_MARKER!r} banner")
+    banner = next((m for m in SCRAPE_MARKERS if m in template), None)
+    if banner is None:
+        raise RenderError(f"template lost the {SCRAPE_MARKERS[0]!r} banner")
 
     a, b = template.index(DATA_START), template.index(BUNDLE_MARKER)
-    c, d = template.index(DATA_END), template.index(SCRAPE_MARKER)
+    c, d = template.index(DATA_END), template.index(banner)
     if not a < b < c < d:
         raise RenderError(
             "template markers are out of order: "
@@ -176,6 +184,8 @@ def check_payload(payload: dict) -> list[str]:
                     continue
                 if kind == "ledger":
                     ledgers += 1
+                elif kind == "stats":
+                    _check_stats(block, where, out)
                 elif kind == "command":
                     failing += _check_command(block, where, out)
                 elif kind == "prose":
@@ -224,7 +234,65 @@ def check_payload(payload: dict) -> list[str]:
     if report.get("failed") != failing:
         out.append(f"report.failed is {report.get('failed')}, the page renders {failing} failing command(s)")
 
+    _check_v3(payload, out)
     return out
+
+
+def _check_v3(payload: dict, out: list[str]) -> None:
+    """@3 surfaces: glossary, map columns/tour, node narration. All additive.
+
+    Payload-internal only, same bucket rule as check_payload: catch what would
+    render a lie or render nothing. The gate re-checks anchors and hashes.
+    """
+    seen: set[str] = set()
+    for g in payload.get("glossary") or []:
+        gid = str(g.get("id") or "")
+        if not re.fullmatch(r"[a-z0-9-]+", gid):
+            out.append(f"glossary entry {gid!r}: id must be a [a-z0-9-]+ slug")
+        elif gid in seen:
+            out.append(f"glossary id {gid!r} is duplicated — popovers would open the wrong entry")
+        seen.add(gid)
+        for key in ("term", "def"):
+            if not str(g.get(key) or "").strip():
+                out.append(f"glossary {gid}: empty {key} — the popover would print nothing")
+        if g.get("anchor") is not None:
+            _check_anchor(g.get("anchor"), f"glossary {gid}", out)
+
+    m = payload.get("map") or {}
+    node_ids = {n.get("id") for n in m.get("nodes") or []}
+    for i, step in enumerate(m.get("tour") or [], 1):
+        if step.get("id") not in node_ids:
+            out.append(f"map.tour step {i} names {step.get('id')!r}, which is not on the board")
+        if not str(step.get("text") or "").strip():
+            out.append(f"map.tour step {i}: empty text")
+    for col in m.get("columns") or []:
+        if not isinstance(col.get("x"), (int, float)):
+            out.append(f"map column {col.get('label')!r} has no numeric x")
+    for n in m.get("nodes") or []:
+        nid = n.get("id")
+        if n.get("role") is not None and (
+            not isinstance(n["role"], list) or not all(isinstance(p, str) for p in n["role"])
+        ):
+            out.append(f"map node {nid}: role must be a list of strings")
+        for kf in n.get("key_files") or []:
+            if not str(kf.get("file") or "").strip() or not str(kf.get("purpose") or "").strip():
+                out.append(f"map node {nid}: key_files entries need file and purpose")
+        if n.get("anchor") is not None:
+            _check_anchor(n.get("anchor"), f"map node {nid}", out)
+
+
+def _check_stats(block: dict, where: str, out: list[str]) -> None:
+    """A stats tile with no value or label renders the word undefined."""
+    items = block.get("items") or []
+    if not items:
+        out.append(f"stop {where}: stats block with no items — it renders an empty strip")
+    for item in items:
+        for key in ("v", "l"):
+            if not str(item.get(key) or "").strip():
+                out.append(f"stop {where}: stats item missing {key}")
+        color = item.get("color")
+        if color is not None and color not in STAT_COLORS:
+            out.append(f"stop {where}: stats color {color!r} is not one of {sorted(STAT_COLORS)}")
 
 
 def _check_prose(block: dict, where: str, out: list[str], claim_ids: list[str]) -> None:

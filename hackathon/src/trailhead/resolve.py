@@ -225,9 +225,42 @@ def expand_anchor(lines: list[str], ms: int, me: int, *, cap: int = 24,
         pad = max(0, (cap - (me - ms + 1)) // 2)
         start = max(1, ms - pad)
         end = min(max(len(lines), 1), me + pad)
+        start, end = _clip_dash_context(lines, start, end, ms, me)
 
     # Containment by construction. Never remove these two lines.
     return min(start, ms), max(end, me)
+
+
+#: The two characters the dash policy (template-parity spec 1.6) keeps out of
+#: authored text. Source lines are the repo's own bytes and are exempt from
+#: transliteration, so the excerpt window instead PREFERS not to show a context
+#: line that carries one. Escapes, not literals: the house style bars the
+#: characters themselves from this package's source.
+_DASH_CHARS = ("\u2014", "\u2013")
+
+
+def _clip_dash_context(lines: list[str], start: int, end: int,
+                       ms: int, me: int) -> tuple[int, int]:
+    """Best effort: shrink a padded window off dash-bearing CONTEXT lines.
+
+    Bundled source is shipped verbatim (hash integrity wins over the dash
+    policy), so the only lever is which context lines the window includes at
+    all. Scanning outward from the match, the window stops just short of the
+    first context line above or below it that carries an em or en dash. Match
+    lines themselves are never touched: `start` can only move up to `ms` and
+    `end` only down to `me`, so containment, and with it focus containment,
+    holds exactly as before. The trade is deliberate: less context beats a
+    dash-bearing line in the artifact, and the quoted evidence never shrinks.
+    """
+    for n in range(ms - 1, start - 1, -1):
+        if any(d in lines[n - 1] for d in _DASH_CHARS):
+            start = n + 1
+            break
+    for n in range(me + 1, end + 1):
+        if any(d in lines[n - 1] for d in _DASH_CHARS):
+            end = n - 1
+            break
+    return start, end
 
 
 def focus_lines(quote: str, focus: Sequence[str] | None, start: int, *,

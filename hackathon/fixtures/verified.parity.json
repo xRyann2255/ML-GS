@@ -1,0 +1,420 @@
+{
+  "contract": "trailhead/verified@3",
+  "repo": {
+    "name": "parity-mini",
+    "commit": "f1x7ure0",
+    "generated_at": "2026-07-31T00:00:00Z"
+  },
+  "report": {
+    "claims": 3,
+    "verified": 2,
+    "dropped": 0,
+    "inferred": 1,
+    "commands": 0,
+    "failed": 0,
+    "anchors": 5,
+    "tool_version": "parity-fixture 1.0",
+    "duration_s": 0,
+    "regen": "Hand-built @3 parity fixture. Rebuild by hand; re-check: node tools/verify-contract.js fixtures/verified.parity.json."
+  },
+  "glossary": [
+    {
+      "id": "rv",
+      "term": "realized variance",
+      "def": "The sum of squared intraday returns over one trading day. It is the number every model in this mini repo forecasts.",
+      "anchor": {
+        "file": "src/mini/measures.py",
+        "start": 12,
+        "end": 14,
+        "focus": [
+          12
+        ],
+        "sha256": "569f7e7f96b67f50074d46dbaffd63a1e183008b0a60b1a62062a00ca6ea6bc5"
+      }
+    },
+    {
+      "id": "registry",
+      "term": "registry",
+      "def": "The string-to-class map that lets a config name a component without importing it. This entry carries no anchor on purpose: the popover shows the definition only."
+    }
+  ],
+  "map": {
+    "w": 900,
+    "h": 240,
+    "columns": [
+      {
+        "label": "INTERFACE",
+        "x": 150,
+        "line": true
+      },
+      {
+        "label": "CORE",
+        "x": 450,
+        "line": true
+      },
+      {
+        "label": "DATA",
+        "x": 750,
+        "line": false
+      }
+    ],
+    "note": {
+      "title": "WHAT IS NOT ON THIS BOARD",
+      "text": "The test container src/tests/ is off the board, and 2 modules the code imports do not exist in this snapshot; see the restore ledger on the setup stop."
+    },
+    "tour": [
+      {
+        "id": "n-cli",
+        "text": "Start here: every interaction is a `mini` subcommand, and each one registers itself."
+      },
+      {
+        "id": "n-core",
+        "text": "The hub. One dict, the [[registry|registry]], is why everything imports this module."
+      },
+      {
+        "id": "n-data",
+        "text": "Where ticks become one [[rv|realized variance]] number per day."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-cli",
+        "label": "cli",
+        "loc": 180,
+        "files": 3,
+        "x": 75,
+        "y": 88,
+        "w": 150,
+        "h": 52,
+        "why": "Owns the command surface.",
+        "top": [
+          "main.py (12 commits)"
+        ]
+      },
+      {
+        "id": "n-core",
+        "label": "core",
+        "loc": 240,
+        "files": 2,
+        "x": 375,
+        "y": 88,
+        "w": 150,
+        "h": 56,
+        "path": "src/mini/",
+        "role": [
+          "The hub of the mini pipeline: one [[registry|registry]] dict maps config names to classes, so a YAML file can name components without importing them.",
+          "Change it and everything downstream feels it, which is why the tour stops here second."
+        ],
+        "reads": "Config names from `cli`.",
+        "feeds": "Class lookups to every other module on the board.",
+        "key_files": [
+          {
+            "file": "core.py",
+            "purpose": "REGISTRY and the register() decorator"
+          },
+          {
+            "file": "measures.py",
+            "purpose": "the [[rv|realized variance]] estimator the whole repo exists to feed"
+          }
+        ],
+        "concepts": [
+          "registry pattern",
+          "decorator registration"
+        ],
+        "anchor": {
+          "file": "src/mini/core.py",
+          "start": 3,
+          "end": 10,
+          "focus": [
+            5
+          ],
+          "sha256": "95d5f6d775fcfca9a1216c9aa4d52af2c412a65da04388ff79e418a9e4a34c5b"
+        },
+        "anchor_caption": "The registry and its decorator: the reason everything imports core.",
+        "why": "Most imported module on the board.",
+        "top": [
+          "core.py (20 commits)"
+        ]
+      },
+      {
+        "id": "n-data",
+        "label": "data",
+        "loc": 320,
+        "files": 4,
+        "x": 675,
+        "y": 88,
+        "w": 150,
+        "h": 60,
+        "why": "Turns ticks into daily measures.",
+        "top": [
+          "measures.py (17 commits)"
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "a": "n-cli",
+        "b": "n-core",
+        "n": 4
+      },
+      {
+        "a": "n-data",
+        "b": "n-core",
+        "n": 2
+      }
+    ]
+  },
+  "files": {
+    "src/mini/core.py": {
+      "1": "\"\"\"Core registry for the mini pipeline.\"\"\"",
+      "2": "",
+      "3": "REGISTRY = {}",
+      "4": "",
+      "5": "def register(name):",
+      "6": "    \"\"\"Bind a component class to a config name.\"\"\"",
+      "7": "    def deco(cls):",
+      "8": "        REGISTRY[name] = cls",
+      "9": "        return cls",
+      "10": "    return deco"
+    },
+    "src/mini/measures.py": {
+      "12": "def realized_variance(returns):",
+      "13": "    \"\"\"Sum of squared intraday returns for one day.\"\"\"",
+      "14": "    return sum(r * r for r in returns)",
+      "15": "",
+      "16": "def daily_panel(ticks):",
+      "17": "    return [realized_variance(day) for day in ticks]"
+    }
+  },
+  "tracks": [
+    {
+      "title": "ORIENT",
+      "minutes": 6,
+      "stops": [
+        {
+          "id": "cover",
+          "title": "What you are looking at",
+          "kind": "stop",
+          "minutes": 2,
+          "lede": "A minimal @3 parity payload. Every underlined sentence is anchored; dotted terms like [[rv|realized variance]] open the glossary.",
+          "blocks": [
+            {
+              "type": "stats",
+              "items": [
+                {
+                  "v": "740",
+                  "l": "LINES OF CODE",
+                  "s": "9 Python files"
+                },
+                {
+                  "v": "3",
+                  "l": "MODULES",
+                  "of": "5",
+                  "s": "2 test containers off board"
+                },
+                {
+                  "v": "2",
+                  "l": "MISSING MODULES",
+                  "s": "counted, not hidden",
+                  "color": "inf"
+                },
+                {
+                  "v": "5",
+                  "l": "ANCHORS VERIFIED",
+                  "color": "ok"
+                }
+              ]
+            },
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-101",
+                  "text": "Components self-register: `register(name)` binds a class into REGISTRY, so configuration can name a [[registry|registry]] entry instead of importing it.",
+                  "status": "verified",
+                  "anchor": {
+                    "file": "src/mini/core.py",
+                    "start": 5,
+                    "end": 10,
+                    "focus": [
+                      8
+                    ],
+                    "sha256": "4b25af1c1a5d4adbcab0b25e7423d7e64a6c050a2d3561db473e8847dd75f1b6"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "callout",
+              "level": "info",
+              "title": "BEFORE YOU START",
+              "text": "This payload exists to exercise every field trailhead/verified@3 added, in the smallest internally consistent shape that passes both gates."
+            }
+          ]
+        },
+        {
+          "id": "map",
+          "title": "The map",
+          "kind": "stop",
+          "minutes": 2,
+          "lede": "Three modules in three labelled columns, with a guided tour.",
+          "blocks": [
+            {
+              "type": "graph"
+            }
+          ]
+        },
+        {
+          "id": "setup",
+          "title": "Missing at this commit",
+          "kind": "stop",
+          "minutes": 2,
+          "lede": "The restore ledger: modules the code imports that do not exist in this snapshot.",
+          "blocks": [
+            {
+              "type": "table",
+              "caption": "Import-site counts come from the survey; the walkthrough names the holes rather than writing around them.",
+              "sortable": true,
+              "columns": [
+                "MISSING MODULE",
+                "WHAT IT WAS",
+                "IMPORT SITES"
+              ],
+              "rows": [
+                [
+                  "<code>mini/config.py</code>",
+                  "the YAML schema every stage parses",
+                  "7"
+                ],
+                [
+                  "<code>mini/runner.py</code>",
+                  "the pipeline runner the tests drive",
+                  "3"
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "INSIDE THE SYSTEM",
+      "minutes": 4,
+      "stops": [
+        {
+          "id": "dive-core",
+          "title": "Inside core",
+          "kind": "stop",
+          "minutes": 4,
+          "lede": "One deep dive stop, the shape COMPOSE emits per dive: answer.",
+          "blocks": [
+            {
+              "type": "prose",
+              "claims": [
+                {
+                  "id": "c-102",
+                  "text": "The data layer computes [[rv|realized variance]] as a plain sum of squared returns and maps it across the panel one day at a time.",
+                  "status": "verified",
+                  "anchor": {
+                    "file": "src/mini/measures.py",
+                    "start": 16,
+                    "end": 17,
+                    "focus": [
+                      17
+                    ],
+                    "sha256": "ced9baf5cb520d50f12d39a105a05c6eaf91a937a582593f390fe0db396f6e56"
+                  }
+                },
+                {
+                  "id": "c-103",
+                  "text": "What it is not: a live system. Nothing here listens on a socket; every entry point runs to completion.",
+                  "status": "inferred"
+                }
+              ]
+            },
+            {
+              "type": "excerpt",
+              "anchor": {
+                "file": "src/mini/core.py",
+                "start": 3,
+                "end": 10,
+                "focus": [
+                  5
+                ],
+                "sha256": "95d5f6d775fcfca9a1216c9aa4d52af2c412a65da04388ff79e418a9e4a34c5b"
+              },
+              "caption": "The registry and its decorator, the excerpt the node drawer also shows."
+            },
+            {
+              "type": "stats",
+              "items": [
+                {
+                  "v": "240",
+                  "l": "LINES OF CODE",
+                  "s": "2 files in src/mini/"
+                },
+                {
+                  "v": "6",
+                  "l": "FAN-IN",
+                  "of": "9"
+                },
+                {
+                  "v": "2",
+                  "l": "DANGLING IMPORTS",
+                  "color": "bad"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "CLOSE",
+      "minutes": 4,
+      "stops": [
+        {
+          "id": "glossary",
+          "title": "The glossary",
+          "kind": "stop",
+          "minutes": 2,
+          "lede": "Every dotted term on this page, in one table.",
+          "blocks": [
+            {
+              "type": "table",
+              "caption": "Click any dotted term in the prose to see this content in place.",
+              "sortable": true,
+              "columns": [
+                "TERM",
+                "DEFINITION"
+              ],
+              "rows": [
+                [
+                  "<b>realized variance</b>",
+                  "The sum of squared intraday returns over one trading day. It is the number every model in this mini repo forecasts."
+                ],
+                [
+                  "<b>registry</b>",
+                  "The string-to-class map that lets a config name a component without importing it. This entry carries no anchor on purpose: the popover shows the definition only."
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "audit",
+          "title": "The ledger",
+          "kind": "stop",
+          "minutes": 2,
+          "lede": "What this payload claimed and what survived verification.",
+          "blocks": [
+            {
+              "type": "ledger"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dropped": []
+}

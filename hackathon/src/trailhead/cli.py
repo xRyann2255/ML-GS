@@ -243,7 +243,7 @@ def build(args) -> int:
     # --- stage 3 NARRATE + compose ---------------------------------------
     if start <= STAGES.index("narrate"):
         if args.emit_prompts:
-            return _emit_prompts(sv, root, work, cmds, hops, args)
+            return _emit_prompts(sv, mp, root, work, cmds, hops, args)
         content = _narrate(sv, mp, cmds, hops, root, work, args, say)
         verify_mod.write_json(work / ARTIFACTS["narrate"], content)
     elif start <= STAGES.index("verify"):
@@ -255,7 +255,8 @@ def build(args) -> int:
         payload, audit = verify_mod.assemble(
             content, sv, mp, cmds, root, t0=t0,
             windows=_windows(content),
-            run_stats={"commands": len((cmds or {}).get("runs") or [])})
+            run_stats={"commands": len((cmds or {}).get("runs") or [])},
+            regen=_regen_line(args))
         verify_mod.write_json(work / ARTIFACTS["verify"], payload)
         verify_mod.write_json(work / "verification-report.json", audit)
         r = payload["report"]
@@ -296,7 +297,8 @@ def _narrate(sv: dict, mp: dict, cmds: dict, hops: list, root: Path,
 
     result = narrate_mod.run(sv, root, prov, work=work, commands=cmds,
                              hops=hops, max_units=args.max_units,
-                             offline=args.offline, verbose=args.verbose)
+                             offline=args.offline, verbose=args.verbose,
+                             map_data=mp)
     model = result["model"]
     say(f"        {len(result['units'])} units, {model['calls']} call(s), "
         f"{model['cache_hits']} cache hit(s), {len(result['ledger'])} parser drop(s)")
@@ -309,11 +311,16 @@ def _narrate(sv: dict, mp: dict, cmds: dict, hops: list, root: Path,
         # rehearsal and the run on stage are the same page.
         rng=random.Random((sv.get("repo") or {}).get("commit") or sv.get("repo", {}).get("name", "")),
         degradations=[])
-    tracks = compose_mod.build_course(ctx)
+    # The glossary stop lists term + definition, both of which survive
+    # verification unconditionally (only anchors can drop), so composing it
+    # from the raw gloss answer cannot disagree with the verified payload.
+    gloss_answer = (result["narration"].get("gloss") or {})
+    tracks = compose_mod.build_course(
+        ctx, glossary=list(gloss_answer.get("terms") or []))
     say(f"compose {len(tracks)} track(s), "
         f"{sum(len(t['stops']) for t in tracks)} stop(s)")
 
-    return {
+    content = {
         "contract": "trailhead/content@1",
         "repo": {"name": (sv.get("repo") or {}).get("name"),
                  "commit": (sv.get("repo") or {}).get("commit")},
@@ -331,10 +338,16 @@ def _narrate(sv: dict, mp: dict, cmds: dict, hops: list, root: Path,
         "windows": _file_windows(result["windows"]),
         "units": result["units"],
     }
+    # The @3 unit answers (glossary terms, per-node narration, tour text,
+    # column labels) ride in content.json beside the tracks so that
+    # `--from-stage verify` replays them from disk like everything else.
+    # Absent units contribute nothing and the keys stay off the file.
+    content.update(_unit_answers(result))
+    return content
 
 
-def _emit_prompts(sv: dict, root: Path, work: Path, cmds: dict | None,
-                  hops: list, args) -> int:
+def _emit_prompts(sv: dict, mp: dict, root: Path, work: Path,
+                  cmds: dict | None, hops: list, args) -> int:
     """Write the prompt packs and stop, printing what to do with them.
 
     Stopping is the point. The host agent answers each pack into the `out` path
@@ -342,7 +355,7 @@ def _emit_prompts(sv: dict, root: Path, work: Path, cmds: dict | None,
     them through `StubProvider` with no model in the loop at all.
     """
     packs = narrate_mod.emit_prompts(sv, root, work, commands=cmds, hops=hops,
-                                     max_units=args.max_units)
+                                     max_units=args.max_units, map_data=mp)
     for pack in packs:
         print(f"{pack['unit']:>6}  {pack['pack']}")
     print(f"\n{len(packs)} prompt pack(s) in {Path(work) / narrate_mod.PROMPTS_DIRNAME}.")
@@ -390,6 +403,59 @@ def _file_windows(unit_windows) -> dict:
             except (KeyError, TypeError, ValueError):
                 continue
     return {f: [list(s) for s in sorted(spans)] for f, spans in out.items()}
+
+
+def _unit_answers(result: dict) -> dict:
+    """The @3 unit answers, lifted out of the narration for content.json.
+
+    Unit ids are matched exact-or-prefix on the colon: `gloss`, `tour` and
+    `cols` are exact, `node:<gid>` carries its map group id after the colon
+    (the claim-bearing `five` and `dive:<gid>` units are compose's business
+    and are deliberately not lifted here). Each answer is accepted either as
+    the schema object (`{"terms": [...]}`) or as the bare list, so the narrate
+    parser is free to store whichever it validated.
+
+    Returns only the keys that have substance; a repo whose new units were
+    never answered gets an empty dict and a content.json identical to @2's.
+    """
+    narration = (result or {}).get("narration") or {}
+    gloss: list = []
+    nodes: dict = {}
+    tour: list = []
+    cols: list = []
+
+    def unwrap(answer, key):
+        if isinstance(answer, dict):
+            answer = answer.get(key)
+        return list(answer) if isinstance(answer, list) else []
+
+    for unit_id in sorted(narration, key=str):
+        answer = narration[unit_id]
+        head, _, tail = str(unit_id).partition(":")
+        if head == "gloss" and not tail:
+            gloss.extend(unwrap(answer, "terms"))
+        elif head == "node" and tail and isinstance(answer, dict):
+            nodes[tail] = answer
+        elif head == "tour" and not tail:
+            tour = unwrap(answer, "steps")
+        elif head == "cols" and not tail:
+            cols = unwrap(answer, "labels")
+
+    out: dict = {}
+    if gloss:
+        out["glossary"] = gloss
+    if nodes:
+        out["map_answers"] = nodes
+    if tour:
+        out["tour"] = tour
+    if cols:
+        out["cols"] = cols
+    # A narrate stage that already attached an answer set at the result's top
+    # level is authoritative over this lift.
+    for key in ("glossary", "map_answers", "tour", "cols"):
+        if (result or {}).get(key):
+            out[key] = result[key]
+    return out
 
 
 def _windows(content) -> dict | None:
@@ -463,6 +529,25 @@ def _hops_for(sv: dict) -> tuple[list, str]:
     hops = list(doc.get("hops") or [])
     return hops, (f"trace   {len(hops)} hop(s) hand-specified in {rel} "
                   f"(decision #25) - anchors re-verified from disk, not discovered")
+
+
+def _regen_line(args) -> str:
+    """The regeneration command the ledger footer prints as `report.regen`.
+
+    Built from THIS run's own arguments, never from a constant: the footer is
+    provenance, and before this existed the renderer's fallback sentence
+    claimed the hand-built template artifact's pedigree ("re-verified by
+    template/verify.mjs") for every generated page — a provenance lie on the
+    one panel whose whole job is honesty. The paths are echoed as the user
+    typed them, forward-slashed so the line pastes into the documented
+    `cd hackathon` invocation on any shell, and the string is kept dash-free
+    (plain hyphens only) like every other authored string in the payload.
+    """
+    repo = str(args.repo or ".").replace("\\", "/")
+    line = (f"Regenerate: PYTHONPATH=src python -m trailhead build {repo} "
+            f"-o {Path(args.out).as_posix()} "
+            f"--run-commands {args.run_commands}")
+    return line.replace("\u2014", "-").replace("\u2013", "-")
 
 
 def _root_of(root: Path | None, sv: dict | None) -> Path | None:

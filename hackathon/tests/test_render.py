@@ -87,7 +87,9 @@ class Splice(unittest.TestCase):
             self.assertEqual(html.count(marker), 1, marker)
         self.assertLess(html.index(render.DATA_START), html.index(render.BUNDLE_MARKER))
         self.assertLess(html.index(render.BUNDLE_MARKER), html.index(render.DATA_END))
-        self.assertLess(html.index(render.DATA_END), html.index(render.SCRAPE_MARKER))
+        banner = next((m for m in render.SCRAPE_MARKERS if m in html), None)
+        self.assertIsNotNone(banner, "no RENDER banner survived the splice")
+        self.assertLess(html.index(render.DATA_END), html.index(banner))
 
     def test_the_dangerous_sequences_are_escaped(self):
         # Every one of these is a real line shape from a real repo, and every one
@@ -101,13 +103,13 @@ class Splice(unittest.TestCase):
             "2": "URL = 'https://example.com/a/b.js'  // not a comment",
             "3": "HTML = '<script src=\"//cdn.example.com/x.js\"></script>'",
             "4": "CSS = '@font-face { src: url(x) }'  # @import too",
-            "5": "BANNER = 'RENDER — knows only the nine block types'",
+            "5": "BANNER = 'RENDER \u2014 knows only the block types'",
         }
 
         region = data_region(render.splice(self.TEMPLATE, payload))
 
         for seq in ("/*", "//", "</script>", "@font-face", "@import", "://",
-                    "<", "@", "/", "—"):
+                    "<", "@", "/", "\u2014"):
             self.assertNotIn(seq, region, f"{seq!r} survived the armour")
 
     def test_json_round_trips_through_the_armour(self):
@@ -117,7 +119,7 @@ class Splice(unittest.TestCase):
         # recomputes from `files` mismatches.
         payload = minimal()
         payload["files"]["evil.py"] = {
-            "1": "a = '/* @ // — </script> https://x/y'",
+            "1": "a = '/* @ // \u2014 </script> https://x/y'",
             "2": "b = 'café ✓ ·'",
         }
 
@@ -162,6 +164,13 @@ class CheckPayload(unittest.TestCase):
         payload = json.loads(SAMPLE.read_text(encoding="utf-8"))
 
         self.assertEqual(render.check_payload(payload), [])
+
+    def test_a_plain_v2_payload_passes_untouched(self):
+        # The @3 additions are strictly additive: a payload carrying none of the
+        # new fields (no glossary, no stats, no tour, no columns) must sail
+        # through check_payload exactly as it did under @2. A repo with no
+        # answers for the new narration units produces precisely this shape.
+        self.assertEqual(render.check_payload(minimal()), [])
 
     def test_an_inferred_claim_with_an_anchor_is_rejected(self):
         # An anchor is the only thing that makes a sentence render as verified.
@@ -267,6 +276,169 @@ class CheckPayload(unittest.TestCase):
         self.assertTrue(any("the ledger lists 1" in p for p in render.check_payload(payload)))
 
 
+def stats_block() -> dict:
+    """A valid stats block, spec 1.4: v and l required, s/of/color optional."""
+    return {"type": "stats", "items": [
+        {"v": "96,897", "l": "LINES OF CODE"},
+        {"v": "21", "l": "MODULES", "s": "counted by survey",
+         "of": "22", "color": "inf"}]}
+
+
+def parity() -> dict:
+    """A minimal @3 payload: every new surface present and valid.
+
+    The over-policing guard for `_check_v3`, playing the role
+    `fixtures/verified.sample.json` plays for the @2 checks: any complaint
+    against this payload is a bug in the checker, not in the payload.
+    """
+    payload = minimal()
+    payload["contract"] = "trailhead/verified@3"
+    payload["glossary"] = [
+        {"id": "qlike", "term": "QLIKE", "def": "The loss the repo optimises.",
+         "anchor": {"file": "a.py", "start": 1, "end": 1,
+                    "focus": [1], "sha256": "0" * 64}},
+        {"id": "har", "term": "HAR", "def": "The baseline model."},
+    ]
+    payload["map"] = {
+        "w": 1000, "h": 520,
+        "columns": [{"label": "LAYER 1", "x": 180, "line": True}],
+        "note": {"title": "WHAT IS NOT ON THIS BOARD", "text": "Test containers."},
+        "tour": [{"id": "n-core", "text": "Start here: everything imports core."}],
+        "nodes": [{"id": "n-core", "label": "core", "loc": 90, "files": 3,
+                   "x": 120, "y": 40, "w": 150, "h": 64, "path": "src/core/",
+                   "role": ["It owns the estimators.", "Everything imports it."],
+                   "reads": "raw ticks", "feeds": "the CLI",
+                   "key_files": [{"file": "core.py", "purpose": "The entry point."}],
+                   "concepts": ["estimator"],
+                   "anchor": {"file": "a.py", "start": 1, "end": 1,
+                              "focus": [1], "sha256": "0" * 64},
+                   "anchor_caption": "Where core is wired up."}],
+        "edges": [],
+    }
+    payload["tracks"][0]["stops"][0]["blocks"].insert(1, stats_block())
+    return payload
+
+
+class CheckPayloadV3(unittest.TestCase):
+    """The @3 checks: additive, and policed with the same two buckets.
+
+    Everything here must hold WITHOUT weakening an @2 check, so each rejection
+    test also implicitly proves the field is looked at at all: before the @3
+    work these payloads sailed through unread.
+    """
+
+    def test_the_parity_payload_passes(self):
+        self.assertEqual(render.check_payload(parity()), [])
+
+    def test_a_stats_block_is_a_known_type(self):
+        # Before @3 this was "unknown block type" and the whole payload was
+        # refused; now it must be accepted when well-formed.
+        payload = minimal()
+        payload["tracks"][0]["stops"][0]["blocks"].insert(1, stats_block())
+
+        self.assertEqual(render.check_payload(payload), [])
+
+    def test_a_lineage_block_is_a_known_type(self):
+        payload = minimal()
+        payload["tracks"][0]["stops"][0]["blocks"].insert(
+            1, {"type": "lineage", "entities": []})
+
+        self.assertEqual(render.check_payload(payload), [])
+
+    def test_an_unknown_block_type_is_still_refused(self):
+        # Widening BLOCK_TYPES for @3 must not have turned the check into a
+        # pass-through: B["diagram"] is still undefined in the new template.
+        payload = minimal()
+        payload["tracks"][0]["stops"][0]["blocks"].insert(1, {"type": "diagram"})
+
+        self.assertTrue(any("unknown block type" in p for p in render.check_payload(payload)))
+
+    def test_a_stats_item_missing_value_or_label_is_flagged(self):
+        # A tile with no v or no l renders the word "undefined" on the cover,
+        # the first thing a judge sees.
+        for key in ("v", "l"):
+            with self.subTest(missing=key):
+                payload = minimal()
+                block = stats_block()
+                block["items"][0][key] = ""
+                payload["tracks"][0]["stops"][0]["blocks"].insert(1, block)
+
+                self.assertTrue(any(f"stats item missing {key}" in p
+                                    for p in render.check_payload(payload)))
+
+    def test_a_stats_color_off_the_enum_is_flagged(self):
+        # `style="color:var(--red)"` resolves to nothing and the tile silently
+        # loses its colour; the enum is ok|inf|bad.
+        payload = minimal()
+        block = stats_block()
+        block["items"][1]["color"] = "red"
+        payload["tracks"][0]["stops"][0]["blocks"].insert(1, block)
+
+        self.assertTrue(any("stats color" in p for p in render.check_payload(payload)))
+
+    def test_an_empty_stats_block_is_flagged(self):
+        payload = minimal()
+        payload["tracks"][0]["stops"][0]["blocks"].insert(1, {"type": "stats", "items": []})
+
+        self.assertTrue(any("stats block with no items" in p
+                            for p in render.check_payload(payload)))
+
+    def test_a_duplicate_glossary_id_is_flagged(self):
+        # GLO is a dict keyed by id; the second entry silently wins and every
+        # popover for the first opens the wrong definition.
+        payload = parity()
+        payload["glossary"].append(
+            {"id": "qlike", "term": "QLIKE again", "def": "A different sentence."})
+
+        self.assertTrue(any("duplicated" in p for p in render.check_payload(payload)))
+
+    def test_a_tour_step_off_the_board_is_flagged(self):
+        # A dangling tour id highlights nothing: the reader is told to look at
+        # a module that is not there.
+        payload = parity()
+        payload["map"]["tour"].append({"id": "n-ghost", "text": "Now look at ghost."})
+
+        self.assertTrue(any("not on the board" in p for p in render.check_payload(payload)))
+
+    def test_an_inferred_claim_with_an_anchor_is_still_refused_at_v3(self):
+        # Non-negotiable #2 survives the contract bump: the @3 checker runs in
+        # addition to the @2 ones, never instead of them.
+        payload = parity()
+        claim = payload["tracks"][0]["stops"][0]["blocks"][0]["claims"][0]
+        claim["status"] = "inferred"
+
+        self.assertTrue(any("inferred but carries an anchor" in p
+                            for p in render.check_payload(payload)))
+
+
+class TemplateSource(unittest.TestCase):
+    def test_the_template_carries_no_em_or_en_dash(self):
+        # Spec 1.6: bundled source lines in `files` are exempt from the dash
+        # policy, but the shipped template has an EMPTY placeholder, so there is
+        # no files region yet and the whole file must be clean. Scanned outside
+        # the DATA region anyway, so this test keeps passing if a fixture is
+        # ever inlined for the demo.
+        text = render.template_path().read_text(encoding="utf-8")
+        a = text.index(render.DATA_START)
+        b = text.index(render.DATA_END) + len(render.DATA_END)
+        outside = text[:a] + text[b:]
+
+        for ch, name in (("\u2014", "em dash U+2014"), ("\u2013", "en dash U+2013")):
+            self.assertNotIn(ch, outside, f"{name} in the template outside the data region")
+
+    def test_the_ledger_fallback_no_longer_claims_hand_built_provenance(self):
+        # The provenance lie: a GENERATED artifact whose report carried no
+        # `regen` printed the hand-built template's footer ("re-verified by
+        # template/verify.mjs") as its own pedigree. The fallback must be a
+        # neutral sentence that is true of every artifact this renderer draws.
+        text = render.template_path().read_text(encoding="utf-8")
+
+        self.assertNotIn("Hand-built", text)
+        self.assertNotIn("template/verify.mjs", text)
+        self.assertIn("re-read from disk and hash-matched by the verify stage",
+                      text)
+
+
 class Render(unittest.TestCase):
     def test_it_writes_inside_the_repo_rather_than_refusing(self):
         # The ledger prints `trailhead build . --out trailhead.html` on screen as
@@ -332,7 +504,7 @@ const src = tpl.slice(a, b + 2);
 const el = () => ({ textContent: '', innerHTML: '', hidden: null,
                     classList: { on: new Set(),
                                  toggle(c, v) { v ? this.on.add(c) : this.on.delete(c); } } });
-const nodes = { '.brand b': el(), '.meta': el(), '#badge': el(), '#rsel': el() };
+const nodes = { '#rname': el(), '#rmeta': el(), '#badge': el(), '#rsel': el() };
 const $ = s => nodes[s];
 const esc = s => String(s);
 const document = { title: '' };
@@ -343,8 +515,8 @@ eval(src + '\nshell();');
 
 console.log(JSON.stringify({
   title: document.title,
-  name: nodes['.brand b'].textContent,
-  meta: nodes['.meta'].textContent,
+  name: nodes['#rname'].textContent,
+  meta: nodes['#rmeta'].textContent,
   badge: nodes['#badge'].innerHTML,
   lowconf: nodes['#badge'].classList.on.has('lowconf'),
   selHidden: nodes['#rsel'].hidden,
@@ -531,6 +703,30 @@ console.log(JSON.stringify({ rows: ledgerRows(), table: ledgerTable() }));
 
         self.assertEqual(got["rows"].count("<tr>"), len(payload["dropped"]))
         self.assertIn(str(payload["report"]["claims"]), got["table"])
+
+    def test_the_footer_prints_the_runs_own_regen_line_when_present(self):
+        # `report.regen` is built by the cli from THIS run's arguments and the
+        # footer must print it verbatim, not the fallback.
+        payload = minimal()
+        payload["report"]["regen"] = ("Regenerate: PYTHONPATH=src python -m "
+                                      "trailhead build demo -o out/demo.html "
+                                      "--run-commands safe")
+
+        got = self.run_ledger(payload)
+
+        self.assertIn("build demo -o out/demo.html", got["table"])
+        self.assertNotIn("Hand-built", got["table"])
+        self.assertNotIn("re-read from disk and hash-matched", got["table"])
+
+    def test_the_footer_fallback_is_neutral_when_regen_is_absent(self):
+        # No regen line may never mean "borrow the hand-built artifact's
+        # pedigree": the fallback describes what the verify stage and the gate
+        # actually did, which is true of every payload this renderer draws.
+        got = self.run_ledger(minimal())
+
+        self.assertIn("re-read from disk and hash-matched", got["table"])
+        self.assertNotIn("Hand-built", got["table"])
+        self.assertNotIn("template/verify.mjs", got["table"])
 
 
 if __name__ == "__main__":

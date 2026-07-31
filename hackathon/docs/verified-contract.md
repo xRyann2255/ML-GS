@@ -1,9 +1,11 @@
 # `verified.json` — frozen contract
 
-**Version:** `trailhead/verified@2` (the `contract` key at the top of every payload)
-**Status:** frozen 2026-07-30, extended to `@2` the same day. Stages 3, 4 and 5 all
-code against this. `verify-contract.js` now asserts the version string itself, so a
-silent bump fails the gate.
+**Version:** `trailhead/verified@3` (the `contract` key at the top of every payload)
+**Status:** frozen 2026-07-30, extended to `@2` the same day and to `@3` on
+2026-07-31 (template parity, see `docs/template-parity-spec.md`). Stages 3, 4 and 5
+all code against this. `verify-contract.js` asserts the version string itself, so a
+silent bump fails the gate. `@1` and `@2` payloads remain valid: every `@3` addition
+is optional, and a payload that carries none of them renders exactly as `@2` did.
 
 ### What `@2` added
 
@@ -22,14 +24,94 @@ The gate rejects a `command.predict` that ships an `answer`, a `predict` on the 
 trace hop (nothing to key against), and one whose next hop is the same file (the
 question would be trivial).
 
+### What `@3` added
+
+All optional, all additive; the renderer conditions every new feature on its field.
+The quality target is the hand-built template (`template/payload.mjs` is a full
+worked example of every shape below).
+
+| Field | Where | Meaning |
+|---|---|---|
+| `glossary` | top level | Term definitions with optional hashed anchors; popovers in the page |
+| `` `code` `` and `[[id\|label]]` | authored text | Inline markup: code spans and glossary term buttons |
+| `w`, `h` | `map` | Explicit SVG viewBox, computed by MAP (renderer falls back to 900x400 for `@2`) |
+| `columns` | `map` | Pipeline-stage column headers: `{ label, x, line }`, `x` inside the viewBox |
+| `note` | `map` | `{ title, text }` callout under the board naming what is deliberately off it |
+| `tour` | `map` | Guided tour: `{ id, text }` steps, each `id` an existing node |
+| `h`, `path` | `map.nodes[]` | Explicit node height (required on `@3` nodes) and directory path |
+| `role`, `reads`, `feeds` | `map.nodes[]` | Narrated drawer paragraphs and data-flow lines; absent falls back to `why`/`top` |
+| `key_files`, `concepts` | `map.nodes[]` | `[{ file, purpose }]` and concept chips for the drawer |
+| `anchor`, `anchor_caption` | `map.nodes[]` | One hashed excerpt per node, shown in the drawer |
+| `stats` | new block type | Cover / dive tiles: `{ items: [{ v, l, s?, of?, color? }] }` |
+| `anchors` | `report` | Total anchors shipped (claims + excerpts + nodes + glossary); claim math unchanged |
+| dash policy | authored text | No U+2014 / U+2013 in any authored string (details below) |
+
+#### `glossary`
+
+```jsonc
+"glossary": [ { "id": "qlike", "term": "QLIKE", "def": "1-2 sentences.",
+                "anchor": { "file": "…", "start": 1, "end": 9,
+                            "focus": [3], "sha256": "…" } } ]
+```
+
+- `id` is a slug `[a-z0-9-]+`, unique across the glossary. `term` and `def` are
+  required and non-empty.
+- `anchor` is optional and, when present, is a standard anchor: bundled into
+  `files`, whole, and sha256-matched like any claim anchor. No anchor means the
+  popover shows the definition only.
+- Stage 4 verifies glossary cites like claims; a failed anchor is dropped (the
+  entry keeps its definition) and recorded in `dropped` with id `g-<slug>`.
+
+#### Inline markup in authored text
+
+In `claim.text`, `stop.lede`, `callout.text`, `map.note.text`, `map.tour[].text`,
+`map.nodes[].role[]`, `reads`, `feeds`, and `key_files[].purpose`:
+
+- `` `code` `` renders as `<code>`.
+- `[[id|label]]` renders as a glossary term button (dotted underline, popover,
+  jump to evidence). An explicit id that is not in `glossary` fails the gate;
+  stage 4 rewrites unresolvable markers to the plain label before assembly, so a
+  shipped payload never carries one.
+- `[[Label]]` (bare form) slug-matches the label; no match degrades to plain
+  text and is not gated. Raw HTML stays banned in claim text.
+- Glossary `def`, checkpoint `provenance` and `explanation` are escaped by the
+  renderer, not enriched: markers there are inert text and are not gated.
+
+#### `stats` — the eleventh block type
+
+```jsonc
+{ "type": "stats", "items": [ { "v": "96,897", "l": "LINES OF CODE",
+                                "s": "455 Python files", "of": "22",
+                                "color": "inf" } ] }
+```
+
+`v` and `l` are required non-empty strings; `s` (sub line) and `of` (denominator,
+rendered as `v / of`) are optional strings; `color` is optional and one of
+`ok | inf | bad`, mapping to the renderer's semantic CSS variables. Every value is
+computed by COMPOSE from `survey.json`, never authored by the model.
+
+#### Dash policy (authored text only)
+
+No U+2014 (em dash) or U+2013 (en dash) in any authored string: claim text,
+ledes, callout text, tour text, map note, node `role`/`reads`/`feeds`,
+`key_files[].purpose`, glossary `def`, checkpoint `provenance` and `explanation`.
+COMPOSE transliterates model output at the source; the gate re-scans on `@3`
+payloads only (the frozen `@2` fixtures predate the policy). Two surfaces are
+exempt by design: the `files` map (the repo's own bytes; hash integrity wins) and
+command `out` (real capture, non-negotiable #4).
+
+---
+
 This is the only interface between the generator and the artifact. RENDER consumes
 this and nothing else; VERIFY produces it; NARRATE produces the pre-verification
 form of it. `docs/walkthrough-spec.md` describes what the page *looks like* — this
 describes what it *eats*.
 
-Reference payloads: `fixtures/verified.sample.json` (synthetic repo, 13 anchors)
-and `fixtures/verified.ml-gs.json` (this repo, 17 anchors).
-Gate: `node tools/verify-contract.js fixtures/verified.sample.json`.
+Reference payloads: `fixtures/verified.sample.json` (synthetic repo, 13 anchors,
+kept at `@2` for the demo bundle), `fixtures/verified.ml-gs.json` (this repo, 17
+anchors, `@2`), and `fixtures/verified.parity.json` (minimal `@3`, exercises every
+field `@3` added, 5 anchors hashed over its own `files` map).
+Gate: `node tools/verify-contract.js fixtures/verified.parity.json`.
 
 **How the demo bundle stores these.** Between the `TRAILHEAD-DATA-START` and
 `TRAILHEAD-DATA-END` markers it declares `BUNDLES`, a map of repo name to payload,
@@ -118,6 +200,32 @@ present; the map is sparse and ranges may be non-contiguous. Every line in
 page (spec §4.4). Node area ∝ `loc`, edge thickness ∝ `n`. Every edge's `a` and
 `b` must name an existing node.
 
+`@3` extends the map additively (see the `@3` table above for the full list):
+
+```jsonc
+"map": {
+  "w": 1000, "h": 520,
+  "columns": [ { "label": "LAYER 2", "x": 340, "line": true } ],
+  "note":    { "title": "WHAT IS NOT ON THIS BOARD", "text": "…" },
+  "tour":    [ { "id": "n-data", "text": "…" } ],
+  "nodes":   [ { "id": "n-data", "…": "@2 fields as above", "h": 64,
+                 "path": "src/pkg/data/",
+                 "role": ["para 1", "para 2"], "reads": "…", "feeds": "…",
+                 "key_files": [ { "file": "measures.py", "purpose": "…" } ],
+                 "concepts": ["…"],
+                 "anchor": { "…": "standard anchor" }, "anchor_caption": "…" } ]
+}
+```
+
+Gate rules: every `columns[].x` is numeric and inside `[0, map.w]` (renderer
+fallback 900 when `w` is absent); every `tour[].id` names an existing node, once;
+`role` is a non-empty array of strings, `key_files` entries carry `file` and
+`purpose`, `concepts` is an array of strings; a node `anchor` is hashed exactly
+like a claim anchor; and on an `@3` payload every node carries a numeric `h`
+(the renderer no longer derives it there — `@2` nodes still get the derived
+fallback). A node without `role` falls back to `why`/`top` in the drawer, which
+is why both stay required on every node.
+
 ## `tracks` → `stops` → `blocks`
 
 ```jsonc
@@ -166,7 +274,7 @@ Both sides must compute it identically or every anchor drops:
 
 ## Block types — the complete set
 
-RENDER implements exactly these ten and nothing more.
+RENDER implements exactly these eleven and nothing more.
 
 | `type` | Fields |
 |---|---|
@@ -180,6 +288,7 @@ RENDER implements exactly these ten and nothing more.
 | `callout` | `level`, `title`, `text` |
 | `ledger` | *(none — renders `report` + `dropped`)* |
 | `lineage` | `title`, `entities[]` |
+| `stats` (`@3`) | `items[]` = `{ v, l, s?, of?, color? }` |
 
 Notes that the gate enforces:
 
@@ -293,3 +402,36 @@ is the single source of truth for the demo bundle — edit the JSON, never the
 
 A new field is only real when the gate enforces it. `@2` shipped with four
 assertions and four negative tests; do the same.
+
+### What the gate asserts for `@3`
+
+All additive; the frozen `@2` fixtures and the demo bundle pass unchanged.
+
+- `trailhead/verified@3` appended to `KNOWN` (`@1`/`@2` still accepted).
+- `glossary`: array; slug ids `[a-z0-9-]+`, unique; `term` and `def` non-empty;
+  an `anchor`, when present, goes through the same validator as a claim anchor
+  (bundled, whole, sha256-matched).
+- Explicit `[[id|label]]` markers in claim text, ledes, callout text, map note,
+  tour text, node `role`/`reads`/`feeds`, and `key_files[].purpose` must resolve
+  to a glossary id. Bare `[[Label]]` markers degrade and are not gated.
+- `map.columns[]`: non-empty `label`; numeric `x` inside `[0, map.w]`
+  (900 when `w` is absent, mirroring the renderer's viewBox fallback).
+- `map.tour[]`: each `id` names an existing node, no duplicates, non-empty text.
+- `map.nodes[]`: `role` a non-empty array of strings; `key_files` entries carry
+  `file` + `purpose`; `concepts` an array of strings; `reads`/`feeds` strings;
+  node `anchor` hashed; on `@3`, every node carries a numeric `h`.
+- `stats` joins the closed block-type vocabulary (an unknown type still fails):
+  `items` non-empty; `v`/`l` non-empty strings; `s`/`of` strings when present;
+  `color` one of `ok | inf | bad`.
+- Dash scan (`@3` payloads only): no U+2014/U+2013 in authored strings (list in
+  the dash-policy section above). The `files` map and command `out` are exempt.
+
+Each assertion carries a negative test: a mutation harness clones
+`fixtures/verified.parity.json`, breaks one rule per case (45 cases: 40 expected
+failures with message match, 5 expected passes proving the exemptions and the
+`@2` scoping), and asserts the gate's verdict. Re-create any case as a one-liner,
+e.g.:
+
+```bash
+node -e "const D=require('./fixtures/verified.parity.json');D.map.tour[0].id='n-ghost';require('fs').writeFileSync('mut.json',JSON.stringify(D))" && node tools/verify-contract.js mut.json   # expect: FAIL tour step n-ghost
+```

@@ -7,12 +7,12 @@ never invents a stop, a title, a lede, a table cell, a command or an answer key.
 
 Three rules shape every line below.
 
-**Nine block types, no tenth.** The renderer implements exactly `prose`,
-`excerpt`, `command`, `graph`, `table`, `trace`, `checkpoint`, `callout` and
-`ledger`; its dispatch table has no default arm, so a tenth type renders
-*nothing* — a silently blank stop that both gates still pass. Every block is
-built by one of the constructors here and `build_course` re-checks the type of
-everything a builder hands back.
+**Ten block types, no eleventh.** The renderer implements exactly `prose`,
+`excerpt`, `command`, `graph`, `table`, `trace`, `checkpoint`, `callout`,
+`ledger` and, since `@3`, `stats`; its dispatch table has no default arm, so an
+unknown type renders *nothing*: a silently blank stop that both gates still
+pass. Every block is built by one of the constructors here and `build_course`
+re-checks the type of everything a builder hands back.
 
 **Never a blank stop, never a silent omission.** §9's degradation table is
 implemented in full: whenever a stop cannot be built as designed it emits a
@@ -35,6 +35,7 @@ banner (`verify.assemble` computes the drop rate).
 """
 import json
 import random
+import re
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
@@ -47,17 +48,25 @@ from trailhead import TOOL_VERSION
 from trailhead.mapper import EDGE_CAP
 from trailhead.textio import cell
 
-#: The complete block vocabulary. `excerpt` has no producer in this table by
-#: design (§5.7) — it is supported by the renderer and checked by
-#: `verify-contract.js:99`, so the constructor exists and the type set stays
-#: closed, but no stop emits one.
+#: The complete block vocabulary. `excerpt` had no producer before `@3`; the
+#: dive stops now emit one when their map node carries an anchor. `stats` is
+#: the `@3` tile row, computed here and never narrated.
 BLOCK_TYPES = frozenset(
     ["prose", "excerpt", "command", "graph", "table", "trace",
-     "checkpoint", "callout", "ledger"]
+     "checkpoint", "callout", "ledger", "stats"]
 )
 
 #: `callout.level` — three, no more (spec §4.7).
 CALLOUT_LEVELS = frozenset(["info", "inferred", "broken"])
+
+#: `stats.items[].color` values the renderer maps onto its palette variables.
+#: Anything else would silently fall back to the default ink, hiding the typo.
+STAT_COLORS = frozenset(["ok", "inf", "bad"])
+
+#: What a stat tile's `v` and `of` may contain. The renderer interpolates both
+#: WITHOUT escaping (they are its own numbers), so the constructor refuses
+#: anything that is not a plain figure.
+_STAT_VALUE = re.compile(r"^[A-Za-z0-9 ,.%+-]+$")
 
 #: How a stop behaves when its precondition is unmet. Only DROP removes it.
 PLACEHOLDER, ALTERNATE, DROP = "PLACEHOLDER", "ALTERNATE", "DROP"
@@ -68,14 +77,32 @@ PLACEHOLDER, ALTERNATE, DROP = "PLACEHOLDER", "ALTERNATE", "DROP"
 TRACKS = (
     ("ORIENT", "ORIENT", 15),
     ("RUN", "GET IT RUNNING", 20),
+    ("DIVE", "INSIDE THE SYSTEM", 15),
     ("READ", "FOLLOW ONE PATH", 25),
     ("CONV", "CONVENTIONS", 8),
     ("AUDIT", "CLOSE", 6),
 )
 
-#: The narrate units compose can consume. Anything else in `ctx.narration` is
-#: ignored rather than rendered — a unit with no stop has nowhere to go.
+#: The narrate units compose consumes by name. Deep-dive units are composite,
+#: keyed `dive:<gid>` (one per map group narrate chose), and matched by the
+#: prefix below, exact-or-prefix and never a substring test, so they are not
+#: listed here. Anything else in `ctx.narration` is ignored rather than
+#: rendered: a unit with no stop has nowhere to go.
 UNITS = ("five", "trace", "conv", "green")
+
+#: The composite-unit prefix for the INSIDE THE SYSTEM track: `dive:core`
+#: names a deep dive of map group `core`.
+DIVE_UNIT_PREFIX = "dive:"
+
+#: Rail minutes for one dive stop, a rounded reading estimate like the rest.
+DIVE_MINUTES = 4
+
+#: Claim-id bases for dive stops: unit i gets DIVE_ID_BASE + i*DIVE_ID_STRIDE.
+#: The stride is wider than any dive pack's claim budget, and the whole range
+#: sits above every ID_BASE entry and below the 900 fallback, so ids stay
+#: unique across the payload without a shared counter.
+DIVE_ID_BASE = 201
+DIVE_ID_STRIDE = 20
 
 #: The stop that is never skippable and never filterable. Stripping every
 #: `ledger` block from the fixture leaves `verify-contract.js` exiting 0, so
@@ -114,8 +141,8 @@ DEGRADATIONS = {
         "info", "NO HOP PATH WAS SPECIFIED FOR THIS REPO",
         "This repo declares {n} ({candidates}), so the entry point is not what "
         "is missing. The hops for this stop are hand-specified input rather "
-        "than generated — a repo carries its chain in {fixture} or it has none "
-        "— and this run had {hops}. Fewer than two hops is not a path, so the "
+        "than generated: a repo carries its chain in {fixture} or it has none, "
+        "and this run had {hops}. Fewer than two hops is not a path, so the "
         "stop says so instead of inventing one."),
     "no_test_command": (
         "info", "NO TEST COMMAND DETECTED",
@@ -123,7 +150,7 @@ DEGRADATIONS = {
     "setup_all_failed": (
         "broken", "THIS REPO DID NOT BUILD DURING GENERATION.",
         "All {n} setup commands failed. Every one is shown below with its real "
-        "exit code and output — nothing is hidden."),
+        "exit code and output; nothing is hidden."),
     "few_modules": (
         "info", "TOO FEW MODULES TO DRAW A GRAPH",
         "{n} module group(s) found. The table below carries the same "
@@ -143,6 +170,10 @@ DEGRADATIONS = {
         "info", "NO COMMANDS WERE EXECUTED",
         "The allowlist admitted nothing from this repo. "
         "Candidates considered: {candidates}."),
+    "dive_empty": (
+        "info", "SUBSYSTEM DIVES NOT GENERATED",
+        "Narration for {names} returned no claims that survived filtering, so "
+        "those stops were omitted rather than rendered empty."),
 }
 
 #: Catalogue key -> the code that reaches `degradations`. A §9 row with more
@@ -214,12 +245,10 @@ def prose(claims: Sequence[dict]) -> dict:
 
 
 def excerpt(cite: dict, caption: str = "") -> dict:
-    """Standalone code excerpt. No builder in the STOP_TABLE emits one.
-
-    It exists so the nine-type vocabulary is complete and closed: the renderer
-    supports it and `verify-contract.js` anchor-checks it, so a future stop can
-    use it without inventing a tenth type. `caption` goes through `cell` — the
-    renderer interpolates it without escaping.
+    """Standalone code excerpt. Since `@3` the dive stops emit one when their
+    map node carries an anchor; VERIFY resolves `cite` into the anchor the
+    renderer draws, exactly as it does for a prose claim. `caption` goes
+    through `cell` — the renderer interpolates it without escaping.
     """
     return {"type": "excerpt", "cite": dict(cite), "caption": cell(caption)}
 
@@ -270,6 +299,43 @@ def table(columns: Sequence[str], rows: Sequence[Sequence[str]],
         out.append(r)
     return {"type": "table", "caption": caption, "sortable": bool(sortable),
             "columns": cols, "rows": out}
+
+
+def stats(items: Sequence[dict]) -> dict:
+    """A row of stat tiles (`@3`). Every value is computed, never narrated.
+
+    The renderer interpolates `v` and `of` WITHOUT escaping (they are treated
+    as the page's own numbers), so both are checked against a plain-figure
+    whitelist here; `l` and `s` are escaped by the renderer and pass through
+    as text. `color` tints the value and must be one of STAT_COLORS, because
+    an unknown color silently falls back to the default ink and the typo
+    would never surface.
+    """
+    out = []
+    for i, it in enumerate(items):
+        v, label = str(it.get("v") or ""), str(it.get("l") or "")
+        if not v or not label:
+            raise ValueError(f"stats tile {i} needs a non-empty v and l")
+        if not _STAT_VALUE.fullmatch(v):
+            raise ValueError(f"stats tile {i} value {v!r} is not a plain figure")
+        tile = {"v": v, "l": label}
+        if it.get("s"):
+            tile["s"] = str(it["s"])
+        if it.get("of"):
+            of = str(it["of"])
+            if not _STAT_VALUE.fullmatch(of):
+                raise ValueError(f"stats tile {i} of {of!r} is not a plain figure")
+            tile["of"] = of
+        if it.get("color"):
+            if it["color"] not in STAT_COLORS:
+                raise ValueError(
+                    f"stats tile {i} color {it['color']!r} not in "
+                    f"{sorted(STAT_COLORS)}")
+            tile["color"] = it["color"]
+        out.append(tile)
+    if not out:
+        raise ValueError("a stats block needs at least one tile")
+    return {"type": "stats", "items": out}
 
 
 def trace(steps: Sequence[dict]) -> dict:
@@ -495,8 +561,10 @@ def _claims(ctx: Ctx, unit: str) -> list[dict]:
     return out
 
 
-def _numbered(unit: str, claims: Sequence[dict]) -> list[dict]:
-    base = ID_BASE.get(unit, 900)
+def _numbered(unit: str, claims: Sequence[dict],
+              base: int | None = None) -> list[dict]:
+    if base is None:
+        base = ID_BASE.get(unit, 900)
     return [claim(f"c-{base + i:03d}", c["text"], c.get("cite"))
             for i, c in enumerate(claims)]
 
@@ -515,6 +583,9 @@ def _narration_note(ctx: Ctx) -> dict:
     wanted = [u for u in UNITS
               if (u != "green" or _green_pick(ctx))
               and (u != "trace" or len(ctx.hops or []) >= 2)]
+    # Dive units count exactly when narrate planned them, and a planned unit
+    # is one present in `ctx.narration` (a stub miss still keys `{claims: []}`).
+    wanted += _dive_units(ctx)
     got = [u for u in wanted if _claims(ctx, u)]
     return _fire(ctx, "narration_budget", n=len(got), m=len(wanted))
 
@@ -524,12 +595,14 @@ def _narration_note(ctx: Ctx) -> dict:
 # --------------------------------------------------------------------------
 
 def build_cover(ctx: Ctx) -> list[dict]:
-    """`callout` · `table`. Every value survey-derived; nothing model-written.
+    """`stats` · `callout` · `table`. Survey-derived; nothing model-written.
 
-    The table states the anchor scope on screen (decision #6): Python source
-    plus the text files the survey admitted, and nothing else was read. Saying
-    it here and in the ledger is the difference between a stated limit and an
-    implied capability.
+    The tile row opens the page with the repo's real size and the run's real
+    command record, every value computed from `survey.json` and
+    `commands.json` (`@3`, spec §6). The table states the anchor scope on
+    screen (decision #6): Python source plus the text files the survey
+    admitted, and nothing else was read. Saying it here and in the ledger is
+    the difference between a stated limit and an implied capability.
     """
     sv, st = _repo(ctx), _stats(ctx)
     runs = _runs(ctx)
@@ -549,7 +622,7 @@ def build_cover(ctx: Ctx) -> list[dict]:
         f"This walkthrough was generated from "
         f"{_plural(st.get('py_files', 0), 'Python file')} and "
         f"{_plural(texts, 'other text file')}. Anchors resolve into those files "
-        f"and nowhere else — anything outside that scope is out of scope for "
+        f"and nowhere else; anything outside that scope is out of scope for "
         f"this page, not absent from the repo. {ran}")
 
     minutes = sum(m for _, _, m in TRACKS)
@@ -563,13 +636,64 @@ def build_cover(ctx: Ctx) -> list[dict]:
         [cell("modules"),
          cell(f"{st.get('modules', 0)} in {len(_nodes(ctx))} groups on the map")],
         [cell("entry point"),
-         cell(entry[0].get("target") or entry[0].get("name") or "—", code=True)
+         cell(entry[0].get("target") or entry[0].get("name") or "unknown",
+              code=True)
          if entry else cell("none declared")],
         [cell("commands executed"), cell(f"{len(runs)} ({failed} failing)")],
         [cell("est. reading time"), cell(f"{minutes} minutes")],
     ]
-    return [intro, table([cell("FIELD"), cell("VALUE")], rows,
-                         caption="Generation record")]
+    return [_cover_stats(ctx), intro,
+            table([cell("FIELD"), cell("VALUE")], rows,
+                  caption="Generation record")]
+
+
+def _cover_stats(ctx: Ctx) -> dict:
+    """The cover tile row (spec §6). Every value formatted from survey facts.
+
+    The dangling tile appears only when the survey found imports with no file
+    on disk, coloured `inf` so it reads as the caveat it is. No model comes
+    anywhere near these numbers.
+    """
+    st = _stats(ctx)
+    runs = _runs(ctx)
+    failed = sum(1 for r in runs if r.get("exit") not in (0, None))
+    tiles = [
+        {"v": f"{st.get('loc', 0):,}", "l": "LINES OF CODE"},
+        {"v": f"{st.get('py_files', 0):,}", "l": "PYTHON FILES",
+         "of": f"{st.get('files', 0):,}"},
+        {"v": f"{st.get('modules', 0):,}", "l": "MODULES",
+         "s": (f"{_plural(len(_nodes(ctx)), 'group')} on the map"
+               if _nodes(ctx) else "")},
+        {"v": f"{_test_file_count(ctx):,}", "l": "TEST FILES"},
+        {"v": f"{len(runs):,}", "l": "COMMANDS RUN", "s": f"{failed} failing"},
+    ]
+    dangling = ctx.survey.get("dangling") or []
+    if dangling:
+        n = sum(int(d.get("n") or 0) for d in dangling)
+        tiles.append({"v": f"{len(dangling):,}", "l": "MISSING MODULES",
+                      "s": f"{_plural(n, 'import statement')} cannot resolve",
+                      "color": "inf"})
+    return stats(tiles)
+
+
+def _test_file_count(ctx: Ctx) -> int:
+    """Files under a declared test root, straight off `survey.roots`.
+
+    Component-safe containment, not a substring test: `src/tests_extra` is
+    not under `src/tests`. No declared test root means zero, which is an
+    honest tile on a repo the survey found no test directory in.
+    """
+    roots = [str(r).replace("\\", "/").strip("/")
+             for r in ((ctx.survey.get("roots") or {}).get("test_roots") or [])
+             if r]
+    if not roots:
+        return 0
+    n = 0
+    for f in ctx.survey.get("files") or []:
+        p = str(f.get("path") or "")
+        if any(p == r or p.startswith(r + "/") for r in roots):
+            n += 1
+    return n
 
 
 def build_five(ctx: Ctx) -> list[dict]:
@@ -652,16 +776,24 @@ def build_map(ctx: Ctx) -> list[dict]:
 
 
 def build_where(ctx: Ctx) -> list[dict]:
-    """`table` (PATH/PURPOSE/FILES/LOC/rank[/committers]).
+    """`table` (PATH/PURPOSE/FILES/LOC/metric[/committers]).
 
     Decision #20: the purpose cell is the package `__init__.py` docstring's
-    first sentence, or an em dash. Never model prose — a table cell has no claim
+    first sentence, or an honest gap. Never model prose — a table cell has no claim
     marker, no anchor, and `verify-contract.js` never walks one, so a model
     sentence in a cell is an unverified factual claim on the stop a joiner reads
     second. Prose about the layout goes in the `map` stop above.
 
-    §9 row 6: with no git history the rank column is relabelled in place and the
-    committers column is dropped rather than padded with a column of `n/a`.
+    The metric column prints the metric itself — the real commit count, the
+    fan-in, the loc — never the row's 1..n rank. A rank under a COMMITS
+    header reads as commit numbers the history does not contain, which is a
+    fabrication in everything but authorship, on the one page whose pitch is
+    that it fabricates nothing.
+
+    §9 row 6: with no git history the metric column is relabelled in place.
+    The committers column exists only when some row actually has a committer:
+    a snapshot repo has git history but no per-module committers, and a
+    column of `n/a` repeated down every row is dropped rather than padded.
     """
     rows_src = _where_rows(ctx)
     if not rows_src:
@@ -671,7 +803,7 @@ def build_where(ctx: Ctx) -> list[dict]:
 
     label = _rank_label(ctx)
     ranked = sorted(rows_src, key=lambda r: (-r["rank_by"], r["path"]))
-    committers = _churn_available(ctx)
+    committers = _churn_available(ctx) and any(r["committers"] for r in ranked)
 
     columns = [cell("PATH"), cell("PURPOSE"), cell("FILES"), cell("LOC"),
                cell(label.upper())]
@@ -679,9 +811,10 @@ def build_where(ctx: Ctx) -> list[dict]:
         columns.append(cell("RECENT COMMITTERS"))
 
     rows = []
-    for i, r in enumerate(ranked, 1):
+    for r in ranked:
         row = [cell(r["path"] + "/", code=True), cell(r["purpose"]),
-               cell(r["files"]), cell(f"{r['loc']:,}"), cell(i)]
+               cell(r["files"]), cell(f"{r['loc']:,}"),
+               cell(f"{r['rank_by']:,}")]
         if committers:
             row.append(cell(", ".join(r["committers"][:2]) or "n/a"))
         rows.append(row)
@@ -755,7 +888,7 @@ def build_setup(ctx: Ctx) -> list[dict]:
         else:
             blocks.append(_fire(ctx, "no_commands",
                                 candidates=_candidate_list(ctx) or "none found"))
-        return blocks
+        return blocks + _restore_ledger(ctx)
 
     failed = sum(1 for r in runs if r.get("exit") not in (0, None))
     if failed:
@@ -772,7 +905,62 @@ def build_setup(ctx: Ctx) -> list[dict]:
             f"Every command above ({_plural(len(runs), 'command')}) ran during "
             f"generation and passed. The output shown is the captured output, "
             f"not an example of what it should look like."))
-    return blocks
+    return blocks + _restore_ledger(ctx)
+
+
+def _restore_ledger(ctx: Ctx) -> list[dict]:
+    """The missing-modules table and callout (`@3`, spec §6), or `[]`.
+
+    When `survey.dangling` is non-empty the setup stop closes with the RESTORE
+    LEDGER: every module the repo imports that has no file on disk at this
+    commit, ranked by import statements, capped at 20 rows. The wording is
+    generic on purpose ("at this commit"): a dangling import is a fact about
+    the tree, not a story about how the tree got that way. All of it is
+    survey-derived and the callout names the top offenders because those are
+    the ModuleNotFoundErrors a new joiner will hit first.
+    """
+    dangling = [d for d in (ctx.survey.get("dangling") or [])
+                if isinstance(d, dict) and d.get("target")]
+    if not dangling:
+        return []
+
+    ranked = sorted(dangling,
+                    key=lambda d: (-int(d.get("n") or 0), str(d.get("target"))))
+    rows = []
+    for d in ranked[:20]:
+        sites = [str(s.get("file")) for s in (d.get("sites") or [])
+                 if isinstance(s, dict) and s.get("file")]
+        files = list(dict.fromkeys(sites))
+        if files:
+            shown = ", ".join(files[:2])
+            rest = len(files) - 2
+            frm = f"{shown}, and {rest} more" if rest > 0 else shown
+        else:
+            frm = "unknown"
+        rows.append([cell(str(d.get("target")), code=True), cell(frm),
+                     cell(f"{int(d.get('n') or 0):,}")])
+
+    caption = ("Missing at this commit: modules imported somewhere in this "
+               "repo that have no file on disk. IMPORT SITES counts import "
+               "statements.")
+    if len(ranked) > 20:
+        caption += (f" Showing the top 20 of {len(ranked)} by import "
+                    f"statement count.")
+    tbl = table([cell("MISSING MODULE"), cell("IMPORTED FROM"),
+                 cell("IMPORT SITES")], rows, caption=caption, sortable=True)
+
+    total = sum(int(d.get("n") or 0) for d in dangling)
+    top = ", ".join(
+        f"{d.get('target')} ({_plural(int(d.get('n') or 0), 'import')})"
+        for d in ranked[:3])
+    note = callout(
+        "broken", "MISSING AT THIS COMMIT",
+        f"The survey counted {_plural(len(dangling), 'imported module')} with "
+        f"no file on disk at this commit, across "
+        f"{_plural(total, 'import statement')}. The heaviest: {top}. Code "
+        f"paths that reach these imports fail with ModuleNotFoundError until "
+        f"the modules are restored.")
+    return [tbl, note]
 
 
 def build_green(ctx: Ctx) -> list[dict]:
@@ -816,6 +1004,149 @@ def build_green(ctx: Ctx) -> list[dict]:
             f"imports from the source root the survey resolved. It does not "
             f"run a single test, and this page will not pretend otherwise."))
     return blocks
+
+
+def _dive_units(ctx: Ctx) -> list[str]:
+    """Every `dive:<gid>` unit in this run's narration, in map order.
+
+    Map order is the mapper's left-to-right pipeline order, so the dive track
+    reads in the same direction as the board above it. Units whose gid matches
+    no node sort after the matched ones, then alphabetically, so the order
+    stays deterministic even on a map that has moved since narration.
+    """
+    units = [u for u in (ctx.narration or {})
+             if isinstance(u, str) and u.startswith(DIVE_UNIT_PREFIX)
+             and len(u) > len(DIVE_UNIT_PREFIX)]
+    return sorted(units, key=lambda u: (
+        _dive_node(ctx, u[len(DIVE_UNIT_PREFIX):])[1], u))
+
+
+def _dive_node(ctx: Ctx, gid: str) -> tuple[dict | None, int]:
+    """The map node a dive gid names, and its index in the node order.
+
+    Narrate keys dive units by map group; the join tolerates the node id with
+    or without its `n-` prefix and falls back to label and path, because the
+    two stages have different owners and a silent join miss would quietly
+    demote every dive stop to prose-only. A total miss returns `(None, N)` so
+    unmatched units sort last and still render under their own name.
+    """
+    nodes = _nodes(ctx)
+    for probe in (lambda n: n.get("id") == gid,
+                  lambda n: n.get("id") == f"n-{gid}",
+                  lambda n: n.get("label") == gid,
+                  lambda n: n.get("path") == gid):
+        for i, n in enumerate(nodes):
+            if probe(n):
+                return n, i
+    return None, len(nodes)
+
+
+def _slug(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
+    return s or "group"
+
+
+def _build_dives(ctx: Ctx) -> list[dict]:
+    """The INSIDE THE SYSTEM stops: one per `dive:<gid>` unit that came back.
+
+    Blocks per stop: `prose` (the dive claims), an `excerpt` when the map node
+    carries an anchor, and a `stats` tile row computed from the node and the
+    map edges. A unit with no surviving claims produces NO stop: a dive with
+    nothing to say is omitted, and the omission is recorded once via `_fire`
+    under `dive_empty`. The callout `_fire` returns here has no stop to sit
+    on, so it is dropped and `build_audit` re-emits an identical one from the
+    recorded row, on the close track, where a reader looks for what the page
+    did not do.
+    """
+    stops: list[dict] = []
+    used: set[str] = set()
+    for i, unit in enumerate(_dive_units(ctx)):
+        gid = unit[len(DIVE_UNIT_PREFIX):]
+        node, _ = _dive_node(ctx, gid)
+        label = str((node or {}).get("label") or gid)
+        claims = _claims(ctx, unit)
+        if not claims:
+            # An unanswered dive unit is indistinguishable here from one that
+            # was never planned: absence-by-default (spec section 4) means a
+            # cold run must produce the exact @2 course, so the omission is
+            # silent. Answers the parser refused already sit in the ledger.
+            continue
+
+        base = DIVE_ID_BASE + DIVE_ID_STRIDE * i
+        blocks = [prose(_numbered(unit, claims, base=base))]
+        anchor = (node or {}).get("anchor")
+        if isinstance(anchor, dict) and anchor:
+            blocks.append(excerpt(
+                anchor, str((node or {}).get("anchor_caption") or "")))
+        if node:
+            blocks.append(_group_stats(ctx, node))
+
+        want = f"dive-{_slug(gid)}"
+        sid, k = want, 2
+        while sid in used:
+            sid, k = f"{want}-{k}", k + 1
+        used.add(sid)
+        stops.append({"id": sid, "title": f"Inside {label}", "kind": "stop",
+                      "minutes": DIVE_MINUTES, "blocks": blocks,
+                      "lede": _lede_dive(label, len(stops))})
+    return stops
+
+
+def _group_stats(ctx: Ctx, node: dict) -> dict:
+    """One dive stop's tile row: group size and coupling, all from `map.json`.
+
+    Fan counts are distinct group edges on the emitted map, which is the same
+    graph the reader is looking at; self edges never count.
+    """
+    nid = node.get("id")
+    edges = (ctx.map or {}).get("edges") or []
+    fan_in = sum(1 for e in edges
+                 if e.get("b") == nid and e.get("a") != nid)
+    fan_out = sum(1 for e in edges
+                  if e.get("a") == nid and e.get("b") != nid)
+    return stats([
+        {"v": f"{int(node.get('loc') or 0):,}", "l": "LINES OF CODE"},
+        {"v": f"{int(node.get('files') or 0):,}", "l": "FILES"},
+        {"v": f"{fan_in:,}", "l": "FAN-IN",
+         "s": "groups that import this one"},
+        {"v": f"{fan_out:,}", "l": "FAN-OUT",
+         "s": "groups this one imports"},
+    ])
+
+
+#: The dive-stop lede templates, dealt by stop position on the DIVE track so
+#: adjacent stops never open with the same sentence. One sentence stamped
+#: across every dive reads as the template it is; four rotated ones read as a
+#: written page while staying exactly as deterministic (#20c): the rotation is
+#: keyed by position, never by a random draw, so a cold rerun deals the same
+#: lede to the same stop. Every template states only what is true of every
+#: dive stop — the claim-marker contract — because a lede has no claim marker
+#: and cannot promise blocks (an excerpt, a tile row) a given stop may lack.
+DIVE_LEDES = (
+    "A closer read of {label}. The claims here are checked the same way as "
+    "everywhere else on this page, and anything marked INFERRED could not be "
+    "anchored to a line and says so.",
+    "What {label} actually does, read from its own source. Each sentence "
+    "carries a claim marker, and the sentences that failed their re-check "
+    "are in the ledger rather than on this stop.",
+    "A few minutes inside {label}. The rules are the same here as on every "
+    "other stop: a sentence is either anchored to a real line range or "
+    "marked as unproven on its face.",
+    "The shape of {label}, up close. Nothing below asks to be taken on "
+    "trust; every claim marker opens the evidence behind its sentence, or "
+    "says plainly that there is none.",
+)
+
+
+def _lede_dive(label: str, index: int) -> str:
+    """One of DIVE_LEDES, dealt by the stop's position on the DIVE track.
+
+    `index` counts emitted stops, not narration units, so a dive that came
+    back empty and was omitted does not leave a hole in the rotation: the
+    stops that do render still cycle through the templates in order, and two
+    neighbours can never share one.
+    """
+    return DIVE_LEDES[index % len(DIVE_LEDES)].format(label=label)
 
 
 def build_trace(ctx: Ctx) -> list[dict]:
@@ -925,8 +1256,16 @@ def build_audit(ctx: Ctx) -> list[dict]:
 
     dropped = [d for d in ctx.degradations if d.get("code") == "stop_dropped"]
     if dropped:
-        rows = "; ".join(f"{d.get('stop')} — {d.get('reason')}" for d in dropped)
+        rows = "; ".join(f"{d.get('stop')}: {d.get('reason')}" for d in dropped)
         blocks.append(degradation("stops_dropped", rows=rows))
+
+    # Dive units that came back empty were omitted from the DIVE track, so
+    # their `_fire` callout had no stop to sit on. The row is on the ledger;
+    # this re-emits its callout here, where a reader looks for omissions.
+    empty_dives = [d for d in ctx.degradations if d.get("code") == "dive_empty"]
+    if empty_dives:
+        blocks.append(callout("info", DEGRADATIONS["dive_empty"][1],
+                              empty_dives[0]["reason"]))
 
     blocks.append(ledger())
     return blocks
@@ -963,15 +1302,33 @@ def _lede_map(ctx: Ctx) -> str:
     if len(_nodes(ctx)) < 3:
         return ("Too few module groups to draw a graph worth reading. The "
                 "table below carries the same information.")
+    # The guided tour is promised only when the map actually carries one:
+    # inviting a click on a button that is not there is a small lie on a
+    # surface with no claim marker.
+    if (ctx.map or {}).get("tour"):
+        act = "Click any module, or take the guided tour."
+    else:
+        act = "Click any module."
     return (f"Derived from the real import graph, not from a description of "
             f"it. Node area is lines of code and edge weight is import count; "
-            f"{_map_caveat(ctx)} Click any module.")
+            f"{_map_caveat(ctx)} {act}")
 
 
 def _lede_where(ctx: Ctx) -> str:
-    if not _where_rows(ctx):
+    # The lede promises only what the table below it shows. "Ranked by
+    # commits" over a column of identical counts describes a ranking that
+    # does not exist, so the degenerate-churn mode gets its own sentence.
+    rows = _where_rows(ctx)
+    if not rows:
         return ("The survey found no importable package under an import root, "
                 "so there is nothing to list here.")
+    if _churn_available(ctx) and _churn_degenerate(rows):
+        return ("The same information as the map, as a list, for the people "
+                "who prefer lists. The commit counts shown are real but "
+                "identical for every module, which is what a tree committed "
+                "in one snapshot looks like, so the rows are ordered by path "
+                "rather than by history. The purpose column is each package's "
+                "own __init__ docstring.")
     return (f"The same information as the map, as a list, for the people who "
             f"prefer lists. Ranked by {_rank_label(ctx).lower()}, and the "
             f"purpose column is each package's own __init__ docstring.")
@@ -1056,17 +1413,19 @@ def _needs_trace(ctx: Ctx) -> str | None:
 
     Asking `_fired` about the ROW and not about either trigger is why row 1 kept
     one ledger code: this precondition wants "did the trace stop degrade", which
-    is one question however many ways there are to reach it.
-
-    **This reason string is stale on the fewer-than-two-hops half** — it says
-    "no traceable entry point" on repos that have one, the same wording defect
-    just fixed in the callout above it. It is not fixed here because all four
-    `tests/repos/*/expect.json` pin it byte-for-byte in `stop_drops` and this
-    module does not own them; changing it and them is one commit, by whoever
-    owns both.
+    is one question however many ways there are to reach it. The REASON follows
+    the trigger, though: the entry-point half is a fact about the repo, the
+    hops half is a fact about what this run was given, and each fixture repo's
+    `expect.json` pins the half that is true for it. One text for both meant
+    a repo with entry points was told it had none, the same wording defect
+    `build_trace` fixed in its callout.
     """
     if _fired(ctx, "no_trace"):
-        return "no traceable entry point, so the trace stop was not generated"
+        if not _entry_points(ctx):
+            return ("no traceable entry point, so the trace stop was not "
+                    "generated")
+        return ("fewer than two hops were specified, so the trace stop was "
+                "not generated")
     return _needs_checkpoints(("cp-c1", "cp-c2"), ctx)
 
 
@@ -1102,7 +1461,47 @@ STOP_TABLE = (
 )
 
 
-def build_course(ctx: Ctx) -> list[dict]:
+def build_gloss(glossary: Sequence[dict] | None) -> dict | None:
+    """The CLOSE track's glossary stop (`@3`, spec §6), or None to omit it.
+
+    The entries are the payload `glossary` the verify stage attaches: term and
+    definition survive verification even when an entry's anchor fails (only
+    the anchor is dropped), so every surviving entry is listable here. No
+    glossary, no stop, which is what keeps a no-glossary run rendering
+    exactly as `@2` did. Terms are the popover targets of the page's dotted
+    `[[...]]` markers; the table is the same content as a flat list.
+    """
+    entries = [g for g in (glossary or [])
+               if isinstance(g, dict)
+               and str(g.get("term") or "").strip()
+               and str(g.get("def") or "").strip()]
+    if not entries:
+        return None
+    rows = [[cell(str(g["term"]).strip(), bold=True),
+             cell(str(g["def"]).strip())] for g in entries]
+    tbl = table([cell("TERM"), cell("DEFINITION")], rows,
+                caption=("Click any dotted term in the prose to open the "
+                         "same definition in place."),
+                sortable=True)
+    return {"id": "gloss", "title": "The glossary", "kind": "stop",
+            "minutes": 2, "blocks": [tbl],
+            "lede": ("Every dotted term on this page, in one table. The "
+                     "definitions travel with the page and open in place "
+                     "when you click a term.")}
+
+
+def _typed(stop_id: str, blocks: Sequence[dict]) -> list[dict]:
+    """The closed-vocabulary check, shared by table stops and dive stops."""
+    blocks = list(blocks)
+    for b in blocks:
+        if b.get("type") not in BLOCK_TYPES:
+            raise ValueError(
+                f"stop {stop_id} emitted block type {b.get('type')!r}, "
+                f"which the renderer has no arm for")
+    return blocks
+
+
+def build_course(ctx: Ctx, glossary: list[dict] | None = None) -> list[dict]:
     """`tracks[]` for `content@1`: the whole course, preconditions applied.
 
     Runs the table in order, because later stops read what earlier ones
@@ -1111,20 +1510,27 @@ def build_course(ctx: Ctx) -> list[dict]:
     by experiment, stripping every ledger block from the fixture still leaves
     `verify-contract.js` exiting 0 with ALL CHECKS PASS, so nothing mechanical
     stops a ledger-less page.
+
+    `@3` additions, both absent-by-default so a bare `@2` run is unchanged:
+    the DIVE track is assembled first (so `build_audit`, which runs last,
+    sees any `dive_empty` row), and `glossary` is the verified glossary the
+    caller wants listed on the CLOSE track; None or empty means no stop.
     """
     built: dict[str, list[dict]] = {}
+
+    dives = _build_dives(ctx)
+    for s in dives:
+        _typed(s["id"], s["blocks"])
+    if dives:
+        built["DIVE"] = dives
+
     for spec in STOP_TABLE:
         reason = spec.precondition(ctx)
         if reason and spec.on_fail == DROP and spec.id != AUDIT_STOP:
             _record(ctx, "stop_dropped", reason, stop=spec.id)
             continue
 
-        blocks = list(spec.build(ctx))
-        for b in blocks:
-            if b.get("type") not in BLOCK_TYPES:
-                raise ValueError(
-                    f"stop {spec.id} emitted block type {b.get('type')!r}, "
-                    f"which the renderer has no arm for")
+        blocks = _typed(spec.id, spec.build(ctx))
         if spec.kind == "cp" and not any(b["type"] == "checkpoint" for b in blocks):
             # A checkpoint stop with no checkpoint would auto-tick itself
             # complete and teach nothing. Drop it and say so in the audit.
@@ -1146,6 +1552,13 @@ def build_course(ctx: Ctx) -> list[dict]:
             # the frozen fixture does and the renderer treats it as optional.
             stop["lede"] = spec.lede(ctx) if spec.lede else spec.title
         built.setdefault(spec.track, []).append(stop)
+
+    gloss = build_gloss(glossary)
+    if gloss:
+        # Before the audit stop, which stays last on the page (AUDIT is the
+        # final track and `audit` is appended by the loop above).
+        _typed(gloss["id"], gloss["blocks"])
+        built.setdefault("AUDIT", []).insert(0, gloss)
 
     return [{"title": title, "minutes": minutes, "stops": built[key]}
             for key, title, minutes in TRACKS if built.get(key)]
@@ -1261,11 +1674,18 @@ def _candidate_list(ctx: Ctx) -> str:
 
 
 def _test_candidates(ctx: Ctx) -> str:
-    """Every test candidate considered, with the reason it was not run.
+    """Every test candidate considered, with the truthful reason it is not green.
 
     Naming the denied candidate is the difference between "no tests here" and
     "pytest is not importable under the resolved interpreter" — one is a
     statement about the repo and the other is a statement about this machine.
+
+    The runner's record outranks everything above it. A candidate that WAS
+    executed is described by its real result, never as "not executed": the
+    setup stop is about to render that exact command with its real exit code,
+    and a callout contradicting the command block one screen away is the one
+    defect this project cannot ship. Only candidates with no run record keep
+    the not-executed wording.
     """
     seen: dict[str, str] = {}
     for c in _candidates(ctx):
@@ -1281,7 +1701,25 @@ def _test_candidates(ctx: Ctx) -> str:
         # out of this callout.
         if s.get("kind") in ("test", "", None):
             seen[str(s.get("cmd"))] = str(s.get("reason", "skipped"))
-    bits = [f"{cmd} — {why}" for cmd, why in seen.items()]
+    # Executed candidates become a whole sentence rather than a "cmd: reason"
+    # pair, because the honest statement is about the result, not the denial.
+    # `cmd` is the one join key three producers share (see `_kind_of`).
+    ran: dict[str, str] = {}
+    for r in _runs(ctx):
+        cmd = str(r.get("cmd"))
+        if cmd not in seen or r.get("exit") is None:
+            continue
+        if r.get("timed_out"):
+            ran[cmd] = (f"{cmd} was executed and timed out, so there is no "
+                        f"green test command to hand you")
+        elif r.get("exit") == 0:
+            ran[cmd] = (f"{cmd} was executed and passed, but the runner did "
+                        f"not record it as a test run")
+        else:
+            ran[cmd] = (f"{cmd} was executed and failed with exit "
+                        f"{r['exit']}, so there is no green test command to "
+                        f"hand you")
+    bits = [ran.get(cmd) or f"{cmd}: {why}" for cmd, why in seen.items()]
     return "; ".join(bits[:4]) or "none found in this repo"
 
 
@@ -1290,7 +1728,7 @@ def _skipped_text(skipped: Sequence[dict]) -> str:
     bits = []
     for s in skipped[:4]:
         where = f" (from {s['source']})" if s.get("source") else ""
-        bits.append(f"{s.get('cmd')}{where} — {s.get('reason', 'skipped')}")
+        bits.append(f"{s.get('cmd')}{where}: {s.get('reason', 'skipped')}")
     more = len(skipped) - len(bits)
     return ("These candidates were found but never executed: "
             + "; ".join(bits)
@@ -1390,6 +1828,17 @@ def _map_caveat(ctx: Ctx) -> str:
     return (", ".join(bits) + ".") if bits else "every edge found is drawn."
 
 
+def _churn_degenerate(rows: Sequence[dict]) -> bool:
+    """A churn "ranking" with no information in it.
+
+    A tree committed as one snapshot gives every module the same commit
+    count. The counts are still printed — they are real — but a column of
+    identical numbers is not a ranking, and the lede must stop calling it
+    one. A single-row table is exempt: one row is not a ranking claim.
+    """
+    return len(rows) > 1 and len({r["rank_by"] for r in rows}) == 1
+
+
 def _rank_label(ctx: Ctx) -> str:
     """What the rank column actually ranks by — decision #18, made visible.
 
@@ -1415,10 +1864,13 @@ def _first_sentence(doc: str, limit: int = 90) -> str:
 
 
 def _purpose(ctx: Ctx, path: str) -> str:
-    """The package `__init__.py` docstring's first sentence, or an em dash.
+    """The package `__init__.py` docstring's first sentence, or `no docstring`.
 
-    Decision #20. An em dash is a better cell than a plausible sentence nobody
-    checked: this column has no claim marker and the gate never walks it.
+    Decision #20. An honest gap is a better cell than a plausible sentence
+    nobody checked: this column has no claim marker and the gate never walks
+    it. The gap used to be an em dash; `@3`'s dash policy bans that glyph on
+    every authored surface, and `purpose` is on the scanned list, so the gap
+    is now spelled out.
     """
     want = f"{path}/__init__.py"
     for f in ctx.survey.get("files") or []:
@@ -1427,7 +1879,7 @@ def _purpose(ctx: Ctx, path: str) -> str:
         for key in ("doc", "docstring", "module_doc", "summary"):
             if f.get(key):
                 return _first_sentence(f[key])
-    return "—"
+    return "no docstring"
 
 
 def _module_for(node: dict, mods: dict) -> dict:

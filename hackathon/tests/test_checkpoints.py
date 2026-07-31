@@ -317,6 +317,32 @@ class BuildCheckpoints(unittest.TestCase):
                         list(range(1, len(block["options"]) + 1)),
                     )
 
+    READER_SUFFIX = (
+        "options shuffled deterministically by the commit seed, so a "
+        "regenerated page asks the same question the same way."
+    )
+
+    def test_provenance_speaks_to_the_reader_not_about_the_generator(self):
+        # "options ordered by seed repo.commit" is a generator internal on a
+        # reader-facing surface. The reworded suffix says what the seed MEANS
+        # for the reader; the leading survey-source clause stays, because the
+        # page stating where its key came from is non-negotiable #6.
+        for cp_id, block in self.build().items():
+            with self.subTest(cp=cp_id):
+                self.assertNotIn("seed repo.commit", block["provenance"])
+                self.assertTrue(
+                    block["provenance"].endswith(self.READER_SUFFIX),
+                    block["provenance"],
+                )
+
+    def test_provenance_still_opens_with_its_survey_source_clause(self):
+        built = self.build()
+
+        self.assertTrue(built["cp-a1"]["provenance"].startswith("survey.json → "))
+        self.assertTrue(built["cp-a2"]["provenance"].startswith("survey.json → "))
+        self.assertTrue(built["cp-c1"]["provenance"].startswith("map.json → "))
+        self.assertTrue(built["cp-c2"]["provenance"].startswith("trace hops → "))
+
     def test_options_are_escaped_and_carry_only_whitelisted_markup(self):
         # checkpoint.options[] is interpolated raw by the renderer (#20b), so a
         # `<` in a path must arrive escaped.

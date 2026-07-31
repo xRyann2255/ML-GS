@@ -91,6 +91,14 @@ check(/overflow-x\s*:\s*auto|overflow\s*:\s*auto/.test(src), 'contained horizont
 check(/focus-visible/.test(src), 'visible focus styling');
 check(/data-proj/.test(src), 'projector mode');
 check(/localStorage/.test(src), 'progress persistence');
+// @3 template affordances: the engineering-grid background and the mobile
+// rail toggle. Template-level (payload-independent), so their absence means
+// the wrong renderer shipped, not a degraded repo. Scoped to the parity
+// template by its banner; the frozen demo bundle keeps the old renderer.
+if (src.includes('RENDER: knows only')) {
+  check(/body::before[\s\S]{0,400}linear-gradient/.test(src), 'engineering grid background');
+  check(/railbtn/.test(src), 'mobile rail toggle');
+}
 
 // --- 5. inline JS parses -----------------------------------------------------
 const scripts = [...src.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);

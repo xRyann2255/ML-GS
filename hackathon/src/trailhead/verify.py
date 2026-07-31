@@ -55,6 +55,12 @@ Anchor = resolve.Anchor
 #: string, so a silent bump is a gate failure rather than a surprise on stage.
 CONTRACT = "trailhead/verified@2"
 
+#: The template-parity contract. Emitted only when the payload actually carries
+#: an @3 surface (glossary, enriched map, stats); a repo with no answers for the
+#: new narration units keeps emitting byte-identical @2, which is what makes
+#: the extension additive rather than a migration.
+CONTRACT_V3 = "trailhead/verified@3"
+
 #: The audit log this module writes beside the payload. Not shipped in the
 #: bundle and not read by the renderer; it exists so a drop can be explained
 #: after the fact without re-running the pipeline.
@@ -89,13 +95,19 @@ REASON_SHORT = "quote shorter than two lines"
 REASON_LONG = "quote longer than the anchor cap"
 REASON_UNPARSEABLE = "model returned unparseable output"
 
+#: The one reason the @3 tour surface can add: a guided-tour step naming a
+#: module that is not a node on the board highlights nothing, so it is dropped
+#: and counted like any other failed assertion (ledger id `t-<node id>`).
+REASON_OFF_BOARD = "tour step names a module not on the board"
+
 #: Composed rather than restated: `resolve.py` owns the eight it can emit, this
-#: module owns the four that need the disk or the parser. Restating the eight
-#: here would be a second copy of a frozen vocabulary, free to drift.
+#: module owns the rest, which need the disk, the parser or the map. Restating
+#: the eight here would be a second copy of a frozen vocabulary, free to drift.
 DROP_REASONS = frozenset(resolve.REASONS) | {
     REASON_NO_FILE,
     REASON_HASH,
     REASON_UNPARSEABLE,
+    REASON_OFF_BOARD,
 }
 
 #: The twelfth reason is a template rather than a literal, so it gets a pattern.
@@ -119,6 +131,47 @@ _WHITELIST_TAGS = re.compile(r"</?(?:code|b)>")
 #: `runner.classify_failure`'s rule, mirrored here for the case where a capture
 #: arrives without one. See `_derive_broken` for why that is not duplication.
 _FAILURE_LINE = re.compile(r"(Error|Exception|error:|FAILED|assert)")
+
+# --- @3 sanitisation (template-parity spec 1.6) ----------------------------
+# The dash policy: no em or en dash in any authored string of the payload.
+# Bundled source lines in `files` and command captures are the machine's own
+# bytes and are exempt; everything a model or a template sentence produced is
+# transliterated here, at assembly time, so the gate's re-scan finds nothing.
+# All three patterns use escapes because the house style bars the characters
+# themselves from this package's source.
+
+#: An em dash with its surrounding spaces, in authored prose. Replaced with a
+#: comma-space, which is the reading the em dash almost always carries.
+_EM_DASH = re.compile(r"[ \t]*\u2014[ \t]*")
+
+#: An en dash anywhere in authored prose. Replaced with a plain hyphen, which
+#: is what it means in the ranges ("3-5 lines") it actually appears in.
+_EN_DASH = "\u2013"
+
+#: Either dash inside a ledger REASON. Reasons keep their frozen wording but
+#: the `code <dash> detail` join becomes `code: detail`, which is exactly the
+#: legacy colon form `is_known_reason` has always accepted for hash mismatches.
+_REASON_DASH = re.compile(r"[ \t]*[\u2014\u2013][ \t]*")
+
+#: The ledger placeholder for "no file was cited". The em dash it replaces
+#: would be the one authored dash left in a clean payload.
+_NO_FILE = "(none)"
+
+#: Glossary ids are slugs, unique, and the target of `[[id|label]]` markers.
+_GLOSS_ID = re.compile(r"^[a-z0-9-]+$")
+_SLUG_JUNK = re.compile(r"[^a-z0-9]+")
+
+#: A trailing parenthetical on a glossary term: "realized variance (RV)".
+#: Prose writes the bare words, so the id must slug from the bare words too —
+#: an id of `realized-variance-rv` leaves every bare `[[realized variance]]`
+#: marker dead on screen.
+_TERM_PAREN = re.compile(r"\s*\([^()]*\)\s*$")
+
+#: The explicit glossary marker form the renderer expands. A marker whose id
+#: is not in the surviving glossary is rewritten to its bare label so the gate
+#: never sees a dangling reference; the rewrite is counted in the audit, not
+#: the ledger, because it is a formatting downgrade rather than a lie.
+_GLOSS_MARKER = re.compile(r"\[\[([a-z0-9-]+)\|([^\]]+)\]\]")
 
 class VerifyError(Exception):
     """Assembly refused to emit a payload.
@@ -145,12 +198,18 @@ def reason_text(why) -> str:
 
 
 def is_known_reason(reason: str) -> bool:
-    """True if `reason` is vocabulary, or vocabulary plus a ` — detail` tail."""
+    """True if `reason` is vocabulary, or vocabulary plus a detail tail.
+
+    Two joins are accepted for the tail: the em dash the ledger historically
+    used, and the `: ` the dash policy (spec 1.6) transliterates it to at
+    assembly time. Old payloads keep passing; new ones ship dash-free.
+    """
     if not isinstance(reason, str) or not reason.strip():
         return False
     if _OUT_OF_RANGE.match(reason) or reason in _LEGACY_REASONS:
         return True
-    return any(reason == r or reason.startswith(r + " — ") for r in DROP_REASONS)
+    return any(reason == r or reason.startswith(r + " \u2014 ")
+               or reason.startswith(r + ": ") for r in DROP_REASONS)
 
 
 def reason_out_of_range(start: int, end: int, end_of_file: int) -> str:
@@ -203,6 +262,18 @@ def iter_anchors(payload: Mapping) -> Iterator[Anchor]:
                 failure = entity.get("failure_mode") or {}
                 if failure.get("anchor"):
                     yield failure["anchor"]
+
+    # The @3 surfaces anchor evidence outside `tracks`: a glossary entry cites
+    # where its term lives, a map node cites one excerpt for its drawer. Both
+    # ship lines in `files` and both are re-hashed by the gate, so both belong
+    # to this walk. Yielded after the tracks so an @2 payload's `files` map
+    # keeps its exact key order.
+    for entry in payload.get("glossary") or []:
+        if entry.get("anchor"):
+            yield entry["anchor"]
+    for node in (payload.get("map") or {}).get("nodes") or []:
+        if node.get("anchor"):
+            yield node["anchor"]
 
 
 # --- Anchors (§6.2, §6.3) --------------------------------------------------
@@ -340,7 +411,7 @@ def _ledger_row(claim: Mapping, cite: Mapping | None, reason: str) -> dict:
     return {
         "id": claim.get("id"),
         "text": claim.get("text") or claim.get("claim") or "",
-        "file": (cite or {}).get("file") or "—",
+        "file": (cite or {}).get("file") or _NO_FILE,
         "reason": reason,
     }
 
@@ -380,6 +451,16 @@ def cited_files(content: Mapping) -> set[str]:
                     take(step)
                 take({"cite": (entity.get("failure_mode") or {}).get("cite"),
                       "anchor": (entity.get("failure_mode") or {}).get("anchor")})
+
+    # @3 surfaces cite files too, and forgetting them here is the documented
+    # failure mode: the file never enters the snapshot and every glossary or
+    # node cite drops as `file does not exist at this commit`.
+    for entry in content.get("glossary") or []:
+        if isinstance(entry, Mapping):
+            take(entry)
+    for answer in (content.get("map_answers") or {}).values():
+        if isinstance(answer, Mapping):
+            take(answer)
     return out
 
 
@@ -503,11 +584,15 @@ def merge_command(block: Mapping, runs: Mapping[tuple[str, str], dict],
 
 
 def _dur_from_ms(ms) -> str:
-    """`dur` is a display string; the renderer prints it verbatim."""
+    """`dur` is a display string; the renderer prints it verbatim.
+
+    The fallback is `n/a` rather than a dash glyph: `dur` reaches the payload
+    and the dash policy (spec 1.6) keeps both dash characters out of it.
+    """
     try:
         return f"{int(ms) / 1000:.1f} s"
     except (TypeError, ValueError):
-        return "—"
+        return "n/a"
 
 
 def _derive_broken(out: str, code: int) -> str:
@@ -586,6 +671,7 @@ def assemble(content: Mapping, survey: Mapping, map_json: Mapping | None,
              sources: Mapping[str, Source] | None = None,
              windows: Mapping[str, Sequence[tuple[int, int]]] | None = None,
              run_stats: Mapping[str, int] | None = None,
+             regen: str | None = None,
              degradations: Sequence[str] = ()) -> tuple[dict, dict]:
     """content + survey + map + commands + the repo on disk -> (payload, report).
 
@@ -605,6 +691,12 @@ def assemble(content: Mapping, survey: Mapping, map_json: Mapping | None,
     the point of the pitch. Two keys are read: `commands`, the number of
     commands actually run, and `extra_claims`, claims the narrate parser
     discarded before they ever reached `content.json`.
+
+    `regen` is THIS run's regeneration command, built by the caller from its
+    own arguments and emitted verbatim (dash-transliterated) as
+    `report.regen`, the ledger footer's provenance line. Absent, the key
+    stays off the report and the renderer falls back to a neutral sentence —
+    never to a claim of hand-built pedigree.
     """
     if snapshot is None or sources is None:
         if root is None:
@@ -619,7 +711,7 @@ def assemble(content: Mapping, survey: Mapping, map_json: Mapping | None,
 
     for row in content.get("dropped", []) or []:
         row = dict(row)
-        row.setdefault("file", "—")
+        row.setdefault("file", _NO_FILE)
         row.setdefault("text", "")
         run.drop(row)
 
@@ -645,16 +737,33 @@ def assemble(content: Mapping, survey: Mapping, map_json: Mapping | None,
                 merged["minutes"] = sum(int(s.get("minutes") or 0) for s in stops)
             tracks.append(merged)
 
+    # --- @3 surfaces: resolved with the same machinery as the claims --------
+    # Each degrades to absence, so a content.json without the new keys leaves
+    # this whole section a no-op and the payload exactly as @2 emitted it.
+    notes: list[str] = []
+    glossary = _resolve_glossary(content.get("glossary"), run, snapshot, sources)
+    the_map = _map_block(map_json)
+    _merge_node_answers(the_map, content.get("map_answers"), run, snapshot,
+                        sources, tracks=tracks)
+    _apply_tour(the_map, content.get("tour"), run, notes)
+    _apply_columns(the_map, content.get("cols"), notes)
+
     payload = {
         "contract": CONTRACT,
         "repo": _repo_block(content, survey),
         "report": {},
-        "map": _map_block(map_json),
+        "map": the_map,
         "files": {},
         "tracks": tracks,
         "dropped": run.dropped,
     }
+    if glossary:
+        payload["glossary"] = glossary
     payload["files"] = bundle_files(payload, sources)
+
+    # Spec 1.6: authored dashes out, dead glossary markers rewritten. After
+    # every resolution (the ledger is complete), before the report is counted.
+    marker_rewrites = _sanitise(payload)
 
     claims_run = (run.kept_verified + run.kept_inferred + len(run.dropped)
                   + int((run_stats or {}).get("extra_claims", 0)))
@@ -669,7 +778,21 @@ def assemble(content: Mapping, survey: Mapping, map_json: Mapping | None,
         "tool_version": TOOL_VERSION,
         "duration_s": max(0, round(time.monotonic() - t0)) if t0 is not None else 0,
     }
+    if regen and str(regen).strip():
+        # The footer prints this as the run's own provenance. A command line
+        # reads dashes as flags, so both banned dashes become plain hyphens
+        # here rather than the comma join prose gets.
+        report["regen"] = (str(regen).strip()
+                           .replace("\u2014", "-").replace(_EN_DASH, "-"))
     payload["report"] = report
+
+    # The contract names what the payload carries, decided on the OUTPUT: any
+    # @3 surface bumps the version and adds `report.anchors` (glossary and
+    # node cites are anchors, not claims, so the claim math above is exactly
+    # @2's). A barren repo keeps @2, field for field.
+    if _has_v3_surface(payload):
+        payload["contract"] = CONTRACT_V3
+        report["anchors"] = sum(1 for _ in iter_anchors(payload))
 
     rate = report["dropped"] / max(report["claims"], 1)
     if rate > LOW_CONFIDENCE:
@@ -697,12 +820,18 @@ def assemble(content: Mapping, survey: Mapping, map_json: Mapping | None,
         "blocks_dropped": run.blocks_dropped,
         "stops_dropped": run.stops_dropped,
         "anchors_stripped_from_inferred": run.stripped_anchors,
+        # `[[id|label]]` markers rewritten to their bare label because the id
+        # was not in the surviving glossary. A formatting downgrade, counted
+        # here rather than in the ledger (spec section 5).
+        "glossary_markers_rewritten": marker_rewrites,
         # §9's fired rows arrive from two earlier stages under their own key;
         # the audit log is where all three meet, so the count in the ledger
-        # callout can be taken from one place.
+        # callout can be taken from one place. `notes` carries the @3 surface
+        # degradations decided in this stage (tour dropped, labels mismatched).
         "degradations": (list(survey.get("degradations") or [])
                          + list(content.get("degradations") or [])
-                         + list(degradations)),
+                         + list(degradations)
+                         + notes),
     }
     return payload, audit
 
@@ -726,12 +855,396 @@ def _repo_block(content: Mapping, survey: Mapping) -> dict:
 
 
 def _map_block(map_json: Mapping | None) -> dict:
-    """`map.json`'s nodes and edges, copied through with the contract tag off."""
+    """`map.json`, copied through with the contract tag and diagnostics off.
+
+    Nodes and edges are the `@2` shape and always ship. The `@3` board surfaces
+    (`w`/`h` viewBox, `columns`, `note`, `tour`) pass through only when the
+    mapper emitted them, so an `@2` map stays byte-identical. Per-node fields
+    (`path`, `h`, and later the narrated `role`/`reads`/`feeds`/`key_files`/
+    `concepts`/`anchor`) ride inside the node dicts and were never stripped.
+    """
     source = map_json or {}
-    return {
+    out = {
         "nodes": copy.deepcopy(list(source.get("nodes", []) or [])),
         "edges": copy.deepcopy(list(source.get("edges", []) or [])),
     }
+    for key in ("w", "h", "columns", "note", "tour"):
+        if key in source:
+            out[key] = copy.deepcopy(source[key])
+    return out
+
+
+# --- @3 surfaces (template-parity spec 1.1, 1.3, section 5) ----------------
+# Everything below degrades to absence: a content.json with none of these keys
+# produces exactly the @2 payload it always did. The answers arrive from the
+# new narration units via the cli driver (`gloss` -> content.glossary,
+# `node:<gid>` -> content.map_answers, `tour` -> content.tour, `cols` ->
+# content.cols), and every cite in them is resolved and hashed by the same
+# `anchor_for` + `_confirm_on_disk` pair a prose claim goes through.
+
+
+def _slugify(term) -> str:
+    """A glossary id: lowercase, `[a-z0-9-]+`, matching the renderer's own
+    slug rule for bare `[[Label]]` markers so slug-matching works both ways.
+
+    A trailing parenthetical is stripped before slugging: the model defines
+    "realized variance (RV)" but the prose that cites it writes the bare
+    `[[realized variance]]`, so the id must be `realized-variance` or the
+    marker resolves to nothing and renders as plain text. A term that is ALL
+    parenthetical keeps its full slug rather than vanishing. Collisions after
+    stripping fall to the caller's dedupe: first spelling wins, ledger
+    untouched, exactly as two spellings of one term always have.
+    """
+    text = str(term or "")
+    slug = _SLUG_JUNK.sub("-", _TERM_PAREN.sub("", text).lower()).strip("-")
+    if not slug:
+        slug = _SLUG_JUNK.sub("-", text.lower()).strip("-")
+    return slug
+
+
+def _resolve_glossary(entries, run: _Run, snap: Snapshot,
+                      sources: Mapping[str, Source]) -> list[dict]:
+    """Glossary answers -> the payload's top-level `glossary` list.
+
+    A failed cite keeps the DEFINITION and loses only the anchor: a glossary
+    popover without evidence is honest (the renderer shows the definition and
+    no jump-to-evidence button), so the entry survives while the failure is
+    ledgered under `g-<slug>`. Contrast the node answers below, where a failed
+    cite discards the narration entirely.
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+    for raw in entries or []:
+        if not isinstance(raw, Mapping):
+            continue
+        term = str(raw.get("term") or "").strip()
+        definition = str(raw.get("def") or raw.get("definition") or "").strip()
+        if not term or not definition:
+            continue
+        gid = _slugify(raw.get("id") or term)
+        if not gid or gid in seen:
+            continue                      # dedupe: first spelling of a term wins
+        seen.add(gid)
+        entry = {"id": gid, "term": term, "def": definition}
+
+        cite = raw.get("cite")
+        pre = raw.get("anchor")
+        resolved = why = None
+        if cite:
+            resolved, why = anchor_for(cite, snap)
+            if resolved is not None:
+                resolved, why = _confirm_on_disk(resolved, sources)
+        elif pre:
+            resolved, why = _confirm_on_disk(copy.deepcopy(dict(pre)), sources)
+        if resolved is not None:
+            entry["anchor"] = resolved
+        elif why is not None:
+            run.drop({"id": f"g-{gid}", "text": term,
+                      "file": ((cite or pre or {}).get("file")) or _NO_FILE,
+                      "reason": why})
+        out.append(entry)
+    return out
+
+
+def _merge_node_answers(the_map: dict, answers, run: _Run, snap: Snapshot,
+                        sources: Mapping[str, Source], *,
+                        tracks: Sequence[dict] | None = None) -> None:
+    """`node:<gid>` answers -> role/reads/feeds/key_files/concepts on the node.
+
+    The asymmetry with the glossary is deliberate: a node answer is narrated
+    prose ABOUT the module, and its cite is the evidence the drawer opens on.
+    When that cite fails, shipping the prose anyway would put unanchored
+    narration behind a board that looks verified, so the node keeps its
+    deterministic `why`/`top` fallback instead and the failure is ledgered
+    under the node's own id (`n-<gid>`).
+
+    `tracks` is the verified course: when the anchor resolves, the matching
+    dive stop (`dive-<slug(gid)>`) gains the same evidence as an excerpt
+    block, because compose could not emit one — at compose time the node had
+    no anchor yet. See `_inject_dive_excerpt`.
+    """
+    if not answers:
+        return
+    by_id = {n.get("id"): n for n in the_map.get("nodes", []) or []}
+    for gid in sorted(answers, key=str):
+        answer = answers[gid]
+        if not isinstance(answer, Mapping):
+            continue
+        node = by_id.get(gid) or by_id.get(f"n-{gid}")
+        if node is None:
+            continue                      # narrated a group that fell off the board
+
+        nid = str(node.get("id") or "")
+        ledger_id = nid if nid.startswith("n-") else f"n-{gid}"
+        cite = answer.get("cite")
+        anchor = None
+        if cite:
+            anchor, why = anchor_for(cite, snap)
+            if anchor is not None:
+                anchor, why = _confirm_on_disk(anchor, sources)
+            if anchor is None:
+                run.drop({"id": ledger_id,
+                          "text": str(answer.get("caption")
+                                      or node.get("label") or ""),
+                          "file": (cite or {}).get("file") or _NO_FILE,
+                          "reason": why})
+                continue                  # why/top fallback, nothing merged
+
+        role = [str(p).strip() for p in (answer.get("role") or [])
+                if isinstance(p, str) and p.strip()]
+        if role:
+            node["role"] = role
+        for key in ("reads", "feeds"):
+            value = str(answer.get(key) or "").strip()
+            if value:
+                node[key] = value
+        key_files = [{"file": str(k.get("file")).strip(),
+                      "purpose": str(k.get("purpose")).strip()}
+                     for k in (answer.get("key_files") or [])
+                     if isinstance(k, Mapping)
+                     and str(k.get("file") or "").strip()
+                     and str(k.get("purpose") or "").strip()]
+        if key_files:
+            node["key_files"] = key_files
+        concepts = [str(c).strip() for c in (answer.get("concepts") or [])
+                    if isinstance(c, str) and c.strip()]
+        if concepts:
+            node["concepts"] = concepts
+        if anchor is not None:
+            node["anchor"] = anchor
+            caption = str(answer.get("caption") or "").strip()
+            if caption:
+                node["anchor_caption"] = caption
+            _inject_dive_excerpt(tracks, gid, anchor, caption)
+
+
+def _inject_dive_excerpt(tracks: Sequence[dict] | None, gid: str,
+                         anchor: Anchor, caption: str) -> None:
+    """Put a node's resolved evidence on its own dive stop as an excerpt.
+
+    Compose emits a dive stop's excerpt only when the map node already
+    carries an anchor, and at compose time it never does: the anchor is the
+    `node:<gid>` answer's cite, resolved here, one stage later. Without this
+    the one stop titled "Inside <module>" ships prose about the module and no
+    line of it — the evidence exists, hashed and bundled, and only the board
+    drawer can open it.
+
+    The anchor handed in is already resolved and disk-confirmed, and
+    `iter_anchors` walks excerpt blocks the same as node anchors, so the
+    lines are bundled and re-hashed by the gate with no new resolution and no
+    new ledger path. The block goes directly after the stop's prose block,
+    where compose would have put it, and only when the stop exists and does
+    not already carry an excerpt of its own.
+    """
+    want = f"dive-{_SLUG_JUNK.sub('-', str(gid).lower()).strip('-') or 'group'}"
+    for track in tracks or []:
+        for stop in track.get("stops") or []:
+            if stop.get("id") != want:
+                continue
+            blocks = stop.get("blocks") or []
+            if any(b.get("type") == "excerpt" for b in blocks):
+                return
+            at = next((i + 1 for i, b in enumerate(blocks)
+                       if b.get("type") == "prose"), len(blocks))
+            blocks.insert(at, {"type": "excerpt",
+                               "anchor": copy.deepcopy(anchor),
+                               "caption": caption or ""})
+            return
+
+
+def _apply_tour(the_map: dict, steps, run: _Run, notes: list) -> None:
+    """The guided tour, kept only where it can actually guide.
+
+    A step whose id is not a node on the board is dropped and ledgered
+    (`t-<id>`); if fewer than three steps survive, the whole tour goes, noted
+    in the verification report rather than the ledger because the surviving
+    steps asserted nothing false. The answer from the `tour` unit wins over a
+    tour the mapper may have carried; both are validated the same way.
+    """
+    if steps is None:
+        steps = the_map.get("tour")
+    the_map.pop("tour", None)
+    if not steps:
+        return
+    node_ids = {n.get("id") for n in the_map.get("nodes", []) or []}
+    kept: list[dict] = []
+    seen: set[str] = set()
+    offered = 0
+    for step in steps:
+        if not isinstance(step, Mapping):
+            continue
+        sid = str(step.get("id") or "").strip()
+        text = str(step.get("text") or "").strip()
+        if not sid or not text or sid in seen:
+            continue
+        seen.add(sid)
+        offered += 1
+        if sid not in node_ids:
+            run.drop({"id": f"t-{sid}", "text": text, "file": _NO_FILE,
+                      "reason": REASON_OFF_BOARD})
+            continue
+        kept.append({"id": sid, "text": text})
+    if len(kept) >= 3:
+        the_map["tour"] = kept
+    elif offered:
+        notes.append(f"map tour dropped: only {len(kept)} of {offered} "
+                     "steps survived validation (minimum 3)")
+
+
+def _apply_columns(the_map: dict, labels, notes: list) -> None:
+    """`cols` answer -> labels on the mapper's LAYER placeholders, in order.
+
+    Column GEOMETRY is the mapper's and never the model's; the answer renames
+    the columns and does nothing else. A count mismatch keeps the placeholders
+    and is noted in the verification report: wrong labels on the right columns
+    would be a lie about the architecture, placeholders are merely mute.
+    """
+    columns = the_map.get("columns")
+    if labels is None or not isinstance(columns, list) or not columns:
+        return
+    given = [str(label).strip() for label in (labels or [])
+             if isinstance(label, str) and str(label).strip()]
+    if len(given) != len(columns):
+        notes.append(f"column labels answer had {len(given)} labels for "
+                     f"{len(columns)} columns; LAYER placeholders kept")
+        return
+    for column, label in zip(columns, given):
+        if isinstance(column, dict):
+            column["label"] = label
+
+
+def _has_v3_surface(payload: Mapping) -> bool:
+    """Does anything in this payload need the @3 contract to describe it?
+
+    Checked on the assembled payload, not the inputs, so an answer that failed
+    verification and left no trace does not bump the version. A False here is
+    the bit-stability promise: the payload is field-for-field what @2 emitted.
+    """
+    if payload.get("glossary"):
+        return True
+    the_map = payload.get("map") or {}
+    if any(key in the_map for key in ("w", "h", "columns", "note", "tour")):
+        return True
+    for node in the_map.get("nodes") or []:
+        if any(key in node for key in ("role", "reads", "feeds", "key_files",
+                                       "concepts", "anchor", "anchor_caption",
+                                       "path", "h")):
+            return True
+    return any(block.get("type") == "stats"
+               for block in iter_blocks(payload.get("tracks") or []))
+
+
+def _sanitise(payload: dict) -> list[str]:
+    """The spec 1.6 pass: dashes out of authored text, dead markers rewritten.
+
+    Runs once, on the assembled payload, after every resolution and before the
+    report is computed. Three distinct rules:
+
+      * authored prose (claim text, ledes, callouts, tour text, node role and
+        friends, glossary defs, captions): em dash becomes a comma join, en
+        dash becomes a hyphen;
+      * ledger reasons keep their frozen wording with the dash join replaced
+        by a colon, which `is_known_reason` accepts alongside the dash form;
+      * explicit `[[id|label]]` markers whose id is not in the surviving
+        glossary are rewritten to the bare label, and the rewrite is reported
+        in the audit rather than the ledger (a formatting downgrade, not a
+        lie).
+
+    Deliberately untouched: `files` (the repo's own bytes; hash integrity
+    wins), command captures and banners (real output, non-negotiable #4), and
+    checkpoint fields (the shipped key must deep-equal `survey.checkpoints`,
+    non-negotiable #6, so cleanliness is the checkpoint builder's job).
+    """
+    known = {entry.get("id") for entry in payload.get("glossary") or []}
+    rewrites: list[str] = []
+
+    def clean(value, markers: bool = False):
+        if not isinstance(value, str):
+            return value
+        value = _EM_DASH.sub(", ", value).replace(_EN_DASH, "-")
+        if markers:
+            def swap(match):
+                if match.group(1) in known:
+                    return match.group(0)
+                rewrites.append(match.group(1))
+                return match.group(2)
+            value = _GLOSS_MARKER.sub(swap, value)
+        return value
+
+    for track in payload.get("tracks") or []:
+        for stop in track.get("stops") or []:
+            if isinstance(stop.get("lede"), str):
+                stop["lede"] = clean(stop["lede"], markers=True)
+            for block in stop.get("blocks") or []:
+                kind = block.get("type")
+                if kind == "prose":
+                    for claim in block.get("claims") or []:
+                        claim["text"] = clean(claim.get("text"), markers=True)
+                elif kind == "callout":
+                    block["title"] = clean(block.get("title"), markers=True)
+                    block["text"] = clean(block.get("text"), markers=True)
+                elif kind in ("excerpt", "table"):
+                    if isinstance(block.get("caption"), str):
+                        block["caption"] = clean(block["caption"], markers=True)
+                elif kind == "trace":
+                    for step in block.get("steps") or []:
+                        if isinstance(step.get("claim"), str):
+                            step["claim"] = clean(step["claim"], markers=True)
+                elif kind == "lineage":
+                    # Only the tool-written `downgraded` reason is touched
+                    # (colon rule, like the ledger); the narrated fields are
+                    # compose's to keep clean at the source.
+                    for entity in block.get("entities") or []:
+                        for step in entity.get("steps") or []:
+                            if isinstance(step.get("downgraded"), str):
+                                step["downgraded"] = _REASON_DASH.sub(
+                                    ": ", step["downgraded"])
+
+    the_map = payload.get("map") or {}
+    note = the_map.get("note")
+    if isinstance(note, dict):
+        note["title"] = clean(note.get("title"))
+        note["text"] = clean(note.get("text"), markers=True)
+    for step in the_map.get("tour") or []:
+        if isinstance(step, dict):
+            step["text"] = clean(step.get("text"), markers=True)
+    for column in the_map.get("columns") or []:
+        if isinstance(column, dict) and isinstance(column.get("label"), str):
+            column["label"] = clean(column["label"])
+    for node in the_map.get("nodes") or []:
+        if isinstance(node.get("role"), list):
+            node["role"] = [clean(p, markers=True) for p in node["role"]]
+        for key in ("reads", "feeds"):
+            if isinstance(node.get(key), str):
+                node[key] = clean(node[key], markers=True)
+        for key in ("why", "anchor_caption"):
+            if isinstance(node.get(key), str):
+                node[key] = clean(node[key])
+        for entry in node.get("key_files") or []:
+            if isinstance(entry, dict) and isinstance(entry.get("purpose"), str):
+                entry["purpose"] = clean(entry["purpose"], markers=True)
+        if isinstance(node.get("concepts"), list):
+            node["concepts"] = [clean(c) for c in node["concepts"]]
+        if isinstance(node.get("top"), list):
+            node["top"] = [clean(t) for t in node["top"]]
+
+    for entry in payload.get("glossary") or []:
+        entry["term"] = clean(entry.get("term"))
+        entry["def"] = clean(entry.get("def"))
+
+    # Ledger rows are mutated in place: the audit dict aliases this exact
+    # list, so the verification report comes out as clean as the payload.
+    for row in payload.get("dropped") or []:
+        if isinstance(row.get("text"), str):
+            row["text"] = clean(row["text"])
+        if isinstance(row.get("reason"), str):
+            row["reason"] = _REASON_DASH.sub(": ", row["reason"])
+        path = row.get("file")
+        if not isinstance(path, str) or not path.strip() \
+                or path.strip() in ("\u2014", "\u2013"):
+            row["file"] = _NO_FILE
+
+    return rewrites
 
 
 def _verify_stop(stop: Mapping, run: _Run, snap: Snapshot,
@@ -840,7 +1353,11 @@ def _verify_block(block: Mapping, run: _Run, snap: Snapshot,
     if kind == "lineage":
         return _verify_lineage(block, run, snap, sources)
 
-    if kind in ("graph", "ledger", "callout", "table"):
+    # `stats` (@3) passes through like the other deterministic blocks: every
+    # number in its tiles is computed by compose from survey.json, never by a
+    # model, so there is nothing to resolve; self_police still checks its
+    # shape so a malformed tile cannot reach the renderer unchecked.
+    if kind in ("graph", "ledger", "callout", "table", "stats"):
         return copy.deepcopy(dict(block)), None
 
     return None, f"unknown block type: {kind!r}"
@@ -1031,7 +1548,9 @@ def _flag_low_confidence(payload: dict, rate: float) -> None:
     callout = {
         "type": "callout",
         "level": "broken",
-        "title": f"Low confidence — {pct}% of claims dropped",
+        # Colon, not a dash: this title is authored text in the payload and
+        # the dash policy (spec 1.6) applies to it like any other callout.
+        "title": f"Low confidence: {pct}% of claims dropped",
         "text": (f"{payload['report']['dropped']} of {payload['report']['claims']} "
                  "generated claims failed verification and were deleted. Every one "
                  "is listed in the audit ledger."),
@@ -1197,6 +1716,24 @@ def self_police(payload: Mapping, survey: Mapping | None = None) -> list[str]:
                     bad.extend(_unescaped(cell_text, "table cell"))
         elif kind == "excerpt":
             bad.extend(_unescaped(block.get("caption") or "", "excerpt.caption"))
+        elif kind == "stats":
+            # @3. `v` and `of` are interpolated RAW by the renderer (they may
+            # carry a `<span>` from nowhere but here), `l`/`s` are escaped;
+            # a missing `v` or `l` prints the literal word `undefined`.
+            items = block.get("items") or []
+            if not items:
+                bad.append("stats block with no items")
+            for item in items:
+                item = item if isinstance(item, Mapping) else {}
+                for field in ("v", "l"):
+                    if not str(item.get(field) or "").strip():
+                        bad.append(f"stats tile has no {field}")
+                color = item.get("color")
+                if color is not None and color not in ("ok", "inf", "bad"):
+                    bad.append(f"stats color {color!r} is not ok|inf|bad")
+                for field in ("v", "of"):
+                    if isinstance(item.get(field), str):
+                        bad.extend(_unescaped(item[field], f"stats.{field}"))
         elif kind == "lineage":
             # The downgrade path in `_verify_lineage` has exactly two ways to be
             # wrong, and both render a step as evidenced when it is not. The
@@ -1256,6 +1793,8 @@ def self_police(payload: Mapping, survey: Mapping | None = None) -> list[str]:
 
     node_ids = set()
     for node in payload["map"].get("nodes", []):
+        # The required set is @2's, unchanged: every @3 field below is checked
+        # only when present, so existing payloads pass exactly as before.
         missing = {"id", "label", "loc", "files", "x", "y", "w", "why", "top"} - set(node)
         if missing:
             bad.append(f"map node {node.get('id')!r} missing {sorted(missing)}")
@@ -1263,10 +1802,80 @@ def self_police(payload: Mapping, survey: Mapping | None = None) -> list[str]:
             bad.append(f"map node {node.get('id')!r} has an empty top[]")
         bad.extend(_unescaped(str(node.get("label") or ""), "map node label"))
         node_ids.add(node.get("id"))
+        nid = node.get("id")
+        if "h" in node and (isinstance(node.get("h"), bool)
+                            or not isinstance(node.get("h"), (int, float))):
+            bad.append(f"map node {nid!r}: h is not numeric")
+        if "role" in node and (
+                not isinstance(node.get("role"), list)
+                or not node["role"]
+                or not all(isinstance(p, str) and p.strip() for p in node["role"])):
+            bad.append(f"map node {nid!r}: role is not a non-empty list of "
+                       "paragraphs")
+        for entry in node.get("key_files") or []:
+            entry = entry if isinstance(entry, Mapping) else {}
+            if not str(entry.get("file") or "").strip() \
+                    or not str(entry.get("purpose") or "").strip():
+                bad.append(f"map node {nid!r}: key_files entry missing file "
+                           "or purpose")
+        # The drawer interpolates the caption into a raw figcaption, exactly
+        # like an excerpt block's.
+        bad.extend(_unescaped(str(node.get("anchor_caption") or ""),
+                              f"map node {nid!r} anchor_caption"))
     for edge in payload["map"].get("edges", []):
         for end in ("a", "b"):
             if edge.get(end) not in node_ids:
                 bad.append(f"map edge references unknown node {edge.get(end)!r}")
+
+    # --- @3 board surfaces, all conditional on presence ---------------------
+    the_map = payload["map"]
+    for column in the_map.get("columns") or []:
+        column = column if isinstance(column, Mapping) else {}
+        if not str(column.get("label") or "").strip():
+            bad.append("map column with no label")
+        if isinstance(column.get("x"), bool) \
+                or not isinstance(column.get("x"), (int, float)):
+            bad.append(f"map column {column.get('label')!r}: x is not numeric")
+    note = the_map.get("note")
+    if note is not None:
+        for field in ("title", "text"):
+            if not str((note if isinstance(note, Mapping) else {}).get(field)
+                       or "").strip():
+                bad.append(f"map.note has no {field}")
+    seen_tour: set = set()
+    for step in the_map.get("tour") or []:
+        step = step if isinstance(step, Mapping) else {}
+        sid = step.get("id")
+        if sid not in node_ids:
+            bad.append(f"map tour step references unknown node {sid!r}")
+        if sid in seen_tour:
+            bad.append(f"duplicate map tour step id {sid!r}")
+        seen_tour.add(sid)
+        if not str(step.get("text") or "").strip():
+            bad.append(f"map tour step {sid!r} has no text")
+
+    # --- @3 glossary (top level, optional) ----------------------------------
+    seen_gloss: set = set()
+    for entry in payload.get("glossary") or []:
+        entry = entry if isinstance(entry, Mapping) else {}
+        gid = entry.get("id")
+        if not isinstance(gid, str) or not _GLOSS_ID.match(gid or ""):
+            bad.append(f"glossary id {gid!r} is not a lowercase slug")
+        if gid in seen_gloss:
+            bad.append(f"duplicate glossary id {gid!r}")
+        seen_gloss.add(gid)
+        for field in ("term", "def"):
+            if not str(entry.get(field) or "").strip():
+                bad.append(f"glossary {gid!r} has no {field}")
+
+    # `report.anchors` (@3) counts what actually shipped; the anchor walk is
+    # the same one `files` was bundled from, so disagreement means the report
+    # was computed before the payload stopped changing.
+    if "anchors" in report:
+        shipped = sum(1 for _ in iter_anchors(payload))
+        if report["anchors"] != shipped:
+            bad.append(f"report.anchors {report['anchors']!r} != {shipped} "
+                       "anchors shipped")
 
     return bad
 

@@ -157,6 +157,14 @@ Rules:
 - Anchors are verified by re-reading the file and comparing `sha256` — taken over the source lines joined by `\n`, no trailing newline, no line numbers. Mismatch → `dropped`. Exact definition in `docs/verified-contract.md`.
 - The count of dropped claims is displayed in the top bar. Hiding it defeats the point.
 
+**`@3` additions.** The whole sentence is the click target (not just the
+superscript marker), and the expanded evidence shows a sha chip: the first ten
+hex digits of the anchor's `sha256`, tooltipped as recomputed by the verifier.
+Authored text supports two inline forms, resolved at paint time: `` `code` ``
+renders as `<code>`, and `[[id|label]]` renders as a glossary term (see 4.8).
+No em or en dash appears in any authored string; bundled source lines and
+captured command output are exempt (they are real bytes, never rewritten).
+
 ### 4.2 CodeExcerpt
 
 ```
@@ -196,6 +204,29 @@ $ make test                                        exit 0 · 41.2 s
 - Zoom and pan; `0` resets.
 - **Density cap:** more than 40 modules → collapse to top-level packages with per-node expand. Prevents the hairball on a large repo.
 - **Text fallback** directly beneath: nested list of modules and dependencies. Serves screen readers, and serves you when the graph is too dense to read.
+
+**`@3` board additions** (all conditional on their payload field; an `@2` payload
+draws exactly as before):
+
+- **Columns.** `map.columns[]` paints pipeline-stage headers (uppercase label at
+  the top, optional faint vertical rule) at the given `x` centers inside the
+  `map.w` x `map.h` viewBox. Edges default to faint and light up on hover or
+  during the tour, so the board reads as stages first, wiring second. Deliberate
+  absences are named in `map.note`, rendered as an info callout under the board
+  (test containers kept off the board, dangling imports, and the like).
+- **Node drawer, narrated.** When a node carries `role[]`, the drawer renders
+  those paragraphs (with inline markup) instead of the mechanical `why` string;
+  `reads` and `feeds` render as "What flows in" / "What flows out" lines;
+  `key_files[]` replaces the churn list with `file` + `purpose` rows;
+  `concepts[]` renders as chips; `anchor` + `anchor_caption` show one hashed
+  excerpt at the bottom. Every field absent falls back to the `@2` drawer
+  (`why` + `top`), so the drawer is never empty.
+- **Guided tour.** When `map.tour[]` is present, a GUIDED TOUR button appears on
+  the board. Each step highlights its node, dims everything else, lights that
+  node's edges, and shows a card with the step text (STEP n OF m), BACK / NEXT /
+  FINISH navigation, and an OPEN button that opens that node's drawer. `Esc`
+  exits. Every step id must name a node on the board; the verifier drops
+  stray steps and drops the whole tour below 3 surviving steps.
 
 ### 4.4a Prediction (`predict`, contract `@2`)
 
@@ -262,6 +293,47 @@ Opened from the verification badge; also stop 14.
 
 Three levels only. `info` (grey), `inferred` (amber), `broken` (red). No other decorative boxes.
 
+### 4.8 Glossary term and popover (`@3`)
+
+Every `[[id|label]]` marker in authored text renders as a dotted-underline term
+button. Activating it opens a popover near the cursor: the term, its 1-2
+sentence definition, and, when the entry carries an anchor, a "defined at
+`file:line`" jump that opens the full hashed excerpt in a modal (the same
+excerpt component as 4.2, sha chip included). An entry without an anchor shows
+the definition only. Unknown explicit ids fail the generation gate; a bare
+`[[Label]]` that slug-matches no entry degrades to plain text. The CLOSE track
+carries a glossary stop: one sortable table of every surviving term, generated
+from the same `glossary` array. Popovers close on `Esc`, on navigation, and on
+any click outside.
+
+### 4.9 Stats tiles (`@3`)
+
+```
+┌─────────────┬──────────────┬─────────────────┬──────────────┐
+│  96,897     │  24          │  14             │  5 / 22      │
+│  LINES OF   │  REGISTERED  │  MODULES LOST   │  ANCHORS     │
+│  CODE       │  MODELS      │  IN RESTORE     │  VERIFIED    │
+│  455 files  │              │  counted, amber │  green       │
+└─────────────┴──────────────┴─────────────────┴──────────────┘
+```
+
+A responsive grid of value tiles: big value `v` (optionally `v / of`), small
+uppercase label `l`, optional sub line `s`. `color` tints the value with the
+page's semantic palette (`ok` green, `inf` amber, `bad` red) and nothing else;
+meaning is always carried by the label text too. Every number is computed by
+COMPOSE from `survey.json`, never authored by the model. Used on the cover
+(repo-scale numbers, generation record) and on dive stops (per-subsystem
+loc / files / fan-in).
+
+### 4.10 Restore ledger (`@3` compose pattern, not a new block)
+
+When the survey finds dangling imports (modules the code imports that do not
+exist at this commit), the setup stop gains a sortable `table`: missing module,
+what it was, import-site count, plus a `broken` callout naming the top
+offenders. Data comes from `survey.dangling`; the table is an ordinary 4.x
+table block, so the gate's row/column checks cover it. The point is stated on
+the page: the walkthrough names the holes rather than writing around them.
+
 ---
 
 ## 5. Render input contract
@@ -315,6 +387,16 @@ Block types — the complete set. Render implements exactly these and nothing mo
 | `checkpoint` | see 4.5 |
 | `callout` | `level`, `title`, `text`, `links?[]` = `{ label, href, note? }`, `linknote?` |
 | `ledger` | *(none — renders `report` + `dropped`)* |
+| `lineage` | `title`, `entities[]` (see `docs/verified-contract.md`; this row was missing here while the contract doc had it — fixed, not added) |
+| `stats` (`@3`) | `items[]` = `{ v, l, s?, of?, color? }`, see 4.9 |
+
+`trailhead/verified@3` also adds two optional top-level surfaces the blocks draw
+on: `glossary` (4.8) and the map additions `w`/`h`/`columns`/`note`/`tour` plus
+per-node `h`/`path`/`role`/`reads`/`feeds`/`key_files`/`concepts`/`anchor`/
+`anchor_caption` (4.4). All optional: a payload carrying none of them renders
+exactly as `@2` did. Field-by-field rules and gate assertions live in
+`docs/verified-contract.md`; `fixtures/verified.parity.json` is the minimal `@3`
+example.
 
 ---
 

@@ -76,8 +76,12 @@ class Window:
 class Unit:
     """One model call's worth of work — a stop-unit, not a module or a claim.
 
-    Four exist for the proving-ground repo (`five`, `trace`, `conv`, `green`)
-    and `narrate.build_units` decides which of them the repo can support.
+    The claim-shaped kinds are `five`, `trace`, `green`, `conventions` and
+    `dive` (one per major map group, claims identical to `five`). The
+    structured kinds are `node` (drawer content per map group), `gloss`
+    (repo glossary), `tour` (guided map tour) and `cols` (column labels);
+    their answers are validated against per-kind schemas, not the claims
+    schema. `narrate.build_units` decides which of them the repo supports.
 
     `kind` drives the task text AND the parser's quarantine: `conventions`
     forces every returned claim to `inferred` in code, so the quarantine holds
@@ -87,6 +91,11 @@ class Unit:
     trace hops. Without them the model is asked to narrate a chain it was never
     shown, every quote resolves outside the windows, and the stop that carries
     the pitch loses all eight claims.
+
+    `choices` is the fixed vocabulary an answer may reference: the node ids a
+    tour step may name, or the file names a node's key_files may name. The
+    parser and the per-unit schema both enforce it, so the model can only pick
+    from what the pack listed, never invent a member.
     """
 
     id: str
@@ -96,6 +105,7 @@ class Unit:
     files: tuple[str, ...] = ()
     regions: tuple[tuple[str, int, int], ...] = ()
     notes: tuple[str, ...] = ()
+    choices: tuple[str, ...] = ()
 
 
 SYSTEM = """You are the narration stage of Trailhead, a tool that generates a \
@@ -117,15 +127,79 @@ Rules, all enforced in code after you answer:
    for character. Do not reflow, re-indent, elide, or add an ellipsis.
 4. Quote only code you were shown below. Quoting something you inferred exists
    is the single most expensive thing you can do here.
-5. `cite.focus` is an array of exact substrings of your own `cite.quote` — the
+5. `cite.focus` is an array of exact substrings of your own `cite.quote`, the
    one or two lines that actually carry the point.
 6. If you cannot support a sentence with a quote, set `"status": "inferred"` and
    omit `cite` entirely. That is a legitimate, visible answer, not a failure.
 7. `text` is one plain sentence, at most 280 characters. No backticks, no
-   newlines, no markdown links, no `<`.
-8. Write for someone who has never opened this repo. Name real symbols and real
-   paths. Never say "this codebase appears to" — say what it does.
+   newlines, no markdown links, no `<`. Use commas instead of dashes.
+8. Say what the system DOES in its own domain's terms. When the README or a
+   package docstring states the project's purpose, that purpose is the story;
+   argument parsing, CLI wiring, and directory layout are never what a repo
+   is for.
+9. Write for someone who has never opened this repo. Name real symbols and real
+   paths. Never say "this codebase appears to", say what it does.
 """.replace("{min}", str(ASK_MIN_LINES)).replace("{max}", str(ASK_MAX_LINES))
+
+#: The `dive` variant: claims-shaped like SYSTEM, but the renderer gives dive
+#: prose the rich-text treatment, so backticks and glossary markers are legal.
+#: Derived by replacement so the two cannot drift apart silently; the assert
+#: below fails the import the moment the anchor text is edited without this.
+SYSTEM_DIVE = SYSTEM.replace(
+    "7. `text` is one plain sentence, at most 280 characters. No backticks, no\n"
+    "   newlines, no markdown links, no `<`. Use commas instead of dashes.",
+    "7. `text` is one plain sentence, at most 280 characters. Backticks may mark\n"
+    "   code identifiers and [[term]] or [[id|label]] may mark a glossary term.\n"
+    "   No newlines, no markdown links, no `<`. Use commas instead of dashes.")
+assert SYSTEM_DIVE != SYSTEM, "SYSTEM rule 7 drifted; update the SYSTEM_DIVE replacement"
+
+#: The structured kinds (`node`, `gloss`, `tour`, `cols`) answer per-kind
+#: schemas rather than the claims schema, so their rules talk about fields,
+#: not sentences. Same verification framing: quotes are re-resolved, unknown
+#: keys discard the whole answer, and honesty beats decoration.
+SYSTEM_INFO = """You are the narration stage of Trailhead, a tool that \
+generates a verified walkthrough of an unfamiliar Python repository for a new \
+joiner.
+
+Everything you write is checked afterwards by ordinary deterministic code. Any
+quote you return is searched for verbatim in the file on disk; anything not
+found exactly is deleted and counted on screen. Fields that fail their checks
+are dropped, and a malformed answer is discarded whole, so answer the schema
+exactly.
+
+Rules, all enforced in code after you answer:
+
+1. Reply with JSON matching the schema and nothing else. An unknown key
+   anywhere discards the whole answer.
+2. NEVER return a line number. The gutter (`  123| `) is orientation for you
+   only. It is not part of any line and must not appear inside a quote.
+3. Where the schema allows a `cite`, its `quote` is a VERBATIM, CONTIGUOUS copy
+   of {min}-{max} lines from ONE file shown below, lines joined with newlines,
+   indentation copied exactly. `focus` is an array of exact substrings of your
+   own quote. A cite is optional: omitting one is honest, inventing one is not.
+4. Prose fields are plain sentences. Backticks may mark code identifiers and
+   [[term]] or [[id|label]] may mark a glossary term. No newlines inside a
+   field, no markdown links, no `<`. Use commas instead of dashes.
+5. State substantive domain facts: what a thing is FOR, what flows through it,
+   what would surprise a newcomer. Never restate code mechanics the reader can
+   see, and never present argument parsing or CLI wiring as a purpose. When the
+   README or a package docstring states the purpose, that purpose is the story.
+6. Write for someone who has never opened this repo. Name real symbols and real
+   paths. Never say "appears to", say what it is.
+""".replace("{min}", str(ASK_MIN_LINES)).replace("{max}", str(ASK_MAX_LINES))
+
+
+def system_for(kind: str) -> str:
+    """The system prompt for one unit kind. Three texts, chosen in one place.
+
+    `pack` calls this, so the cache key follows the kind automatically: editing
+    any of the three invalidates exactly the stores of the kinds it serves.
+    """
+    if kind == "dive":
+        return SYSTEM_DIVE
+    if kind in ("node", "gloss", "tour", "cols"):
+        return SYSTEM_INFO
+    return SYSTEM
 
 
 def number(lines, start: int, end: int) -> str:
@@ -163,7 +237,7 @@ def facts(survey: dict) -> str:
     roots = survey.get("roots") or {}
     modules = survey.get("modules") or {}
 
-    out = ["FACTS — from survey.json, deterministic. Rely on these; never quote them."]
+    out = ["FACTS (from survey.json, deterministic). Rely on these; never quote them."]
     out.append(f"repo: {repo.get('name', '(unnamed)')} @ {repo.get('commit', '(no commit)')}")
     out.append(
         "size: {files} files, {py} python files, {loc} loc, {mods} modules".format(
@@ -188,7 +262,7 @@ def facts(survey: dict) -> str:
         out.append("modules (largest first, fan-in = how many modules import it):")
         for name, info in modules_by_loc(modules)[:10]:
             out.append(
-                "  {name} — {files} files, {loc} loc, fan-in {fi}".format(
+                "  {name}: {files} files, {loc} loc, fan-in {fi}".format(
                     name=name, files=(info or {}).get("files", "?"),
                     loc=(info or {}).get("loc", "?"), fi=fan_in.get(name, 0),
                 )
@@ -210,7 +284,7 @@ def facts(survey: dict) -> str:
         stmts = sum(int(d.get("n") or 0) for d in dangling)
         out.append(
             f"dangling imports: {len(dangling)} module name(s) imported by this repo "
-            f"have no file on disk, across {stmts} import statements — "
+            f"have no file on disk, across {stmts} import statements: "
             + ", ".join(str(d.get("target")) for d in dangling[:5])
         )
 
@@ -220,7 +294,7 @@ def facts(survey: dict) -> str:
             out.append("git history: available; files are ranked by commit count")
         else:
             out.append(
-                "git history: unavailable ({reason}) — files are ranked by "
+                "git history: unavailable ({reason}); files are ranked by "
                 "{sub} instead".format(
                     reason=churn.get("reason", "no reason recorded"),
                     sub=churn.get("substitute", "fan-in"),
@@ -257,27 +331,91 @@ def pack(unit: Unit, survey: dict, root) -> tuple[str, str, tuple[Window, ...]]:
             quotable_start = max(start, HEAD_LINES + 1)
             if quotable_start <= end:
                 windows.append(Window(path, quotable_start, end))
-    return SYSTEM, user, tuple(windows)
+    return system_for(unit.kind), user, tuple(windows)
 
 
 def task(unit: Unit) -> str:
     """The per-unit instruction. One shape per `unit.kind`, all deterministic."""
-    lines = [f"TASK — {unit.title}"]
+    lines = [f"TASK: {unit.title}"]
 
     if unit.kind == "five":
         lines += [
             f"Write exactly {unit.max_claims} sentences that tell a new joiner what this repo",
-            "is, in the order they would want to hear them: what it does, what it produces,",
-            "how the pieces fit, and where the work actually happens.",
-            "The last sentence says what this repo is NOT — the thing a newcomer would",
-            "reasonably assume and be wrong about. That one is normally 'inferred'.",
+            "is. Follow this shape, one sentence each, in this order:",
+            "  1. What the system IS, in its domain's own words: the problem it exists",
+            "     to solve, taken from the README or a package docstring when one",
+            "     states it.",
+            "  2. What it CONSUMES: the real inputs, data sources, or upstream systems.",
+            "  3. How QUALITY is judged: the metric, test, or comparison that decides",
+            "     whether the output is good.",
+            "  4. What the OUTPUTS FEED: who or what consumes the results.",
+            "  5. What is UNUSUAL about this repo, the thing a newcomer would not guess.",
+            "  6. What this repo is NOT: the thing a newcomer would reasonably assume",
+            "     and be wrong about. Mark that one 'inferred'; an absence has no line",
+            "     to cite.",
+            "Domain first: parser setup, CLI plumbing, and directory layout are never",
+            "the story when a README or docstring states a purpose.",
+        ]
+    elif unit.kind == "dive":
+        lines += [
+            f"Write 6 to {unit.max_claims} sentences that take a new joiner INSIDE this",
+            "part of the repo: what it is for in domain terms, what flows in and out,",
+            "the mechanism that makes it work, how you can tell it is correct, and",
+            "anything a newcomer would not guess. Substantive facts only; never",
+            "restate code mechanics the reader can see in the excerpt.",
+            "Quote from the files shown above wherever a sentence can be anchored,",
+            "and mark honest readings 'inferred'. One inferred sentence about what",
+            "this part does NOT do is welcome.",
+        ]
+    elif unit.kind == "node":
+        lines += [
+            "Fill the drawer for this module group. Return a JSON object with:",
+            "  role: 2 or 3 short paragraphs saying what this group IS and DOES in",
+            "        domain terms, and what is distinctive about how it does it.",
+            "  reads: one sentence, what this group consumes and where it comes from.",
+            "  feeds: one sentence, what depends on this group's output.",
+            "  key_files: 3 to 6 entries; 'file' is copied exactly from the FILES",
+            "        list below and 'purpose' is one line saying why a newcomer",
+            "        would open that file.",
+            "  concepts: 3 to 6 short terms a newcomer should recognise here.",
+            f"  cite (optional): one verbatim quote of {ASK_MIN_LINES}-{ASK_MAX_LINES} contiguous lines from",
+            "        the source shown above that best captures this group, with an",
+            "        optional one-line caption.",
+        ]
+    elif unit.kind == "gloss":
+        lines += [
+            f"Identify up to {unit.max_claims} terms of art a newcomer to this repo",
+            "must know: domain concepts, internal names, systems, metrics. For each,",
+            "return 'term' (at most 40 characters, spelled the way the codebase",
+            "spells it) and 'def' (one or two plain sentences, at most 300",
+            "characters, that teach the concept rather than the code). Add a 'cite'",
+            "with a verbatim quote where the repo defines or computes the thing,",
+            "when the source shown above contains one.",
+            "Prefer terms the repo's own README, docstrings, and file names use.",
+            "Skip generic programming vocabulary.",
+        ]
+    elif unit.kind == "tour":
+        lines += [
+            f"Write the guided tour of the module map: exactly {unit.max_claims} steps,",
+            "one per node id listed below, in the order given. Each step is 'id'",
+            "(copied exactly from the list) and 'text' (at most 340 characters):",
+            "what the reader is looking at, why it matters, and why it comes next.",
+            "Name real files and symbols.",
+        ]
+    elif unit.kind == "cols":
+        lines += [
+            f"Name the layers of the module map: exactly {unit.max_claims} labels, one",
+            "per column, in the order given below. Each label is at most 14",
+            "characters, ALL UPPERCASE, and says what the column's groups have in",
+            "common (for example INTERFACE, DATA, MODELS, OUTPUT). No two labels",
+            "alike.",
         ]
     elif unit.kind == "trace":
         lines += [
             f"Below is one real call chain through this repo, {unit.max_claims} hops long.",
             f"Write exactly {unit.max_claims} sentences, one per hop, in the order given.",
             "Each sentence says what happens at that hop and what it hands to the next.",
-            "Quote from the hop's own file — the lines you need are shown above.",
+            "Quote from the hop's own file; the lines you need are shown above.",
         ]
     elif unit.kind == "green":
         lines += [
@@ -288,7 +426,7 @@ def task(unit: Unit) -> str:
     elif unit.kind == "conventions":
         lines += [
             f"Write exactly {unit.max_claims} sentences about the conventions and habits of",
-            "this codebase — how errors are handled, how modules are laid out, what the",
+            "this codebase: how errors are handled, how modules are laid out, what the",
             "authors clearly cared about.",
             "These are readings, not facts. Every one of them will be marked inferred and",
             "shown as such; do not stretch for a quote to make one look verified.",
@@ -454,7 +592,7 @@ def _render(shown: dict, sources: dict) -> str:
     if not shown:
         return ""
 
-    out = ["SOURCE — line numbers are a gutter, not part of any line. Never quote them."]
+    out = ["SOURCE (line numbers are a gutter, not part of any line; never quote them)"]
     for path, ranges in shown.items():
         out.append("")
         out.append(f"--- {path} ---")

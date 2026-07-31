@@ -170,13 +170,14 @@ def _cp_a1(survey, rng):
         provenance=(
             f"survey.json → {source}: {winner['display']} is imported by "
             f"{winner['fan_in']} modules, the most in the repo; {note}; "
-            "options ordered by seed repo.commit."
+            "options shuffled deterministically by the commit seed, so a "
+            "regenerated page asks the same question the same way."
         ),
         explanation=(
             f"{winner['display']} is imported by {winner['fan_in']} modules. "
             f"The next highest is {runner['display']} at {runner['fan_in']}. "
             "Whatever the rest of the repo points at is where its assumptions "
-            "live — it is the thing you cannot change quietly."
+            "live: it is the thing you cannot change quietly."
         ),
     )
 
@@ -333,12 +334,13 @@ def _cp_a2(survey, rng):
             f"survey.json → entry_points[{ep.get('kind')}]: {name} → "
             f"{ep.get('target') or answer_file}, declared at {where}; "
             "the distractors are other real files from this repo; "
-            "options ordered by seed repo.commit."
+            "options shuffled deterministically by the commit seed, so a "
+            "regenerated page asks the same question the same way."
         ),
         explanation=(
             f"{where} declares it and it starts in {answer_file}. "
             "The other three are real files from this repo, not invented "
-            "distractors — they are the files a reader lands in first if they "
+            "distractors: they are the files a reader lands in first if they "
             "follow the wrong entry point."
         ),
     )
@@ -438,7 +440,9 @@ def _cp_c1(mp, rng):
         provenance=(
             "map.json → node column index: columns are ordered by "
             "(fan-in − fan-out) over the import DAG, one option per column, "
-            "largest node in each; options ordered by seed repo.commit."
+            "largest node in each; options shuffled deterministically by the "
+            "commit seed, so a regenerated page asks the same question the "
+            "same way."
         ),
         explanation=(
             f"{first.get('label')} sits in the leftmost column: it imports "
@@ -534,11 +538,13 @@ def _cp_c2(steps, rng):
         provenance=(
             f"trace hops → hop {len(steps)} of {len(steps)}, its file = "
             f"{answer}; every hop is anchored to a line range and sha256-"
-            "verified in the ledger; options ordered by seed repo.commit."
+            "verified in the ledger; options shuffled deterministically by "
+            "the commit seed, so a regenerated page asks the same question "
+            "the same way."
         ),
         explanation=(
             f"The chain ends in {answer}. The other three options are real "
-            "hops in the same trace, earlier in the chain — each is where the "
+            "hops in the same trace, earlier in the chain: each is where the "
             "chain would appear to end if you stopped following it one call "
             "too soon."
         ),

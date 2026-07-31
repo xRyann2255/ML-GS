@@ -40,9 +40,10 @@ from trailhead.provider import CITE_KEYS, SCHEMA, MissingNarration, cache_key
 #: `Unit` and `Window` are re-exported deliberately: a caller wiring stage 3
 #: into the pipeline should need one import, and `compose.py` reads the windows
 #: this stage recorded.
-__all__ = ["Unit", "Window", "Rejected", "build_units", "parse", "run",
-           "emit_prompts", "main", "CACHE_DIRNAME", "PROMPTS_DIRNAME",
-           "CODE_UNNARRATED"]
+__all__ = ["Unit", "Window", "Rejected", "build_units", "parse",
+           "parse_structured", "schema_for", "run", "emit_prompts", "main",
+           "CACHE_DIRNAME", "PROMPTS_DIRNAME", "CODE_UNNARRATED",
+           "STRUCTURED_KINDS"]
 
 #: `.trailhead/narration/<key>.json` — record and replay share one directory.
 CACHE_DIRNAME = "narration"
@@ -50,17 +51,75 @@ CACHE_DIRNAME = "narration"
 #: `.trailhead/prompts/<key>.json` — the agent route's inbox.
 PROMPTS_DIRNAME = "prompts"
 
-MAX_UNITS_DEFAULT = 12
+#: The @3 unit set tops out at 22 (4 claim units, 10 node, 5 dive, gloss,
+#: tour, cols), so the default budget clears it with headroom rather than
+#: silently cutting the drawers on every big repo.
+MAX_UNITS_DEFAULT = 24
 
 #: Reverse priority. Overflow drops from the left, matching §14's stop-cut
-#: order. `trace` is last because it carries beat 4 of the pitch.
-DROP_ORDER = ("conv", "green", "five", "trace")
+#: order. `trace` is last because it carries beat 4 of the pitch. An entry
+#: matches a unit id exactly OR as a `<prefix>:` family (`node` matches
+#: `node:core`); family members drop one at a time, last-built first, so the
+#: smallest groups lose their drawers before the biggest do.
+DROP_ORDER = ("cols", "conv", "gloss", "tour", "node", "dive",
+              "green", "five", "trace")
+
+#: The @2 claim-shaped kinds. `unit_unnarrated` degradations are scoped to
+#: these: for a structured unit, an unanswered pack IS the designed @2
+#: fallback (the drawer keeps `why`/`top`, the page keeps no glossary), so
+#: labelling it a gap would put noise rows on every partially-answered run.
+CORE_KINDS = ("five", "green", "trace", "conventions")
+
+#: Kinds whose answers are structured objects validated by per-kind schemas
+#: rather than claim lists. Their narration value is a dict, `{}` on absence.
+STRUCTURED_KINDS = ("node", "gloss", "tour", "cols")
 
 #: Claim text rules from §5.5. Backticks and `<` reach a raw-interpolation
 #: surface; a newline breaks the one-sentence-per-claim contract the renderer
 #: lays out against; `](` is a markdown link the page will never render.
 TEXT_MAX_CHARS = 280
 TEXT_BANNED = ("`", "\n", "<", "](")
+
+#: The @3 kinds (`node`, `dive`, `gloss`, `tour`, `cols`) render through the
+#: template's rich() pipeline, which escapes first and then turns `code`
+#: spans and [[glossary]] markers into markup, so backticks are legal there.
+#: Angle brackets and markdown links stay banned everywhere.
+TEXT_BANNED_MARKUP = ("\n", "<", "](")
+
+#: Unit counts for the @3 packs: top-K on-board map groups get a `node:` unit,
+#: top-D get a `dive:` unit as well (both by loc, biggest first).
+NODE_UNITS_MAX = 10
+DIVE_UNITS_MAX = 5
+
+#: Files fed to a node/dive pack: the group's top fan-in files, plus its
+#: package `__init__` and the repo README, all under the prompt line budget.
+NODE_TOP_FILES = 6
+DIVE_TOP_FILES = 5
+GLOSS_TOP_FILES = 5
+
+#: Dive claims mirror `five` (6..8 sentences, cite-or-inferred).
+DIVE_MAX_CLAIMS = 8
+
+#: Field caps for the structured answers, enforced in `parse_structured` and
+#: stated in each pack's schema. Spec section 4 fixes terms<=14, term<=40,
+#: def<=300, tour text<=340, column label<=14; the rest are house numbers
+#: sized off the hand-built template payload.
+GLOSS_TERMS_MAX = 14
+TERM_MAX_CHARS = 40
+DEF_MAX_CHARS = 300
+TOUR_TEXT_MAX_CHARS = 340
+TOUR_STEP_CAP = 12
+TOUR_MIN_STEPS = 3
+COL_LABEL_MAX_CHARS = 14
+NODE_ROLE_MIN = 2
+NODE_ROLE_MAX = 3
+ROLE_MAX_CHARS = 600
+READS_FEEDS_MAX_CHARS = 300
+KEY_FILES_MAX = 6
+PURPOSE_MAX_CHARS = 200
+CONCEPTS_MAX = 6
+CONCEPT_MAX_CHARS = 60
+CAPTION_MAX_CHARS = 200
 
 #: A quote longer than this cannot become an anchor — `expand_anchor`'s cap is
 #: 24 lines and a focus line outside the anchor fails `verify-contract.js:69`.
@@ -73,7 +132,7 @@ QUOTE_MAX_LINES = 24
 TRACE_CLAIM_CAP = 12
 
 #: Two of the twelve frozen drop reasons (§6.6) belong to this stage. Detail is
-#: appended at the ledger boundary as `f"{code} — {detail}"`, so the vocabulary
+#: appended at the ledger boundary as `f"{code}: {detail}"`, so the vocabulary
 #: stays a set of literals while the on-screen row still says what happened.
 REASON_UNPARSEABLE = "model returned unparseable output"
 REASON_QUOTE_CAP = "quote longer than the anchor cap"
@@ -101,27 +160,36 @@ class Rejected(Exception):
 # ---------------------------------------------------------------------------
 
 def build_units(survey: dict, commands: dict | None = None,
-                hops: list | None = None, *,
+                hops: list | None = None, *, map_data: dict | None = None,
                 max_units: int = MAX_UNITS_DEFAULT) -> tuple[list[Unit], list[dict]]:
-    """-> (units, degradations). Four units at most; fewer on a thinner repo.
+    """-> (units, degradations). Fewer on a thinner repo, more with a map.
 
-    One call per stop-unit, never per module and never per claim: decisions #19
-    and #26 deleted the ten `map:<node>` units and the three `hyp:` units, which
-    were 13 of 17 calls and routed unanchored prose onto surfaces with no claim
-    marker on them.
+    The @2 rule stands: one call per stop-unit, never per claim. What changed
+    at @3 is what counts as a stop-unit. Decisions #19 and #26 deleted the old
+    `map:<node>` units because they routed unanchored prose onto surfaces with
+    no claim marker; the @3 `node:`/`dive:` units are their disciplined
+    replacement: dives are ordinary claim units (markers, audit rows, the
+    lot), and node drawer text renders on a surface the template marks as
+    narrated, with its optional cite resolved by stage 4 exactly like a
+    claim's.
 
-    A unit is built only when the repo can support it — `trace` needs a hop
-    list, `green` needs a command that actually passed. Building a unit whose
-    stop will render from a template anyway spends a call to produce claims
-    nobody will see.
+    A unit is built only when the repo can support it: `trace` needs a hop
+    list, `green` needs a command that actually passed, `node`/`dive`/`tour`/
+    `cols` need `map.json` (passed as `map_data`), `gloss` needs at least one
+    file worth showing. Every new unit degrades to absence downstream, so an
+    unanswered pack costs nothing but the model call that was never made.
     """
     hops = list(hops or [])
     degradations = []
     units = []
 
-    five_files = _dedupe(_entry_files(survey) + _top_files(survey, 4))[:4]
+    # Six, not five: the @3 shape adds "what is unusual" between the pipeline
+    # sentences and the closing inferred "what it is not". The title is a
+    # stop name, not a count.
+    five_files = _dedupe(_readme_files(survey) + _entry_files(survey)
+                         + _top_files(survey, 4))[:6]
     units.append(Unit(
-        id="five", kind="five", title="Five sentences", max_claims=5,
+        id="five", kind="five", title="Five sentences", max_claims=6,
         files=tuple(five_files),
     ))
 
@@ -155,15 +223,29 @@ def build_units(survey: dict, commands: dict | None = None,
         max_claims=4, files=tuple(_top_files(survey, 4)),
     ))
 
+    units += _map_units(survey, map_data)
+
+    gloss_files = _dedupe(_fanin_files(survey, GLOSS_TOP_FILES)
+                          + _readme_files(survey))
+    if gloss_files:
+        units.append(Unit(
+            id="gloss", kind="gloss", title="Glossary",
+            max_claims=GLOSS_TERMS_MAX, files=tuple(gloss_files),
+        ))
+
     total = len(units)
     if total > max_units:
         # §9 row 7. Drop from the left of DROP_ORDER until the budget holds;
         # the affected stops fall back to their template blocks and carry no
-        # claims, which the audit callout says out loud.
+        # claims, which the audit callout says out loud. A `<prefix>:` family
+        # sheds members one at a time, last-built (smallest group) first.
         for victim in DROP_ORDER:
+            for unit in reversed(_drop_matches(units, victim)):
+                if len(units) <= max_units:
+                    break
+                units = [u for u in units if u is not unit]
             if len(units) <= max_units:
                 break
-            units = [u for u in units if u.id != victim]
         degradations.append({
             "code": "narrate_budget",
             "reason": (f"{len(units)} of {total} units narrated. The rest render "
@@ -173,6 +255,73 @@ def build_units(survey: dict, commands: dict | None = None,
         })
 
     return units, degradations
+
+
+def _drop_matches(units: list, victim: str) -> list:
+    """The units a DROP_ORDER entry names: exact id or `<victim>:` family."""
+    return [u for u in units
+            if u.id == victim or u.id.startswith(victim + ":")]
+
+
+def _map_units(survey: dict, map_data: dict | None) -> list:
+    """The `node:`/`dive:`/`tour`/`cols` units a map makes possible.
+
+    Everything here reads `map.json` defensively: a pipeline run that has not
+    produced a map (or an old map without `columns`/`tour_order`) simply
+    builds fewer units, which downstream degrades to the exact @2 page.
+    """
+    out = []
+    board = _board_nodes(map_data)
+
+    for node in board[:NODE_UNITS_MAX]:
+        gid = _gid(node)
+        group_files = _node_files(survey, node, NODE_TOP_FILES)
+        if not group_files:
+            continue
+        label = str(node.get("label") or gid)
+        out.append(Unit(
+            id=f"node:{gid}", kind="node", title=f"Drawer: {label}",
+            max_claims=1,
+            files=tuple(_dedupe(group_files + _readme_files(survey))),
+            notes=tuple(_node_notes(node, group_files)),
+            choices=tuple(_dedupe([_basename(p) for p in group_files])),
+        ))
+
+    for node in board[:DIVE_UNITS_MAX]:
+        gid = _gid(node)
+        group_files = _node_files(survey, node, DIVE_TOP_FILES)
+        if not group_files:
+            continue
+        label = str(node.get("label") or gid)
+        out.append(Unit(
+            id=f"dive:{gid}", kind="dive", title=f"Inside {label}",
+            max_claims=DIVE_MAX_CLAIMS,
+            files=tuple(_dedupe(group_files + _readme_files(survey))),
+            notes=tuple(_group_note(node)),
+        ))
+
+    tour_ids, by_id = _tour_ids(map_data)
+    if len(tour_ids) >= TOUR_MIN_STEPS:
+        tour_files = _dedupe([f for nid in tour_ids
+                              for f in _node_files(survey, by_id[nid], 1)])
+        out.append(Unit(
+            id="tour", kind="tour", title="Guided tour",
+            max_claims=len(tour_ids),
+            files=tuple(tour_files[:TOUR_STEP_CAP]),
+            notes=tuple(_tour_notes(tour_ids, by_id)),
+            choices=tuple(tour_ids),
+        ))
+
+    columns = [c for c in ((map_data or {}).get("columns") or [])
+               if isinstance(c, dict)]
+    if len(columns) >= 2:
+        out.append(Unit(
+            id="cols", kind="cols", title="Column labels",
+            max_claims=len(columns),
+            notes=tuple(_cols_notes(map_data, columns, board)),
+        ))
+
+    return out
 
 
 def _entry_files(survey: dict) -> list:
@@ -246,7 +395,7 @@ def _command_notes(run_record: dict, kind: str | None) -> list:
     where they are checkable. Everything else quoted here — cmd, cwd, kind, exit
     code, output — is a function of the repo, so the same repo hashes the same.
     """
-    out = ["COMMAND THAT PASSED (real capture — exit code and output are not simulated)",
+    out = ["COMMAND THAT PASSED (real capture; exit code and output are not simulated)",
            f"  cmd: {run_record.get('cmd')}",
            f"  cwd: {run_record.get('cwd')}",
            f"  kind: {kind or 'unclassified'}",
@@ -264,7 +413,7 @@ def _hop_notes(hops: list) -> list:
         region = _hop_region(hop)
         where = region[0] if region else hop.get("file", "?")
         what = hop.get("what") or hop.get("label") or hop.get("symbol") or ""
-        out.append(f"  {i}. {where}{(' — ' + what) if what else ''}")
+        out.append(f"  {i}. {where}{(': ' + what) if what else ''}")
     return out
 
 
@@ -291,6 +440,168 @@ def _dedupe(items: list) -> list:
     for item in items:
         if item not in out:
             out.append(item)
+    return out
+
+
+def _basename(path: str) -> str:
+    return path.rsplit("/", 1)[-1] if "/" in path else path
+
+
+def _dirkey(path) -> str:
+    """A directory path normalised for prefix comparison: `/`-separated, no
+    leading or trailing slash, `""` for the repo root (`.` included)."""
+    key = str(path or "").replace("\\", "/").strip("/")
+    return "" if key == "." else key
+
+
+def _board_nodes(map_data: dict | None) -> list:
+    """The on-board map groups, biggest first, ties broken by id.
+
+    The upgraded mapper keeps pure test containers off the board entirely and
+    names them in `map.note`; `is_test` is checked anyway so an older map
+    cannot put a `node:tests` drawer on the page.
+    """
+    nodes = (map_data or {}).get("nodes") or []
+    kept = [n for n in nodes
+            if isinstance(n, dict) and n.get("id") and not n.get("is_test")]
+    return sorted(kept, key=lambda n: (-int(n.get("loc") or 0), str(n["id"])))
+
+
+def _gid(node: dict) -> str:
+    """The group id a composite unit id carries: the node id minus its `n-`."""
+    nid = str(node.get("id"))
+    return nid[2:] if nid.startswith("n-") and len(nid) > 2 else nid
+
+
+def _group_top_files(survey: dict, node: dict, limit: int) -> list:
+    """The group's top fan-in files: every `top` entry of every survey module
+    whose directory sits under the node's path, highest fan-in first."""
+    gdir = _dirkey(node.get("path"))
+    rows = []
+    for _, info in sorted((survey.get("modules") or {}).items()):
+        mdir = _dirkey((info or {}).get("path"))
+        if not (mdir == gdir or (gdir and mdir.startswith(gdir + "/"))):
+            continue
+        for item in (info or {}).get("top") or []:
+            path = item.get("path") if isinstance(item, dict) else item
+            if not isinstance(path, str) or not path:
+                continue
+            fan_in = int(item.get("fan_in") or 0) if isinstance(item, dict) else 0
+            rows.append((-fan_in, path))
+    rows.sort()
+    return _dedupe([path for _, path in rows])[:limit]
+
+
+def _node_files(survey: dict, node: dict, limit: int) -> list:
+    """Top fan-in files plus the package `__init__` for one map group."""
+    files = _group_top_files(survey, node, limit)
+    gdir = _dirkey(node.get("path"))
+    if gdir:
+        init = gdir + "/__init__.py"
+        if init not in files:
+            files.append(init)
+    return files
+
+
+def _readme_files(survey: dict) -> list:
+    """Root-level README paths from the survey, or the conventional name.
+
+    `prompts._read_files` skips anything not on disk, so guessing `README.md`
+    on a repo without one costs nothing.
+    """
+    out = [f.get("path") for f in survey.get("files") or []
+           if isinstance(f.get("path"), str) and "/" not in f["path"]
+           and f["path"].lower().startswith("readme")]
+    return out[:2] or ["README.md"]
+
+
+def _fanin_files(survey: dict, limit: int) -> list:
+    """The highest fan-in files repo-wide, from every module's `top` list."""
+    rows = []
+    for _, info in sorted((survey.get("modules") or {}).items()):
+        for item in (info or {}).get("top") or []:
+            path = item.get("path") if isinstance(item, dict) else item
+            if not isinstance(path, str) or not path:
+                continue
+            fan_in = int(item.get("fan_in") or 0) if isinstance(item, dict) else 0
+            rows.append((-fan_in, path))
+    rows.sort()
+    return _dedupe([path for _, path in rows])[:limit]
+
+
+def _tour_ids(map_data: dict | None) -> tuple[list, dict]:
+    """-> (tour step ids in order, node id -> node). Empty list without a map.
+
+    `tour_order` is the mapper's pipeline ordering; an older map without it
+    falls back to reading order (left to right, top to bottom), which is the
+    same thing computed the crude way. Ids not on the board are dropped here,
+    so the pack can promise every id it fixes.
+    """
+    nodes = _board_nodes(map_data)
+    by_id = {n["id"]: n for n in nodes}
+    order = [i for i in ((map_data or {}).get("tour_order") or []) if i in by_id]
+    if not order:
+        order = [n["id"] for n in sorted(
+            nodes, key=lambda n: (int(n.get("x") or 0), int(n.get("y") or 0),
+                                  str(n["id"])))]
+    return order[:TOUR_STEP_CAP], by_id
+
+
+def _group_note(node: dict) -> list:
+    """One orientation line naming the group a node/dive pack is about."""
+    label = node.get("label") or _gid(node)
+    where = node.get("path") or "(repo root)"
+    return [f"GROUP: {label} at {where}: "
+            f"{node.get('files', '?')} files, {node.get('loc', '?')} loc."]
+
+
+def _node_notes(node: dict, group_files: list) -> list:
+    """The group facts plus the fixed key_files vocabulary, names first."""
+    out = _group_note(node)
+    out.append("FILES you may name in key_files (copy the name exactly):")
+    for path in group_files:
+        out.append(f"  - {_basename(path)} ({path})")
+    return out
+
+
+def _tour_notes(tour_ids: list, by_id: dict) -> list:
+    """The fixed step ids in order, with enough facts to write against."""
+    out = ["TOUR NODES, in order. One step per id, ids copied exactly:"]
+    for i, nid in enumerate(tour_ids, 1):
+        node = by_id.get(nid) or {}
+        label = node.get("label") or _gid(node) or nid
+        where = node.get("path") or "(repo root)"
+        out.append(f"  {i}. {nid}: {label} at {where}, {node.get('loc', '?')} loc")
+    return out
+
+
+def _cols_notes(map_data: dict | None, columns: list, board: list) -> list:
+    """The columns in order, each with the groups that sit in it.
+
+    Membership comes from the mapper's own `diagnostics.columns` when it is
+    published, else from nearest column center x: both deterministic, neither
+    trusted to exist.
+    """
+    diag = ((map_data or {}).get("diagnostics") or {}).get("columns") or {}
+    xs = [c.get("x") for c in columns]
+    have_x = bool(xs) and all(isinstance(x, (int, float)) for x in xs)
+
+    members: dict[int, list] = {}
+    for node in board:
+        idx = diag.get(node["id"])
+        if not isinstance(idx, int) or not (0 <= idx < len(columns)):
+            if have_x:
+                center = int(node.get("x") or 0) + int(node.get("w") or 0) / 2
+                idx = min(range(len(xs)), key=lambda i: abs(xs[i] - center))
+            else:
+                idx = 0
+        members.setdefault(idx, []).append(str(node.get("label") or _gid(node)))
+
+    out = ["COLUMNS of the module map, left to right. One label per column, "
+           "in this order:"]
+    for i in range(len(columns)):
+        names = ", ".join(members.get(i, [])) or "(no groups)"
+        out.append(f"  {i + 1}. holds: {names}")
     return out
 
 
@@ -347,7 +658,7 @@ def parse(raw, unit: Unit) -> tuple[list[dict], list[dict]]:
             continue
 
         text = claim.get("text")
-        bad_text = _text_problem(text)
+        bad_text = _text_problem(text, _banned_for(unit.kind))
         if bad_text is not None:
             ledger.append(_row(_ledger_text(text, unit, index), _cite_file(claim),
                                _reason(REASON_UNPARSEABLE, bad_text)))
@@ -376,14 +687,38 @@ def parse(raw, unit: Unit) -> tuple[list[dict], list[dict]]:
     return kept, ledger
 
 
-def _text_problem(text) -> str | None:
+def _banned_for(kind: str) -> tuple:
+    """Which character set a kind's prose must clear.
+
+    The @2 kinds keep the full ban (their claims render through `esc()` paths
+    that never grew rich-text). The @3 kinds render through the template's
+    rich() pipeline, so backticks are content there, not markup injection.
+    """
+    if kind in ("dive",) + STRUCTURED_KINDS:
+        return TEXT_BANNED_MARKUP
+    return TEXT_BANNED
+
+
+def _text_problem(text, banned: tuple = TEXT_BANNED) -> str | None:
     if not isinstance(text, str) or not text.strip():
         return "claim text is empty"
     if len(text) > TEXT_MAX_CHARS:
         return f"claim text is {len(text)} chars, cap is {TEXT_MAX_CHARS}"
-    for banned in TEXT_BANNED:
-        if banned in text:
-            return f"claim text contains {banned!r}"
+    for item in banned:
+        if item in text:
+            return f"claim text contains {item!r}"
+    return None
+
+
+def _prose_problem(text, max_chars: int, banned: tuple) -> str | None:
+    """None, or why this structured-answer string cannot ship."""
+    if not isinstance(text, str) or not text.strip():
+        return "text is empty"
+    if len(text) > max_chars:
+        return f"text is {len(text)} chars, cap is {max_chars}"
+    for item in banned:
+        if item in text:
+            return f"text contains {item!r}"
     return None
 
 
@@ -415,8 +750,14 @@ def _clean_cite(cite) -> tuple[dict | None, str | None]:
 
 
 def _reason(code: str, detail: str) -> str:
-    """`f"{code} — {detail}"`, so the frozen vocabulary stays a set of literals."""
-    return f"{code} — {detail}"
+    """`f"{code}: {detail}"`, so the frozen vocabulary stays a set of literals.
+
+    A colon, not the historical em dash: these rows land verbatim in the
+    payload's audit table, the @3 dash policy bans em and en dashes from every
+    authored string that can reach the artifact, and `verify.is_known_reason`
+    accepts exactly this join (plus the legacy dash for old payloads).
+    """
+    return f"{code}: {detail}"
 
 
 def _row(text: str, path: str, reason: str) -> dict:
@@ -438,11 +779,368 @@ def _ledger_text(text, unit: Unit, index: int) -> str:
 
 
 # ---------------------------------------------------------------------------
+# the structured parsers (@3 kinds)
+# ---------------------------------------------------------------------------
+
+def parse_structured(raw, unit: Unit) -> tuple[dict, list[dict]]:
+    """One `node`/`gloss`/`tour`/`cols` response -> (answer, ledger rows).
+
+    Same law as `parse`: reject, never repair. An unknown key anywhere, a
+    malformed required field, or a mismatched positional count raises
+    `Rejected` and the whole answer is discarded; a bad OPTIONAL slot (one
+    glossary term, one tour step, a cite) is dropped and the rest ships.
+    `{}` means absence, and absence is the designed @2 fallback, so a stub
+    miss (`{"claims": []}`) parses to `({}, [])` rather than an error.
+
+    No ledger rows are minted here today: structured answers are not claims,
+    their drop accounting belongs to stage 4's `n-<gid>`/`g-<slug>`/`t-<id>`
+    ledger ids, and a whole-response rejection earns its one row in `run`
+    exactly as a claim unit's does. The rows slot in the signature keeps the
+    two parsers interchangeable at the call site.
+    """
+    if isinstance(raw, dict) and raw.get("_stop_reason"):
+        raise Rejected(f"stop_reason={raw['_stop_reason']}")
+    if not isinstance(raw, dict):
+        raise Rejected("response is not a JSON object")
+    if raw == {"claims": []}:
+        # The stub's miss sentinel: no answer exists. Absence, not failure.
+        return {}, []
+
+    if unit.kind == "node":
+        return _parse_node(raw, unit), []
+    if unit.kind == "gloss":
+        return _parse_gloss(raw, unit), []
+    if unit.kind == "tour":
+        return _parse_tour(raw, unit), []
+    if unit.kind == "cols":
+        return _parse_cols(raw, unit), []
+    raise Rejected(f"unit kind {unit.kind!r} has no structured parser")
+
+
+def _reject_extra(mapping: dict, allowed: frozenset, where: str) -> None:
+    extra = sorted(set(mapping) - allowed)
+    if extra:
+        raise Rejected(f"{where} carries " + ", ".join(repr(k) for k in extra))
+
+
+def _clean_optional_cite(raw: dict, out: dict, banned: tuple) -> None:
+    """Attach a validated cite (and its caption) to `out`, or neither.
+
+    Unknown cite keys reject the whole answer, exactly as they do for a
+    claim: a cite carrying `start` is the model answering a different schema.
+    A cite that is merely unusable (empty quote, over the anchor cap) is
+    dropped; the drawer then keeps its deterministic `why` fallback, which is
+    the honest degradation, and a caption without a cite captions nothing.
+    """
+    cite = raw.get("cite")
+    if not isinstance(cite, dict):
+        return
+    _reject_extra(cite, CITE_KEYS, "cite")
+    clean, problem = _clean_cite(cite)
+    if problem is not None:
+        return
+    out["cite"] = clean
+    caption = raw.get("caption")
+    if caption is not None and _prose_problem(caption, CAPTION_MAX_CHARS,
+                                              banned) is None:
+        out["caption"] = caption
+
+
+_NODE_KEYS = frozenset({"role", "reads", "feeds", "key_files", "concepts",
+                        "cite", "caption"})
+
+
+def _parse_node(raw: dict, unit: Unit) -> dict:
+    """`{role, reads, feeds, key_files, concepts, cite?, caption?}`, checked.
+
+    Required fields are strict: a drawer with one role paragraph or a prose
+    `reads` full of markup is a failed answer, not a thin one. The two list
+    fields filter per item but must keep at least one survivor, and a
+    `key_files.file` must be one of the names the pack listed; the model
+    picks from the vocabulary, it does not extend it.
+    """
+    _reject_extra(raw, _NODE_KEYS, "node answer")
+    banned = TEXT_BANNED_MARKUP
+
+    role = raw.get("role")
+    if not isinstance(role, list) or not (NODE_ROLE_MIN <= len(role) <= NODE_ROLE_MAX):
+        raise Rejected(f"role must be a list of {NODE_ROLE_MIN} to "
+                       f"{NODE_ROLE_MAX} paragraphs")
+    for para in role:
+        problem = _prose_problem(para, ROLE_MAX_CHARS, banned)
+        if problem is not None:
+            raise Rejected(f"role paragraph: {problem}")
+    out = {"role": list(role)}
+
+    for field in ("reads", "feeds"):
+        value = raw.get(field)
+        problem = _prose_problem(value, READS_FEEDS_MAX_CHARS, banned)
+        if problem is not None:
+            raise Rejected(f"{field}: {problem}")
+        out[field] = value
+
+    items = raw.get("key_files")
+    if not isinstance(items, list):
+        raise Rejected("key_files is not a list")
+    allowed_names = set(unit.choices)
+    kept_files, seen = [], set()
+    for item in items[:KEY_FILES_MAX]:
+        if not isinstance(item, dict):
+            continue
+        _reject_extra(item, frozenset({"file", "purpose"}), "key_files entry")
+        name = item.get("file")
+        base = _basename(name) if isinstance(name, str) else ""
+        if base not in allowed_names or base in seen:
+            continue
+        if _prose_problem(item.get("purpose"), PURPOSE_MAX_CHARS, banned) is not None:
+            continue
+        seen.add(base)
+        kept_files.append({"file": base, "purpose": item["purpose"]})
+    if not kept_files:
+        raise Rejected("no key_files entry names a listed file")
+    out["key_files"] = kept_files
+
+    concepts = raw.get("concepts")
+    if not isinstance(concepts, list):
+        raise Rejected("concepts is not a list")
+    kept_concepts = _dedupe(
+        [c for c in concepts
+         if _prose_problem(c, CONCEPT_MAX_CHARS, banned) is None])[:CONCEPTS_MAX]
+    if not kept_concepts:
+        raise Rejected("concepts carries no usable term")
+    out["concepts"] = kept_concepts
+
+    _clean_optional_cite(raw, out, banned)
+    return out
+
+
+def _parse_gloss(raw: dict, unit: Unit) -> dict:
+    """`{terms: [{term, def, cite?}]}`. Bad terms drop; bad shape rejects."""
+    _reject_extra(raw, frozenset({"terms"}), "gloss answer")
+    terms = raw.get("terms")
+    if not isinstance(terms, list):
+        raise Rejected("terms is not a list")
+
+    banned = TEXT_BANNED_MARKUP
+    kept, seen = [], set()
+    for item in terms[: unit.max_claims]:
+        if not isinstance(item, dict):
+            continue
+        _reject_extra(item, frozenset({"term", "def", "cite"}), "glossary term")
+        term, definition = item.get("term"), item.get("def")
+        if _prose_problem(term, TERM_MAX_CHARS, banned) is not None:
+            continue
+        if _prose_problem(definition, DEF_MAX_CHARS, banned) is not None:
+            continue
+        key = term.strip().lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        entry = {"term": term, "def": definition}
+        _clean_optional_cite(item, entry, banned)
+        entry.pop("caption", None)          # terms carry no caption field
+        kept.append(entry)
+    return {"terms": kept} if kept else {}
+
+
+def _parse_tour(raw: dict, unit: Unit) -> dict:
+    """`{steps: [{id, text}]}`, ids fixed by the pack, output in pack order.
+
+    A step naming an id off the fixed list is the tour equivalent of a quote
+    outside the shown windows: dropped, and stage 4 would drop it again
+    (`t-<id>`) if it slipped through. Order is normalised to the pack's,
+    because the board walks the pipeline, not the model's whim.
+    """
+    _reject_extra(raw, frozenset({"steps"}), "tour answer")
+    steps = raw.get("steps")
+    if not isinstance(steps, list):
+        raise Rejected("steps is not a list")
+
+    by_id = {}
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        _reject_extra(step, frozenset({"id", "text"}), "tour step")
+        sid = step.get("id")
+        if sid not in unit.choices or sid in by_id:
+            continue
+        if _prose_problem(step.get("text"), TOUR_TEXT_MAX_CHARS,
+                          TEXT_BANNED_MARKUP) is not None:
+            continue
+        by_id[sid] = {"id": sid, "text": step["text"]}
+
+    ordered = [by_id[sid] for sid in unit.choices if sid in by_id]
+    return {"steps": ordered} if ordered else {}
+
+
+def _parse_cols(raw: dict, unit: Unit) -> dict:
+    """`{labels: [...]}`: positional, so the count must match exactly."""
+    _reject_extra(raw, frozenset({"labels"}), "cols answer")
+    labels = raw.get("labels")
+    if not isinstance(labels, list):
+        raise Rejected("labels is not a list")
+    if len(labels) != unit.max_claims:
+        raise Rejected(f"expected {unit.max_claims} labels, got {len(labels)}")
+    for label in labels:
+        problem = _prose_problem(label, COL_LABEL_MAX_CHARS, TEXT_BANNED_MARKUP)
+        if problem is not None:
+            raise Rejected(f"label: {problem}")
+        if label != label.upper():
+            raise Rejected(f"label {label!r} is not uppercase")
+    return {"labels": list(labels)}
+
+
+def _parse_unit(raw, unit: Unit) -> tuple[list, dict | None, list]:
+    """-> (claims, structured answer or None, ledger rows), by unit kind."""
+    if unit.kind in STRUCTURED_KINDS:
+        answer, rows = parse_structured(raw, unit)
+        return [], answer, rows
+    claims, rows = parse(raw, unit)
+    return claims, None, rows
+
+
+def _answer_items(kind: str, answer: dict | None) -> int:
+    """How much content a structured answer carries, for the unit record."""
+    if not answer:
+        return 0
+    if kind == "node":
+        return 1
+    key = {"gloss": "terms", "tour": "steps", "cols": "labels"}.get(kind, "")
+    return len(answer.get(key) or []) if key else 1
+
+
+# ---------------------------------------------------------------------------
+# per-unit response schemas
+# ---------------------------------------------------------------------------
+
+def _cite_schema() -> dict:
+    """A fresh copy of the cite schema, so callers can embed it safely."""
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "file": {"type": "string"},
+            "quote": {"type": "string"},
+            "focus": {"type": "array", "items": {"type": "string"}},
+        },
+    }
+
+
+def schema_for(unit: Unit) -> dict:
+    """The response schema THIS unit's answer must satisfy.
+
+    The claim kinds share `provider.SCHEMA` verbatim; the structured kinds
+    each get their own, built per unit so the fixed vocabularies (`tour` step
+    ids, `key_files` names) are enums the provider can enforce before the
+    parser re-checks them in code. Both `run` and `emit_prompts` route
+    through here, so the schema the live API constrains against and the
+    schema a pack shows the answering agent are the same object shape.
+    """
+    if unit.kind == "node":
+        file_schema = {"type": "string"}
+        if unit.choices:
+            file_schema["enum"] = list(unit.choices)
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["role", "reads", "feeds", "key_files", "concepts"],
+            "properties": {
+                "role": {"type": "array", "minItems": NODE_ROLE_MIN,
+                         "maxItems": NODE_ROLE_MAX,
+                         "items": {"type": "string", "maxLength": ROLE_MAX_CHARS}},
+                "reads": {"type": "string", "maxLength": READS_FEEDS_MAX_CHARS},
+                "feeds": {"type": "string", "maxLength": READS_FEEDS_MAX_CHARS},
+                "key_files": {
+                    "type": "array", "minItems": 1, "maxItems": KEY_FILES_MAX,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["file", "purpose"],
+                        "properties": {
+                            "file": file_schema,
+                            "purpose": {"type": "string",
+                                        "maxLength": PURPOSE_MAX_CHARS},
+                        },
+                    },
+                },
+                "concepts": {"type": "array", "minItems": 1,
+                             "maxItems": CONCEPTS_MAX,
+                             "items": {"type": "string",
+                                       "maxLength": CONCEPT_MAX_CHARS}},
+                "cite": _cite_schema(),
+                "caption": {"type": "string", "maxLength": CAPTION_MAX_CHARS},
+            },
+        }
+    if unit.kind == "gloss":
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["terms"],
+            "properties": {
+                "terms": {
+                    "type": "array", "maxItems": unit.max_claims,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["term", "def"],
+                        "properties": {
+                            "term": {"type": "string",
+                                     "maxLength": TERM_MAX_CHARS},
+                            "def": {"type": "string",
+                                    "maxLength": DEF_MAX_CHARS},
+                            "cite": _cite_schema(),
+                        },
+                    },
+                },
+            },
+        }
+    if unit.kind == "tour":
+        id_schema = {"type": "string"}
+        if unit.choices:
+            id_schema["enum"] = list(unit.choices)
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["steps"],
+            "properties": {
+                "steps": {
+                    "type": "array", "minItems": unit.max_claims,
+                    "maxItems": unit.max_claims,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["id", "text"],
+                        "properties": {
+                            "id": id_schema,
+                            "text": {"type": "string",
+                                     "maxLength": TOUR_TEXT_MAX_CHARS},
+                        },
+                    },
+                },
+            },
+        }
+    if unit.kind == "cols":
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["labels"],
+            "properties": {
+                "labels": {"type": "array", "minItems": unit.max_claims,
+                           "maxItems": unit.max_claims,
+                           "items": {"type": "string",
+                                     "maxLength": COL_LABEL_MAX_CHARS}},
+            },
+        }
+    return SCHEMA
+
+
+# ---------------------------------------------------------------------------
 # the unit loop
 # ---------------------------------------------------------------------------
 
 def run(survey: dict, root, prov, *, work=None, commands: dict | None = None,
-        hops: list | None = None, max_units: int = MAX_UNITS_DEFAULT,
+        hops: list | None = None, map_data: dict | None = None,
+        max_units: int = MAX_UNITS_DEFAULT,
         offline: bool = False, verbose: bool = False) -> dict:
     """Narrate one repo. Serial, cached, and the only place `prov` is touched.
 
@@ -452,7 +1150,9 @@ def run(survey: dict, root, prov, *, work=None, commands: dict | None = None,
 
     Returns, all keyed by unit id where it matters:
 
-        narration      unit id -> claims, in `content@1` shape, ids stamped
+        narration      unit id -> claims (claim kinds, `content@1` shape, ids
+                       stamped) OR the validated structured answer dict for
+                       `node:`/`gloss`/`tour`/`cols` units, `{}` on absence
         windows        unit id -> the quotable spans the model was shown
         ledger         drop rows the parser produced, ids from the same counter
         degradations   §9 row 7, plus `unit_unnarrated` for a silent gap
@@ -469,7 +1169,8 @@ def run(survey: dict, root, prov, *, work=None, commands: dict | None = None,
     fires on a partly-answered store and not on a cold one.
     """
     started = time.monotonic()
-    units, degradations = build_units(survey, commands, hops, max_units=max_units)
+    units, degradations = build_units(survey, commands, hops,
+                                      map_data=map_data, max_units=max_units)
     store = _store(work)
 
     counter = _Counter()
@@ -480,6 +1181,8 @@ def run(survey: dict, root, prov, *, work=None, commands: dict | None = None,
     for unit in units:
         system, user, unit_windows = prompts.pack(unit, survey, root)
         key = cache_key(system, user)
+        schema = schema_for(unit)
+        structured = unit.kind in STRUCTURED_KINDS
         windows[unit.id] = [{"file": w.file, "start": w.start, "end": w.end}
                             for w in unit_windows]
 
@@ -490,7 +1193,7 @@ def run(survey: dict, root, prov, *, work=None, commands: dict | None = None,
                 raise MissingNarration(
                     f"no narration for unit {unit.id} (key {key}) and --offline is set"
                 )
-            raw = prov.complete(system, user, SCHEMA)
+            raw = prov.complete(system, user, schema)
             calls += 1
             source = "provider"
             _write_store(store, key, raw)
@@ -498,17 +1201,18 @@ def run(survey: dict, root, prov, *, work=None, commands: dict | None = None,
             hits += 1
 
         try:
-            claims, rows = parse(raw, unit)
+            claims, answer, rows = _parse_unit(raw, unit)
         except Rejected as first:
-            # One retry, and only when the answer came from a provider — a
+            # One retry, and only when the answer came from a provider: a
             # second read of the same cache entry returns the same bytes and
             # fails the same way, so retrying it is a slower way to lose.
-            claims, rows, detail = [], [], str(first)
+            claims, answer, rows = [], ({} if structured else None), []
+            detail = str(first)
             if source == "provider":
-                retry = prov.complete(system, user, SCHEMA)
+                retry = prov.complete(system, user, schema)
                 calls += 1
                 try:
-                    claims, rows = parse(retry, unit)
+                    claims, answer, rows = _parse_unit(retry, unit)
                     _write_store(store, key, retry)
                     detail = None
                 except Rejected as second:
@@ -524,19 +1228,23 @@ def run(survey: dict, root, prov, *, work=None, commands: dict | None = None,
         for row in rows:
             row["id"] = counter.next()
 
-        narration[unit.id] = claims
+        narration[unit.id] = answer if structured else claims
+        content = _answer_items(unit.kind, answer) if structured else len(claims)
         ledger += rows
         records.append({
             "id": unit.id, "kind": unit.kind, "title": unit.title,
             "max_claims": unit.max_claims, "files": list(unit.files),
             "key": key, "source": source,
-            "claims": len(claims), "dropped": len(rows),
+            "claims": content, "dropped": len(rows),
         })
-        if not claims and not rows:
+        if not content and not rows and unit.kind in CORE_KINDS:
+            # Only the claim-shaped @2 units can go SILENTLY missing: an
+            # unanswered structured unit is the designed @2 fallback, not a
+            # gap on a page that looks narrated.
             empty.append((unit, key, source))
         if verbose:
             sys.stderr.write(
-                f"narrate {unit.id}: {len(claims)} claims, {len(rows)} dropped "
+                f"narrate {unit.id}: {content} item(s), {len(rows)} dropped "
                 f"({source}, key {key[:12]})\n"
             )
 
@@ -637,7 +1345,7 @@ class _Counter:
 # ---------------------------------------------------------------------------
 
 def emit_prompts(survey: dict, root, work, *, commands: dict | None = None,
-                 hops: list | None = None,
+                 hops: list | None = None, map_data: dict | None = None,
                  max_units: int = MAX_UNITS_DEFAULT) -> list[dict]:
     """Write one prompt pack per unit and return the packs as written.
 
@@ -646,8 +1354,9 @@ def emit_prompts(survey: dict, root, work, *, commands: dict | None = None,
     answering a pack never computes a sha256 by hand, never gets it wrong, and
     never produces a store the stub cannot find.
 
-    The pack is self-describing — schema included — so answering one needs
-    nothing but the file.
+    The pack is self-describing (schema included, and since @3 the schema is
+    the UNIT's schema, not the claims schema), so answering one needs nothing
+    but the file.
     """
     root = Path(root)
     store = _store(work)
@@ -655,7 +1364,8 @@ def emit_prompts(survey: dict, root, work, *, commands: dict | None = None,
     inbox.mkdir(parents=True, exist_ok=True)
     store.mkdir(parents=True, exist_ok=True)
 
-    units, _ = build_units(survey, commands, hops, max_units=max_units)
+    units, _ = build_units(survey, commands, hops, map_data=map_data,
+                           max_units=max_units)
     packs = []
     for unit in units:
         system, user, windows = prompts.pack(unit, survey, root)
@@ -670,7 +1380,7 @@ def emit_prompts(survey: dict, root, work, *, commands: dict | None = None,
             "user": user,
             "windows": [{"file": w.file, "start": w.start, "end": w.end}
                         for w in windows],
-            "schema": SCHEMA,
+            "schema": schema_for(unit),
             "out": str((store / f"{key}.json").resolve()),
             "pack": str((inbox / f"{key}.json").resolve()),
         }
@@ -696,14 +1406,20 @@ def _read_store(store: Path, key: str):
         return None
 
 
+#: A stored answer must carry at least one of these, non-empty. `claims` is
+#: the @2 shape; the rest are the structured @3 answers. Anything else is a
+#: miss dressed up as an answer and must never enter the store.
+_STORE_CONTENT_KEYS = ("claims", "role", "terms", "steps", "labels")
+
+
 def _write_store(store: Path, key: str, raw) -> None:
     """Record a real answer. A stub miss is never written.
 
-    Writing `{"claims": []}` would poison the store: the next run would replay
-    the empty answer as a hit and the unit could never recover, which is the
-    opposite of what a cache is for.
+    Writing `{"claims": []}` (or `{"terms": []}`) would poison the store: the
+    next run would replay the empty answer as a hit and the unit could never
+    recover, which is the opposite of what a cache is for.
     """
-    if not isinstance(raw, dict) or not raw.get("claims"):
+    if not isinstance(raw, dict) or not any(raw.get(k) for k in _STORE_CONTENT_KEYS):
         return
     store.mkdir(parents=True, exist_ok=True)
     _write_json(store / f"{key}.json", raw)
@@ -735,6 +1451,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--work", default=".trailhead", help="work dir (default .trailhead)")
     parser.add_argument("--commands", help="path to commands.json")
     parser.add_argument("--hops", help="path to a trace hop fixture")
+    parser.add_argument("--map", dest="map_path",
+                        help="path to map.json (enables the node/dive/tour/cols units)")
     parser.add_argument("--provider", choices=("stub", "claude"), default="stub")
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--emit-prompts", action="store_true",
@@ -750,10 +1468,12 @@ def main(argv: list[str] | None = None) -> int:
     hops = json.loads(Path(args.hops).read_text(encoding="utf-8")) if args.hops else None
     if isinstance(hops, dict):
         hops = hops.get("hops") or hops.get("steps") or []
+    map_data = (json.loads(Path(args.map_path).read_text(encoding="utf-8"))
+                if args.map_path else None)
 
     if args.emit_prompts:
         packs = emit_prompts(survey, root, args.work, commands=commands, hops=hops,
-                             max_units=args.max_units)
+                             map_data=map_data, max_units=args.max_units)
         for pack in packs:
             sys.stderr.write(f"{pack['unit']:6s} -> {pack['pack']}\n")
         sys.stderr.write(f"{len(packs)} pack(s) written. Answer each into its own 'out' path.\n")
@@ -761,7 +1481,8 @@ def main(argv: list[str] | None = None) -> int:
 
     prov = provider_mod.build(args.provider, _store(args.work), offline=args.offline)
     result = run(survey, root, prov, work=args.work, commands=commands, hops=hops,
-                 max_units=args.max_units, offline=args.offline, verbose=args.verbose)
+                 map_data=map_data, max_units=args.max_units,
+                 offline=args.offline, verbose=args.verbose)
     json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")
     return 0
