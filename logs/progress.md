@@ -240,4 +240,6 @@
 - Backed up all 12 generated bundles to `hackathon/backup/` (pipeline never writes there — live-demo fallback), then cut an orphan `hackathon` branch: single snapshot commit, `hackathon/` contents at branch root, 196 files, zero vol-project files or history (a subtree split would have carried restored/'s 1,063 borrowed files in past commits). README "Known limits" still claims 13 `test_render.py` failures — stale since e272148 fixed them; worth a one-line fix before submitting
 - Pushed `hackathon` to origin, then renamed all 56 `.py` files to `.py.txt` on that branch (c7f0a9d, pushed) — same GS-transfer guard as docs-only, temporary; pure renames done in a throwaway worktree so the main checkout never moved, undo command recorded in the commit message
 
+- Assembled the pitch recording (8424e99, pushed): lossless ffmpeg concat of the 7 screen-recording mkv parts into `presentation.mp4` (9:27, h264 1080p60), end-trims applied per filename (14s/2s/3s/2s off parts 1/2/5/6), part 4 moved to the end on request; force-added past the `*.mp4` gitignore rule
+
 **Next:** demo rehearsal against a genuinely unread repo (generate live on stage), decide the two open CLAUDE.md items (which internal GS tool Narrate names, demo repo choice); after the hackathon, restore CLAUDE.vol-project.md per the header note
