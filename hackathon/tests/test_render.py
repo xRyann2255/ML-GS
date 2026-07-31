@@ -496,7 +496,7 @@ class Shell(unittest.TestCase):
     HARNESS = r"""
 const fs = require('fs');
 const [tplPath, payloadPath] = process.argv.slice(2);
-const tpl = fs.readFileSync(tplPath, 'utf8');
+const tpl = fs.readFileSync(tplPath, 'utf8').replace(/\r\n/g, '\n');
 const a = tpl.indexOf('function shell(){');
 const b = tpl.indexOf('\n}\n', a);
 const src = tpl.slice(a, b + 2);
@@ -611,7 +611,7 @@ class Ledger(unittest.TestCase):
     HARNESS = r"""
 const fs = require('fs');
 const [tplPath, payloadPath] = process.argv.slice(2);
-const tpl = fs.readFileSync(tplPath, 'utf8');
+const tpl = fs.readFileSync(tplPath, 'utf8').replace(/\r\n/g, '\n');
 const grab = name => {
   const a = tpl.indexOf('function ' + name + '(){');
   if (a < 0) throw new Error('template has no function ' + name);

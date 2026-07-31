@@ -578,8 +578,14 @@ def _order_block(rng, *, prompt, items, display, provenance, explanation):
     permutation rather than by looking the option text back up, so two options
     that render identically still produce a real permutation instead of a
     duplicated rank and a crashed build (Appendix A.5).
+
+    An identity draw is redrawn: options shown in the true order key to
+    `[1, 2, ..., n]` and the question grades itself. The redraw consumes the
+    same seeded generator, so it is as deterministic as the first draw.
     """
     perm = _permutation(rng, len(items))
+    while len(perm) > 1 and perm == sorted(perm):
+        perm = _permutation(rng, len(items))
     return {
         "kind": "order",
         "prompt": prompt,

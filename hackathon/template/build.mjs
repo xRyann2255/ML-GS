@@ -143,12 +143,39 @@ function resolveCommand(b) {
   return { ...rest, out: out || '(no output)' };
 }
 
+// Order checkpoints are AUTHORED with their options in the true sequence and
+// the identity key, the same contract as the generator's _order_block. The
+// shuffle happens here: Fisher-Yates over the (option, rank) pairs, seeded
+// from repo.commit and the checkpoint id, so a rebuild asks the same question
+// the same way. An identity draw re-rolls on the next seed: a rank question
+// whose on-screen order is already correct grades itself.
+function shuffleOrder(b) {
+  const n = b.options.length;
+  if (n > 9) throw new Error(b.id + ': order checkpoint exceeds the 9-option seed budget');
+  for (let round = 0; ; round++) {
+    const perm = permutation(payload.repo.commit + '\x00' + b.id + '\x00' + round, n);
+    if (n > 1 && perm.every((v, i) => v === i)) continue;
+    return { ...b, options: perm.map(j => b.options[j]), answer: perm.map(j => b.answer[j]) };
+  }
+}
+
+function permutation(seed, n) {
+  const bytes = crypto.createHash('sha256').update(seed, 'utf8').digest();
+  const perm = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) {
+    const j = bytes.readUInt32BE((n - 1 - i) * 4) % (i + 1);
+    [perm[i], perm[j]] = [perm[j], perm[i]];
+  }
+  return perm;
+}
+
 function walkBlocks(blocks) {
   return blocks.map(b => {
     if (b.type === 'prose') {
       const claims = b.claims.map(resolveClaim).filter(Boolean);
       return { ...b, claims };
     }
+    if (b.type === 'checkpoint' && b.kind === 'order') return shuffleOrder(b);
     if (b.type === 'excerpt') {
       const r = resolveAnchor(b.anchor, 'excerpt');
       if (r.err) throw new Error('excerpt anchor failed (' + b.anchor.file + '): ' + r.err);

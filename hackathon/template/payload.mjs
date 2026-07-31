@@ -565,12 +565,16 @@ export const payload = {
           answer: 1,
           provenance: 'evaluation/metrics.py names QLIKE the primary metric and states the asymmetry; statistical_tests.py sorts the tournament by QLIKE ascending.',
           explanation: 'Under-predicting vol is the expensive mistake in risk terms, so the loss is asymmetric on purpose. The Sharpe comes later, as the economic check on top.' },
+        // order checkpoints: author options in the TRUE sequence with the
+        // identity key. build.mjs shuffles them deterministically (commit +
+        // id seed) and rewrites the key, so never describe the on-screen
+        // option order in the explanation: state the true sequence in words.
         { type: 'checkpoint', id: 'cp-c2', kind: 'order',
           prompt: 'Put these feature layers in ascending layer-number order.',
           options: ['<code>har_core</code> (HAR lags and quarticity)', '<code>asymmetry</code> (semivariances, jumps)', '<code>options</code> (VRP, skew, tenors)', '<code>microstructure</code> (VPIN, Kyle lambda)', '<code>cross_asset</code> (rates, FX, spillover)', '<code>calendar</code> (FOMC, NFP, OpEx)'],
           answer: [1, 2, 3, 4, 5, 6],
           provenance: 'Each file\'s first docstring line states its layer number: har.py Layer 0 through calendar.py Layer 5.',
-          explanation: 'The options are listed in the correct order: HAR is the Layer 0 backbone and calendar closes the numbered spine at Layer 5.' },
+          explanation: 'Each file\'s first docstring line numbers its layer: har_core is the Layer 0 backbone, then asymmetry (1), options (2), microstructure (3), cross_asset (4), and calendar closes the numbered spine at Layer 5.' },
         { type: 'checkpoint', id: 'cp-c3', kind: 'single',
           prompt: 'What h=1 QLIKE did the current champion record, and which model is it?',
           options: ['0.1292, XGBoost (trial-067)', '0.1289, LightGBM (trial-036)', '0.13397, ridge HAR (trial-055)', '0.1500, har_iv'],
@@ -634,7 +638,7 @@ export const payload = {
           options: ['Load the YAML into an ExperimentConfig', 'Ingest gate: fetch data for universe symbols missing an RV cache', 'Tournament: train and compare all configured models', 'Update the trial registry from metrics.json'],
           answer: [1, 2, 3, 4],
           provenance: 'src/volforecast/__main__.py: from_yaml, then the missing-symbol ingest gate, then all modes route through the tournament, then update_trial_from_metrics.',
-          explanation: 'Config first, data second, competition third, bookkeeping last. The options are listed in the correct order.' },
+          explanation: 'Config first, data second, competition third, bookkeeping last: from_yaml parses the YAML, the ingest gate fills missing RV caches, every mode routes through the tournament, and the trial registry is updated from metrics.json.' },
       ] },
     ] },
     // ================================================== THE AGENT LAYER

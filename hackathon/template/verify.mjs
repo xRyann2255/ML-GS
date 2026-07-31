@@ -16,7 +16,7 @@ const REPO = path.resolve(HERE, '..', 'restored');
 const OUT = path.resolve(HERE, '..', 'out', 'trailhead-mlvol-template.html');
 
 const html = fs.readFileSync(OUT, 'utf8');
-const m = html.match(/const DATA = (\{.*?\});\n/s);
+const m = html.match(/const DATA = (\{.*?\});\r?\n/s);
 if (!m) { console.error('FAIL: payload not found'); process.exit(1); }
 const D = JSON.parse(m[1]);
 
@@ -60,7 +60,17 @@ for (const t of D.tracks) for (const s of t.stops) for (const b of s.blocks) {
     if (typeof b.exit !== 'number' || !b.out || /placeholder/i.test(b.out))
       errs.push(s.id + ': command lacks a real exit/output: ' + b.cmd);
   }
-  if (b.type === 'checkpoint' && !b.provenance) errs.push(b.id + ': checkpoint without provenance');
+  if (b.type === 'checkpoint') {
+    if (!b.provenance) errs.push(b.id + ': checkpoint without provenance');
+    if (b.kind === 'order') {
+      const n = (b.options || []).length;
+      const key = Array.isArray(b.answer) ? [...b.answer].sort((x, y) => x - y) : [];
+      if (key.length !== n || key.some((v, i) => v !== i + 1))
+        errs.push(b.id + ': order answer is not a permutation of 1..' + n);
+      else if (n > 1 && b.answer.every((v, i) => v === i + 1))
+        errs.push(b.id + ': order options ship in the true order (identity key), the question grades itself');
+    }
+  }
 }
 for (const g of D.glossary || []) if (g.anchor) checkAnchor(g.anchor, 'glossary:' + g.id);
 for (const n of D.map.nodes) if (n.anchor) checkAnchor(n.anchor, 'node:' + n.id);

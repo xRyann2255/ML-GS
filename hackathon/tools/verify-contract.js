@@ -246,6 +246,8 @@ for (const bl of s.blocks) {
         if (bl.answer.length !== bl.options.length) bad(`${bl.id}: answer/options length mismatch`);
         if ([...bl.answer].sort((x, y) => x - y).join() !== want)
           bad(`${bl.id}: answer is not a permutation of 1..n`);
+        else if (bl.answer.length > 1 && bl.answer.every((v, i) => v === i + 1))
+          bad(`${bl.id}: options ship in the true order (identity key), the question grades itself`);
       }
       break;
     case 'table':

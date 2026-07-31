@@ -265,6 +265,17 @@ class BuildCheckpoints(unittest.TestCase):
 
         self.assertTrue(any(inverted))
 
+    def test_the_order_options_never_ship_in_the_true_order(self):
+        # The reader-facing failure this guards: options displayed in the true
+        # sequence key to [1, 2, ..., n] and the question grades itself. An
+        # identity draw is redrawn from the same seeded generator, so this
+        # holds on every commit, not merely on most.
+        for commit in self.SEEDS:
+            with self.subTest(commit=commit):
+                block, _ = self.order_block(commit)
+
+                self.assertNotEqual(block["answer"], sorted(block["answer"]))
+
     def test_the_traced_chain_ends_in_the_last_hops_file(self):
         block = self.build()["cp-c2"]
 
