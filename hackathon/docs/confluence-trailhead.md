@@ -1,4 +1,4 @@
-# Trailhead - GS AI Hackathon, 30–31 July 2026
+# Trailhead - GS AI Hackathon, 30-31 July 2026
 
 **Theme:** Improve the Developer Experience · **Categories:** Saving Time, Improving User Experience
 
@@ -6,15 +6,15 @@
 
 ## 1. Summary
 
-Trailhead turns a code repository into a single web page that teaches it. Point it at a repo and you get one file that walks a reader through what the code does, how to run it, and how one request flows through it. Every factual sentence carries a button opening the exact lines of code behind it.
+**Trailhead is not a single prompt.** It is a five-stage pipeline in which four stages are deterministic Python, plus two Node gate scripts and a 700-test suite - the model writes prose in exactly one stage, and ordinary code checks every sentence it writes. Point it at a repo and you get one self-contained web page that teaches it: what the code does, how to run it, how one request flows through it, and a clickable evidence trail behind every factual sentence.
 
 What matters is what happens to sentences it *cannot* back up: they are deleted before anyone sees the page, and the number deleted is printed on screen.
 
 | Term | Meaning |
 |---|---|
 | **claim** | One factual sentence in the generated page |
-| **anchor** | The `file:line` range a claim cites, plus those lines and a checksum |
-| **`verified.json`** | The data file the page is built from - the frozen generator-to-page contract |
+| **anchor** | The `file:line` range a claim cites, plus those lines and a sha256 |
+| **`verified.json`** | The data file the page is built from - the frozen generator-to-page contract, now `trailhead/verified@3` |
 
 ---
 
@@ -27,17 +27,14 @@ Reading code you did not write is slow, and it is not only a new-joiner problem 
 | **New joiner onboarding** | A map before the detail | Files read in arbitrary order; asking a colleague costs two people |
 | **Engineer entering an unfamiliar module** | Boundaries, conventions, blast radius | Grep-and-guess; conventions live in one or two heads |
 | **Returning to code after months** | What it does, and why | Re-deriving decisions the code never recorded |
-| **Understanding a set of changes** | What moved, and what it affects | A diff without the structure to judge its consequences |
 
 **The answer is already in the repo - the cost is locating it and trusting it.** Documentation solves locating, then decays. Asking a person keeps trust but spends two people's time.
 
-> **Scope note.** Trailhead covers the first three cases today. The fourth is roadmap, not a current feature - see §10.
-
 ---
 
-## 3. What Trailhead does
+## 3. What Trailhead is, mechanically
 
-Five stages run in order. Only one uses AI.
+Five stages run in order. Only one uses AI. All five are built and tested.
 
 ```
 repo ──▶ 1 SURVEY ──▶ survey.json ──▶ 2 MAP ──▶ map.json
@@ -53,158 +50,110 @@ repo ──▶ 1 SURVEY ──▶ survey.json ──▶ 2 MAP ──▶ map.json
 
 | Stage | AI? | Job |
 |---|---|---|
-| 1 Survey | No | File tree, import edges, entry points, git churn |
-| 2 Map | No | Collapse to modules; compute the diagram layout up front |
-| 3 Narrate | **Yes** | The prose - one small call per unit, returning claims plus verbatim quotes |
-| 4 Verify | No | Re-open every file, hash-match every excerpt, delete what fails |
-| 5 Render | No | Turn `verified.json` into one HTML file |
+| 1 Survey | No | File tree, import graph, entry points, dangling imports, churn - stdlib `ast`, Python only |
+| 2 Map | No | Collapse 300+ modules to a board of ~11 groups; DAG-layered columns; test containers taken off-board; geometry computed up front, no layout engine in the page |
+| 3 Narrate | **Yes** | Prose only. One self-describing prompt pack per unit; the model answers with claims plus verbatim quotes, never line numbers |
+| 4 Verify | No | Re-open every cited file, resolve every quote, hash every excerpt, delete what fails, assemble the payload |
+| 5 Render | No | Splice one JSON payload into a fixed renderer template; refuse anything that would render a lie or a blank page |
 
-A command runner executes the repo's own setup and test commands, capturing real exit codes, output and timings.
+Plus a **command runner** (before narrate, deterministic) that executes the repo's own allowlisted setup and test commands and captures real exit codes, output and timings - a failing command ships failing.
+
+Narrate runs as two CLI passes with an agent step in between: pass A emits the packs and stops; the host agent answers each pack into the narration store; pass B replays the store with no live model in the loop. For the proving-ground repo that is 22 packs across 9 unit kinds.
 
 ---
 
 ## 4. Innovation - the model writes, the machine checks
 
-Most tools ask a model to explain your code and print what it says. Trailhead assumes the model will sometimes be confident and wrong, and puts an automated checker between it and the reader.
-
 **Only stage 3 touches a model.** Everything that checks is deterministic code - a model cannot be its own auditor.
 
-**Never ask for line numbers; ask for a quote.** Models count badly and copy well. The model receives the file with line numbers attached and must return the snippet it cites; code then locates that snippet and derives the range. A snippet not found word-for-word is deleted, not repaired.
+**Never ask for line numbers; ask for a quote.** Models count badly and copy well. The model sees numbered windows and must return the verbatim snippet; code locates it and derives the range. A snippet not found word-for-word is deleted, not repaired.
 
-**Deleted claims are counted on screen.** The badge opens a ledger of every deletion and its reason. Hiding the number would defeat the point of computing it.
+**Deleted claims are counted on screen.** The badge opens a ledger of every deletion and its reason. This is now observed behaviour, not design intent: the first full generation run deleted 10 of 65 claims (quotes taken outside the shown windows, one docstring duplicated across two files, one over-length answer). They were re-answered honestly; the final run carries 0 deletions because every anchor resolves, and the ledger says which of those two worlds you are in.
 
-**Commands are run, not described.** Exit codes, output and timings come from real execution; failing commands are shown failing, with any suggested cause marked unverified.
+**Commands are run, not described.** 4 commands executed on the demo repo, 3 failing, shown failing, with cause hypotheses explicitly tagged INFERRED.
 
 ---
 
 ## 5. How a claim is checked
 
-All of the above rests on one question: when the page tells you something about the code, why should you believe it? Because a claim must pass a mechanical test before it is allowed onto the page - and that test is ordinary code that never asks a model anything.
+Each claim arrives as a sentence plus the **verbatim snippet** it cites. The snippet must survive: a quality floor (length and distinctiveness), exact character-for-character match, exactly one match, in the cited file, inside the window the model was shown, then a sha256 over the resolved lines - recomputed by stage 4 against disk and again by the gate against the copy shipped inside the page. Failing any check deletes the claim and ledgers the reason; twelve reasons are defined.
 
-Each claim arrives as a sentence plus the **verbatim snippet** it says it is citing, never a line number. The snippet then has to survive five checks:
+> **What this does not check:** that a sentence is a *good* description - only that it cites real code, uniquely, where it says it does, and that the evidence shipped is the evidence checked. Anything unanchorable is marked `INFERRED` on screen instead of dressed up as fact.
 
-1. **Quality floor** - at least two lines and 40 non-whitespace characters. Shorter quotes are not distinctive enough to locate reliably.
-2. **Exact match** - searched for character-for-character in the cited file. No fuzzy matching, no whitespace-insensitive comparison, no closest-match fallback; a fallback that can land in the wrong place is the exact failure this exists to prevent.
-3. **Exactly one match** - if the snippet appears twice, the claim is deleted rather than guessed at. Measured on a real repo, 12.8% of two-line quotes occur more than once in their own file.
-4. **The right file** - if it resolves in a file other than the one cited, the claim is deleted. Without this check, a wrong-file citation would display as verified with a valid checksum.
-5. **Checksum** - the cited lines are hashed, and the copy shipped inside the page is re-hashed by an automated gate. A mismatch means what you are reading is not what was checked.
-
-A claim failing any check is removed from the page entirely and listed in the ledger with its reason. Twelve reasons are defined; these fire most:
-
-| What went wrong | What the reader sees |
-|---|---|
-| Snippet is not in the file word-for-word | `snippet not found verbatim in file` |
-| Snippet appears more than once | `snippet ambiguous` |
-| Snippet is really in a different file | `snippet belongs to a different file than the one cited` |
-| The file changed after the prose was written | `excerpt hash mismatch: file changed after narration` |
-| The model returned something unusable | `model returned unparseable output` |
-
-> **What this does not check.** None of it establishes that a sentence is a *good description* of the code - only that it cites real code, uniquely, where it says it does. That boundary is deliberate. Anything unanchorable is marked `INFERRED` on screen instead of dressed up as fact; the most interpretive part of the walkthrough is marked inferred wholesale; command output comes from execution, not description. What is guaranteed is that the evidence is real and is the evidence that was checked - narrower than "correct", and something ordinary code can guarantee with no model in the loop.
-
-The resolver is specified in full and written test-first. Stage 4 is not yet built - see §10.
+The same machinery now verifies every new `@3` surface: glossary anchors, map-node excerpts, and tour references all resolve, hash, and drop through the same ledger (`g-`, `n-`, `t-` prefixed entries).
 
 ---
 
-## 6. Impact
+## 6. What is new since the spec (contract `@3`)
 
-### Saving time
+The hand-built walkthrough at `out/trailhead-mlvol-template.html` was authored first as the quality lock; the generator was then rebuilt until its output matches it. The renderer in the pipeline **is** that template. Everything below is generated for any repo, degrades to the old `@2` page when narration is absent, and is enforced by the extended gates:
 
-Generated once per commit, read many times. Two costs disappear: the "who do I ask" hop, and the "is this still true" re-check.
-
-**Time saved per reader: [TBD - needs measurement].** No figure is quoted because none has been measured; inventing one would contradict the premise of the project.
-
-Assumptions any figure would rest on, stated so they can be challenged:
-
-- The reader would otherwise interrupt a colleague - the real cost is two people's time
-- Generation is amortised: one run serves every later reader of that commit
-- The walkthrough covers what people ask first - orientation, setup, one end-to-end path
-
-**The experiment that would produce the number:** two engineers, one unfamiliar repo, five comprehension questions, one with Trailhead and one without; record time to correct answers.
-
-### Improving user experience
-
-| Today | With Trailhead |
+| Feature | What it is |
 |---|---|
-| You must know what to ask before a chatbot helps | A fixed route; no question needed to start |
-| Answers arrive with no evidence | Every claim expands to the lines behind it |
-| Docs may be stale and you cannot tell | Unbackable claims deleted; the count is on screen |
-| Setup steps may not work | Commands were executed; failures shown failing |
-| Needs a network, a login, a tool | One file, opens offline from `file://` |
+| **Whole-sentence evidence** | Every verified sentence is clickable; the excerpt opens inline with real line numbers and a sha chip |
+| **Narrated node drawers** | Click any map module: 2-3 role paragraphs, what flows in and out, key files with purposes, concept chips, one anchored excerpt. Falls back to mechanical stats when unnarrated |
+| **Layered map** | Import-DAG columns with model-narrated labels; edges dim by default, hover isolates; tests off-board with an honest note |
+| **Guided tour** | Steps through the board from the entry point with narration; BACK / NEXT / OPEN |
+| **Glossary** | Dotted terms in prose open popovers with a jump to the defining lines; a glossary stop lists all terms; dead references are rewritten to plain text at verify |
+| **Stats tiles** | Cover metrics straight from `survey.json` - loc, files, modules, tests, commands, missing modules |
+| **Restore ledger** | When imports resolve to no file on disk (14 modules, 706 sites on the demo repo), a table names them instead of writing around them |
+| **Dive stops** | An INSIDE THE SYSTEM track: one narrated deep-dive per major subsystem, each with prose, an anchored excerpt, and group stats |
+| **Predictions and confidence** | Command results and trace hops veil until you predict; checkpoints capture sure/guessing before answering; a YOUR RECORD panel reports confident-and-wrong |
+| **Honest provenance** | The ledger footer prints the real regeneration command; checkpoint answer keys still come from `survey.json`, never a model |
+| Plus | Engineering-grid GS shell, cover START, mobile rail, print linearises every stop, keyboard-complete, light and dark |
 
 ---
 
-## 7. Feasibility
-
-Some of this is built and machine-checked today; the rest is not. Both gates pass, output quoted verbatim.
+## 7. Feasibility - current state, all machine-checked
 
 ```
-node tools/check-bundle.js     → BUNDLE OK, exit 0    (21 structural checks, 125.2 KB)
-node tools/verify-contract.js  → ALL ANCHOR + CONTRACT CHECKS PASS, exit 0
-                                 payments-core: 5 tracks, 11 stops, 13 anchors sha256-verified
-                                 ML-GS:         5 tracks, 12 stops, 17 anchors sha256-verified
-PYTHONPATH=src py -3.11 -m unittest discover -s tests → Ran 8 tests, OK
+PYTHONPATH=src python -m pytest tests/ → 587 passed, 122 subtests passed
+node tools/check-bundle.js out/restored.html    → BUNDLE OK
+node tools/verify-contract.js out/restored.html → ALL ANCHOR + CONTRACT CHECKS PASS (72 anchors sha256-verified)
+node tools/check-fixtures.js                    → FIXTURE CHAIN CONSISTENT
 ```
 
 | Piece | State |
 |---|---|
-| Artifact spec - 9 sections, 12 acceptance tests | Done |
-| `verified.json` contract | Frozen |
-| Renderer - all 9 block types | Working |
-| Automated gates | Both passing |
-| Verification design - resolver, drop vocabulary, hash recipe | Specified in full |
-| Stage 1 Survey | Partial - import parsing, 8 tests; no file walker |
-| Stages 2, 4, command runner | Not built |
-| Stage 3 Narrate | Not built; AI tool not yet selected |
-
-Budget is 10 hours, with the pivot rule fixed in advance: if the generator loop is still unreliable at hour 4, hard-code the demo path rather than chase generality.
+| Stages 1-5 + command runner | Built, tested, run end to end |
+| Contract `trailhead/verified@3` | Frozen, gate-enforced with negative tests and a parity fixture |
+| Generated demo | `out/restored.html`: 17 stops, 63 claims (49 verified / 14 inferred / 0 dropped), 27 live glossary terms, both gates green |
+| Quality lock | `out/trailhead-mlvol-template.html`: hand-built target the generator is judged against |
+| Genericity | Four fixture repos generate cold (no narration) with honest degradation and green gates, pinned by tests |
 
 ---
 
-## 8. What you see on screen
+## 8. Demo - the 60-second path
 
-It reads like a short course, not a chat window - one screen at a time, contents rail down the left.
-
-- **Top bar** - repo, commit, generation date; a badge showing claims, deletions, commands, failures; projector mode, theme, reset
-- **Left rail** - the route in five tracks, a tick per completed stop, overall progress
-- **Main column** - one stop at a time: prose, excerpts, module diagram, command output, checkpoints
-- **Claim marker** - click a marked sentence; the cited lines appear, numbered and highlighted, with a copy button
-- **Badge** - opens the ledger of deleted claims and the reason for each
-- **Checkpoints** - graded in the page against a key derived from survey data, never a model; with no model present to grade free text, questions are multiple-choice or ordering
-- Progress is saved per commit, so a regenerated walkthrough starts clean
+1. Open `hackathon/out/restored.html` - no server, no network
+2. Read the badge: 63 claims, 0 dropped, 4 cmds, 3 failing; click it for the ledger
+3. On **Five sentences**, click any sentence - the cited lines open with a sha chip
+4. On **The map**, hit GUIDED TOUR, then click the `data` node for its drawer
+5. On **Prerequisites and setup**, answer the prediction, then read the missing-modules restore ledger
+6. Open any **Inside ...** stop and click a dotted glossary term
 
 ---
 
-## 9. Demo - the 60-second path
-
-1. Open `hackathon/demo/trailhead-demo.html` - no server, no network
-2. Read the top-bar badge: claims, deletions, commands, failures
-3. Click it - the ledger lists every deleted claim and why
-4. Open **Five things to know**, click a claim marker - the cited lines appear
-5. Open **Run the gates** - real captured output, including a command that failed
-6. Use the repo switcher to move between the two walkthroughs
-
----
-
-## 10. Status, risks and next steps
+## 9. What is still missing
 
 Stated plainly, because a page about verification that overstated itself would be self-defeating.
 
 | Item | Detail |
 |---|---|
-| **No model has run through the pipeline yet** | Stage 3 is not built; both walkthroughs were written by hand against the frozen contract. The checks in §5 are specified and test-driven, but the deletion counts shown are authored, not observed. |
-| **One demo repo is synthetic** | `payments-core` does not exist - it is test data, labelled `SAMPLE · SYNTHETIC REPO` on screen. Its command output is illustrative, not captured. |
-| **The real walkthrough's anchors are pinned to an older commit** | `ML-GS` cites commit `fb3c3ce`. Four of its eight cited files match that commit byte-for-byte, 14 of 14 lines. The other four were untracked then, and two have since been rewritten - 93 of 112 bundled lines no longer match the working tree. |
-| **Why the gates still pass** | The gate recomputes each checksum from the copy shipped inside the page, proving the excerpt was not altered after generation. Re-opening the file on disk is stage 4's job, and stage 4 is not built - precisely the gap §5 closes once it ships. |
-
-**Next, in order:** stage 4, so anchors are re-checked against disk; the command runner; select and wire the AI tool for stage 3; regenerate against a repo nobody has read; measure the time saved.
+| **Checkpoint breadth** | 4 derived checkpoints in 2 stops; the quality lock carries 13 across 5. More deterministic key sources needed (GET IT RUNNING, dives, conventions have none) |
+| **Glossary depth** | Pack caps at 14 terms; the lock carries 28. Raising the cap is a prompt-pack change |
+| **Trace discovery** | The 8-hop trace for the demo repo is a hand-checked fixture (by design); automatic trace discovery for arbitrary repos is not built - repos without a fixture get an honest degradation callout |
+| **Named AI tool** | Narrate runs as host-agent-answered prompt packs (any model) or a live provider; which internal GS tool it names on stage is still the open decision |
+| **Language scope** | Python-only survey via stdlib `ast`, deliberately |
+| **Time saved** | Unmeasured. The experiment: two engineers, one unfamiliar repo, five comprehension questions, with and without Trailhead |
 
 ---
 
 ## Judging criteria - where the evidence is
 
-| Criterion | Evidence on this page |
+| Criterion | Evidence |
 |---|---|
-| **Innovation** | §4 - verification is deterministic code, not a second model; quote-not-line-numbers. §5 - the five checks a claim must survive and the twelve ways it can be deleted. §3 - one stage of five uses AI. |
-| **Impact** | §2 - four situations, and where the time goes in each. §6 - mechanism and assumptions stated; the figure marked `[TBD]` rather than invented, with the experiment named. |
-| **Feasibility** | §7 - both gates pass with output quoted, 8 tests pass, contract frozen, verification design specified in full, 10-hour budget with a written pivot rule. §10 - what is not built. |
-| **User experience** | §8 - on-screen anatomy. §9 - a 60-second path anyone can follow. §6 - one offline file, evidence one click away, no question needed to start. |
+| **Innovation** | §4 - deterministic checker between model and reader, quote-not-line-numbers, observed deletions on screen. §5 - the checks and the drop vocabulary. §3 - one stage of five uses AI |
+| **Impact** | §2 - where the time goes. §7 - generated once per commit, read many times, offline |
+| **Feasibility** | §7 - full pipeline built, 587 tests, gates green on generated output, genericity pinned on fixture repos. §9 - what is not built, stated |
+| **User experience** | §6 - the feature set. §8 - a 60-second path anyone can follow |
