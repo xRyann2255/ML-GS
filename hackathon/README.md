@@ -124,15 +124,14 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 hackathon/
 ├── README.md                 this file
-├── briefs/                   per-stage build briefs (A-survey … E-integration)
+├── backup/                   verbatim copies of every generated bundle — demo fallback, never written by the pipeline
 ├── demo/trailhead-demo.html  two-payload demo bundle, 165 KB, passes all gates
 ├── docs/                     walkthrough-spec.md   spec for the generated page (authoritative)
 │                             verified-contract.md  frozen field-by-field payload contract
 │                             pipeline-contracts.md stage-to-stage artifact contracts
-│                             ideas-shortlist.md    pre-hackathon idea selection
 ├── fixtures/                 hand-written stage payloads; verified.parity.json is the minimal @3 reference
 ├── out/                      pre-generated walkthroughs (restored, imc, qrt, ryanatron-v2, …)
-├── restored/                 the committed proving-ground repo out/restored.html is generated from
+├── restored/                 local proving-ground repo out/restored.html was generated from (on disk, gitignored)
 ├── src/trailhead/            the generator — pure-stdlib Python package
 ├── template/                 hand-built template walkthrough and its build pipeline
 ├── tests/                    unittest suite + four synthetic fixture repos with oracles
