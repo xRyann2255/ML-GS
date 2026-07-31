@@ -1,0 +1,305 @@
+{
+  "area": "workspace-ops",
+  "overview": "This subsystem is the dev loop and governance layer of ml-vol-estimator, the ML realized volatility forecasting project (registered as productGuid product::982135 in .gs-project.yml). Because most day-to-day work is done by Copilot agents rather than humans, the repo enforces its rules with ordinary code instead of convention. The centerpiece is workspace/lint/lint_all.py, a stdlib-only runner that executes a registry of 21 governance checks in parallel: secexpr safe-mode enforcement, secrets scanning, CoALA memory schema and token budgets, subagent model pins, parity between the ./vol CLI and its documentation, VS Code task hygiene, prompt and schema checks, and more. That same 21-check suite is wired in three places: a local pre-commit hook that always runs, the first step of the GitHub Actions CI job, and the lint-workspace VS Code task. CI itself is explicitly a mirror-only gate: the real remote is GS GitLab where Actions never fire, so ci.yml runs ruff, mypy, and pytest with a 30 percent coverage floor only on the personal GitHub mirror. Agent behavior is governed by .github/copilot-instructions.md: two supported execution surfaces (GS Windows and GS Linux Coder), all file writes confined to workspace/tmp/, all compute routed through the ./vol wrapper or the 45 predefined VS Code tasks that pass arguments via JSON args-files, TDD required for Python changes, and every subagent pinned to a specific Claude model. The workspace/research/ folder is the scientific record that this loop protects: an append-only research journal (capped at 10 entries with an archive) logging trial outcomes such as the trial-067 XGBoost champion at h=1 QLIKE 0.1292, the trial-032 IV tenor-matching win, the trial-055 linear champion ridge_har_cj_iv_0dte at 0.13397, and the GNN program's honest null result, all cross-referenced to trial configs under workspace/configs/.",
+  "modules": [
+    {
+      "path": "workspace/lint/",
+      "role": "The enforcement point for repo governance: 25 stdlib-only Python scripts, 21 of which are registered in lint_all.py and run in parallel (default 4 workers) with a pass/fail exit code. Checks span security (secexpr safe mode, secrets, doc safety), agent contracts (model pins, args-file contract, wrapper targets, prompts), knowledge hygiene (CoALA memory schema with explicit token budgets, memory priority, index completeness, broken refs), and drift detection (vol CLI vs docs parity, registry drift, VS Code task and markdown compatibility). It is invoked by the pre-commit hook, by CI, and by the lint-workspace VS Code task, so the same gate fires at every stage of the loop.",
+      "key_files": [
+        { "file": "lint_all.py", "purpose": "Registry and parallel runner for the 21 governance checks, exit 0 only if all pass." },
+        { "file": "lint_model_pins.py", "purpose": "Single source of truth for the subagent model pin, EXPECTED_MODEL = Claude Opus 4.6." },
+        { "file": "lint_vol_parity.py", "purpose": "Keeps ./vol CLI dispatch arms, its help text, and memory/ref/vol-cli.md in three-way parity by parsing vol as text." },
+        { "file": "validate_memory.py", "purpose": "Enforces the CoALA memory schema: frontmatter, domains, naming, and token budgets (P0+P1 up to 50k, P2 up to 100k)." },
+        { "file": "lint_secexpr_safety.py", "purpose": "Blocks secexpr --full and safe=False outside a small whitelist so the GS data tool stays safe by default." }
+      ],
+      "concepts": ["governance lint", "model pinning", "CoALA memory budgets", "CLI-doc parity", "safe-by-default"]
+    },
+    {
+      "path": "workspace/research/",
+      "role": "The operational research record for the vol forecasting program. INDEX.md routes every experiment result into trials.yaml (the structured registry, absent from this restore) plus an append-only research-journal.md capped at 10 entries with an overflow archive. The journal records hypotheses, trial outcomes, and retractions with exact QLIKE numbers: the trial-067 XGBoost h=1 champion (0.1292), the trial-032 IV tenor-matching result, the trial-036 retraction after a 5-seed reseed envelope, and the GNN program close-out where five graph trials landed within 1 bp of the har_iv baseline. weekly-progress.md is the manager-facing digest and open-questions.md the research backlog.",
+      "key_files": [
+        { "file": "INDEX.md", "purpose": "Routing table for research artifacts: what goes in trials.yaml, the journal, weekly progress, and open questions." },
+        { "file": "research-journal.md", "purpose": "Append-only session log of hypotheses, trial results, retractions, and key decisions with QLIKE numbers." },
+        { "file": "research-journal-archive.md", "purpose": "Overflow archive that receives the oldest journal entries beyond the 10-entry cap." },
+        { "file": "weekly-progress.md", "purpose": "Manager-facing Shipped/Decided/Learned/Next progress log." }
+      ],
+      "concepts": ["QLIKE", "trial registry", "retraction discipline", "seed envelope validation", "GNN null result"]
+    },
+    {
+      "path": "workspace/",
+      "role": "Infrastructure root for the agent operating layer, distinct from the five primitives (personas, skills, memory, workflows, policy) that design.md defines as the system model with hard boundaries between them. It holds configs/ (trial YAMLs like trial_077_linear_alpha_cv_tournament.yaml with hypotheses and success criteria written into the config headers), plans/ (multi-plan suites such as the GNN implementation plans), bin/, docs/, learning/, presentation/, scripts/, and the TTL-managed tmp/ that is the only sanctioned write target for agents. Note the drift: design.md describes plan/, governance/, tests/, and raw/ subfolders that do not exist in the restored tree.",
+      "key_files": [
+        { "file": "design.md", "purpose": "System-wide single source of truth: five primitives, hard boundaries, repo shape, and the design lint that enforces them." },
+        { "file": "configs/trial_077_linear_alpha_cv_tournament.yaml", "purpose": "Linear model tournament config whose header records the trial-055 vs trial-056 h=1 champion discrepancy it was built to settle." }
+      ],
+      "concepts": ["five primitives", "constraint system", "trial configs as pre-registration", "TTL-managed tmp"]
+    },
+    {
+      "path": ".vscode/",
+      "role": "The task surface for the GS Windows execution surface: tasks.json defines 45 tasks. Roughly 35 wrap GS-internal skills (SECDB inspect/diff/position/translog, SLANG edit/review/eval/copilot, GitLab MR/search/pipelines, Symphony, Prime, NDS infra, data-ingest, feature-build, model-train, evaluate, backtest) each launching a skill's task script with parameters passed through a JSON args-file in workspace/tmp/, so agents never compose free-form shell. Three vol-* tasks run the ./vol wrapper (test, lint, typecheck) cross-platform via vol.cmd on Windows, and a post-open task auto-runs on folderOpen.",
+      "key_files": [
+        { "file": "tasks.json", "purpose": "45 shell tasks: skill wrappers with args-file JSON contracts, vol test/lint/typecheck, and a folderOpen bootstrap." }
+      ],
+      "concepts": ["args-file contract", "run_task surface", "terminal isolation"]
+    },
+    {
+      "path": ".github/",
+      "role": "Agent contract and mirror CI. copilot-instructions.md is the hard-rule sheet injected into every Copilot session: two supported surfaces, workspace/tmp/-only writes, wrapper-only compute, terminal cleanup exit gate, TDD, evidence-over-assumption, and the Claude Opus 4.6 subagent pin. workflows/ci.yml is explicitly labeled mirror-only because the real remote is GS GitLab where GitHub Actions never fire; it runs the 21-check governance lint at repo root, then uv-installs deps from public PyPI and runs ruff, mypy, and pytest with the project's only coverage gate at 30 percent.",
+      "key_files": [
+        { "file": "copilot-instructions.md", "purpose": "The 9 hard rules governing every agent session on both execution surfaces." },
+        { "file": "workflows/ci.yml", "purpose": "Mirror-only CI: governance lint, ruff, mypy, pytest with --cov-fail-under=30." }
+      ],
+      "concepts": ["execution surfaces", "mirror-only CI", "coverage gate", "TDD contract"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "The repo's quality gate is workspace/lint/lint_all.py, which registers 21 governance checks in a typed LINTS registry and runs them in parallel, exiting 0 only when every check passes.",
+      "file": "workspace/lint/lint_all.py",
+      "start": 55,
+      "end": 66,
+      "focus": [57],
+      "quote": "LINTS: list[tuple[str, Path, list[str], bool, bool]] = ["
+    },
+    {
+      "text": "The governance suite goes well beyond style: registered checks include a subagent model pin audit and a parity check between the ./vol CLI and its documentation, alongside secrets, prompts, and schema checks.",
+      "file": "workspace/lint/lint_all.py",
+      "start": 170,
+      "end": 190,
+      "focus": [171, 185],
+      "quote": "        \"model pins\",\n        \"vol parity\","
+    },
+    {
+      "text": "lint_secexpr_safety.py statically enforces that the GS secexpr data tool runs safe by default, scanning every Python file under skills/ for --full invocations or safe=False outside a small whitelist.",
+      "file": "workspace/lint/lint_secexpr_safety.py",
+      "start": 1,
+      "end": 13,
+      "focus": [1],
+      "quote": "\"\"\"Static lint: enforce secexpr --safe-by-default rule."
+    },
+    {
+      "text": "Every Copilot subagent is pinned to one exact model string: lint_model_pins.py holds EXPECTED_MODEL as the single source of truth and flags any other model literal in tracked prompt, policy, or memory surfaces.",
+      "file": "workspace/lint/lint_model_pins.py",
+      "start": 14,
+      "end": 28,
+      "focus": [21],
+      "quote": "EXPECTED_MODEL = \"Claude Opus 4.6\""
+    },
+    {
+      "text": "Agent memory is budgeted like a resource: validate_memory.py enforces the CoALA schema including a 50k token cap on always-loaded P0+P1 memory and a 100k token cap on on-demand P2 memory.",
+      "file": "workspace/lint/validate_memory.py",
+      "start": 1,
+      "end": 18,
+      "focus": [15, 16],
+      "quote": "  9. Loaded budget: P0+P1 ≤ 50k tokens\n 10. On-demand budget: P2 ≤ 100k tokens"
+    },
+    {
+      "text": "lint_vol_parity.py keeps the ./vol CLI honest by requiring every dispatch case arm to have a documentation row in memory/ref/vol-cli.md and vice versa, parsing the script as text because vol deliberately exits off Linux.",
+      "file": "workspace/lint/lint_vol_parity.py",
+      "start": 1,
+      "end": 14,
+      "focus": [5, 6],
+      "quote": "  V1. Every case arm in vol's dispatch block has a row in vol-cli.md.\n  V2. Every command documented in vol-cli.md is a real case arm."
+    },
+    {
+      "text": "workspace/design.md defines the agent operating layer as five primitives (Persona, Skill, Memory, Workflow, Policy) with hard boundaries between what each may define, and treats boundary violations as design errors caught by design_lint.py.",
+      "file": "workspace/design.md",
+      "start": 16,
+      "end": 30,
+      "focus": [20],
+      "quote": "The system is composed of **five primitives**:"
+    },
+    {
+      "text": "Only two execution surfaces are supported (GS Windows desktop and GS Linux Coder); the GitHub cloud coding agent is explicitly unsupported because GS-internal services are unreachable from cloud runners and the vol wrapper hard-exits there.",
+      "file": ".github/copilot-instructions.md",
+      "start": 6,
+      "end": 15,
+      "focus": [9, 10],
+      "quote": "S-B (GS Linux Coder workspace). The GitHub cloud coding agent (S-C) is **UNSUPPORTED**: `*.gs.com`\nservices are unreachable from cloud runners, `./vol` hard-exits there, and no `run_task` labels"
+    },
+    {
+      "text": "Agents may write files only under workspace/tmp/ inside the repo; writing to /tmp, the home directory, or any outside path is banned because it triggers manual approval prompts that break automation.",
+      "file": ".github/copilot-instructions.md",
+      "start": 15,
+      "end": 24,
+      "focus": [17, 19],
+      "quote": "ALL file writes (temp files, outputs, scripts, artifacts) MUST go to `workspace/tmp/` relative to repo root.\n**NEVER** write to `/tmp/`, `~`, `/home/*/`, or any path outside this repository. Violations trigger manual approval prompts that block automation."
+    },
+    {
+      "text": "On the Linux surface all Python and tooling must go through the ./vol wrapper (shell, test, lint, fmt, exec, bg, sync); bare python, pytest, pip, uv, ruff, or mypy are forbidden because they fail silently with the wrong venv or missing library paths.",
+      "file": ".github/copilot-instructions.md",
+      "start": 23,
+      "end": 34,
+      "focus": [25],
+      "quote": "- **S-B (Linux Coder):** ALWAYS use `./vol` (`shell|test|lint|fmt|exec|bg|sync`). **NEVER** run"
+    },
+    {
+      "text": "Test-driven development is a hard rule for agents: every Python change must start from a failing test, with bug fixes reproducing the symptom first and refactors protected by characterization tests.",
+      "file": ".github/copilot-instructions.md",
+      "start": 59,
+      "end": 70,
+      "focus": [63],
+      "quote": "Write a **failing test BEFORE implementation** for all Python code changes:"
+    },
+    {
+      "text": "GitHub Actions CI is a mirror-only safety net, not the project's quality gate: the real remote is GS GitLab where Actions never fire, so ci.yml only runs on the personal GitHub mirror.",
+      "file": ".github/workflows/ci.yml",
+      "start": 1,
+      "end": 11,
+      "focus": [2],
+      "quote": "# MIRROR-ONLY WORKFLOW (Gate C, plan-02, 2026-07): the real remote is GS GitLab"
+    },
+    {
+      "text": "The first CI step re-runs the same 21-check workspace governance lint that the pre-commit hook enforces locally, executing it at repo root with stdlib Python before any dependencies are installed.",
+      "file": ".github/workflows/ci.yml",
+      "start": 36,
+      "end": 46,
+      "focus": [40, 44],
+      "quote": "      - name: Workspace governance lint (lint_all.py, 21 checks)\n        run: python workspace/lint/lint_all.py"
+    },
+    {
+      "text": "The CI pytest step carries the project's only coverage gate anywhere (30 percent), because the local ./vol test commands measure no coverage at all, so a green local run is not a coverage signal.",
+      "file": ".github/workflows/ci.yml",
+      "start": 60,
+      "end": 72,
+      "focus": [65, 70],
+      "quote": "      # NOTE (AW-G27): this --cov-fail-under=30 is the ONLY coverage gate anywhere.\n        run: uv run pytest tests/ --cov=volforecast --cov-report=term-missing --cov-fail-under=30"
+    },
+    {
+      "text": "The governance lint cannot rot off a branch name: a repo-local pre-commit hook runs lint_all.py with always_run true at every commit, chosen after an earlier CI trigger never fired because it watched the wrong branches.",
+      "file": ".pre-commit-config.yaml",
+      "start": 12,
+      "end": 22,
+      "focus": [16, 17, 20],
+      "quote": "        name: workspace governance lint (lint_all.py, 21 checks)\n        entry: python workspace/lint/lint_all.py\n        always_run: true"
+    },
+    {
+      "text": "The 45 VS Code tasks are the sanctioned compute surface on GS Windows: each skill task passes its parameters through a JSON args-file under workspace/tmp/ rather than free-form shell arguments, so invocations stay lintable and reproducible.",
+      "file": ".vscode/tasks.json",
+      "start": 3,
+      "end": 12,
+      "focus": [5, 9],
+      "quote": "            \"label\": \"lint-workspace\",\n            \"args\": [\"--args-file\", \"workspace/tmp/lint_args.json\"],"
+    },
+    {
+      "text": "The GNN research program ended in a defensible null: all five completed graph trials (GHAR, factor-residual, GNNHAR, attention, DCRNN) landed within 1 basis point of the har_iv linear baseline at every horizon, so graph structure does not beat pooling plus asset identity on this universe.",
+      "file": "workspace/research/research-journal.md",
+      "start": 109,
+      "end": 123,
+      "focus": [113],
+      "quote": "All five completed graph trials landed **within 1 bp of `har_iv` at every horizon** (per [trials.yaml#L2997-L3200](trials.yaml#L2997-L3200)):"
+    },
+    {
+      "text": "The best h=1 forecaster on record is XGBoost (trial-067) at QLIKE 0.1292, built from mapped LightGBM hyperparameters, a custom QLIKE objective, and a har_iv_0dte linear warm start, beating the LightGBM 5-seed mean by 76 basis points.",
+      "file": "workspace/research/research-journal.md",
+      "start": 60,
+      "end": 71,
+      "focus": [68],
+      "quote": "- **XGBoost is the new h=1 champion (trial-067, 0.1292).** XGBoost with mapped LightGBM hyperparams + custom QLIKE objective + har_iv_0dte init beats LightGBM 5-seed mean by +76 bps. Low seed variance (~2.5 bps from original single-seed). First tree model to also beat har_iv at h=22 (single-seed, unvalidated)."
+    },
+    {
+      "text": "Matching the implied volatility tenor to the forecast horizon is a confirmed win: in trial-032 the har_iv_1w variant (1 week ATM IV) improved QLIKE over har_iv from 0.1500 to 0.1403 at h=1 and from 0.1188 to 0.1072 at h=5, both with Diebold-Mariano p=0.0.",
+      "file": "workspace/research/research-journal.md",
+      "start": 787,
+      "end": 800,
+      "focus": [797, 798],
+      "quote": "- h=1: har_iv_1w QLIKE 0.1403 vs har_iv 0.1500 (+97 bps, DM p=0.0)\n- h=5: har_iv_1w QLIKE 0.1072 vs har_iv 0.1188 (+115 bps, DM p=0.0)"
+    },
+    {
+      "text": "The best linear model found is ridge_har_cj_iv_0dte, a ridge HAR with continuous/jump decomposition plus 0DTE implied vol, at h=1 QLIKE 0.13397 in trial-055; trial-077 was pre-registered to settle its discrepancy against lasso_shar_iv_0dte (0.13663) under one shared config with CV-selected alpha.",
+      "file": "workspace/configs/trial_077_linear_alpha_cv_tournament.yaml",
+      "start": 1,
+      "end": 14,
+      "focus": [6, 7],
+      "quote": "# unresolved h=1 discrepancy (055: ridge_har_cj_iv_0dte 0.13397 vs\n# 056: lasso_shar_iv_0dte 0.13663) and identifies the true best linear"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "QLIKE",
+      "definition": "Quasi-likelihood loss, the project's headline volatility forecast metric; it heavily penalizes under-predicting variance and is robust to noise in the realized variance proxy. The tournament reports Patton QLIKE alongside panel Diebold-Mariano tests and a 5 percent model confidence set.",
+      "file": "workspace/research/research-journal.md",
+      "line": 128
+    },
+    {
+      "term": "HAR",
+      "definition": "Heterogeneous Autoregressive model: a linear regression of future realized volatility on daily, weekly, and monthly RV averages (log_rv_d/w/m), the standard baseline every model here must beat.",
+      "file": "workspace/research/research-journal.md",
+      "line": 794
+    },
+    {
+      "term": "har_iv",
+      "definition": "The 4-parameter HAR extended with ATM implied volatility; a long-running champion baseline that outperformed the 128-feature LightGBM at all horizons in the IV sanity check.",
+      "file": "workspace/research/research-journal.md",
+      "line": 40
+    },
+    {
+      "term": "DM test",
+      "definition": "Diebold-Mariano test of equal predictive accuracy between two forecast series; trial results quote DM p-values to show whether a QLIKE gap is statistically significant.",
+      "file": "workspace/research/research-journal.md",
+      "line": 797
+    },
+    {
+      "term": "CoALA memory",
+      "definition": "The structured agent memory scheme (from the Cognitive Architectures for Language Agents framing): distilled knowledge files with validated frontmatter, domain folders, and hard token budgets enforced by validate_memory.py.",
+      "file": "workspace/lint/validate_memory.py",
+      "line": 2
+    },
+    {
+      "term": "secexpr",
+      "definition": "A GS-internal data access command invoked by skills; the lint suite forces its safe mode by default and allows the --full flag only in explicitly whitelisted files.",
+      "file": "workspace/lint/lint_secexpr_safety.py",
+      "line": 1
+    },
+    {
+      "term": "execution surface",
+      "definition": "A sanctioned environment where agents may run: S-A is the GS Windows desktop with VS Code tasks, S-B is the GS Linux Coder workspace with the ./vol wrapper, and S-C (GitHub cloud agent) is unsupported.",
+      "file": ".github/copilot-instructions.md",
+      "line": 8
+    },
+    {
+      "term": "args-file contract",
+      "definition": "The convention that VS Code tasks pass all parameters through a JSON file under workspace/tmp/ instead of shell arguments, making skill invocations reproducible and lintable (enforced by lint_args_contract.py).",
+      "file": ".vscode/tasks.json",
+      "line": 9
+    }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "lint_model_pins.py enforces one exact model string for every Copilot subagent. Which is it?",
+      "options": ["Claude Opus 4.6", "Claude Sonnet 4", "GPT-4o", "Claude Haiku 3.5"],
+      "answer": 0,
+      "provenance": "EXPECTED_MODEL constant at workspace/lint/lint_model_pins.py:21",
+      "explanation": "EXPECTED_MODEL = \"Claude Opus 4.6\" is the single source of truth; any other model literal outside two sanctioned files fails the model pins lint."
+    },
+    {
+      "kind": "single",
+      "prompt": "How many governance checks does workspace/lint/lint_all.py register and run?",
+      "options": ["9", "15", "21", "45"],
+      "answer": 2,
+      "provenance": "LINTS registry at workspace/lint/lint_all.py:57-205; named as 21 checks in .github/workflows/ci.yml:40 and .pre-commit-config.yaml:16",
+      "explanation": "The LINTS registry holds 21 entries, and both the CI step and the pre-commit hook name it as the 21-check suite. 45 is the number of VS Code tasks, not lint checks."
+    },
+    {
+      "kind": "single",
+      "prompt": "Per the agent hard rules, where is the ONLY place an agent may write temporary files?",
+      "options": ["/tmp/", "workspace/tmp/ inside the repo", "the user home directory", "src/tmp/"],
+      "answer": 1,
+      "provenance": "Rule 1 at .github/copilot-instructions.md:17-19",
+      "explanation": "All file writes must go to workspace/tmp/ relative to repo root; anything outside the repository triggers manual approval prompts that block automation."
+    },
+    {
+      "kind": "order",
+      "prompt": "Put the quality gates in the order they fire for a change that gets committed and pushed to the GitHub mirror.",
+      "options": ["pre-commit workspace-lint hook (lint_all.py, always_run)", "CI workspace governance lint at repo root", "CI ruff lint and format check", "CI mypy type check", "CI pytest with the 30 percent coverage gate"],
+      "answer": 0,
+      "provenance": ".pre-commit-config.yaml:13-20 (commit time) then .github/workflows/ci.yml:40-70 (step order: governance lint, ruff, mypy, pytest)",
+      "explanation": "The options are listed in execution order: the local always_run hook fires at commit time, then the mirror CI job repeats the governance lint first and only afterwards runs ruff, mypy, and the coverage-gated pytest."
+    }
+  ],
+  "confirmed_missing": [
+    "workspace/research/trials.yaml: designated the structured experiment registry by workspace/research/INDEX.md:13 and cited with line anchors by research-journal.md:113, but the file is absent from the restored tree",
+    "workspace/plan/, workspace/governance/, workspace/tests/, workspace/raw/: described in the repo shape at workspace/design.md:59-74, but none exist on disk; the live tree has workspace/plans/ and workspace/configs/ instead"
+  ]
+}

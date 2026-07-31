@@ -1,0 +1,248 @@
+{
+  "area": "configs-experiments",
+  "overview": "The experiment layer is where the vol forecasting pipeline is actually driven. Every experiment, from the plain HAR baseline to the tree and graph model tournaments, is a single YAML file in workspace/configs/, parsed into an ExperimentConfig dataclass and executed by the vol run CLI in src/volforecast/__main__.py. A config names the trial, picks a symbol universe (up to 34 tickers in the full universe), a date range, and forecast horizons of 1, 5, and 22 trading days, then stacks ordered feature layers (HAR memory features, semivariances, noise-robust estimators, options-implied signals, calendar dummies, tree expansions) and selects a model by registry name. Cross-validation, Optuna tuning, SHAP feature selection, and a tournament block with Diebold-Mariano tests, a Model Confidence Set bootstrap, and economic backtests (delta-hedged straddles, vol targeting, and the GSVIVS01 variance swap signal) are all declared in the same file, so a trial is fully reproducible from its YAML. Trials follow a trial_NNN_description naming convention, over 100 of them survive in the restore, and each writes to a matching data/models/ directory. Results are logged to workspace/research/, whose research journal records the headline numbers: trial-036's LightGBM champion (h=1 QLIKE 0.1289) was retracted after a 5-seed reseed showed it below the seed-variance envelope, and trial-067's XGBoost with a custom QLIKE objective and har_iv_0dte init is the current h=1 champion at QLIKE 0.1292. Two restore gaps matter here: src/volforecast/config.py, the dataclass source of truth that every stage imports, and workspace/research/trials.yaml, the structured trial registry, are both absent from disk.",
+  "modules": [
+    {
+      "path": "workspace/configs/",
+      "role": "Holds every experiment definition as a standalone YAML file, over 100 trial configs plus a fully commented canonical example that documents each field ExperimentConfig.from_yaml accepts. A config declares universe, date_range, horizons, ordered feature_layers, a model with hyperparameters, cv, optional tuning and feature_selection, a tournament block, training_mode, seed, and output_dir. Trials are named trial_NNN_description.yaml (for example trial_036_CHAMPION.yaml, trial_067_xgb_gsvivs01_eval.yaml) and the name field doubles as the output path under data/models/. These files feed the vol run CLI, which parses them into ExperimentConfig and routes everything through the tournament runner; results land in the output_dir and get logged into workspace/research/.",
+      "key_files": [
+        { "file": "_CANONICAL_EXAMPLE.yaml", "purpose": "Reference config documenting every field accepted by ExperimentConfig.from_yaml, including feature layer ordering rules and the full model registry." },
+        { "file": "baseline_har.yaml", "purpose": "Minimal reference experiment: plain HAR on SPY only, 2015 to 2024, per_symbol training, the baseline every ML trial must beat." },
+        { "file": "trial_036_CHAMPION.yaml", "purpose": "The LightGBM champion config: per-horizon tenor-matched HAR-IV init_score plus a GSVIVS01 signal backtest with a tuned dead-band threshold." },
+        { "file": "trial_067_xgb_gsvivs01_eval.yaml", "purpose": "Single stub-fold XGBoost eval aligned to the GSVIVS01 strategy inception date, marked broken because the restore truncated it mid-key." }
+      ],
+      "concepts": ["experiment as YAML", "feature layers", "expanding window CV", "purge gap", "tournament", "horizon overrides", "tenor matching", "GSVIVS01 signal backtest"]
+    },
+    {
+      "path": "workspace/research/",
+      "role": "The living research record that experiments write back into. research-journal.md is an append-only session log capped at 10 entries holding the scorecard: retracted trial-036 QLIKE numbers, the trial-067 XGBoost champion at 0.1292, the closure of the LSTM research line, and the walk-forward GSVIVS01 threshold finding. weekly-progress.md is the manager-facing Shipped/Decided/Learned/Next log, and INDEX.md maps which document owns which kind of finding. The structured registry trials.yaml that INDEX.md points to did not survive the restore, so the journal and configs are the only surviving record of trial outcomes.",
+      "key_files": [
+        { "file": "research-journal.md", "purpose": "Append-only experiment log holding the QLIKE scorecard, retractions, and key decisions such as tenor matching and the XGBoost champion." },
+        { "file": "weekly-progress.md", "purpose": "Manager-facing weekly log recording milestones and findings like the QLIKE vanishing-gradient diagnosis for LSTMs." },
+        { "file": "INDEX.md", "purpose": "Routing table for research artifacts; names trials.yaml as the structured experiment registry (missing from the restore)." }
+      ],
+      "concepts": ["QLIKE scorecard", "retraction discipline", "seed-variance envelope", "walk-forward validation", "research journal"]
+    },
+    {
+      "path": "src/volforecast/",
+      "role": "The CLI entry point __main__.py turns a config file into a run: vol run loads the YAML via ExperimentConfig.from_yaml (with an interactive picker if no path is given), applies tuning overrides from CLI flags, checks the realized-vol cache for every universe symbol and auto-ingests the missing ones, then routes every mode through _run_tournament. The tournament handler reads the model list, horizons, DM baseline, and MCS bootstrap count straight off the config object, so the YAML fully determines what runs. The ExperimentConfig class itself lives in volforecast/config.py, which is imported here and by checkpoint, fold-cache, and reporting code but is absent from the restored snapshot.",
+      "key_files": [
+        { "file": "__main__.py", "purpose": "CLI entry: parses vol run arguments, loads ExperimentConfig from YAML, gates on ingest, and executes the model tournament." }
+      ],
+      "concepts": ["config-driven pipeline", "ingest gate", "tournament routing", "ExperimentConfig"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "Every experiment is one YAML file parsed by ExperimentConfig.from_yaml; the canonical example documents every accepted field, and its declared source of truth, src/volforecast/config.py, is missing from the restored snapshot.",
+      "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml",
+      "start": 1,
+      "end": 14,
+      "focus": [4, 8],
+      "quote": "# This file documents every field accepted by ExperimentConfig.from_yaml().\n# Source of truth: src/volforecast/config.py (dataclasses)"
+    },
+    {
+      "text": "Forecasts are produced at three horizons, 1, 5, and 22 trading days (daily, weekly, monthly), over a symbol universe capped at 34 tickers.",
+      "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml",
+      "start": 15,
+      "end": 28,
+      "focus": [19, 26],
+      "quote": "universe:  # List of ticker symbols (max 34 in full universe)\nhorizons: [1, 5, 22]  # Forecast horizons in trading days (1=daily, 5=weekly, 22=monthly)"
+    },
+    {
+      "text": "Feature layers are order-sensitive: iv_surface must precede the options layer because it supplies the implied-vol data that layer consumes, and tree_expansion must come last because it expands features from all preceding layers.",
+      "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml",
+      "start": 44,
+      "end": 57,
+      "focus": [48, 49],
+      "quote": "#   - iv_surface MUST come before options (provides IV data that options layer consumes)\n#   - tree_expansion MUST come last (expands features from all preceding layers)"
+    },
+    {
+      "text": "Model choice is a one-line registry name in YAML: gradient-boosted trees (lightgbm variants and xgboost), graph models (ghar, gnn, gnnhar, dcrnn_har, stid, gsp_har), deep sequence models (lstm, tcn), and naive baselines like ewma and vix_implied are all swappable without code changes.",
+      "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml",
+      "start": 84,
+      "end": 93,
+      "focus": [85, 87, 90, 91],
+      "quote": "  #   ML:          lightgbm, lightgbm_dart, lightgbm_bagged, lightgbm_calibrated, xgboost\n  #   Graph:       ghar, gnn, gnn_learned, gnnhar, dcrnn_har, stid, gsp_har\n  #   Deep:        lstm, tcn\n  #   Naive:       ewma, same_day_rv, random_walk, vix_implied, atm_iv_implied,"
+    },
+    {
+      "text": "Cross-validation defaults to an expanding window with a 10-date purge gap between train and test to prevent leakage, a 504 trading day (2 year) initial train window, and 126 day (6 month) test folds.",
+      "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml",
+      "start": 235,
+      "end": 245,
+      "focus": [241, 243, 244],
+      "quote": "  purge_gap: 10        # Embargo gap in DATE units between train/test to prevent leakage\n  train_size: 504      # Initial training window in trading days (504 = 2 years)\n  test_size: 126       # Test window per fold in trading days (126 = 6 months)"
+    },
+    {
+      "text": "Tournament mode evaluates a list of models against a named baseline using Diebold-Mariano tests and a 10,000-sample bootstrap Model Confidence Set test.",
+      "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml",
+      "start": 289,
+      "end": 304,
+      "focus": [302, 303],
+      "quote": "  baseline: har            # Reference model for DM tests / delta tables\n  mcs_bootstrap: 10000    # Bootstrap samples for Model Confidence Set test"
+    },
+    {
+      "text": "Beyond statistical loss, the tournament runs economic-value backtests: delta-hedged straddle PnL, vol-targeting Sharpe, and a GSVIVS01 variance swap signal backtest, each toggled in the config.",
+      "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml",
+      "start": 304,
+      "end": 318,
+      "focus": [307, 309, 312],
+      "quote": "  dh_enabled: true         # Delta-hedged straddle PnL table + plots\n  vt_enabled: true         # Vol-targeting Sharpe / PnL table + plots\n  gsvivs_enabled: true     # Enable GSVIVS01 variance swap signal backtest"
+    },
+    {
+      "text": "The trial-036 champion is a LightGBM that boosts residuals from a linear HAR-IV base forecast supplied as init_score via the base_model parameter, rather than learning volatility levels from scratch.",
+      "file": "workspace/configs/trial_036_CHAMPION.yaml",
+      "start": 46,
+      "end": 68,
+      "focus": [47, 62],
+      "quote": "  name: lightgbm\n    base_model: har_iv_1w"
+    },
+    {
+      "text": "The champion config tenor-matches the implied-vol init to each horizon via horizon_overrides: 0DTE ATM IV at h=1, 1-week IV at h=5, and 1-month IV at h=22, so the linear base always prices the exact forecast window.",
+      "file": "workspace/configs/trial_036_CHAMPION.yaml",
+      "start": 70,
+      "end": 80,
+      "focus": [70, 75, 79],
+      "quote": "# Per-horizon init: exact tenor matching\n        base_model: har_iv_0dte\n        base_model: har_iv"
+    },
+    {
+      "text": "The champion trades the GSVIVS01 variance swap signal with a 0.0030 variance-space dead-band threshold, which lifted h=1 Sharpe from 1.95 to 2.27 on Exec Kvar in a single-seed sweep.",
+      "file": "workspace/configs/trial_036_CHAMPION.yaml",
+      "start": 81,
+      "end": 92,
+      "focus": [83],
+      "quote": "  gsvivs_short_threshold: 0.0030  # variance-space dead-band (single-seed sweep, 2026-06-12): Sharpe 1.95 -> 2.27 @ h=1 on Exec Kvar; supersedes trial-042 threshold=0 finding pending multi-seed confirmation"
+    },
+    {
+      "text": "Each trial writes its results to a directory under data/models named after the experiment, so the trial_NNN config name doubles as the artifact path.",
+      "file": "workspace/configs/trial_036_CHAMPION.yaml",
+      "start": 111,
+      "end": 124,
+      "focus": [124],
+      "quote": "output_dir: data/models/trial_036_lgbm_0dte_tenor_matched"
+    },
+    {
+      "text": "The trial-036 headline QLIKE numbers (0.1289 at h=1, 0.1067 at h=5, 0.1628 at h=22) were formally retracted after the trial-047 reseed showed each sat below the 5-seed variance envelope minimum.",
+      "file": "workspace/research/research-journal.md",
+      "start": 15,
+      "end": 28,
+      "focus": [23, 24, 25],
+      "quote": "| h=1 | 0.1289 | trial-036 | trial-047 reseed: 79 bps below 5-seed envelope min |\n| h=5 | 0.1067 | trial-036 | trial-047 reseed: 13 bps below 5-seed envelope min |\n| h=22 | 0.1628 | trial-036 | trial-047 reseed: 55 bps below 5-seed envelope min |"
+    },
+    {
+      "text": "An IV sanity check recorded the 4-parameter linear har_iv model beating the 128-feature LightGBM at h=5 (QLIKE 0.1187 vs 0.1365) and h=22 (0.1844 vs 0.2079), showing implied vol carries most of the longer-horizon signal.",
+      "file": "workspace/research/research-journal.md",
+      "start": 32,
+      "end": 42,
+      "focus": [40, 41],
+      "quote": "| **har_iv** | **0.1498** | **0.1187** | **0.1844** |\n| lightgbm | 0.1489 | 0.1365 | 0.2079 |"
+    },
+    {
+      "text": "Walk-forward validation of the GSVIVS01 long-flat signal found threshold=0 optimal with an honest Sharpe of 1.83 at h=1, retracting a static-sweep Sharpe of 3.29 that was overfit to the test period.",
+      "file": "workspace/research/research-journal.md",
+      "start": 59,
+      "end": 70,
+      "focus": [65],
+      "quote": "- **GSVIVS01 long_flat signal: threshold=0 is walk-forward optimal.** Static sweep found t=-0.001 (Sharpe 3.29) but this was overfit to the test period. Walk-forward adaptive threshold (252d lookback) yields honest Sharpe 1.83 at h=1 with 65% position rate. The simple rule \"flat when gap < 0, short otherwise\" is the correct production policy. No threshold tuning needed."
+    },
+    {
+      "text": "The LSTM research line was closed on 2026-06-22 after seven trials showed no integration mode, standalone, residual, embedding, or feature stacking, improved on the tree models.",
+      "file": "workspace/research/research-journal.md",
+      "start": 59,
+      "end": 70,
+      "focus": [67],
+      "quote": "- **LSTM research line CLOSED (2026-06-22).** No integration mode (standalone, residual, embedding, feature stacking, daily-feature Rosenbaum, XGBoost-residual) produces improvement over tree models. Trials 051/053/054/061b/066/066b/066c all fail or add zero signal."
+    },
+    {
+      "text": "Trial-067 crowned XGBoost the h=1 champion at QLIKE 0.1292, using mapped LightGBM hyperparameters, a custom QLIKE objective, and a har_iv_0dte init, beating the LightGBM 5-seed mean by 76 bps with only about 2.5 bps of seed variance.",
+      "file": "workspace/research/research-journal.md",
+      "start": 59,
+      "end": 70,
+      "focus": [68],
+      "quote": "- **XGBoost is the new h=1 champion (trial-067, 0.1292).** XGBoost with mapped LightGBM hyperparams + custom QLIKE objective + har_iv_0dte init beats LightGBM 5-seed mean by +76 bps. Low seed variance (~2.5 bps from original single-seed). First tree model to also beat har_iv at h=22 (single-seed, unvalidated)."
+    },
+    {
+      "text": "The vol run command loads the experiment YAML through ExperimentConfig.from_yaml, so a single config file drives ingestion, training, and evaluation end to end.",
+      "file": "src/volforecast/__main__.py",
+      "start": 818,
+      "end": 841,
+      "focus": [827, 829],
+      "quote": "        from volforecast.config import ExperimentConfig\n\n        config = ExperimentConfig.from_yaml(args.config)"
+    },
+    {
+      "text": "Before training, the runner checks every universe symbol for a realized-vol cache file and auto-ingests the missing ones, then routes all experiment modes through the tournament executor.",
+      "file": "src/volforecast/__main__.py",
+      "start": 842,
+      "end": 865,
+      "focus": [850, 865],
+      "quote": "            missing = [s for s in universe if not rv_cache_path(s).exists()]\n        # All modes route through tournament"
+    },
+    {
+      "text": "The tournament handler pulls the model list, Model Confidence Set bootstrap count, and Diebold-Mariano baseline straight from the ExperimentConfig object, so the YAML alone determines what is compared and against what.",
+      "file": "src/volforecast/__main__.py",
+      "start": 308,
+      "end": 321,
+      "focus": [316, 320, 321],
+      "quote": "    models = config.effective_models\n    mcs_bootstrap = config.tournament.mcs_bootstrap\n    baseline = config.tournament.baseline"
+    },
+    {
+      "text": "trial_067_xgb_gsvivs01_eval aligns out-of-sample evaluation to the GSVIVS01 strategy inception date of 2022-05-25 via a single stub fold, but the restored file is marked broken, truncated mid-key in its explainability section.",
+      "file": "workspace/configs/trial_067_xgb_gsvivs01_eval.yaml",
+      "start": 1,
+      "end": 14,
+      "focus": [1, 4, 5],
+      "quote": "# BROKEN: truncated mid-key in explainability section, do not use\n# Purpose: Train on ALL data before 2022-05-25, evaluate from 2022-05-25 onward.\n# This aligns OOS evaluation with the GSVIVS01 strategy inception date."
+    }
+  ],
+  "glossary": [
+    { "term": "QLIKE", "definition": "The project's loss function for volatility forecasts; it penalizes underestimating volatility more heavily than overestimating, which matters for risk management.", "file": "workspace/research/weekly-progress.md", "line": 447 },
+    { "term": "HAR", "definition": "Heterogeneous autoregression, the linear baseline family regressing future realized vol on daily, weekly, and monthly RV averages; the registry offers har, harq, shar, har_j, har_cj and regularized variants.", "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml", "line": 63 },
+    { "term": "GSVIVS01", "definition": "An internal variance swap strategy whose signal backtest the tournament can run; forecasts feed a short or flat position rule on the IV-RV gap.", "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml", "line": 312 },
+    { "term": "Kvar", "definition": "A variance swap strike; exec_kvar is the true execution strike from GSVIVS01 fills, used as one of the IV sources for the signal.", "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml", "line": 321 },
+    { "term": "Purge gap", "definition": "An embargo of N dates between the train and test windows of each CV fold, preventing overlapping-horizon leakage.", "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml", "line": 241 },
+    { "term": "Model Confidence Set", "definition": "A bootstrap test (10,000 samples by default) that identifies the set of models statistically indistinguishable from the best.", "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml", "line": 303 },
+    { "term": "Diebold-Mariano test", "definition": "A pairwise test of equal predictive accuracy; every tournament model is tested against the config's named baseline.", "file": "workspace/configs/_CANONICAL_EXAMPLE.yaml", "line": 302 },
+    { "term": "Tenor matching", "definition": "Choosing the implied-vol maturity that matches the forecast horizon, 0DTE for h=1, 1-week for h=5, 1-month for h=22, so the IV init prices exactly the window being forecast.", "file": "workspace/configs/trial_036_CHAMPION.yaml", "line": 70 },
+    { "term": "base_model (init_score)", "definition": "A linear HAR-IV forecast supplied as LightGBM's or XGBoost's initial score, so the tree learns residuals on top of a sensible linear base.", "file": "workspace/configs/trial_036_CHAMPION.yaml", "line": 62 },
+    { "term": "VRP", "definition": "Variance risk premium, the gap between implied and expected realized variance; the project computes it using the HAR h=22 forecast as E[RV] per the Bollerslev 2009 spec.", "file": "workspace/research/research-journal.md", "line": 49 }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "Which feature layer must always appear last in feature_layers?",
+      "options": ["tree_expansion", "iv_surface", "options", "calendar"],
+      "answer": 0,
+      "provenance": "workspace/configs/_CANONICAL_EXAMPLE.yaml:49 states tree_expansion MUST come last because it expands features from all preceding layers",
+      "explanation": "tree_expansion generates _change and _zscore columns from every feature produced before it, so it can only run after all other layers."
+    },
+    {
+      "kind": "single",
+      "prompt": "In the trial-036 champion config, which base model initializes LightGBM at horizon h=1?",
+      "options": ["har_iv_0dte", "har_iv_1w", "har_iv", "ewma"],
+      "answer": 0,
+      "provenance": "workspace/configs/trial_036_CHAMPION.yaml:71-75, horizon_overrides sets base_model: har_iv_0dte for horizon 1",
+      "explanation": "Trial-036's hypothesis is exact tenor matching: 0DTE ATM IV prices exactly tomorrow's realized vol, so it is the h=1 init, with 1-week IV at h=5 and 1-month IV at h=22."
+    },
+    {
+      "kind": "single",
+      "prompt": "What h=1 QLIKE did the trial-067 XGBoost champion record?",
+      "options": ["0.1292", "0.1498", "0.1067", "0.2079"],
+      "answer": 0,
+      "provenance": "workspace/research/research-journal.md:68 records XGBoost as the new h=1 champion at 0.1292",
+      "explanation": "Trial-067's XGBoost with a custom QLIKE objective and har_iv_0dte init beat the LightGBM 5-seed mean by 76 bps, becoming the current h=1 champion."
+    },
+    {
+      "kind": "order",
+      "prompt": "Put the stages of vol run in execution order.",
+      "options": ["Load the YAML into ExperimentConfig", "Ingest any universe symbols missing a realized-vol cache", "Run the model tournament"],
+      "answer": 0,
+      "provenance": "src/volforecast/__main__.py:829 (from_yaml), :850 (missing-symbol check), :865-867 (all modes route through tournament)",
+      "explanation": "The run handler parses the config first, then gates on ingest for missing symbols, and finally routes every mode through _run_tournament."
+    }
+  ],
+  "confirmed_missing": [
+    "src/volforecast/config.py: defines ExperimentConfig, CVConfig, ModelConfig; imported by src/volforecast/__main__.py:827, src/volforecast/evaluation/checkpoint.py:17, src/volforecast/pipeline/fold_cache.py:33, src/volforecast/reporting/html_report.py:10, and named as the schema source of truth by workspace/configs/_CANONICAL_EXAMPLE.yaml:8, but absent from disk in the restore",
+    "workspace/research/trials.yaml: the structured experiment registry referenced by workspace/research/INDEX.md:13 and by research-journal.md entries, absent from disk",
+    "workspace/configs/trial_067_xgb_gsvivs01_eval.yaml exists but is self-marked BROKEN, truncated mid-key in its explainability section (line 1), a visible restore artifact rather than a missing file"
+  ]
+}

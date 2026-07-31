@@ -1,0 +1,305 @@
+==================================================
+Running all lint checks (max 4 parallel)
+==================================================
+  [....................] 1/21 skills structure
+  [#...................] 2/21 secexpr safety
+  [##..................] 3/21 memory schema
+  [###.................] 4/21 skills content
+  [####................] 5/21 hardcoded env
+  [#####...............] 6/21 memory priority
+  [######..............] 7/21 memory index completeness
+  [#######.............] 8/21 forbidden patterns
+  [########............] 9/21 doc safety
+  [#########...........] 10/21 registry drift
+  [##########..........] 11/21 design rules
+  [###########.........] 12/21 vscode tasks
+  [############........] 13/21 broken refs
+  [#############.......] 14/21 args contract
+  [##############......] 15/21 model pins
+  [###############.....] 16/21 vol parity
+  [################....] 17/21 vscode md compat
+  [#################...] 18/21 wrapper targets
+  [##################..] 19/21 prompts
+  [###################.] 20/21 canonical schema
+  [####################] 21/21 secrets
+  [####################] 21/21 done
+  PASS  secexpr safety  (0.4s)
+        Scanned 41 Python files under C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\skills
+        PASS: no secexpr safety violations.
+  PASS  hardcoded env  (0.6s)
+        Scanned 112 Python files
+        Kerberos IDs checked: ['piresm', 'ryanpc']
+        PASS: no hardcoded environment values.
+  PASS  memory schema  (0.4s)
+        Validated 43 files in C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\memory
+        P0+P1 measured (bytes/4): ~49738 tokens; enforced (non-grandfathered): ~49738 (budget: 50000)
+        P2 measured (bytes/4): ~79905 tokens; enforced (non-grandfathered): ~79905 (budget: 100000)
+        P3 (memory-local .md only): 120 lines (no cap)
+        memory/**.md lines total: 5536
+        PASS: All files pass validation.
+  PASS  skills structure  (0.1s)
+        Scanned C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\skills
+        PASS: all skill folders follow the canonical structure.
+  PASS  forbidden patterns  (1.0s)
+        Scanned 365 files across ['skills', 'personas', 'workflows', 'policy', 'lint', 'memory', 'prompts', 'instructions']
+        PASS: no forbidden patterns.
+  PASS  skills content  (0.1s)
+          [WARN] advisory-section: BACKTEST
+                 Missing advisory section: ## Troubleshooting
+          [WARN] advisory-section: DATA_AUDIT
+                 Missing advisory section: ## Troubleshooting
+          [WARN] advisory-section: DATA_INGEST
+                 Missing advisory section: ## Troubleshooting
+          [WARN] advisory-section: EVALUATE
+                 Missing advisory section: ## Troubleshooting
+          [WARN] advisory-section: FEATURE_BUILD
+                 Missing advisory section: ## Troubleshooting
+          [WARN] advisory-section: GIT_COMMIT
+                 Missing advisory section: ## Troubleshooting
+          [WARN] advisory-section: MODEL_TRAIN
+                 Missing advisory section: ## Troubleshooting
+          [WARN] advisory-section: NOTEBOOK
+                 Missing advisory section: ## Troubleshooting
+          [WARN] advisory-section: RESEARCH
+                 Missing advisory section: ## Troubleshooting
+          [WARN] advisory-section: SLANG_TEST_COVERAGE
+                 Missing advisory section: ## Troubleshooting
+        Scanned 48 skill(s) in C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\skills
+        PASS (with 10 warning(s) � run --strict to treat as errors)
+  PASS  memory priority  (0.5s)
+        P0: 1 files, claimed ~734 tokens (cap: 800)
+        P1: 29 files | P2: 18 files (exempt) | P3: 27 files (exempt)
+          INFO  [p0-budget] P0 measured (bytes/4): ~747 tokens across 1 files; non-grandfathered ~747 vs cap 800.
+          INFO  [p1-budget] P1 measured (bytes/4): ~48991 tokens across 29 files; non-grandfathered ~48991.
+          WARN  [reachability] research/project-scope-and-data.md (P1) is orphaned � not referenced by any skill, persona, workflow, or prompt. Add a reference or downgrade/remove.
+          WARN  [reachability] research/qlike-defense.md (P1) is orphaned � not referenced by any skill, persona, workflow, or prompt. Add a reference or downgrade/remove.
+          WARN  [reachability] ref/terminal-commands.md (P1) is orphaned � not referenced by any skill, persona, workflow, or prompt. Add a reference or downgrade/remove.
+          WARN  [reachability] ref/skill-routing.md (P1) is orphaned � not referenced by any skill, persona, workflow, or prompt. Add a reference or downgrade/remove.
+        PASS (with 4 warning(s))
+  PASS  design rules  (0.6s)
+          [....................] 1/26 coala-sections
+          [#...................] 2/26 structural
+          [##..................] 3/26 persona-purity
+          [###.................] 4/26 policy-purity
+          [###.................] 5/26 dependency-direction
+          [####................] 6/26 section-design
+          [#####...............] 7/26 memory-index-coverage
+          [######..............] 8/26 transition-precedence
+          [######..............] 9/26 memory-domain
+          [#######.............] 10/26 persona-index
+          [########............] 11/26 persona-readonly
+          [#########...........] 12/26 persona-verification-loop
+          [##########..........] 13/26 persona-effort-gate
+          [##########..........] 14/26 persona-cross-dispatch
+          [###########.........] 15/26 persona-readonly-tools
+          [############........] 16/26 workflow-protocol-ref
+          [#############.......] 17/26 workflow-state-machine
+          [#############.......] 18/26 session-state-enum
+          [##############......] 19/26 workflow-domain-leakage
+          [###############.....] 20/26 persona-frontmatter
+          [################....] 21/26 workflow-index
+          [################....] 22/26 workspace-structure
+          [#################...] 23/26 skill-size
+          [##################..] 24/26 skill-memory-ref
+          [###################.] 25/26 skill-dispatch
+          [####################] 26/26 broken-links
+          [####################] 26/26 done
+        WARN: 39 warning(s):
+          [WARN] skill-size: skills\CANVAS\SKILL.md
+                 260 lines — above warning threshold (250). Consider moving static knowledge to memory/.
+          [WARN] skill-memory-ref: skills\PROCMON_JOBS\SKILL.md
+                 83 lines but no link to memory/ — consider extracting domain knowledge.
+          [WARN] coala-sections: memory\research\complete-pipeline.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\data-access.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\deep-research-decision-trees.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\evaluation-framework.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\feature-composition.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\optimal-feature-set.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\project-design.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\project-scope-and-data.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\project-state.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\qlike-defense.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\research-index.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\research-journal.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\volatility.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] coala-sections: memory\research\weekly-progress.md
+                 Missing CoALA sections: Anti-patterns, Concepts, Edge Cases, Links, Patterns, Rules
+          [WARN] policy-purity: policy\subagent_protocol.md
+                 Code block of 19 lines — policy documents should contain constraints, not executable examples.
+          [WARN] section-design: skills\design.md
+                 121 lines — exceeds 120-line budget per workspace/design.md.
+          [WARN] transition-precedence: workflows\cure.md
+                 Transition table at line 31 has 2 conditions but no precedence declaration.
+          [WARN] transition-precedence: workflows\cure.md
+                 Transition table at line 44 has 2 conditions but no precedence declaration.
+          [WARN] transition-precedence: workflows\cure.md
+                 Transition table at line 71 has 2 conditions but no precedence declaration.
+          [WARN] transition-precedence: workflows\debug.md
+                 Transition table at line 40 has 4 conditions but no precedence declaration.
+          [WARN] transition-precedence: workflows\debug.md
+                 Transition table at line 59 has 2 conditions but no precedence declaration.
+          [WARN] transition-precedence: workflows\debug.md
+                 Transition table at line 73 has 3 conditions but no precedence declaration.
+          [WARN] transition-precedence: workflows\execute.md
+                 Transition table at line 44 has 3 conditions but no precedence declaration.
+          [WARN] transition-precedence: workflows\execute.md
+                 Transition table at line 71 has 4 conditions but no precedence declaration.
+          [WARN] transition-precedence: workflows\execute.md
+                 Transition table at line 85 has 3 conditions but no precedence declaration.
+          [WARN] transition-precedence: workflows\plan.md
+                 Transition table at line 50 has 3 conditions but no precedence declaration.
+          [WARN] workflow-protocol-ref: workflows\debug.md
+                 Workflow does not reference _protocol.md in its first paragraph (§4.1).
+          [WARN] workflow-protocol-ref: workflows\execute.md
+                 Workflow does not reference _protocol.md in its first paragraph (§4.1).
+          [WARN] workflow-protocol-ref: workflows\housekeep.md
+                 Workflow does not reference _protocol.md in its first paragraph (§4.1).
+          [WARN] workflow-protocol-ref: workflows\review.md
+                 Workflow does not reference _protocol.md in its first paragraph (§4.1).
+          [WARN] workflow-state-machine: workflows\housekeep.md
+                 Workflow has no 'State Machine' section or state transition arrows (§4.2).
+          [WARN] workflow-state-machine: workflows\review.md
+                 Workflow has no 'State Machine' section or state transition arrows (§4.2).
+          [WARN] workspace-structure: workspace/governance
+                 Required workspace subdirectory 'governance/' missing (design.md §Workspace Structure).
+          [WARN] workspace-structure: workspace/plan
+                 Required workspace subdirectory 'plan/' missing (design.md §Workspace Structure).
+          [WARN] workspace-structure: workspace/raw
+                 Required workspace subdirectory 'raw/' missing (design.md §Workspace Structure).
+          [WARN] workspace-structure: workspace/tests
+                 Required workspace subdirectory 'tests/' missing (design.md §Workspace Structure).
+          [WARN] workspace-structure: workspace/tmp
+                 Required workspace subdirectory 'tmp/' missing (design.md §Workspace Structure).
+        PASS (with 39 warning(s) — run --strict to treat as errors)
+  FAIL  broken refs  (0.6s)
+          ERROR [plain-ref] memory/INDEX.md: plain-text path 'workspace/research/trials.yaml' does not exist
+          ERROR [plain-ref] memory/research/project-state.md: plain-text path 'workspace/research/trials.yaml' does not exist
+          ERROR [plain-ref] .github/instructions/yaml-config.instructions.md: plain-text path 'src/volforecast/config.py' does not exist
+        Scanned 177 Markdown files
+        FAIL: 3 broken reference(s) found (0 link/directive/backtick + 3 plain-text).
+  PASS  memory index completeness  (0.1s)
+        Scanned 43 memory content files, 44 INDEX.md entries
+        PASS: all memory files are indexed and correctly named.
+  PASS  doc safety  (0.2s)
+        Scanned 175 Markdown files
+        PASS: no hardcoded env or secexpr --full in documentation.
+  PASS  registry drift  (0.0s)
+        Actual: 54 skills, 5 personas
+        PASS: documented counts match actual folders.
+  PASS  vscode md compat  (0.3s)
+          [WARN] broken-link: workspace/plans/dealer-gamma-integration.md:22
+                 Link [trials.yaml](../research/trials.yaml) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/plans/dealer-gamma-integration.md:42
+                 Link [spx_gex_daily.parquet](../../data/raw/options_oi/spx_gex_daily.parquet) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\data\raw\options_oi\spx_gex_daily.parquet
+          [WARN] broken-link: workspace/plans/dealer-gamma-integration.md:69
+                 Link [trials.yaml](../research/trials.yaml) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/plans/dealer-gamma-integration.md:316
+                 Link [src/volforecast/features/iv_surface.py](../../src/volforecast/features/iv_surface.py) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\features\iv_surface.py
+          [WARN] broken-link: workspace/plans/dealer-gamma-integration.md:318
+                 Link [src/volforecast/pipeline/runner.py#L1298](../../src/volforecast/pipeline/runner.py#L1298) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/plans/dealer-gamma-integration.md:319
+                 Link [workspace/research/trials.yaml](../research/trials.yaml) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/plans/generic-harx-model.md:5
+                 Link [src/volforecast/models/har_family.py](../../src/volforecast/models/har_family.py) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\models\har_family.py
+          [WARN] broken-link: workspace/plans/generic-harx-model.md:18
+                 Link [src/volforecast/models/har_family.py](../../src/volforecast/models/har_family.py) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\models\har_family.py
+          [WARN] broken-link: workspace/plans/generic-harx-model.md:44
+                 Link [runner.py#L158](../../src/volforecast/pipeline/runner.py#L158) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/plans/generic-harx-model.md:48
+                 Link [_model_utils.py#L61](../../src/volforecast/evaluation/_model_utils.py#L61) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\evaluation\_model_utils.py
+          [WARN] broken-link: workspace/plans/generic-harx-model.md:276
+                 Link [_model_utils.py#L61](../../src/volforecast/evaluation/_model_utils.py#L61) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\evaluation\_model_utils.py
+          [WARN] broken-link: workspace/plans/generic-harx-model.md:298
+                 Link [trial-098](../research/trials.yaml#L3434) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/gnn-program-review.md:5
+                 Link [trials.yaml](trials.yaml) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/gnn-program-review.md:24
+                 Link [src/volforecast/pipeline/runner.py#L1118](../../src/volforecast/pipeline/runner.py#L1118) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:24
+                 Link [runner.py#L1323](../../src/volforecast/pipeline/runner.py#L1323) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:24
+                 Link [runner.py#L1554](../../src/volforecast/pipeline/runner.py#L1554) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:39
+                 Link [trials.yaml#L3095-L3103](trials.yaml#L3095-L3103) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/gnn-program-review.md:56
+                 Link [src/volforecast/evaluation/tournament.py#L944-L987](../../src/volforecast/evaluation/tournament.py#L944-L987) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\evaluation\tournament.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:70
+                 Link [src/volforecast/pipeline/runner.py#L28](../../src/volforecast/pipeline/runner.py#L28) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:70
+                 Link [runner.py#L1118](../../src/volforecast/pipeline/runner.py#L1118) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:70
+                 Link [runner.py#L1323](../../src/volforecast/pipeline/runner.py#L1323) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:70
+                 Link [runner.py#L1554](../../src/volforecast/pipeline/runner.py#L1554) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:70
+                 Link [runner.py#L2470](../../src/volforecast/pipeline/runner.py#L2470) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:70
+                 Link [runner.py#L3479](../../src/volforecast/pipeline/runner.py#L3479) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:90
+                 Link [src/volforecast/pipeline/runner.py#L2830-L2831](../../src/volforecast/pipeline/runner.py#L2830-L2831) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:90
+                 Link [runner.py#L285](../../src/volforecast/pipeline/runner.py#L285) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:90
+                 Link [runner.py#L3038](../../src/volforecast/pipeline/runner.py#L3038) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:105
+                 Link [src/volforecast/evaluation/tournament.py#L182-L184](../../src/volforecast/evaluation/tournament.py#L182-L184) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\evaluation\tournament.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:134
+                 Link [trials.yaml#L2997-L3200](trials.yaml#L2997-L3200) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/gnn-program-review.md:176
+                 Link [runner.py#L2670-L2744](../../src/volforecast/pipeline/runner.py#L2670-L2744) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\src\volforecast\pipeline\runner.py
+          [WARN] broken-link: workspace/research/gnn-program-review.md:177
+                 Link [trials.yaml#L3329](trials.yaml#L3329) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/gnn-program-review.md:179
+                 Link [trials.yaml](trials.yaml) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/INDEX.md:13
+                 Link [trials.yaml](trials.yaml) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/research-journal.md:113
+                 Link [trials.yaml#L2997-L3200](trials.yaml#L2997-L3200) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/research-journal.md:147
+                 Link [trials.yaml#L3329](trials.yaml#L3329) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/research-journal.md:424
+                 Link [workspace/research/trials.yaml](workspace/research/trials.yaml) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\workspace\research\trials.yaml
+          [WARN] broken-link: workspace/research/research-journal.md:459
+                 Link [memory/research/project-state.md](memory/research/project-state.md) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\memory\research\project-state.md
+          [WARN] broken-link: workspace/research/research-journal.md:459
+                 Link [workspace/research/trials.yaml](workspace/research/trials.yaml) -- target not found: C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored\workspace\research\workspace\research\trials.yaml
+        Scanned 276 .md file(s) in C:\Users\RyanPC\Documents\Projects\ML-GS\hackathon\restored
+        PASS (with 38 warning(s))
+  PASS  vscode tasks  (0.1s)
+        Scanned 45 task(s) in tasks.json
+        PASS: all 45 tasks comply with VS Code task policy.
+  PASS  secrets  (2.3s)
+        lint_secrets: OK (0 findings)
+  PASS  args contract  (0.1s)
+        PASS: 76 task args-file values and 83 docs honor the fixed args contract.
+  PASS  model pins  (0.1s)
+        PASS: model pin literals confined to prompt frontmatter (== 'Claude Opus 4.6') and 1 grandfathered files.
+  PASS  wrapper targets  (0.2s)
+        PASS: 41 wrapper targets across 78 wrappers exist and parse.
+  PASS  vol parity  (0.1s)
+        PASS: 37 vol commands in full parity with vol-cli.md and vol help.
+  PASS  prompts  (0.1s)
+          NOTICE [index] .github/prompts/INDEX.md absent � bijection check activates when Plan 07 lands it
+        PASS: 34 prompts hygienic (10 grandfathered until Plan 07).
+  FAIL  canonical schema  (0.1s)
+        [stderr]          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        [stderr]   File "C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 1013, in open
+        [stderr]     return io.open(self, mode, buffering, encoding, errors, newline)
+        [stderr]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        [stderr] FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\restored\\src\\volforecast\\config.py'
+==================================================
+FAILED (2/21): broken refs, canonical schema
+Total: 7.8s

@@ -1,0 +1,2952 @@
+EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE                             [100%]
+=================================== ERRORS ====================================
+_________________ ERROR at setup of test_corr_recovers_blocks _________________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_corr_recovers_blocks>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+__________ ERROR at setup of test_corr_weights_are_abs_correlations ___________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_corr_weights_are_abs_correlations>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+________________ ERROR at setup of test_corr_is_point_in_time _________________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_corr_is_point_in_time>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_________ ERROR at setup of test_knn_out_degree_before_symmetrization _________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_knn_out_degree_before_symmetrization>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+____________ ERROR at setup of test_knn_symmetrized_is_undirected _____________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_knn_symmetrized_is_undirected>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+____________ ERROR at setup of test_empty_window_gives_empty_graph ____________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_empty_window_gives_empty_graph>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+____________ ERROR at setup of test_dy_is_directed_and_thresholded ____________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_dy_is_directed_and_thresholded>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_________ ERROR at setup of test_dy_finds_lead_to_follower_spillover __________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_dy_finds_lead_to_follower_spillover>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+______________ ERROR at setup of test_dy_degenerate_window_empty ______________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_dy_degenerate_window_empty>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+____ ERROR at setup of test_raw_corr_is_dense_but_residual_graph_is_sparse ____
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_raw_corr_is_dense_but_residual_graph_is_sparse>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_________ ERROR at setup of test_residual_graph_keeps_true_idio_pair __________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_residual_graph_keeps_true_idio_pair>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_ ERROR at setup of test_named_factor_column_is_excluded_from_nodes_regressors _
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_named_factor_column_is_excluded_from_nodes_regressors>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+__________________ ERROR at setup of test_registry_complete ___________________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_registry_complete>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_____________ ERROR at setup of test_glasso_no_cross_block_edges ______________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_glasso_no_cross_block_edges>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+__________ ERROR at setup of test_glasso_finds_intra_block_structure __________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_glasso_finds_intra_block_structure>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+________ ERROR at setup of test_glasso_edges_are_binary_and_symmetric _________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_glasso_edges_are_binary_and_symmetric>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_________________ ERROR at setup of test_glasso_cv_mode_runs __________________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_glasso_cv_mode_runs>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+______ ERROR at setup of test_glasso_degenerate_window_falls_back_empty _______
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_glasso_degenerate_window_falls_back_empty>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_______ ERROR at setup of test_glasso_nonfinite_precision_returns_empty _______
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_glasso_nonfinite_precision_returns_empty>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+________ ERROR at setup of test_glasso_convergence_warning_suppressed _________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_glasso_convergence_warning_suppressed>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+______________ ERROR at setup of test_snapshot_shape_properties _______________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_snapshot_shape_properties>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_________ ERROR at setup of test_dense_adjacency_unnormalized_binary __________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_dense_adjacency_unnormalized_binary>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+____________ ERROR at setup of test_dense_adjacency_sym_normalized ____________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_dense_adjacency_sym_normalized>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+____________ ERROR at setup of test_dense_adjacency_row_normalized ____________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_dense_adjacency_row_normalized>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+__________________ ERROR at setup of test_to_torch_roundtrip __________________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_to_torch_roundtrip>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_ ERROR at setup of test_register_graph_decorator_registers_and_rejects_duplicates _
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_register_graph_decorator_registers_and_rejects_duplicates>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_____ ERROR at setup of test_schedule_refits_on_grid_and_freezes_between ______
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_schedule_refits_on_grid_and_freezes_between>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_________ ERROR at setup of test_schedule_skips_insufficient_history __________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_schedule_skips_insufficient_history>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+____________________ ERROR at setup of test_snapshot_stats ____________________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_snapshot_stats>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_________ ERROR at setup of test_edge_jaccard_identical_and_disjoint __________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_edge_jaccard_identical_and_disjoint>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+____ ERROR at setup of test_schedule_stability_reports_consecutive_jaccard ____
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_schedule_stability_reports_consecutive_jaccard>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+__________ ERROR at setup of TestRegimeBlendBasics.test_basic_build ___________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_basic_build>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+__ ERROR at setup of TestRegimeBlendBasics.test_stress_end_uses_stress_graph __
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_stress_end_uses_stress_graph>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+____ ERROR at setup of TestRegimeBlendBasics.test_calm_end_uses_calm_graph ____
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_calm_end_uses_calm_graph>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_ ERROR at setup of TestRegimeBlendBasics.test_fallback_insufficient_regime_data _
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_fallback_insufficient_regime_data>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_______ ERROR at setup of TestRegimeBlendBasics.test_pit_classification _______
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_pit_classification>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+______ ERROR at setup of TestRegimeBlendBasics.test_base_corr_and_glasso ______
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_base_corr_and_glasso>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+______ ERROR at setup of TestRegimeBlendBasics.test_empty_returns_empty _______
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_empty_returns_empty>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+______ ERROR at setup of TestRegimeBlendBasics.test_unknown_base_raises _______
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_unknown_base_raises>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+__________________ ERROR at setup of test_identity_no_edges ___________________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_identity_no_edges>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_________________ ERROR at setup of test_full_uniform_weights _________________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_full_uniform_weights>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+___________ ERROR at setup of test_sector_connects_same_sector_only ___________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_sector_connects_same_sector_only>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+______________ ERROR at setup of test_sector_map_covers_universe ______________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_sector_map_covers_universe>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+_____________ ERROR at setup of test_unknown_symbol_gets_no_edges _____________
+
+fixturedef = <FixtureDef argname='_mock_processor_if_missing' scope='function' baseid='tests'>
+request = <SubRequest '_mock_processor_if_missing' for <Function test_unknown_symbol_gets_no_edges>>
+
+    @pytest.hookimpl(wrapper=True)
+    def pytest_fixture_setup(fixturedef: FixtureDef, request) -> object | None:
+        if (
+            fixturedef.argname == "event_loop_policy"
+            and fixturedef.func.__module__ != __name__
+        ):
+            warnings.warn(
+                PytestDeprecationWarning(_EVENT_LOOP_POLICY_FIXTURE_DEPRECATION_WARNING),
+            )
+        asyncio_mode = _get_asyncio_mode(request.config)
+        if not _is_asyncio_fixture_function(fixturedef.func):
+            if asyncio_mode == Mode.STRICT:
+                # Ignore async fixtures without explicit asyncio mark in strict mode
+                # This applies to pytest_trio fixtures, for example
+>               return (yield)
+                        ^^^^^
+
+C:\Users\RyanPC\AppData\Local\Programs\Python\Python312\Lib\site-packages\pytest_asyncio\plugin.py:924: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\conftest.py:37: in _mock_processor_if_missing
+    import volforecast.data.chunk_store as _cs
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """Tick data access via pytickclient (Chunk Store).
+    
+    Provides functions to fetch L1 trade/quote data for all 34 symbols and
+    L2 order book depth data for E-mini S&P 500. Raw tick data is the
+    foundation for computing realized volatility measures at arbitrary
+    frequencies (5-min, 1-min, tick-by-tick).
+    """
+    
+    from __future__ import annotations
+    
+    import logging
+    import threading
+    import time
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+    from datetime import date, datetime, timedelta
+    from datetime import time as dt_time
+    
+    import pandas as pd
+    
+    try:
+        from pytickclient import query
+    except ImportError:
+        query = None  # Not available outside GS network
+    
+    try:
+        from goldmansachs import pyslang as _pyslang
+    except ImportError:
+        _pyslang = None
+    
+    # Suppress noisy pyslang.launch logging (it adds its own StreamHandler at import time)
+    logging.getLogger("goldmansachs.pyslang.launch").setLevel(logging.ERROR)
+    
+>   from volforecast.constants import CHUNKDB, L1_FIELDS, SYMBOL_UNIVERSE, TICKER_TO_RIC, TZ
+E   ModuleNotFoundError: No module named 'volforecast.constants'
+
+volforecast\data\chunk_store.py:35: ModuleNotFoundError
+=========================== short test summary info ===========================
+ERROR tests/unit/graphs/test_correlation_graphs.py::test_corr_recovers_blocks
+ERROR tests/unit/graphs/test_correlation_graphs.py::test_corr_weights_are_abs_correlations
+ERROR tests/unit/graphs/test_correlation_graphs.py::test_corr_is_point_in_time
+ERROR tests/unit/graphs/test_correlation_graphs.py::test_knn_out_degree_before_symmetrization
+ERROR tests/unit/graphs/test_correlation_graphs.py::test_knn_symmetrized_is_undirected
+ERROR tests/unit/graphs/test_correlation_graphs.py::test_empty_window_gives_empty_graph
+ERROR tests/unit/graphs/test_dy_graph.py::test_dy_is_directed_and_thresholded
+ERROR tests/unit/graphs/test_dy_graph.py::test_dy_finds_lead_to_follower_spillover
+ERROR tests/unit/graphs/test_dy_graph.py::test_dy_degenerate_window_empty - M...
+ERROR tests/unit/graphs/test_factor_residual.py::test_raw_corr_is_dense_but_residual_graph_is_sparse
+ERROR tests/unit/graphs/test_factor_residual.py::test_residual_graph_keeps_true_idio_pair
+ERROR tests/unit/graphs/test_factor_residual.py::test_named_factor_column_is_excluded_from_nodes_regressors
+ERROR tests/unit/graphs/test_factor_residual.py::test_registry_complete - Mod...
+ERROR tests/unit/graphs/test_glasso_graph.py::test_glasso_no_cross_block_edges
+ERROR tests/unit/graphs/test_glasso_graph.py::test_glasso_finds_intra_block_structure
+ERROR tests/unit/graphs/test_glasso_graph.py::test_glasso_edges_are_binary_and_symmetric
+ERROR tests/unit/graphs/test_glasso_graph.py::test_glasso_cv_mode_runs - Modu...
+ERROR tests/unit/graphs/test_glasso_graph.py::test_glasso_degenerate_window_falls_back_empty
+ERROR tests/unit/graphs/test_glasso_graph.py::test_glasso_nonfinite_precision_returns_empty
+ERROR tests/unit/graphs/test_glasso_graph.py::test_glasso_convergence_warning_suppressed
+ERROR tests/unit/graphs/test_graph_base.py::test_snapshot_shape_properties - ...
+ERROR tests/unit/graphs/test_graph_base.py::test_dense_adjacency_unnormalized_binary
+ERROR tests/unit/graphs/test_graph_base.py::test_dense_adjacency_sym_normalized
+ERROR tests/unit/graphs/test_graph_base.py::test_dense_adjacency_row_normalized
+ERROR tests/unit/graphs/test_graph_base.py::test_to_torch_roundtrip - ModuleN...
+ERROR tests/unit/graphs/test_graph_base.py::test_register_graph_decorator_registers_and_rejects_duplicates
+ERROR tests/unit/graphs/test_graph_base.py::test_schedule_refits_on_grid_and_freezes_between
+ERROR tests/unit/graphs/test_graph_base.py::test_schedule_skips_insufficient_history
+ERROR tests/unit/graphs/test_graph_diagnostics.py::test_snapshot_stats - Modu...
+ERROR tests/unit/graphs/test_graph_diagnostics.py::test_edge_jaccard_identical_and_disjoint
+ERROR tests/unit/graphs/test_graph_diagnostics.py::test_schedule_stability_reports_consecutive_jaccard
+ERROR tests/unit/graphs/test_regime_blend_graph.py::TestRegimeBlendBasics::test_basic_build
+ERROR tests/unit/graphs/test_regime_blend_graph.py::TestRegimeBlendBasics::test_stress_end_uses_stress_graph
+ERROR tests/unit/graphs/test_regime_blend_graph.py::TestRegimeBlendBasics::test_calm_end_uses_calm_graph
+ERROR tests/unit/graphs/test_regime_blend_graph.py::TestRegimeBlendBasics::test_fallback_insufficient_regime_data
+ERROR tests/unit/graphs/test_regime_blend_graph.py::TestRegimeBlendBasics::test_pit_classification
+ERROR tests/unit/graphs/test_regime_blend_graph.py::TestRegimeBlendBasics::test_base_corr_and_glasso
+ERROR tests/unit/graphs/test_regime_blend_graph.py::TestRegimeBlendBasics::test_empty_returns_empty
+ERROR tests/unit/graphs/test_regime_blend_graph.py::TestRegimeBlendBasics::test_unknown_base_raises
+ERROR tests/unit/graphs/test_simple_graphs.py::test_identity_no_edges - Modul...
+ERROR tests/unit/graphs/test_simple_graphs.py::test_full_uniform_weights - Mo...
+ERROR tests/unit/graphs/test_simple_graphs.py::test_sector_connects_same_sector_only
+ERROR tests/unit/graphs/test_simple_graphs.py::test_sector_map_covers_universe
+ERROR tests/unit/graphs/test_simple_graphs.py::test_unknown_symbol_gets_no_edges
+44 errors in 0.88s

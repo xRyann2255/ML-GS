@@ -1,0 +1,358 @@
+{
+  "area": "tests",
+  "overview": "The test suite is the largest single subsystem of the repo: 209 test files containing roughly 2,700 test functions under src/tests/. It is organized into unit/ (about 150 files covering ingest, features, models, CV splitters, dashboards, and the GSVIVS signal stack), integration/ (19 files that run multi-component workflows), formulas/ (a paper-audited registry where every mathematical function is checked against hand-computed gold values in JSON), graphs/ (graph construction for the GNN path), plus slow/, scripts/, and research/ folders. The design principle, stated in the integration conftest, is that no test needs the GS network: tick data normally comes from the internal Chunk Store via pytickclient, so tests replace it with mocked chunk_query responses and synthetic generators. The shared conftest simulates one trading day as 23,400 GBM ticks with a known 20 percent annualized vol, giving every estimator test an analytical ground truth; variants inject a 3 percent jump at tick 10,000 so jump-robust estimators (bipower variation, tripower quarticity, the BNS test) can be checked for both false positives and detection power. Daily-frequency fixtures build AR(1) log-RV series with HAR-like persistence. Integration tests then prove each model family end to end through the Pipeline class: HAR with the Duan retransformation correction, HARX with YAML-declared extra features, LightGBM with the QLIKE custom objective, TCN and LSTM (with context vectors) over mocked 5-minute sequence tensors, and a real GATv2 GNN over a correlation graph. Tournament-level tests cover single-model degenerate cases (DM stat 0, MCS trivially includes the model), checkpoint resume that skips already-run models, and a smoke test that the GSVIVS01 variance swap PnL section renders into the dashboard HTML. The restore has gaps: several modules the tests import, including volforecast/config.py and pipeline/runner.py, are absent from disk.",
+  "modules": [
+    {
+      "path": "src/tests/",
+      "role": "Root of the suite; its conftest.py is the fixture factory the whole suite leans on. It simulates GBM log-price paths (23,400 ticks per day, true annualized vol 0.20), tick DataFrames shaped exactly like fetch_trades output with America/New_York timestamps, 500-day AR(1) log-RV series with HAR-like persistence, and 1000-row HAR feature matrices with aligned next-day targets. Autouse fixtures neutralize GS-only infrastructure: one fakes the pyslang session flag, another substitutes a MagicMock for the pytickclient processor so chunk-store logic is exercisable on any machine. Eight top-level test files cover LSTM and GNN model internals directly.",
+      "key_files": [
+        { "file": "conftest.py", "purpose": "Shared synthetic data generators: GBM tick paths with known vol, jump-injected paths, AR(1) daily RV series, HAR feature matrices, and a tmp workspace layout." }
+      ],
+      "concepts": ["GBM simulation", "deterministic seeds", "fixture-based ground truth", "pytickclient mocking"]
+    },
+    {
+      "path": "src/tests/unit/",
+      "role": "About 150 files of fast unit tests spanning the whole pipeline: data ingest (ticks, OHLCV, IV, GEX, credit CDS, VIX options), feature layers (asymmetry, microstructure, IV surface, dealer gamma, regime), every model family (HAR variants, LightGBM, XGBoost, LSTM, TCN, GNN, ensembles, blends), CV splitters with purge gaps, checkpointing, dashboards, and the GSVIVS signal and backtest stack. The heaviest files are test_models.py (80 tests), test_dashboard.py (72), and test_features.py (64). It feeds confidence into the integration layer, which reuses the same synthetic fixtures at larger scale.",
+      "key_files": [
+        { "file": "test_models.py", "purpose": "80 tests over the model registry and per-model fit/predict contracts." },
+        { "file": "test_cv_splitters.py", "purpose": "48 tests on expanding-window and blocked k-fold CV including purge-gap leakage protection." }
+      ],
+      "concepts": ["purged cross validation", "model registry", "feature layers", "dashboard rendering"]
+    },
+    {
+      "path": "src/tests/unit/formulas/",
+      "role": "A formula verification registry unique to this repo: FORMULAS.md maps every mathematical function to its source paper, exact equation number, implementation file, test file, and a gold_values JSON of hand-computed expected outputs. Fourteen test files marked pytest.mark.formula cover RV, RQ and tripower quarticity, BPV, semivariances, realized kernel, jump detection, QLIKE, the Diebold-Mariano test, VRP, VPIN, GFEVD spillovers, and the magnetic Laplacian. The conftest exposes a load_gold factory fixture that reads known-answer inputs from gold_values/. The registry also records known gaps, such as the unverified equation number for realized moments in Amaya et al. 2015.",
+      "key_files": [
+        { "file": "FORMULAS.md", "purpose": "Audit table linking each formula to paper, equation, implementation, test, and gold-value file." },
+        { "file": "test_qlike_formulas.py", "purpose": "Verifies QLIKE against Patton (2011) Eq. (5) including its minimum at truth and asymmetric penalty." }
+      ],
+      "concepts": ["gold values", "known-answer tests", "paper-traceable formulas", "QLIKE"]
+    },
+    {
+      "path": "src/tests/integration/",
+      "role": "Nineteen files that run multi-component workflows on synthetic data with no network or real files, per the conftest docstring. test_data_pipeline.py (57 tests) proves the mocked Chunk Store path: symbol universe, E-mini quarterly contract rolling, batch fetching with per-day API calls, tick resampling to 5-minute bars, and the daily RV measure dictionary. test_rv_pipeline.py (60 tests) validates estimators against GBM ground truth and runs the full simulate-prices to HAR to QLIKE loop, including the Duan retransformation correction. Model-specific pipeline tests (LightGBM, TCN, LSTM context, GNN, HARX) each prove one model family survives the real Pipeline CV loop end to end, and tournament tests cover checkpoint resume, single-model degenerate statistics, and dashboard output.",
+      "key_files": [
+        { "file": "conftest.py", "purpose": "Integration fixtures: 500-day HAR-like RV series and a 3-symbol by 320-day AR(1) panel for graph tests." },
+        { "file": "test_data_pipeline.py", "purpose": "Chunk Store mocking, ES contract rolls, tick resampling, and the daily RV measure dict." },
+        { "file": "test_rv_pipeline.py", "purpose": "Estimator correctness on GBM paths plus the full RV-to-HAR-to-metrics loop and Duan correction." },
+        { "file": "test_checkpoint_resume.py", "purpose": "Proves resumed tournaments skip checkpointed models and reproduce identical predictions." }
+      ],
+      "concepts": ["synthetic OHLCV and ticks", "mocked Chunk Store", "end-to-end pipeline", "checkpoint resume", "tournament"]
+    },
+    {
+      "path": "src/tests/slow/",
+      "role": "Tests that read real data from data/processed/ or data/raw/ and are excluded from the default pytest run via pyproject.toml; run explicitly with uv run pytest tests/slow/. Currently holds a single GPU scaling test. Several integration tests (TCN, LSTM context, GNN) also carry the slow marker so the fast ./vol test loop skips torch training.",
+      "key_files": [
+        { "file": "conftest.py", "purpose": "Documents that slow tests need real local data and are opt-in only." }
+      ],
+      "concepts": ["slow marker", "real-data tests", "GPU scaling"]
+    },
+    {
+      "path": "src/tests/data/ and src/tests/golden/",
+      "role": "Checked-in golden fixtures for the tournament path: six parquet panels under data/tournament_golden (full, stats_only, delta-hedge variants, variance-targeting) and JSON expectations under golden/tournament including a 2-model 2-horizon metrics snapshot and the GSVIVS stats schema. These pin tournament outputs against regression rather than recomputing them from scratch.",
+      "key_files": [
+        { "file": "golden/tournament/metrics_2model_2horizon.json", "purpose": "Frozen expected metrics for a 2-model, 2-horizon tournament run." }
+      ],
+      "concepts": ["golden files", "regression pinning"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "Estimator tests get an analytical ground truth: the shared conftest simulates one trading day as 23,400 GBM ticks with no jumps and a true annualized volatility of exactly 20 percent.",
+      "file": "src/tests/conftest.py",
+      "start": 43,
+      "end": 60,
+      "focus": [45, 48],
+      "quote": "    \"\"\"Simulate GBM log-prices for one trading day (23400 ticks, no jumps).\n    True daily annualized vol = 0.20."
+    },
+    {
+      "text": "Synthetic tick data is manufactured to be a drop-in replacement for the GS Chunk Store: make_synthetic_ticks returns a DataFrame shaped exactly like fetch_trades output, indexed by America/New_York timestamps with price and size columns.",
+      "file": "src/tests/conftest.py",
+      "start": 103,
+      "end": 124,
+      "focus": [103, 121],
+      "quote": "    \"\"\"Create synthetic tick DataFrame matching fetch_trades output format.\n        Tick DataFrame with DatetimeIndex (tz=America/New_York),"
+    },
+    {
+      "text": "The integration suite is deliberately network-free: its conftest states that integration tests exercise multi-component workflows with synthetic data and require neither network access nor real data files.",
+      "file": "src/tests/integration/conftest.py",
+      "start": 1,
+      "end": 14,
+      "focus": [3, 4],
+      "quote": "Integration tests exercise multi-component workflows with synthetic data.\nThey do NOT require network access or real data files."
+    },
+    {
+      "text": "The data pipeline tests run outside Goldman infrastructure by mocking the Chunk Store, because the pytickclient library that feeds real tick data is only available on the GS network.",
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 1,
+      "end": 12,
+      "focus": [4],
+      "quote": "Uses mocked Chunk Store (pytickclient not available outside GS network)."
+    },
+    {
+      "text": "The tradeable universe the data layer serves is at least 35 symbols, composed of 30 equities, 4 ETFs, and the ES E-mini future, and fetching an unknown ticker raises a ValueError.",
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 55,
+      "end": 66,
+      "focus": [62],
+      "quote": "        assert len(SYMBOL_UNIVERSE) >= 35  # 30 equities + 4 ETFs + ES"
+    },
+    {
+      "text": "E-mini futures roll to the next quarterly contract on the Thursday before the third Friday of the expiry month: on 14 March 2024, one day before the third Friday, the resolver already returns the June contract ESM24.",
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 76,
+      "end": 95,
+      "focus": [82, 85],
+      "quote": "        # 3rd Friday of Mar 2024 = Mar 15. Roll date = Mar 14 (Thursday).\n        assert symbol == \"ESM24\""
+    },
+    {
+      "text": "The daily measure computation preserves the semivariance identity: upside and downside realized semivariances computed from a day of ticks must sum to realized variance to within one part in a million.",
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 336,
+      "end": 350,
+      "focus": [342, 343],
+      "quote": "        assert result[\"rs_positive\"] + result[\"rs_negative\"] == pytest.approx(\n            result[\"rv\"], rel=1e-6"
+    },
+    {
+      "text": "Jump detection power is proven directly: when a 3 percent jump is injected into the GBM path, the Barndorff-Nielsen and Shephard test must flag the day with jump_indicator 1.0 and a z statistic above 3, using jump-robust tripower quarticity rather than RQ which the jump itself inflates.",
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 192,
+      "end": 206,
+      "focus": [193, 204, 205],
+      "quote": "        \"\"\"BNS test should detect a 3% jump.\n        assert result[\"jump_indicator\"] == 1.0\n        assert result[\"z_stat\"] > 3.0  # Should be very significant"
+    },
+    {
+      "text": "The realized kernel is verified to actually earn its noise robustness: on prices contaminated with simulated bid-ask noise, the RK estimate must land closer to the clean-price variance than the naive tick-by-tick RV does.",
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 266,
+      "end": 279,
+      "focus": [267, 278],
+      "quote": "        \"\"\"RK should handle noisy prices better than naive tick RV.\"\"\"\n        assert abs(rk - rv_clean) < abs(rv_tick - rv_clean)"
+    },
+    {
+      "text": "A single test closes the whole forecasting loop on synthetic data: simulate 300 days of prices from a persistent AR(1) log-IV process, compute daily RV, build the HAR design matrix, fit HAR to predict next-day log RV, and require positive out-of-sample R squared.",
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 508,
+      "end": 525,
+      "focus": [512],
+      "quote": "        \"\"\"Full pipeline: simulate prices → compute RV & features → fit HAR → evaluate.\"\"\""
+    },
+    {
+      "text": "The Pipeline applies a per-fold Duan (1995) retransformation correction when converting log-RV predictions back to variance space, and for OLS models like HAR the tests require this correction to be positive, approximately half the residual variance, because plain OLS under-predicts after exponentiation.",
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 613,
+      "end": 632,
+      "focus": [614, 632],
+      "quote": "        \"\"\"OLS models should have positive Duan correction (they under-predict).\"\"\"\n        assert results[1][\"duan_correction\"] > 0.01"
+    },
+    {
+      "text": "LightGBM is proven through the real cross-validation loop, not in isolation: the integration test runs it end to end through the Pipeline class with expanding-window CV, the tree_expansion feature layer, and a QLIKE custom training objective, at horizons 1 and 5.",
+      "file": "src/tests/integration/test_lightgbm_pipeline.py",
+      "start": 1,
+      "end": 13,
+      "focus": [3, 4],
+      "quote": "Validates that LightGBM can be run end-to-end through the Pipeline class\nwith expanding-window CV, tree_expansion layer, and QLIKE custom objective."
+    },
+    {
+      "text": "The TCN path is smoke-tested across the full chain, config parsing then sequence loading then fit then predict then QLIKE, with the 5-minute sequence builder mocked so no real parquet files are needed.",
+      "file": "src/tests/integration/test_tcn_pipeline.py",
+      "start": 1,
+      "end": 12,
+      "focus": [3, 4],
+      "quote": "Verifies end-to-end: config parsing → sequence loading → TCN fit → predict → QLIKE.\nUses synthetic data with mock sequence loading (no real parquets required)."
+    },
+    {
+      "text": "The LSTM context-vector test is a TDD regression trap for a real audit finding: it was written to fail with UnboundLocalError on the unfixed runner, which assigned model_params[\"context_dim\"] before model_params was bound whenever context features were configured.",
+      "file": "src/tests/integration/test_lstm_context_pipeline.py",
+      "start": 9,
+      "end": 18,
+      "focus": [14, 15],
+      "quote": "This test is TDD: it MUST FAIL on the current codebase with\n``UnboundLocalError`` and will pass only after the runner fix is applied."
+    },
+    {
+      "text": "The graph path is tested with the real model, not a stub: a GATv2 GNNVolModel trains end to end on a 3-symbol synthetic panel over a thresholded correlation graph rebuilt every 21 days from a 60-day log-RV window, and its predictions must have nonzero variance to rule out a constant predictor.",
+      "file": "src/tests/integration/test_graph_pipeline.py",
+      "start": 16,
+      "end": 35,
+      "focus": [17, 27, 35],
+      "quote": "    \"\"\"Run the real GATv2 GNNVolModel end-to-end through the native graph path.\"\"\"\n        graph=GraphConfig(method=\"corr\", input=\"log_rv\", window=60,\n    assert res[\"predictions\"].std() > 0  # not a constant predictor"
+    },
+    {
+      "text": "The tournament machinery degrades gracefully to a single entrant: with one model the Diebold-Mariano statistic is 0 with p-value 1, the model confidence set trivially includes it, and the dashboard HTML is still produced.",
+      "file": "src/tests/integration/test_single_model_tournament.py",
+      "start": 75,
+      "end": 87,
+      "focus": [76, 84],
+      "quote": "        \"\"\"DM stat is 0 and MCS includes the sole model.\"\"\"\n        assert table.iloc[0][\"dm_stat\"] == 0.0"
+    },
+    {
+      "text": "Tournament checkpointing is proven to save real compute: rerunning with har plus harq executes only harq because har is loaded from its checkpoint, and the restored har predictions are asserted identical to the original run series-for-series.",
+      "file": "src/tests/integration/test_checkpoint_resume.py",
+      "start": 112,
+      "end": 131,
+      "focus": [121, 129],
+      "quote": "        assert call_count[\"har_runs\"] == 1  # only harq ran\n            preds2[\"har\"][1], preds1[\"har\"][1], check_names=False"
+    },
+    {
+      "text": "The vol forecasts feed a trading signal, and the tests check the reporting of it: a smoke test patches the GSVIVS index fetch with synthetic levels so no TSDB is needed, runs a minimal HAR tournament, and asserts the dashboard HTML contains the GSVIVS01 section and a Variance Swap Signal heading.",
+      "file": "src/tests/integration/test_gsvivs_smoke.py",
+      "start": 65,
+      "end": 76,
+      "focus": [72, 75],
+      "quote": "    assert \"GSVIVS01\" in html_content or \"gsvivs\" in html_content, (\n    assert \"Variance Swap Signal\" in html_content, \"Variance Swap Signal heading not found\""
+    },
+    {
+      "text": "HARX extends the three HAR core regressors (daily, weekly, monthly log RV) with YAML-declared extras: the end-to-end test asserts the fitted model has exactly 3 plus len(extra_features) features and that log_bpv_d, the extra declared in example_harx.yaml, landed in the design matrix.",
+      "file": "src/tests/integration/test_harx_end_to_end.py",
+      "start": 139,
+      "end": 160,
+      "focus": [146, 160],
+      "quote": "        n_core = 3  # log_rv_d, log_rv_w, log_rv_m\n        assert \"log_bpv_d\" in fitted_model._feature_names"
+    },
+    {
+      "text": "Every mathematical formula in the codebase is audit-traced: FORMULAS.md is a central registry mapping each function (RV, BPV, semivariances, realized kernel, jump test, QLIKE, DM test, GFEVD, magnetic Laplacian) to its source paper, equation number, implementation file, test file, and hand-computed gold values.",
+      "file": "src/tests/unit/formulas/FORMULAS.md",
+      "start": 1,
+      "end": 10,
+      "focus": [3],
+      "quote": "Central audit file mapping every mathematical function to its source paper, implementation, and test."
+    }
+  ],
+  "glossary": [
+    {
+      "term": "QLIKE",
+      "definition": "The quasi-likelihood loss from Patton (2011), QLIKE(sigma2, h) = log(h) + sigma2/h, the primary evaluation metric of the project. It is minimized when the forecast equals the true variance, is robust to noisy volatility proxies, and penalizes under-prediction more than over-prediction.",
+      "file": "src/tests/unit/formulas/test_qlike_formulas.py",
+      "line": 6
+    },
+    {
+      "term": "Realized variance (RV)",
+      "definition": "The sum of squared intraday returns over a trading day, here computed from 5-minute bars. It is the target quantity the whole project forecasts.",
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "line": 63
+    },
+    {
+      "term": "Bipower variation (BPV)",
+      "definition": "A jump-robust variance estimator built from products of adjacent absolute returns. Without jumps it approximates RV; with a jump it stays below RV, and that gap is the basis for jump detection.",
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "line": 170
+    },
+    {
+      "term": "BNS jump test",
+      "definition": "The Barndorff-Nielsen and Shephard z test comparing RV to BPV, scaled by tripower quarticity (TPQ), which is used instead of standard realized quarticity because RQ is inflated by the jump itself.",
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "line": 197
+    },
+    {
+      "term": "Realized kernel (RK)",
+      "definition": "A microstructure-noise-robust volatility estimator; the tests require it to beat naive tick-level RV at recovering the true variance from noisy prices.",
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "line": 267
+    },
+    {
+      "term": "Realized semivariance",
+      "definition": "The split of RV into upside (positive-return) and downside (negative-return) halves; the two components must sum exactly back to RV.",
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "line": 342
+    },
+    {
+      "term": "HAR",
+      "definition": "The heterogeneous autoregressive model of realized volatility, regressing next-day log RV on daily, weekly, and monthly RV averages; the project's baseline model and the dynamic its synthetic fixtures imitate.",
+      "file": "src/tests/conftest.py",
+      "line": 67
+    },
+    {
+      "term": "Duan correction",
+      "definition": "A retransformation (smearing) correction applied when converting log-space predictions back to variance space; for Gaussian OLS residuals it approximates half the residual variance, and for QLIKE-trained models it is near zero.",
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "line": 635
+    },
+    {
+      "term": "MCS",
+      "definition": "The model confidence set, the collection of models not statistically distinguishable from the best; with only one entrant it trivially includes that model with p-value 1.",
+      "file": "src/tests/integration/test_single_model_tournament.py",
+      "line": 76
+    },
+    {
+      "term": "Diebold-Mariano test",
+      "definition": "The classic test of equal predictive accuracy between two forecast series, per Diebold and Mariano (1995); implemented in evaluation/statistical_tests.py and verified against gold values.",
+      "file": "src/tests/unit/formulas/FORMULAS.md",
+      "line": 36
+    },
+    {
+      "term": "GSVIVS01",
+      "definition": "A GS variance swap index whose PnL section the tournament dashboard renders; tests substitute a synthetic random-walk level series so no TSDB access is required.",
+      "file": "src/tests/integration/test_gsvivs_smoke.py",
+      "line": 1
+    },
+    {
+      "term": "Purge gap",
+      "definition": "A buffer of trading days excluded between the training and test windows in cross validation so overlapping multi-day RV targets cannot leak future information into training; integration configs use purge_gap=5.",
+      "file": "src/tests/integration/test_lightgbm_pipeline.py",
+      "line": 79
+    }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "The integration tests need tick data, but pytickclient only works on the GS network. How does the suite handle this?",
+      "options": [
+        "It mocks the Chunk Store query with synthetic responses and generates GBM ticks locally",
+        "It replays recorded HTTP cassettes of real Chunk Store traffic",
+        "It ships a small parquet of real SPY ticks inside the repo",
+        "It skips all data tests when the network is unreachable"
+      ],
+      "answer": 0,
+      "provenance": "src/tests/integration/test_data_pipeline.py:4 (mocked Chunk Store, pytickclient GS-only) and src/tests/conftest.py:103 (synthetic ticks matching fetch_trades format)",
+      "explanation": "The module docstring says the Chunk Store is mocked because pytickclient is unavailable outside the GS network, and conftest builds synthetic tick DataFrames matching the fetch_trades output format."
+    },
+    {
+      "kind": "single",
+      "prompt": "A 3 percent jump is injected into the synthetic GBM price path at tick 10,000. What do the tests then require?",
+      "options": [
+        "BPV falls below RV and the BNS z statistic exceeds 3, flagging the jump",
+        "BPV rises above RV so the jump ratio inverts",
+        "RV and BPV stay equal because 5-minute sampling absorbs the jump",
+        "The realized kernel rejects the day as unusable"
+      ],
+      "answer": 0,
+      "provenance": "src/tests/integration/test_rv_pipeline.py:169-205 (bpv < rv with jump; jump_indicator == 1.0 and z_stat > 3.0) and src/tests/conftest.py:223 (3 percent jump at tick 10000)",
+      "explanation": "test_bpv_less_than_rv_with_jump asserts bpv < rv, and test_jump_detected_with_large_jump asserts jump_indicator == 1.0 with z_stat > 3.0 using jump-robust tripower quarticity."
+    },
+    {
+      "kind": "single",
+      "prompt": "What identity must hold, to within one part in a million, for the semivariances computed from a day of ticks?",
+      "options": [
+        "rs_positive + rs_negative equals rv",
+        "rs_positive - rs_negative equals bpv",
+        "rs_positive * rs_negative equals rq",
+        "max(rs_positive, rs_negative) equals rk"
+      ],
+      "answer": 0,
+      "provenance": "src/tests/integration/test_data_pipeline.py:340-344 (test_semivariances_sum_to_rv, pytest.approx rel=1e-6)",
+      "explanation": "Upside and downside semivariances partition the squared returns, so their sum must reconstruct realized variance exactly."
+    },
+    {
+      "kind": "order",
+      "prompt": "Put the stages of the TCN pipeline in the order the integration test verifies them end to end.",
+      "options": [
+        "config parsing",
+        "sequence loading",
+        "TCN fit",
+        "predict",
+        "QLIKE evaluation"
+      ],
+      "answer": 0,
+      "provenance": "src/tests/integration/test_tcn_pipeline.py:3 (docstring lists the chain: config parsing, sequence loading, TCN fit, predict, QLIKE)",
+      "explanation": "The module docstring names the verified chain in exactly this order; the options are listed in the correct sequence."
+    }
+  ],
+  "confirmed_missing": [
+    "volforecast/config.py imported by nearly every integration test (ExperimentConfig, CVConfig, ModelConfig, SequenceConfig, GraphConfig, TournamentConfig) but absent from src/volforecast/ in the restore",
+    "volforecast/pipeline/runner.py imported as volforecast.pipeline.runner (Pipeline class) by test_rv_pipeline.py, test_lightgbm_pipeline.py, test_tcn_pipeline.py, test_lstm_context_pipeline.py, test_graph_pipeline.py, test_checkpoint_resume.py, test_harx_end_to_end.py but absent",
+    "volforecast/models/har_family.py imported by test_rv_pipeline.py (HARModel, RidgeHARModel, LassoHARModel) but absent",
+    "volforecast/evaluation/tournament.py imported by test_single_model_tournament.py and test_gsvivs_smoke.py (run_har_tournament) but absent",
+    "volforecast/evaluation/_parallel.py imported by test_checkpoint_resume.py (run_models_pooled) but absent",
+    "volforecast/data/edrvol.py patched by test_gsvivs_smoke.py (fetch_gsvivs_index) but absent"
+  ]
+}

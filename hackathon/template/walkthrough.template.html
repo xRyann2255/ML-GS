@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trailhead</title>
+<style>
+/* ============================================================
+   TRAILHEAD, hand-built target artifact: the walkthrough the
+   generator should aspire to produce.
+   Aesthetic: GS institutional workstation.
+     - cool navy-slate surfaces; sky blue is the one interactive accent
+     - workflow status (verified / inferred / broken) kept strictly
+       separate from brand colour
+     - sans for interface text; mono confined to code, commands, paths
+       and figures; serif reserved for display headings
+     - tabular numerals wherever a number appears
+     - a quiet engineering grid sits behind everything: the page is a
+       drawing board, not a poster
+   Self-contained: no external requests, no fonts, no scripts.
+   Goldman Sans / GS Sans cannot ship in this file (embedded font
+   at-rules are barred by the bundle gate), so --sans approximates it
+   from system faces.
+   ============================================================ */
+
+:root{
+  /* surfaces */
+  --ink:#0a0e14; --ink2:#111722; --ink3:#18202d; --ink4:#212b3a;
+  /* text */
+  --bone:#e8ecf2; --dim:#9ba8ba; --faint:#8494a8;
+  /* structure */
+  --rule:#1e2735; --rule2:#2c3849;
+  /* brand / interactive: GS sky blue */
+  --brand:#7399c6; --brand2:#acd4f1; --brandd:#12243a;
+  /* workflow status */
+  --ok:#4fa97a; --inf:#d8a23c; --bad:#e06c5b;
+  --okd:#0f2a20; --infd:#2a2210; --badd:#2e1614;
+  /* the engineering grid */
+  --grid:rgba(115,153,198,.055); --grid2:rgba(115,153,198,.10);
+  /* type */
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --serif:Charter,"Bitstream Charter","Sitka Text",Cambria,"Times New Roman",Times,serif;
+  --mono:"Cascadia Code","JetBrains Mono","SF Mono","Berkeley Mono","IBM Plex Mono",ui-monospace,monospace;
+  /* shape + elevation: nothing rounder than 4px */
+  --r1:2px; --r2:4px;
+  --e1:0 1px 2px rgba(4,8,14,.28);
+  --e2:0 8px 24px rgba(4,8,14,.40);
+  --base:16px; --rail:272px; --bar:52px;
+}
+/* Sky blue is the dark-theme interactive colour; on white it fails 4.5:1
+   as text, so light drops to deep navy with Mariner for hover. */
+:root[data-theme="light"]{
+  --ink:#ffffff; --ink2:#f5f7fa; --ink3:#eaeef4; --ink4:#dde4ed;
+  --bone:#14181f; --dim:#4a5464; --faint:#5c6775;
+  --rule:#e3e8ef; --rule2:#c2ccd9;
+  --brand:#00355f; --brand2:#2178c4; --brandd:#e8f1fa;
+  --ok:#1a6b43; --inf:#8a5c10; --bad:#b3261e;
+  --okd:#e4f2ea; --infd:#fbf0da; --badd:#fbe9e7;
+  --grid:rgba(0,53,95,.05); --grid2:rgba(0,53,95,.09);
+  --e1:0 1px 2px rgba(20,24,31,.10);
+  --e2:0 8px 24px rgba(20,24,31,.16);
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme]){
+    --ink:#ffffff; --ink2:#f5f7fa; --ink3:#eaeef4; --ink4:#dde4ed;
+    --bone:#14181f; --dim:#4a5464; --faint:#5c6775;
+    --rule:#e3e8ef; --rule2:#c2ccd9;
+    --brand:#00355f; --brand2:#2178c4; --brandd:#e8f1fa;
+    --ok:#1a6b43; --inf:#8a5c10; --bad:#b3261e;
+    --okd:#e4f2ea; --infd:#fbf0da; --badd:#fbe9e7;
+    --grid:rgba(0,53,95,.05); --grid2:rgba(0,53,95,.09);
+    --e1:0 1px 2px rgba(20,24,31,.10);
+    --e2:0 8px 24px rgba(20,24,31,.16);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--ink); color:var(--bone);
+  font:var(--base)/1.6 var(--sans);
+  overflow-x:hidden;
+}
+/* The grid: a fine 26px pitch with a heavier line every 130px, fixed so
+   content scrolls over a stable board. Decoration budget spent here and
+   nowhere else. */
+body::before{
+  content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background-image:
+    linear-gradient(var(--grid2) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid2) 1px,transparent 1px),
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:130px 130px,130px 130px,26px 26px,26px 26px;
+}
+code,pre,samp,kbd{font-family:var(--mono)}
+.badge,.dur,.stop .num,.prog .lab,.code .ln,.sumgrid .v,.tbl .r,
+.drawer .dsub,.opt .i,.hop>.dot,.meta,.stat .v{font-variant-numeric:tabular-nums}
+::selection{background:var(--brand);color:var(--ink)}
+
+/* ---------- top bar ---------- */
+.bar{
+  position:fixed; top:0; left:0; right:0; height:var(--bar); z-index:60;
+  display:flex; align-items:center; gap:16px; padding:0 16px;
+  background:var(--ink2); border-bottom:1px solid var(--rule2); box-shadow:var(--e1);
+}
+.brand{display:flex;align-items:baseline;gap:12px;min-width:0}
+.brand .tm{font:600 11px var(--sans);letter-spacing:.14em;color:var(--brand);flex:none}
+.brand b{font:600 15px var(--sans);letter-spacing:-.01em;white-space:nowrap}
+.meta{font:11.5px var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{
+  margin-left:auto;display:flex;align-items:center;border:1px solid var(--rule2);
+  border-radius:var(--r1);background:var(--ink3);cursor:pointer;flex:none;
+  font:11.5px var(--sans);overflow:hidden;color:var(--dim)
+}
+.badge:hover{border-color:var(--brand)}
+.badge span{padding:5px 10px;border-right:1px solid var(--rule)}
+.badge span:last-child{border-right:0}
+.badge .n{color:var(--bone);font-weight:600;font-style:normal}
+.badge .d{color:var(--inf)} .badge .f{color:var(--bad)}
+.badge.lowconf{border-color:var(--inf)} .badge .lo{color:var(--inf);font-weight:600}
+.tools{display:flex;gap:4px;flex:none}
+.tbtn{
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);
+  color:var(--dim);cursor:pointer;font:600 11px var(--sans);letter-spacing:.04em;padding:5px 8px
+}
+.tbtn:hover{color:var(--bone);border-color:var(--brand)}
+.tbtn[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--ink)}
+
+/* ---------- shell ---------- */
+.wrap{display:flex;min-height:100vh;padding-top:var(--bar)}
+.rail{
+  width:var(--rail);flex:none;position:sticky;top:var(--bar);
+  height:calc(100vh - var(--bar));overflow-y:auto;
+  background:var(--ink2);border-right:1px solid var(--rule);
+  padding:16px 0 24px;
+}
+.track{margin-bottom:4px}
+.track h3{
+  font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--faint);padding:12px 16px 6px;display:flex;justify-content:space-between;align-items:baseline
+}
+.track h3 i{font-style:normal;font-weight:400;color:var(--faint);font-size:10.5px}
+.stop{
+  display:flex;gap:10px;align-items:baseline;padding:7px 16px 7px 14px;cursor:pointer;
+  border-left:2px solid transparent;font-size:13.5px;color:var(--dim)
+}
+.stop:hover{background:var(--ink3);color:var(--bone)}
+.stop.on{border-left-color:var(--brand);background:var(--ink3);color:var(--bone)}
+.stop .num{font:500 11px var(--mono);color:var(--faint);flex:none;width:20px;position:relative}
+.stop.done .num{color:var(--ok)}
+.stop.done .num::after{content:"✓";position:absolute;left:20px;font-size:9px;top:-3px}
+.stop.cp .num{color:var(--inf)}
+.prog{padding:14px 16px 4px;border-top:1px solid var(--rule);margin-top:12px}
+.prog .lab{font:11px var(--mono);color:var(--faint);display:flex;justify-content:space-between;margin-bottom:6px}
+.pbar{height:4px;background:var(--ink4);border-radius:var(--r1);overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--brand);width:0}
+
+.stage{flex:1;min-width:0;padding:36px 40px 80px}
+.stopwrap{max-width:860px;margin:0 auto}
+.plate{
+  display:flex;gap:10px;align-items:center;font:600 10.5px var(--sans);
+  letter-spacing:.08em;color:var(--faint);text-transform:uppercase;margin-bottom:14px
+}
+.plate hr{flex:none;width:24px;border:0;border-top:1px solid var(--rule2)}
+h1{font:700 34px/1.15 var(--serif);letter-spacing:-.01em;margin-bottom:10px}
+.lede{color:var(--dim);font-size:16.5px;max-width:72ch;margin-bottom:28px}
+.blocks>*{margin-bottom:24px}
+.blocks .prose p{max-width:72ch;margin-bottom:14px}
+
+/* ---------- claims: the atomic unit ---------- */
+.claim{cursor:pointer;border-bottom:1px solid rgba(79,169,122,.55);padding-bottom:1px}
+.claim:hover{border-bottom-color:var(--ok);background:rgba(79,169,122,.07)}
+.claim[aria-expanded="true"]{background:rgba(79,169,122,.10)}
+.claim.inf{cursor:default;border-bottom:1px dotted var(--inf);background:none}
+.claim.inf:hover{background:rgba(216,162,60,.07)}
+.mark{
+  display:inline-block;vertical-align:super;font:600 9px var(--mono);
+  color:var(--ok);background:var(--okd);border:1px solid var(--ok);
+  border-radius:var(--r1);padding:0 4px;margin-left:5px;cursor:pointer;line-height:1.5
+}
+.mark:hover{background:var(--ok);color:var(--ink)}
+.tag{
+  display:inline-block;font:600 9px var(--sans);letter-spacing:.06em;color:var(--inf);
+  background:var(--infd);border:1px solid var(--inf);border-radius:var(--r1);
+  padding:0 5px;margin-left:6px;vertical-align:super;line-height:1.6
+}
+.pop{margin:4px 0 18px}
+
+/* glossary terms */
+.gterm{
+  cursor:help;border-bottom:1px dotted var(--brand);color:inherit;
+  background:none;border-top:0;border-left:0;border-right:0;font:inherit;padding:0
+}
+.gterm:hover{color:var(--brand2);border-bottom-style:solid}
+.gpop{
+  position:absolute;z-index:80;max-width:380px;background:var(--ink2);
+  border:1px solid var(--rule2);border-left:2px solid var(--brand);
+  border-radius:var(--r2);box-shadow:var(--e2);padding:12px 14px;font-size:13px
+}
+.gpop .gt{font:600 12px var(--sans);letter-spacing:.03em;margin-bottom:4px}
+.gpop .gd{color:var(--dim);margin-bottom:8px}
+.gpop .gsrc{font:11px var(--mono);color:var(--faint)}
+.gpop .gsrc button{
+  background:none;border:0;color:var(--brand);cursor:pointer;font:inherit;padding:0;text-decoration:underline
+}
+
+/* ---------- code excerpt ---------- */
+.ex{border:1px solid var(--rule2);border-radius:var(--r2);overflow:hidden;background:var(--ink2)}
+.ex header{
+  display:flex;align-items:center;gap:6px;background:var(--ink3);
+  padding:7px 12px;font:12px var(--mono);color:var(--dim);border-bottom:1px solid var(--rule)
+}
+.ex header b{color:var(--bone);font-weight:500}
+.ex header .sp{flex:1}
+.ex header .sha{color:var(--faint);font-size:10.5px}
+.cp-btn{
+  background:none;border:1px solid var(--rule2);border-radius:var(--r1);color:var(--dim);
+  cursor:pointer;font:600 10px var(--sans);letter-spacing:.05em;padding:2px 7px
+}
+.cp-btn:hover{color:var(--bone);border-color:var(--brand)}
+.code{max-height:432px;overflow:auto}
+.code table{border-collapse:collapse;width:100%;font:12.5px/1.55 var(--mono)}
+.code .ln{
+  color:var(--faint);text-align:right;padding:0 10px 0 14px;user-select:none;
+  width:1%;white-space:nowrap;vertical-align:top
+}
+.code .src{white-space:pre;padding-right:16px}
+.code tr.hl{background:var(--okd)}
+.code tr.hl .ln{color:var(--ok);position:relative}
+.code tr.hl .ln::before{content:"▸";position:absolute;left:3px;color:var(--ok)}
+.code tr.el td{color:var(--faint);font-style:italic;padding:2px 14px}
+.ex figcaption{padding:8px 12px;font-size:12px;color:var(--faint);border-top:1px solid var(--rule)}
+
+/* ---------- command block ---------- */
+.cmd{border:1px solid var(--rule2);border-radius:var(--r2);overflow:hidden;background:var(--ink2)}
+.cmd.fail{border-left:2px solid var(--bad)}
+.cmd header{
+  display:flex;align-items:center;gap:10px;background:var(--ink3);
+  padding:9px 12px;font:13px var(--mono)
+}
+.cmd .pr{color:var(--dim)}
+.cmd header code{color:var(--bone)}
+.cmd .res{margin-left:auto;display:flex;gap:8px;align-items:center}
+.pill{font:600 10.5px var(--mono);border-radius:var(--r1);padding:2px 7px}
+.pill.ok{color:var(--ok);background:var(--okd)}
+.pill.bad{color:var(--bad);background:var(--badd)}
+.pill.wait{color:var(--inf);background:var(--infd);margin-left:auto}
+.dur{font:11.5px var(--mono);color:var(--faint)}
+.brk{background:var(--badd);border-top:1px solid var(--rule);padding:10px 12px;font-size:13px}
+.brk b{color:var(--bad);font:600 10.5px var(--sans);letter-spacing:.06em;display:block;margin-bottom:4px}
+.out{border-top:1px solid var(--rule)}
+.out summary{
+  cursor:pointer;padding:7px 12px;font:600 11px var(--sans);letter-spacing:.04em;color:var(--dim);list-style:none
+}
+.out summary::before{content:"▸ ";color:var(--faint)}
+.out[open] summary::before{content:"▾ "}
+.out summary:hover{color:var(--bone)}
+.out pre{
+  padding:10px 14px;font:12px/1.5 var(--mono);color:var(--dim);
+  overflow-x:auto;max-height:420px;overflow-y:auto;border-top:1px solid var(--rule)
+}
+.envnote{padding:6px 12px;font:11px var(--mono);color:var(--faint);border-top:1px solid var(--rule)}
+
+/* predict-then-reveal */
+.pred{border-top:1px solid var(--rule);padding:10px 12px;background:var(--ink2)}
+.pred .q{font-size:13.5px;margin-bottom:8px}
+.pred .q b{
+  font:600 9.5px var(--sans);letter-spacing:.08em;color:var(--brand);
+  border:1px solid var(--brand);border-radius:var(--r1);padding:1px 5px;margin-right:8px;vertical-align:1px
+}
+.popts{display:flex;flex-direction:column;gap:6px}
+.popt{
+  display:flex;gap:10px;align-items:baseline;border:1px solid var(--rule2);
+  border-radius:var(--r1);padding:6px 10px;cursor:pointer;font-size:13px
+}
+.popt:hover{border-color:var(--brand);background:var(--brandd)}
+.popt .i{font:600 11px var(--mono);color:var(--faint);flex:none}
+.pred.done .popt{cursor:default}
+.pred.done .popt:hover{border-color:var(--rule2);background:none}
+.popt.right{border-color:var(--ok);background:var(--okd)}
+.popt.right .i{color:var(--ok)}
+.popt.wrong{border-color:var(--bad);background:var(--badd)}
+.popt.wrong .i{color:var(--bad)}
+.pfoot{display:flex;gap:12px;align-items:baseline;margin-top:8px;flex-wrap:wrap}
+.verdict{font:600 11px var(--sans);letter-spacing:.05em}
+.verdict.y{color:var(--ok)} .verdict.n{color:var(--bad)}
+.prov{font:11.5px var(--mono);color:var(--faint)}
+.prov b{font:600 9.5px var(--sans);letter-spacing:.06em;color:var(--dim);margin-right:6px}
+.veil{visibility:hidden;height:0;overflow:hidden;margin:0 !important}
+.veilnote{
+  border:1px dashed var(--rule2);border-radius:var(--r2);color:var(--faint);
+  font-size:12.5px;padding:10px 14px
+}
+
+/* ---------- callout ---------- */
+.call{
+  border:1px solid var(--rule2);border-left:2px solid var(--rule2);
+  border-radius:var(--r2);padding:12px 16px;font-size:13.5px;color:var(--dim);
+  background:var(--ink2);max-width:none
+}
+.call b{
+  display:block;font:600 10.5px var(--sans);letter-spacing:.07em;
+  color:var(--faint);margin-bottom:5px
+}
+.call.inferred{border-left-color:var(--inf)} .call.inferred b{color:var(--inf)}
+.call.broken{border-left-color:var(--bad)} .call.broken b{color:var(--bad)}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--rule2);border:1px solid var(--rule2);border-radius:var(--r2);overflow:hidden}
+.stat{background:var(--ink2);padding:14px 16px}
+.stat .v{font:600 26px/1.1 var(--sans);letter-spacing:-.01em}
+.stat .v .of{font-size:15px;color:var(--faint);font-weight:400}
+.stat .l{font:600 10px var(--sans);letter-spacing:.07em;color:var(--faint);margin-top:4px;text-transform:uppercase}
+.stat .s{font:11.5px var(--sans);color:var(--dim);margin-top:2px}
+
+/* ---------- table ---------- */
+.tbl{border:1px solid var(--rule2);border-radius:var(--r2);overflow:auto;max-height:560px}
+.tbl table{border-collapse:collapse;width:100%;font-size:13px;min-width:560px}
+.tbl th{
+  position:sticky;top:0;background:var(--ink3);text-align:left;
+  font:600 10.5px var(--sans);letter-spacing:.06em;color:var(--faint);
+  padding:8px 12px;border-bottom:1px solid var(--rule2);white-space:nowrap
+}
+.tbl th[data-sort]{cursor:pointer}
+.tbl th[data-sort]:hover{color:var(--bone)}
+.tbl th .ar{color:var(--brand)}
+.tbl td{padding:7px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+.tbl td.r{text-align:right;font-family:var(--mono);font-size:12.5px}
+.tbl td code{font-size:12px;color:var(--brand2)}
+:root[data-theme="light"] .tbl td code{color:var(--brand)}
+.tbl tr:hover td{background:var(--ink3)}
+
+/* ---------- map ---------- */
+.mapwrap{max-width:1080px}
+.mapbox{
+  border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);
+  position:relative;overflow:hidden
+}
+.mapbox svg{display:block;width:100%;height:auto}
+.map-collab{font:600 10px var(--sans);letter-spacing:.1em;fill:var(--faint)}
+.map-colline{stroke:var(--rule);stroke-dasharray:2 4}
+.edge{fill:none;stroke:var(--brand);opacity:.16;transition:opacity .15s}
+.edge.lit{opacity:.85;stroke:var(--brand)}
+.edge.dim{opacity:.04}
+.node{cursor:pointer}
+.node .n-body{fill:var(--ink3);stroke:var(--rule2);transition:fill .15s,stroke .15s}
+.node:hover .n-body,.node:focus-visible .n-body{fill:var(--brandd);stroke:var(--brand)}
+.node.sel .n-body{fill:var(--brandd);stroke:var(--brand);stroke-width:1.5}
+.node.dim{opacity:.30}
+.node.tourlit .n-body{stroke:var(--brand);stroke-width:2;fill:var(--brandd)}
+.n-lab{font:600 12.5px var(--sans);fill:var(--bone);pointer-events:none}
+.n-loc{font:10px var(--mono);fill:var(--faint);pointer-events:none}
+.hint{
+  position:absolute;right:10px;bottom:8px;font:600 9.5px var(--sans);
+  letter-spacing:.08em;color:var(--faint)
+}
+.maptools{display:flex;gap:6px;position:absolute;left:10px;bottom:8px}
+.tourcard{
+  border:1px solid var(--brand);border-radius:var(--r2);background:var(--ink2);
+  box-shadow:var(--e2);padding:12px 16px;margin-top:10px;max-width:640px
+}
+.tourcard .tk{font:600 10px var(--sans);letter-spacing:.08em;color:var(--brand);margin-bottom:4px}
+.tourcard p{font-size:13.5px;color:var(--dim);margin-bottom:10px}
+.tourcard .tnav{display:flex;gap:6px}
+.fallback{margin-top:12px;font-size:13px;color:var(--dim)}
+.fallback summary{cursor:pointer;font:600 11px var(--sans);letter-spacing:.04em;color:var(--faint)}
+.fallback summary:hover{color:var(--bone)}
+.fallback ul{margin:10px 0 0 18px;display:flex;flex-direction:column;gap:6px}
+
+/* ---------- drawer ---------- */
+.scrim{position:fixed;inset:0;background:rgba(4,8,14,.55);z-index:70}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(460px,92vw);z-index:75;
+  background:var(--ink2);border-left:1px solid var(--rule2);box-shadow:var(--e2);
+  overflow-y:auto;padding:20px 22px 40px
+}
+.drawer .k{font:600 10px var(--sans);letter-spacing:.1em;color:var(--faint);margin-bottom:6px}
+.drawer h4{font:700 22px var(--serif);margin-bottom:2px}
+.drawer .dsub{font:11.5px var(--mono);color:var(--faint);margin-bottom:14px}
+.drawer .role p{font-size:13.5px;color:var(--dim);margin-bottom:10px}
+.drawer h5{
+  font:600 10.5px var(--sans);letter-spacing:.07em;color:var(--faint);
+  margin:16px 0 8px;text-transform:uppercase;border-top:1px solid var(--rule);padding-top:12px
+}
+.drawer .dep{font-size:12.5px;color:var(--dim);margin-bottom:6px}
+.drawer .dep b{color:var(--bone);font-weight:600}
+.kf{display:flex;flex-direction:column;gap:6px}
+.kf div{font-size:12.5px;color:var(--dim)}
+.kf code{color:var(--brand2);font-size:12px}
+:root[data-theme="light"] .kf code{color:var(--brand)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  font:600 10.5px var(--sans);letter-spacing:.03em;color:var(--dim);
+  border:1px solid var(--rule2);border-radius:var(--r1);padding:2px 8px
+}
+.xbtn{
+  position:sticky;top:0;float:right;background:var(--ink3);border:1px solid var(--rule2);
+  border-radius:var(--r1);color:var(--dim);cursor:pointer;font:600 11px var(--sans);padding:4px 8px
+}
+.xbtn:hover{color:var(--bone);border-color:var(--brand)}
+
+/* ---------- trace ---------- */
+.trace{position:relative;padding-left:34px}
+.trace::before{content:"";position:absolute;left:11px;top:8px;bottom:26px;width:1px;background:var(--rule2)}
+.hop{position:relative;margin-bottom:26px}
+.hop>.dot{
+  position:absolute;left:-34px;top:0;width:23px;height:23px;border-radius:50%;
+  background:var(--ink3);border:1px solid var(--brand);color:var(--brand);
+  font:600 11px var(--mono);display:flex;align-items:center;justify-content:center
+}
+.hop h4{font:600 15px var(--sans);margin-bottom:1px}
+.hop .an{font:11.5px var(--mono);color:var(--faint);margin-bottom:8px}
+.hop .nx{font:12.5px var(--sans);color:var(--dim);margin-top:8px}
+.hop .nx b{color:var(--brand2);font-weight:600}
+:root[data-theme="light"] .hop .nx b{color:var(--brand)}
+
+/* ---------- checkpoint ---------- */
+.cpx{border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);padding:16px 18px}
+.cpx>.k{font:600 10px var(--sans);letter-spacing:.09em;color:var(--inf);margin-bottom:8px}
+.cpx h4{font:600 16.5px var(--sans);margin-bottom:12px;max-width:66ch}
+.conf{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--dim);margin-bottom:12px;flex-wrap:wrap}
+.conf.said{color:var(--faint)}
+.cbtn{
+  background:none;border:1px solid var(--rule2);border-radius:var(--r1);color:var(--dim);
+  cursor:pointer;font:600 10.5px var(--sans);letter-spacing:.05em;padding:4px 10px
+}
+.cbtn:hover{border-color:var(--brand);color:var(--bone)}
+.opt{
+  display:flex;gap:10px;align-items:baseline;border:1px solid var(--rule2);
+  border-radius:var(--r1);padding:8px 12px;margin-bottom:6px;cursor:pointer;font-size:13.5px
+}
+.opt:hover{border-color:var(--brand);background:var(--brandd)}
+.opt.gated{opacity:.55;cursor:not-allowed}
+.opt.gated:hover{border-color:var(--rule2);background:none}
+.opt .i{font:600 11.5px var(--mono);color:var(--faint);flex:none}
+.opt.right{border-color:var(--ok);background:var(--okd)}
+.opt.right .i{color:var(--ok)}
+.opt.wrong{border-color:var(--bad);background:var(--badd)}
+.opt.wrong .i{color:var(--bad)}
+.ordr{display:flex;gap:10px;align-items:center;margin-bottom:6px;font-size:13.5px}
+.ordr select{
+  background:var(--ink3);color:var(--bone);border:1px solid var(--rule2);
+  border-radius:var(--r1);font:12.5px var(--mono);padding:3px 6px
+}
+.act{display:flex;align-items:center;gap:12px;margin-top:12px}
+.sub{
+  background:var(--brand);border:1px solid var(--brand);border-radius:var(--r1);
+  color:var(--ink);cursor:pointer;font:600 11px var(--sans);letter-spacing:.05em;padding:6px 14px
+}
+:root[data-theme="light"] .sub{color:#fff}
+.sub:disabled{background:var(--ink3);border-color:var(--rule2);color:var(--faint);cursor:not-allowed}
+.expl{
+  border-top:1px solid var(--rule);margin-top:12px;padding-top:10px;
+  font-size:13px;color:var(--dim)
+}
+.expl .prov{display:block;margin-top:8px}
+
+/* ---------- ledger / audit ---------- */
+.sumgrid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;
+  background:var(--rule2);border:1px solid var(--rule2);border-radius:var(--r2);overflow:hidden;margin-bottom:16px
+}
+.sumgrid>div{background:var(--ink2);padding:12px 14px}
+.sumgrid .v{font:600 24px/1.1 var(--sans)}
+.sumgrid .v .of{font-size:14px;color:var(--faint);font-weight:400}
+.sumgrid .l{font:600 9.5px var(--sans);letter-spacing:.07em;color:var(--faint);margin-top:3px}
+.yh{font:600 10.5px var(--sans);letter-spacing:.08em;color:var(--faint);margin:18px 0 8px}
+.st{font:600 10px var(--sans);letter-spacing:.04em;border-radius:var(--r1);padding:1px 6px}
+.st.x{color:var(--bad);background:var(--badd)}
+
+/* ---------- footer nav ---------- */
+.fnav{display:flex;gap:10px;margin-top:40px}
+.fnav button{
+  flex:1;text-align:left;background:var(--ink2);border:1px solid var(--rule2);
+  border-radius:var(--r2);color:var(--bone);cursor:pointer;padding:12px 16px;font:14px var(--sans)
+}
+.fnav button:hover:not(:disabled){border-color:var(--brand)}
+.fnav button:disabled{opacity:.35;cursor:default}
+.fnav .k{display:block;font:600 10px var(--sans);letter-spacing:.07em;color:var(--faint);margin-bottom:3px}
+.fnav .nxt{text-align:right}
+
+/* ---------- modal ---------- */
+.modal{
+  position:fixed;inset:6vh 8vw;z-index:90;background:var(--ink2);
+  border:1px solid var(--rule2);border-radius:var(--r2);box-shadow:var(--e2);
+  overflow-y:auto;padding:24px 28px
+}
+.modal h3{font:700 24px var(--serif);margin-bottom:14px}
+
+/* ---------- cover ---------- */
+.cover h1{font-size:46px;margin-bottom:6px}
+.cover .thesis{font-size:18px;color:var(--dim);max-width:64ch;margin-bottom:26px}
+.startrow{display:flex;gap:12px;align-items:center;margin:26px 0 6px}
+.start{
+  background:var(--brand);border:1px solid var(--brand);border-radius:var(--r1);
+  color:var(--ink);cursor:pointer;font:600 13px var(--sans);letter-spacing:.05em;padding:10px 22px
+}
+:root[data-theme="light"] .start{color:#fff}
+.start:hover{filter:brightness(1.1)}
+
+/* ---------- projector ---------- */
+:root[data-proj="1"]{--base:20px}
+:root[data-proj="1"] .rail{display:none}
+:root[data-proj="1"] .code{max-height:300px}
+:root[data-proj="1"] .stopwrap{max-width:1000px}
+
+/* ---------- focus / motion / print / responsive ---------- */
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+@media print{
+  body::before{display:none}
+  .bar,.rail,.fnav,.tools,.hint,.maptools{display:none !important}
+  .wrap{padding-top:0}
+  .stage{padding:0}
+  .veil{visibility:visible;height:auto;overflow:visible}
+  .out pre{max-height:none}
+  .code{max-height:none}
+  .printall .stopwrap{page-break-after:always}
+}
+.railbtn{display:none}
+@media (max-width:900px){
+  .railbtn{display:inline-block}
+  .rail{position:fixed;left:0;top:var(--bar);width:100%;height:auto;max-height:60vh;z-index:55;
+    border-bottom:1px solid var(--rule2);display:none;box-shadow:var(--e2)}
+  .rail.open{display:block}
+  .stage{padding:24px 16px 80px}
+  .meta{display:none}
+  .brand .tm{display:none}
+  .modal{inset:4vh 4vw}
+}
+</style>
+</head>
+<body>
+<header class="bar">
+  <button class="tbtn railbtn" id="railbtn" aria-label="Toggle the course outline">☰</button>
+  <div class="brand"><span class="tm">TRAILHEAD</span><b id="rname"></b></div>
+  <div class="meta" id="rmeta"></div>
+  <button class="badge" id="badge" aria-label="Open the verification ledger"></button>
+  <div class="tools">
+    <button class="tbtn" id="projbtn" aria-pressed="false" title="Projector mode">PROJ</button>
+    <button class="tbtn" id="themebtn" title="Toggle light / dark">◐</button>
+    <button class="tbtn" id="resetbtn" title="Clear local progress">RESET</button>
+  </div>
+</header>
+<div class="wrap">
+  <nav class="rail" id="rail" aria-label="Course outline"></nav>
+  <main class="stage" id="stage"></main>
+</div>
+<div id="overlay"></div>
+<script>
+const DATA = __PAYLOAD_JSON__;
+/* ============================================================
+   RENDER: knows only the block types below. Every number it shows
+   comes off the payload; nothing here invents content.
+   ============================================================ */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+/* claim / lede text supports two inline forms after escaping:
+   `code`  ->  <code>code</code>
+   [[term]] or [[id|label]]  ->  glossary term button */
+const GLO={}; (DATA.glossary||[]).forEach(g=>GLO[g.id]=g);
+function rich(s){
+  let h=esc(s);
+  h=h.replace(/`([^`]+)`/g,(m,c)=>`<code>${c}</code>`);
+  h=h.replace(/\[\[([a-z0-9-]+)\|([^\]]+)\]\]/g,(m,id,lab)=>
+    GLO[id]?`<span class="gterm" role="button" tabindex="0" data-g="${id}">${lab}</span>`:lab);
+  h=h.replace(/\[\[([^\]|]+)\]\]/g,(m,lab)=>{
+    const id=lab.toLowerCase().replace(/[^a-z0-9]+/g,"-");
+    return GLO[id]?`<span class="gterm" role="button" tabindex="0" data-g="${id}">${lab}</span>`:lab;
+  });
+  return h;
+}
+let D=DATA, KEY, STOPS, S;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+
+function boot(){
+  KEY="trailhead:"+D.repo.name+":"+D.repo.commit;
+  STOPS=D.tracks.flatMap((t,ti)=>t.stops.map(s=>({...s,ti,track:t.title})));
+  S={cur:0,done:{},ans:{},pred:{},conf:{}};
+  try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
+  S.pred=S.pred||{}; S.conf=S.conf||{};
+  shell();
+  const h=location.hash.replace("#","");
+  const i=STOPS.findIndex(s=>s.id===h);
+  draw(i>=0?i:S.cur||0);
+}
+
+function shell(){
+  const r=D.repo||{}, p=D.report||{};
+  document.title="Trailhead · "+r.name;
+  $("#rname").textContent=r.name;
+  $("#rmeta").textContent=[r.commit,
+    "generated "+(r.generated_at||"").replace("T"," ").replace("Z"," UTC"),
+    "trailhead "+p.tool_version].join(" · ");
+  const lo=p.claims>0&&p.dropped/p.claims>0.40;
+  $("#badge").innerHTML=
+     `<span><i class="n">${p.claims}</i> claims</span>`
+    +`<span class="d">${p.dropped} dropped</span>`
+    +`<span><i class="n">${p.commands}</i> cmds</span>`
+    +`<span class="f">${p.failed} failing</span>`
+    +(lo?`<span class="lo">low confidence · ${Math.round(100*p.dropped/p.claims)}% dropped</span>`:"");
+  $("#badge").classList.toggle("lowconf",lo);
+}
+
+/* ---- predict-then-reveal ---- */
+function predict(id,question,options,key,prov){
+  const a=S.pred[id];
+  const opts=options.map((o,i)=>{
+    let cls="popt";
+    if(a){ if(i===key)cls+=" right"; else if(a.pick===i)cls+=" wrong"; }
+    return `<div class="${cls}" ${a?"":`data-pi="${i}"`} ${a?"":'tabindex="0" role="button"'}>
+      <span class="i">${a?(i===key?"✓":(a.pick===i?"✕":String.fromCharCode(65+i))):String.fromCharCode(65+i)}</span><span>${o}</span></div>`;
+  }).join("");
+  return `<div class="pred${a?(a.ok?" done ok":" done no"):""}" data-pred="${esc(id)}" data-key="${key}">
+    <div class="q"><b>PREDICT</b>${esc(question)}</div>
+    <div class="popts">${opts}</div>
+    ${a?`<div class="pfoot"><span class="verdict ${a.ok?"y":"n"}">${a.ok?"CORRECT":"NOT QUITE"}</span>
+         <span class="prov"><b>ANSWER KEY</b> ${esc(prov)}</span></div>`:""}
+  </div>`;
+}
+
+/* ---- excerpt ---- */
+function excerpt(a,cap){
+  const f=D.files[a.file]||{}, focus=new Set(a.focus||[]);
+  let rows="",prev=null;
+  for(let n=a.start;n<=a.end;n++){
+    if(!(n in f)){ if(prev!==null){rows+=`<tr class="el"><td colspan="2">… elided</td></tr>`;prev=null;} continue; }
+    rows+=`<tr class="${focus.has(n)?"hl":""}"><td class="ln">${n}</td><td class="src">${esc(f[n])}</td></tr>`;
+    prev=n;
+  }
+  const raw=Object.keys(f).filter(n=>+n>=a.start&&+n<=a.end).map(n=>f[n]).join("\n");
+  return `<figure class="ex">
+    <header><b>${esc(a.file)}</b><span>: ${a.start}-${a.end}</span><span class="sp"></span>
+      ${a.sha256?`<span class="sha" title="sha256 over these source lines, recomputed by the verifier">#${a.sha256.slice(0,10)}</span>`:""}
+      <button class="cp-btn" data-copy="${esc(raw).replace(/"/g,"&quot;")}">COPY</button></header>
+    <div class="code"><table>${rows}</table></div>
+    ${cap?`<figcaption>${cap}</figcaption>`:""}
+  </figure>`;
+}
+
+const openPred=b=>b.type==="command"&&b.predict&&!S.pred["pc:"+b.cmd];
+function veil(blocks){
+  const cut=blocks.findIndex(openPred);
+  const html=blocks.map((b,i)=>
+    (cut>=0&&i>cut)?`<div class="veil">${B[b.type](b)}</div>`:B[b.type](b)).join("");
+  return html+((cut>=0&&cut<blocks.length-1)
+    ?`<div class="veilnote">The rest of this stop stays hidden until you answer the prediction above.</div>`:"");
+}
+
+/* ---- blocks ---- */
+const B={
+ prose:b=>`<div class="prose">${b.claims.map(c=>
+   c.status==="inferred"
+    ? `<p><span class="claim inf">${rich(c.text)}</span><span class="tag">INFERRED</span></p>`
+    : `<p><span class="claim" role="button" tabindex="0" aria-expanded="false" data-claim="${c.id}">${rich(c.text)}</span><button class="mark" tabindex="-1" data-claim="${c.id}">${c.id.slice(-3)}</button></p>
+       <div class="pop" data-pop="${c.id}" hidden>${excerpt(c.anchor,"Anchor for claim "+c.id+": re-read and hash-matched at build time.")}</div>`
+  ).join("")}</div>`,
+
+ excerpt:b=>excerpt(b.anchor,b.caption),
+
+ command:b=>{
+   const pid="pc:"+b.cmd, a=b.predict?S.pred[pid]:1, shut=b.predict&&!S.pred[pid];
+   return `<div class="cmd ${b.exit&&!shut?"fail":""}">
+   <header><span class="pr">$</span><code>${esc(b.cmd)}</code>
+     ${shut?`<span class="pill wait">RESULT HIDDEN</span>`:""}
+     <span class="res${shut?" veil":""}"><span class="pill ${b.exit?"bad":"ok"}">exit ${b.exit}</span><span class="dur">${b.dur}</span></span></header>
+   ${b.predict?predict(pid,b.predict,["It passes (exit 0)","It fails (non-zero exit)"],b.exit?1:0,
+       "the exit code captured by the command runner: "+esc(b.env)):""}
+   <div class="${shut?"veil":""}">${b.broken?`<div class="brk"><b>BROKEN</b><div>${esc(b.broken)}
+     ${b.hypothesis?`<div style="margin-top:8px;font-size:12.5px;color:var(--dim)"><span class="tag" style="margin:0 6px 0 0;vertical-align:0">INFERRED</span>${esc(b.hypothesis)}</div>`:""}</div></div>`:""}
+   <details class="out"><summary>output (${b.out.split("\n").length} lines)</summary><pre>${esc(b.out)}</pre></details>
+   <div class="envnote">${esc(b.env)}</div></div></div>`;
+ },
+
+ callout:b=>`<div class="call ${b.level}"><b>${esc(b.title)}</b>${rich(b.text)}</div>`,
+
+ stats:b=>`<div class="stats">${b.items.map(x=>`<div class="stat">
+   <div class="v"${x.color?` style="color:var(--${x.color})"`:""}>${x.v}${x.of?`<span class="of"> / ${x.of}</span>`:""}</div>
+   <div class="l">${esc(x.l)}</div>${x.s?`<div class="s">${esc(x.s)}</div>`:""}</div>`).join("")}</div>`,
+
+ table:b=>`<div class="tbl"><table>
+   <thead><tr>${b.columns.map((c,i)=>`<th ${b.sortable?`data-sort="${i}"`:""}>${c}</th>`).join("")}</tr></thead>
+   <tbody>${b.rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${/^[\d,.]+( |&nbsp;)?[a-z%]*$|^n\/a$/.test(String(c).replace(/<[^>]+>/g,""))&&i>0?"r":""}">${c}</td>`).join("")}</tr>`).join("")}</tbody>
+   </table></div>${b.caption?`<div class="envnote" style="border:1px solid var(--rule2);border-top:0">${esc(b.caption)}</div>`:""}`,
+
+ graph:()=>graph(),
+
+ trace:b=>{
+   const files=[...new Set(b.steps.map(s=>s.anchor.file))].sort();
+   const cut=b.steps.findIndex((s,i)=>s.predict&&b.steps[i+1]&&!S.pred["pt:"+s.anchor.file]);
+   return `<div class="trace">${b.steps.map((s,i)=>{
+     const nx=b.steps[i+1]&&b.steps[i+1].anchor.file;
+     const ask=s.predict&&nx, pid="pt:"+s.anchor.file, done=!ask||S.pred[pid];
+     return `<div class="hop${cut>=0&&i>cut?" veil":""}">
+   <div class="dot">${i+1}</div>
+   <h4>${esc(s.anchor.file.split("/").pop())}</h4>
+   <div class="an">${esc(s.anchor.file)} : ${s.anchor.start}-${s.anchor.end}</div>
+   <div class="prose" style="margin-bottom:10px"><span class="claim inf" style="border-bottom:0;cursor:default">${rich(s.claim)}</span></div>
+   ${excerpt(s.anchor,"")}
+   ${ask?predict(pid,s.predict,files.map(f=>"<code>"+f+"</code>"),files.indexOf(nx),
+       "the next hop's resolved anchor: "+esc(nx)):""}
+   <div class="${done?"":"veil"}">${s.next?`<div class="nx">next → <b>${esc(s.next)}</b></div>`:`<div class="nx">the chain ends here</div>`}</div>
+ </div>`;}).join("")}</div>`;
+ },
+
+ checkpoint:b=>{
+  const a=S.ans[b.id], k=S.conf[b.id];
+  const gate=!a&&!k;
+  const conf=(!a&&!k)
+    ? `<div class="conf"><span>Before you answer, how sure are you?</span>
+        <button class="cbtn" data-conf="${b.id}" data-c="sure">I'M SURE</button>
+        <button class="cbtn" data-conf="${b.id}" data-c="guess">I'M GUESSING</button></div>`
+    : (k?`<div class="conf said"><span>You said you were <b>${k==="sure"?"sure":"guessing"}</b>.</span></div>`:"");
+  if(b.kind==="order"){
+    const opts=b.options.map((o,i)=>`<div class="ordr"><select data-ord="${b.id}" data-i="${i}" ${a||gate?"disabled":""} aria-label="Position of option ${i+1}">
+        <option value="">-</option>${b.options.map((_,k2)=>`<option value="${k2+1}" ${a&&a.pick[i]===k2+1?"selected":""}>${k2+1}</option>`).join("")}
+      </select><span>${o}</span>${a?(a.pick[i]===b.answer[i]?`<span class="verdict y" style="margin-left:auto">✓</span>`:`<span class="verdict n" style="margin-left:auto">✕ ${b.answer[i]}</span>`):""}</div>`).join("");
+    return `<div class="cpx" data-cp="${b.id}"><div class="k">CHECKPOINT · ORDER</div><h4>${esc(b.prompt)}</h4>
+      ${conf}${opts}
+      ${a?verdict(b,a):`<div class="act"><button class="sub" data-go-cp="${b.id}" ${gate?"disabled":""}>CHECK</button></div>`}</div>`;
+  }
+  const opts=b.options.map((o,i)=>{
+    let cls="opt"; if(a){ if(i===b.answer)cls+=" right"; else if(a.pick===i)cls+=" wrong"; }
+    if(gate)cls+=" gated";
+    return `<div class="${cls}" ${gate||a?"":`data-pick="${b.id}" data-i="${i}" tabindex="0" role="button"`}>
+      <span class="i">${a?(i===b.answer?"✓":(a.pick===i?"✕":String.fromCharCode(65+i))):String.fromCharCode(65+i)}</span><span>${o}</span></div>`;
+  }).join("");
+  return `<div class="cpx" data-cp="${b.id}"><div class="k">CHECKPOINT · SINGLE ANSWER</div>
+    <h4>${esc(b.prompt)}</h4>${conf}${opts}${a?verdict(b,a):""}</div>`;
+ },
+
+ ledger:()=>ledgerTable(),
+};
+
+function verdict(b,a){
+  return `<div class="act"><span class="verdict ${a.ok?"y":"n"}">${a.ok?"CORRECT":"NOT QUITE"}</span></div>
+    <div class="expl">${esc(b.explanation)}<span class="prov"><b>ANSWER KEY</b> ${esc(b.provenance)}</span></div>`;
+}
+function allCP(){return STOPS.flatMap(s=>s.blocks.filter(b=>b.type==="checkpoint"))}
+function ledgerRows(){
+  const d=D.dropped||[], n=(D.report||{}).claims||0;
+  if(d.length)return d.map(x=>`<tr><td><code>${esc(x.id)}</code></td><td style="color:var(--dim)">${esc(x.text)}</td>
+    <td><code>${esc(x.file)}</code></td><td><span class="st x">${esc(x.reason)}</span></td></tr>`).join("");
+  const why=n
+    ? `Nothing was deleted in this build. All ${n} claims resolved against this snapshot, so every sentence in the walkthrough carries a live anchor.`
+    : `Nothing was deleted because nothing was claimed. That is a zero from an empty run, not a clean bill of health.`;
+  return `<tr><td colspan="4" style="color:var(--dim);font-style:italic;padding:14px 12px">${why}</td></tr>`;
+}
+function ledgerTable(){
+  const r=D.report||{};
+  return `<div class="sumgrid">
+    <div><div class="v">${r.claims}</div><div class="l">CLAIMS MADE</div></div>
+    <div><div class="v" style="color:var(--ok)">${r.verified}</div><div class="l">VERIFIED</div></div>
+    <div><div class="v" style="color:var(--inf)">${r.inferred}</div><div class="l">INFERRED</div></div>
+    <div><div class="v" style="color:var(--bad)">${r.dropped}</div><div class="l">DELETED</div></div>
+    <div><div class="v">${r.commands}</div><div class="l">COMMANDS RUN</div></div>
+    <div><div class="v" style="color:var(--bad)">${r.failed}</div><div class="l">COMMANDS FAILED</div></div>
+  </div>
+  ${yourScore()}
+  <div class="tbl"><table><thead><tr><th>ID</th><th>DELETED CLAIM</th><th>TARGET</th><th>REASON</th></tr></thead>
+  <tbody>${ledgerRows()}</tbody></table></div>
+  <div class="envnote" style="border:1px solid var(--rule2);border-top:0">${esc((D.report||{}).regen||"Hand-built target artifact: every anchor re-verified by template/verify.mjs against the snapshot.")}</div>`;
+}
+function yourScore(){
+  const ps=Object.values(S.pred), pOk=ps.filter(p=>p.ok).length;
+  const cs=allCP().map(c=>({a:S.ans[c.id],k:S.conf[c.id]})).filter(x=>x.a);
+  const cOk=cs.filter(x=>x.a.ok).length;
+  const sure=cs.filter(x=>x.k==="sure"), sureWrong=sure.filter(x=>!x.a.ok).length;
+  if(!ps.length&&!cs.length)return "";
+  const bits=[];
+  if(ps.length)bits.push(`<div><div class="v">${pOk}<span class="of"> / ${ps.length}</span></div><div class="l">PREDICTIONS RIGHT</div></div>`);
+  if(cs.length)bits.push(`<div><div class="v">${cOk}<span class="of"> / ${cs.length}</span></div><div class="l">CHECKPOINTS RIGHT</div></div>`);
+  if(sure.length)bits.push(`<div><div class="v" style="color:${sureWrong?"var(--bad)":"var(--ok)"}">${sureWrong}<span class="of"> / ${sure.length}</span></div><div class="l">CONFIDENT AND WRONG</div></div>`);
+  return `<h5 class="yh">YOUR RECORD</h5><div class="sumgrid">${bits.join("")}</div>
+    <div class="envnote" style="border:0;padding-left:0">Stored in this browser only, cleared by RESET, never part of the artifact.</div>`;
+}
+
+/* ---- map: a layered board, columns are pipeline stages ---- */
+let TOUR=-1;
+function graph(){
+  const m=D.map, N=m.nodes, E=m.edges, W=m.w||1000, H=m.h||520;
+  const at=id=>N.find(n=>n.id===id);
+  const cols=(m.columns||[]).map(c=>
+    `<text class="map-collab" x="${c.x}" y="20" text-anchor="middle">${esc(c.label)}</text>
+     <line class="map-colline" x1="${c.x}" y1="28" x2="${c.x}" y2="${H-10}" opacity="${c.line?".5":"0"}"/>`).join("");
+  const edges=E.map(e=>{
+    const a=at(e.a),b=at(e.b); if(!a||!b)return "";
+    const x1=a.x+a.w,y1=a.y+a.h/2, x2=b.x,y2=b.y+b.h/2, mx=(x1+x2)/2;
+    return `<path class="edge" data-a="${e.a}" data-b="${e.b}" stroke-width="${.8+Math.min(e.n,40)/12}"
+      d="M${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}"><title>${esc(at(e.a).label+" imports "+at(e.b).label+" from "+e.n+" sites")}</title></path>`;
+  }).join("");
+  const nodes=N.map(n=>`<g class="node" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(n.label)} module, open details">
+      <rect class="n-body" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="2"/>
+      <text class="n-lab" x="${n.x+10}" y="${n.y+19}">${esc(n.label)}</text>
+      <text class="n-loc" x="${n.x+10}" y="${n.y+n.h-9}">${n.loc.toLocaleString()} loc · ${n.files} files</text>
+    </g>`).join("");
+  return `<div class="mapwrap"><div class="mapbox"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Module dependency board, columns ordered by pipeline stage">
+      <g>${cols}</g><g id="edges">${edges}</g><g id="nodes">${nodes}</g></svg>
+      <div class="maptools"><button class="tbtn" id="tourbtn">${TOUR>=0?"EXIT TOUR":"GUIDED TOUR"}</button></div>
+      <div class="hint">HOVER TO ISOLATE · CLICK A MODULE FOR DETAIL · ESC CLOSES</div></div>
+    <div id="tourbox">${TOUR>=0?tourCard():""}</div>
+    ${m.note?`<div class="call info" style="margin-top:12px"><b>${esc(m.note.title)}</b>${rich(m.note.text)}</div>`:""}
+    <details class="fallback"><summary>Text equivalent (${N.length} modules, ${E.length} dependencies)</summary>
+      <ul>${N.map(n=>`<li><b>${esc(n.label)}</b>: ${n.loc.toLocaleString()} loc, ${n.files} files. Imports:
+        ${E.filter(e=>e.a===n.id).map(e=>esc(at(e.b).label)+" ×"+e.n).join(", ")||"none"}</li>`).join("")}</ul></details></div>`;
+}
+function tourCard(){
+  const t=D.map.tour||[]; if(TOUR<0||TOUR>=t.length)return "";
+  const s=t[TOUR];
+  return `<div class="tourcard"><div class="tk">TOUR · STEP ${TOUR+1} OF ${t.length}</div>
+    <p>${rich(s.text)}</p>
+    <div class="tnav">
+      <button class="tbtn" id="tprev" ${TOUR===0?"disabled":""}>← BACK</button>
+      <button class="tbtn" id="tnext">${TOUR===t.length-1?"FINISH":"NEXT →"}</button>
+      <button class="tbtn" id="topen">OPEN ${esc((D.map.nodes.find(n=>n.id===s.id)||{}).label||"")}</button>
+    </div></div>`;
+}
+function tourPaint(){
+  const t=D.map.tour||[];
+  $$(".node").forEach(g=>g.classList.remove("tourlit","dim"));
+  $$(".edge").forEach(e=>e.classList.remove("lit","dim"));
+  if(TOUR>=0&&t[TOUR]){
+    const id=t[TOUR].id;
+    $$(".node").forEach(g=>g.classList.toggle("tourlit",g.dataset.id===id));
+    $$(".node").forEach(g=>{if(g.dataset.id!==id)g.classList.add("dim")});
+    $$(".edge").forEach(e=>{
+      if(e.dataset.a===id||e.dataset.b===id)e.classList.add("lit");else e.classList.add("dim")});
+  }
+  const tb=$("#tourbox"); if(tb)tb.innerHTML=TOUR>=0?tourCard():"";
+  const btn=$("#tourbtn"); if(btn)btn.textContent=TOUR>=0?"EXIT TOUR":"GUIDED TOUR";
+}
+
+/* ---- node drawer ---- */
+function openDrawer(id){
+  const n=D.map.nodes.find(x=>x.id===id); if(!n)return;
+  closeOverlays();
+  const role=(n.role||[]).map(p=>`<p>${rich(p)}</p>`).join("");
+  const dIn=D.map.edges.filter(e=>e.b===id).map(e=>D.map.nodes.find(x=>x.id===e.a)),
+        dOut=D.map.edges.filter(e=>e.a===id).map(e=>D.map.nodes.find(x=>x.id===e.b));
+  $("#overlay").innerHTML=`<div class="scrim" data-close="1"></div>
+  <aside class="drawer" role="dialog" aria-label="${esc(n.label)} module detail">
+    <button class="xbtn" data-close="1">ESC ✕</button>
+    <div class="k">MODULE</div><h4>${esc(n.label)}</h4>
+    <div class="dsub">${esc(n.path||"")} · ${n.loc.toLocaleString()} loc · ${n.files} files</div>
+    <div class="role">${role}</div>
+    ${n.reads?`<h5>What flows in</h5><div class="dep">${rich(n.reads)}</div>`:""}
+    ${n.feeds?`<h5>What flows out</h5><div class="dep">${rich(n.feeds)}</div>`:""}
+    <h5>Key files</h5><div class="kf">${(n.key_files||[]).map(k=>`<div><code>${esc(k.file)}</code> · ${rich(k.purpose)}</div>`).join("")||"<div>none recorded</div>"}</div>
+    ${(n.concepts||[]).length?`<h5>Concepts that live here</h5><div class="chips">${n.concepts.map(c=>`<span class="chip">${esc(c)}</span>`).join("")}</div>`:""}
+    <h5>Dependencies</h5>
+    <div class="dep"><b>imports</b> ${dOut.map(x=>esc(x.label)).join(", ")||"nothing on this board"}</div>
+    <div class="dep"><b>imported by</b> ${dIn.map(x=>esc(x.label)).join(", ")||"nothing on this board"}</div>
+    ${n.anchor?`<h5>One excerpt</h5>${excerpt(n.anchor,n.anchor_caption||"")}`:""}
+  </aside>`;
+  $(".drawer").focus&&$(".drawer").focus();
+}
+function openGloss(id,x,y){
+  const g=GLO[id]; if(!g)return;
+  closeGloss();
+  const div=document.createElement("div");
+  div.className="gpop"; div.id="gpop";
+  div.innerHTML=`<div class="gt">${esc(g.term)}</div><div class="gd">${esc(g.def)}</div>
+    ${g.anchor?`<div class="gsrc">defined at <button data-gev="${id}">${esc(g.anchor.file)}:${g.anchor.focus&&g.anchor.focus[0]||g.anchor.start}</button></div>`:""}`;
+  document.body.appendChild(div);
+  const r=div.getBoundingClientRect();
+  let left=Math.min(x,window.innerWidth-r.width-16), top=y+14;
+  if(top+r.height>window.innerHeight-10)top=y-r.height-10;
+  div.style.left=Math.max(8,left)+"px"; div.style.top=Math.max(8,top+window.scrollY)+"px";
+}
+function closeGloss(){const p=$("#gpop");if(p)p.remove()}
+function openAudit(){
+  closeOverlays();
+  $("#overlay").innerHTML=`<div class="scrim" data-close="1"></div>
+  <div class="modal" role="dialog" aria-label="Verification ledger">
+    <button class="xbtn" data-close="1">ESC ✕</button>
+    <h3>The verification ledger</h3>${ledgerTable()}</div>`;
+}
+function openEvidence(id){
+  const g=GLO[id]; if(!g||!g.anchor)return;
+  closeOverlays();
+  $("#overlay").innerHTML=`<div class="scrim" data-close="1"></div>
+  <div class="modal" role="dialog" aria-label="Evidence for ${esc(g.term)}">
+    <button class="xbtn" data-close="1">ESC ✕</button>
+    <h3>${esc(g.term)}</h3><p style="color:var(--dim);margin-bottom:14px">${esc(g.def)}</p>
+    ${excerpt(g.anchor,"Where this concept lives in the code.")}</div>`;
+}
+function closeOverlays(){$("#overlay").innerHTML="";closeGloss()}
+
+/* ---- rail ---- */
+function rail(){
+  $("#rail").innerHTML=D.tracks.map(t=>`<div class="track">
+    <h3>${esc(t.title)}<i>${t.minutes}m</i></h3>
+    ${t.stops.map(s=>{const i=STOPS.findIndex(x=>x.id===s.id);
+      return `<div class="stop ${i===S.cur?"on":""} ${S.done[s.id]?"done":""} ${s.kind==="cp"?"cp":""}"
+        data-go="${i}" tabindex="0" role="button"><span class="num">${String(i).padStart(2,"0")}</span><span>${esc(s.title)}</span></div>`;
+    }).join("")}</div>`).join("")
+  +`<div class="prog"><div class="lab"><span id="plab"></span><span id="ppct"></span></div>
+     <div class="pbar"><i id="pfill"></i></div></div>`;
+  const n=STOPS.length, d=Object.keys(S.done).length;
+  $("#ppct").textContent=Math.round(d/n*100)+"%";
+  $("#plab").textContent=d+" / "+n+" STOPS";
+  $("#pfill").style.width=Math.round(d/n*100)+"%";
+}
+
+/* ---- stage ---- */
+function draw(i){
+  TOUR=-1; closeOverlays();
+  S.cur=Math.max(0,Math.min(STOPS.length-1,i)); save();
+  const s=STOPS[S.cur];
+  $("#stage").innerHTML=`<div class="stopwrap ${s.id==="cover"?"cover":""}">
+    <div class="plate"><span>STOP ${String(S.cur).padStart(2,"0")} / ${String(STOPS.length-1).padStart(2,"0")}</span>
+      <hr><span>${esc(s.track)}</span><hr><span>${s.minutes} MIN</span></div>
+    <h1>${esc(s.title)}</h1>
+    ${s.lede?`<p class="lede">${rich(s.lede)}</p>`:""}
+    <div class="blocks">${veil(s.blocks)}</div>
+    ${s.id==="cover"?`<div class="startrow"><button class="start" data-nav="1">START THE WALKTHROUGH →</button><span style="font:11.5px var(--sans);color:var(--faint)">or use the arrow keys</span></div>`:""}
+    <div class="fnav">
+      <button ${S.cur===0?"disabled":""} data-nav="-1"><span class="k">← PREV</span>${S.cur>0?esc(STOPS[S.cur-1].title):""}</button>
+      <button class="nxt" ${S.cur===STOPS.length-1?"disabled":""} data-nav="1"><span class="k">NEXT →</span>${S.cur<STOPS.length-1?esc(STOPS[S.cur+1].title):""}</button>
+    </div></div>`;
+  if(s.kind!=="cp"){S.done[s.id]=1;save();}
+  history.replaceState(null,"","#"+s.id);
+  rail(); window.scrollTo({top:0,behavior:"instant"});
+  wireMap();
+}
+
+/* ---- map interactions ---- */
+function wireMap(){
+  const box=$(".mapbox"); if(!box)return;
+  const nodes=$$(".node",box), edges=$$(".edge",box);
+  const clear=()=>{if(TOUR>=0)return tourPaint();
+    nodes.forEach(n=>n.classList.remove("dim"));edges.forEach(e=>e.classList.remove("dim","lit"))};
+  nodes.forEach(g=>{
+    const id=g.dataset.id;
+    g.addEventListener("mouseenter",()=>{ if(TOUR>=0)return;
+      nodes.forEach(n=>n.classList.toggle("dim",n!==g));
+      edges.forEach(e=>{const hit=e.dataset.a===id||e.dataset.b===id;
+        e.classList.toggle("lit",hit);e.classList.toggle("dim",!hit);
+        if(hit){[e.dataset.a,e.dataset.b].forEach(o=>{const n2=nodes.find(x=>x.dataset.id===o);n2&&n2.classList.remove("dim")})}});
+    });
+    g.addEventListener("mouseleave",clear);
+  });
+  tourPaint();
+}
+
+/* ---- printing: linearise every stop ---- */
+let PRINTSAVE=null;
+window.addEventListener("beforeprint",()=>{
+  PRINTSAVE=$("#stage").innerHTML;
+  document.body.classList.add("printall");
+  $("#stage").innerHTML=STOPS.map((s,i)=>`<div class="stopwrap">
+    <div class="plate"><span>STOP ${String(i).padStart(2,"0")}</span><hr><span>${esc(s.track)}</span></div>
+    <h1>${esc(s.title)}</h1>${s.lede?`<p class="lede">${rich(s.lede)}</p>`:""}
+    <div class="blocks">${s.blocks.map(b=>B[b.type](b)).join("")}</div></div>`).join("");
+  $$("#stage details").forEach(d=>d.open=true);
+});
+window.addEventListener("afterprint",()=>{
+  document.body.classList.remove("printall");
+  if(PRINTSAVE!==null){$("#stage").innerHTML=PRINTSAVE;PRINTSAVE=null;wireMap()}
+});
+
+/* ---- events ---- */
+document.addEventListener("click",e=>{
+  const t=e.target;
+  if(t.closest("#railbtn")){$("#rail").classList.toggle("open");return}
+  const go=t.closest("[data-go]"); if(go){draw(+go.dataset.go);$("#rail").classList.remove("open");return}
+  const nav=t.closest("[data-nav]"); if(nav&&!nav.disabled){draw(S.cur+ +nav.dataset.nav);return}
+  if(t.closest("#badge")){openAudit();return}
+  if(t.closest("[data-close]")){closeOverlays();return}
+  if(t.closest("#resetbtn")){
+    if(confirm("Clear local progress, answers and predictions for this walkthrough?")){
+      localStorage.removeItem(KEY);S={cur:S.cur,done:{},ans:{},pred:{},conf:{}};save();draw(S.cur);}
+    return}
+  if(t.closest("#themebtn")){
+    const r=document.documentElement;
+    const cur=r.dataset.theme||(matchMedia("(prefers-color-scheme:light)").matches?"light":"dark");
+    r.dataset.theme=cur==="dark"?"light":"dark";
+    try{localStorage.setItem("trailhead:theme",r.dataset.theme)}catch(err){} return}
+  if(t.closest("#projbtn")){
+    const r=document.documentElement,b=$("#projbtn");
+    const on=r.dataset.proj==="1"; r.dataset.proj=on?"":"1";
+    b.setAttribute("aria-pressed",String(!on)); return}
+  const gev=t.closest("[data-gev]"); if(gev){openEvidence(gev.dataset.gev);return}
+  const gt=t.closest(".gterm"); if(gt){e.stopPropagation();openGloss(gt.dataset.g,e.clientX,e.clientY);return}
+  const cl=t.closest("[data-claim]"); if(cl){
+    const id=cl.dataset.claim,pop=$(`[data-pop="${id}"]`);
+    if(pop){pop.hidden=!pop.hidden;
+      $$(`[data-claim="${id}"]`).forEach(x=>x.setAttribute&&x.setAttribute("aria-expanded",String(!pop.hidden)));}
+    return}
+  const cp=t.closest("[data-copy]"); if(cp){
+    navigator.clipboard&&navigator.clipboard.writeText(cp.dataset.copy);
+    cp.textContent="COPIED";setTimeout(()=>cp.textContent="COPY",900); return}
+  const cf=t.closest("[data-conf]"); if(cf){S.conf[cf.dataset.conf]=cf.dataset.c;save();draw(S.cur);return}
+  const pk=t.closest("[data-pick]"); if(pk){
+    const id=pk.dataset.pick,b=allCP().find(x=>x.id===id);
+    const pick=+pk.dataset.i, ok=pick===b.answer;
+    S.ans[id]={pick,ok};save();cpDone();draw(S.cur);return}
+  const sb=t.closest("[data-go-cp]"); if(sb){
+    const id=sb.dataset.goCp,b=allCP().find(x=>x.id===id);
+    const sels=$$(`select[data-ord="${id}"]`),pick=sels.map(x=>+x.value||0);
+    if(pick.some(v=>!v))return alert("Give every row a position first.");
+    const ok=pick.every((v,i2)=>v===b.answer[i2]);
+    S.ans[id]={pick,ok};save();cpDone();draw(S.cur);return}
+  const po=t.closest(".popt[data-pi]"); if(po){
+    const wrap=po.closest("[data-pred]"),id=wrap.dataset.pred,key=+wrap.dataset.key;
+    const pick=+po.dataset.pi;S.pred[id]={pick,ok:pick===key};save();draw(S.cur);return}
+  const node=t.closest(".node"); if(node){ if(TOUR>=0){TOUR=-1}
+    openDrawer(node.dataset.id);return}
+  if(t.closest("#tourbtn")){TOUR=TOUR>=0?-1:0;tourPaint();return}
+  if(t.closest("#tprev")){TOUR=Math.max(0,TOUR-1);tourPaint();return}
+  if(t.closest("#tnext")){const n=(D.map.tour||[]).length;TOUR=TOUR+1>=n?-1:TOUR+1;tourPaint();return}
+  if(t.closest("#topen")){const s=(D.map.tour||[])[TOUR];if(s)openDrawer(s.id);return}
+  const th=t.closest("th[data-sort]"); if(th){sortTable(th);return}
+  if(!t.closest(".gpop"))closeGloss();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){if(TOUR>=0){TOUR=-1;tourPaint();}closeOverlays();return}
+  const el=document.activeElement;
+  if(el&&(el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA"))return;
+  if(e.key==="Enter"||e.key===" "){
+    const b=el&&el.closest&&el.closest('[role="button"]');
+    if(b){e.preventDefault();b.click();return}}
+  if(e.key==="ArrowLeft"&&S.cur>0)draw(S.cur-1);
+  if(e.key==="ArrowRight"&&S.cur<STOPS.length-1)draw(S.cur+1);
+});
+function cpDone(){
+  for(const s of STOPS){
+    if(s.kind!=="cp")continue;
+    const cps=s.blocks.filter(b=>b.type==="checkpoint");
+    if(cps.length&&cps.every(b=>S.ans[b.id]))S.done[s.id]=1;
+  }
+  save();
+}
+function sortTable(th){
+  const table=th.closest("table"),i=+th.dataset.sort;
+  const rows=[...table.tBodies[0].rows];
+  const dir=th.dataset.dir==="a"?"d":"a"; th.dataset.dir=dir;
+  $$("th",table).forEach(x=>{const a=x.querySelector(".ar");if(a)a.remove()});
+  th.insertAdjacentHTML("beforeend",`<span class="ar"> ${dir==="a"?"▲":"▼"}</span>`);
+  const num=s=>parseFloat(String(s).replace(/[^\d.-]/g,""));
+  rows.sort((r1,r2)=>{
+    const a=r1.cells[i].textContent.trim(),b=r2.cells[i].textContent.trim();
+    const n1=num(a),n2=num(b);
+    const c=(!isNaN(n1)&&!isNaN(n2))?n1-n2:a.localeCompare(b);
+    return dir==="a"?c:-c;
+  });
+  rows.forEach(r=>table.tBodies[0].appendChild(r));
+}
+window.addEventListener("hashchange",()=>{
+  const i=STOPS.findIndex(s=>s.id===location.hash.replace("#",""));
+  if(i>=0&&i!==S.cur)draw(i);
+});
+try{const t=localStorage.getItem("trailhead:theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
+boot();
+</script>
+</body>
+</html>

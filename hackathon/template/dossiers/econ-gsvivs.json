@@ -1,0 +1,326 @@
+{
+  "area": "econ-gsvivs",
+  "overview": "This subsystem is where volatility forecasts become money and where the money claims get stress-tested. The evaluation layer takes a model's out-of-sample log-RV predictions and converts them into three families of trading backtests. First, delta-hedged straddle strategies: a simple analytic gamma P&L mode, a discrete mode that adds the cost of rebalancing the delta hedge 26 times a day, and a full realistic engine (realistic_straddle.py) that models the complete P&L waterfall: tenor-decayed gamma, vanna and volga leakage, maturity-dependent option spreads per Doshi et al. (2025), Leland-style hedge costs, and a Boyle-Emanuel (1980) hedge-error variance that inflates the Sharpe denominator. Phase 2 (discrete_straddle.py) replaces the analytic formulas with a bar-by-bar simulation on 15-minute VWAP bars aggregated from 10-second data. Second, the GSVIVS01 index strategy: the signal compares an implied-vol measure (Kvar, the fair volatility of a 1-day variance swap, with the production source being Exec Kvar at true GSVIVS execution fills) against the RV forecast; when the iv_rv_gap is positive the strategy stays long the short-vol index, otherwise it flips short. Four position-sizing modes exist (binary, asym_long, zscore, long_flat) with asym_long as the empirically chosen default. Third, vol-targeting portfolios that scale exposure inversely with predicted vol. Statistical honesty machinery includes deflated Sharpe ratios, block-bootstrap confidence intervals, cost-band sensitivity, and naive baselines (always long, always short, random). Explainability (TreeSHAP plus a from-scratch ALE implementation) explains what drives the LightGBM forecasts. The graphs package builds point-in-time graphs (correlation, kNN, GLASSO, Diebold-Yilmaz spillover, sector, factor-residual, regime-blend) that feed the GHAR and GNN models, with diagnostics for density explosions and edge instability. The reporting package is a partially built HTML experiment report: the orchestrator and most sections are stubs, but the economic-value section is implemented.",
+  "modules": [
+    {
+      "path": "src/volforecast/evaluation/",
+      "role": "Economic value layer: turns log-RV predictions into straddle, GSVIVS index, and vol-targeting backtests, then applies statistical rigor to the resulting Sharpe ratios. economic_value.py holds the signal generators (iv_rv_gap_signal, kvar_rv_gap_signal, sized variants), the simple and discrete delta-hedged straddle P&L engines, the GSVIVS01 index backtest with precision/recall drawdown metrics, and naive baselines. realistic_straddle.py is the Phase 1 analytic engine with the full P&L waterfall and honest risk accounting; discrete_straddle.py is the Phase 2 bar-by-bar simulator that validates it. gsvivs.py orchestrates the GSVIVS backtest across multiple IV sources and sizing specs for the tournament dashboard, and kvar_table.py builds side-by-side IV variant comparison tables. explainability.py adds TreeSHAP and ALE for the tree models; phase3_experiments.py runs the four Ch18 rigor experiments (cost bands, stat-econ link, Sharpe deflation, hedging-error floor). It consumes prediction series from the tournament and cached IV/index data, and feeds the dashboard and reports.",
+      "key_files": [
+        { "file": "economic_value.py", "purpose": "Signal generation (IV-RV gap, Kvar-RV gap, sized GSVIVS variants), delta-hedged straddle and vol-targeting P&L, Sharpe and drawdown metrics, GSVIVS01 index backtest, naive baselines, and an args-file CLI for the BACKTEST skill." },
+        { "file": "realistic_straddle.py", "purpose": "Phase 1 analytic straddle engine: tenor-decayed gamma, vanna/volga P&L, event-driven option costs on entry/flip/roll, Boyle-Emanuel hedge error variance, cost-band Sharpes, deflated Sharpe ratio, and block-bootstrap CIs." },
+        { "file": "discrete_straddle.py", "purpose": "Phase 2 bar-by-bar hedging simulator on 15-minute VWAP bars with full Black-Scholes deltas, per-day realized kurtosis, a hedging-error floor fit, and Phase 1 vs Phase 2 validation checks." },
+        { "file": "gsvivs.py", "purpose": "GSVIVS01 signal backtest orchestration: IV source registry, per-model per-horizon signal evaluation on common dates, sizing-spec variants, and iv_acceleration and classifier signal types." },
+        { "file": "kvar_table.py", "purpose": "Builds same-day and next-day GSVIVS comparison tables across every cached IV variant (AllDay mark Kvar, exec Kvar, EDRVS 1-DTE and 2-DTE, SPX ATM IV) with baseline rows." },
+        { "file": "explainability.py", "purpose": "TreeSHAP feature importance via LightGBM's native SHAP path plus a pure-numpy Accumulated Local Effects implementation for the tournament dashboard." },
+        { "file": "phase3_experiments.py", "purpose": "Runs the four evaluation-rigor experiments: cost-band Sharpe, P&L regression on gap and forecast error, pooled Sharpe with DSR and bootstrap CI, and hedging-error floor with kappa sensitivity." }
+      ],
+      "concepts": ["iv_rv_gap", "exec Kvar", "GSVIVS01", "delta-hedged straddle", "gamma P&L", "vanna", "volga", "Boyle-Emanuel hedge error", "deflated Sharpe ratio", "cost bands", "vol targeting", "TreeSHAP", "ALE"]
+    },
+    {
+      "path": "src/volforecast/graphs/",
+      "role": "Point-in-time graph construction for the graph-based volatility models (GHAR and GNNs). base.py defines the immutable GraphSnapshot (COO edge index plus weights), a GraphBuilder protocol, and build_graph_schedule, which re-estimates graphs every refit_every trading days on a trailing window using only data up to the forecast date. Builders registered via register_graph include correlation threshold and kNN graphs, a GLASSO precision-support graph, a directed Diebold-Yilmaz generalized-FEVD spillover graph, structural graphs (identity, full, GICS sector), a factor-residual wrapper that strips a market factor by OLS before delegating to a base builder, and a regime-blend builder that estimates separate calm and stress graphs. diagnostics.py monitors density explosions and refit-to-refit edge Jaccard stability and provides the magnetic Laplacian and graph signal energy for GSP-HAR. Linear models consume dense adjacencies from numpy; neural models call to_torch().",
+      "key_files": [
+        { "file": "base.py", "purpose": "GraphSnapshot dataclass, GraphBuilder protocol, and the point-in-time build_graph_schedule with window=252 and refit_every=21 defaults." },
+        { "file": "correlation.py", "purpose": "Correlation-threshold (corr) and top-K nearest neighbor (knn) graph builders weighted by absolute correlation." },
+        { "file": "glasso.py", "purpose": "Sparse conditional-independence graph from the support of a graphical lasso precision matrix, with GraphicalLassoCV when alpha is unset." },
+        { "file": "spillover.py", "purpose": "Directed Diebold-Yilmaz spillover graph from a VAR generalized forecast-error variance decomposition." },
+        { "file": "factor_residual.py", "purpose": "OLS-strips a market factor from returns and builds a corr or glasso graph on the idiosyncratic residual panel." },
+        { "file": "regime_blend.py", "purpose": "Splits the estimation window into calm and stress days by trailing dispersion and picks the graph matching the window-end regime." },
+        { "file": "simple.py", "purpose": "Structural builders needing no estimation: identity (no-graph control), full (uniform 1/(N-1) weights), and GICS sector graph with a hardcoded SECTOR_MAP." },
+        { "file": "diagnostics.py", "purpose": "Density and degree stats, edge-set Jaccard across refits, magnetic Laplacian, and graph signal energy diagnostics." }
+      ],
+      "concepts": ["point-in-time graph", "GraphSnapshot", "correlation graph", "GLASSO", "Diebold-Yilmaz spillover", "generalized FEVD", "sector graph", "factor residual", "regime blend", "edge Jaccard", "magnetic Laplacian"]
+    },
+    {
+      "path": "src/volforecast/reporting/",
+      "role": "Interactive HTML experiment reporting. html_report.py is the orchestrator meant to load metrics, predictions, and the config snapshot from a finished experiment directory and assemble section fragments into one HTML file, but it is an unimplemented stub raising NotImplementedError. Of the six section renderers, only sections/economic_value.py is implemented: it aligns predictions with market data per symbol and horizon, lags implied vol by one day to avoid look-ahead, runs the Phase 1 realistic delta-hedged straddle engine, and renders Sharpe, DSR, bootstrap CI, and cost-band HTML tables. summary, forecast_vs_actual, qlike_analysis, statistical_tests, and diagnostics are documented stubs pointing at workspace/plans/html-report.md.",
+      "key_files": [
+        { "file": "html_report.py", "purpose": "Report orchestrator stub: documents the seven-step assembly plan but raises NotImplementedError." },
+        { "file": "sections/economic_value.py", "purpose": "The one implemented section: runs realistic_delta_hedged_sharpe per symbol and horizon and renders metric and cost-band sensitivity tables as HTML." }
+      ],
+      "concepts": ["HTML experiment report", "section renderers", "look-ahead avoidance", "cost-band table"]
+    },
+    {
+      "path": "src/volforecast/visualization/",
+      "role": "Small visualization helpers. lineage.py converts a model lineage spec (optional base model used as an init score, optional LSTM feature stack, daily tabular features) into a Mermaid flowchart string so dashboards can draw how a stacked model was assembled. The package docstring promises matplotlib/seaborn plotting utilities but only the Mermaid generator exists in the restore.",
+      "key_files": [
+        { "file": "lineage.py", "purpose": "Renders model lineage (feature stack, base-model init score, daily features) as a Mermaid flowchart LR string." }
+      ],
+      "concepts": ["model lineage", "Mermaid flowchart", "feature stacking"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "The IV-RV gap trading signal sells volatility (+1) when implied vol exceeds the RV forecast by more than a threshold and buys volatility (-1) when implied vol is cheap by more than a separate short threshold.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 100,
+      "end": 113,
+      "focus": [111, 112],
+      "quote": "        signal[gap > threshold] = 1.0  # IV expensive -> sell vol\n    signal[gap < -short_threshold] = -1.0  # IV cheap -> buy vol"
+    },
+    {
+      "text": "Before comparing the exec Kvar (365-calendar-day annualized vol points) with the RV forecast (252-trading-day annualized decimal), kvar_rv_gap_signal rescales Kvar into 252-space by multiplying by sqrt(252/365), roughly 0.831.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 158,
+      "end": 172,
+      "focus": [166, 167],
+      "quote": "        _CAL_TO_TRADING = np.sqrt(252.0 / 365.0)  # ~0.831\n        kvar_decimal = kvar / 100.0 * _CAL_TO_TRADING"
+    },
+    {
+      "text": "The GSVIVS01 signal supports four position-sizing modes (binary, asym_long, zscore, long_flat) and the project default is asym_long, which scales the long side by a clipped rolling z-score while pinning the short side at -1.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 185,
+      "end": 196,
+      "focus": [189, 190],
+      "quote": "GSVIVS_SIZING_MODES = (\"binary\", \"asym_long\", \"zscore\", \"long_flat\")\nDEFAULT_GSVIVS_SIZING_MODE = \"asym_long\""
+    },
+    {
+      "text": "The delta-hedged straddle backtest computes daily gamma P&L as half gamma times spot squared times the spread between daily realized variance and the daily implied variance (IV squared times dt), the Black-Scholes carry formula.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 500,
+      "end": 514,
+      "focus": [510, 511],
+      "quote": "    daily_implied_var = iv_safe**2 * dt\n    raw_pnl = 0.5 * gamma * spot_prices**2 * (realized_var - daily_implied_var)"
+    },
+    {
+      "text": "The GSVIVS backtest defines daily strategy P&L as the signal at day t applied to the next-day return of the GSVIVS01 index, so +1 is long the short-vol index and -1 is short it.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 1184,
+      "end": 1198,
+      "focus": [1190],
+      "quote": "    Daily PnL = signal_t * (Index_{t+1} / Index_t - 1)."
+    },
+    {
+      "text": "The vol-targeting portfolio sizes exposure as the target annualized vol divided by the forecast vol, capped at a maximum leverage, so better vol forecasts translate directly into steadier realized portfolio risk.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "start": 533,
+      "end": 547,
+      "focus": [541, 542],
+      "quote": "    Scales position size inversely with predicted volatility:\n    w_t = min(target_vol / vol_forecast_t, max_leverage)."
+    },
+    {
+      "text": "The realistic straddle engine models the full P&L waterfall: tenor-decayed gamma P&L, plus vanna (spot-vol correlation) and volga (vol-of-vol convexity) terms, minus maturity-varying event-driven option costs and per-rebalance hedge costs.",
+      "file": "src/volforecast/evaluation/realistic_straddle.py",
+      "start": 1,
+      "end": 17,
+      "focus": [3, 4, 5, 6, 7, 8],
+      "quote": "Implements the full P&L waterfall from the plan:\n    Gross gamma PnL (tenor-decayed gamma)\n    + Vanna PnL (spot-vol correlation)\n    + Volga PnL (vol-of-vol convexity)\n    - Option cost (maturity-varying, event-driven)\n    - Hedge cost (N rebalances x spread)"
+    },
+    {
+      "text": "Option transaction costs widen as expiry approaches, per the Doshi et al. (2025) schedule: 4.5x the base spread at 6 or fewer trading days remaining, 1.75x at 13 or fewer, and 1x otherwise.",
+      "file": "src/volforecast/evaluation/realistic_straddle.py",
+      "start": 48,
+      "end": 69,
+      "focus": [63, 64, 65, 66],
+      "quote": "    if T_rem_days <= 6:\n        return base_spread * 4.5\n    elif T_rem_days <= 13:\n        return base_spread * 1.75"
+    },
+    {
+      "text": "Discrete hedging risk is quantified with the Boyle-Emanuel (1980) variance formula, which scales with dollar gamma squared, return kurtosis minus one, and sigma to the fourth, and shrinks with the number of rebalances N; it inflates the Sharpe denominator rather than the mean.",
+      "file": "src/volforecast/evaluation/realistic_straddle.py",
+      "start": 248,
+      "end": 262,
+      "focus": [257],
+      "quote": "    Var(HE_day) = (0.5 * Gamma * S^2)^2 * (kappa - 1) * sigma^4 / (252^2 * N)"
+    },
+    {
+      "text": "Sharpe ratios are guarded against multiple-testing luck with the Bailey and Lopez de Prado (2014) Deflated Sharpe Ratio, which returns the probability that the observed Sharpe beats the expected maximum under the null given how many strategy configs were tried.",
+      "file": "src/volforecast/evaluation/realistic_straddle.py",
+      "start": 609,
+      "end": 628,
+      "focus": [616],
+      "quote": "    \"\"\"Deflated Sharpe Ratio (Bailey & Lopez de Prado 2014)."
+    },
+    {
+      "text": "Strategy Sharpe is re-priced at three option cost bands following Muravyev and Pearson (2020): timing-aware at 0.5 vol points, effective at 1.0, and quoted at 1.5, so results are reported across optimistic to pessimistic execution assumptions.",
+      "file": "src/volforecast/evaluation/realistic_straddle.py",
+      "start": 580,
+      "end": 596,
+      "focus": [589],
+      "quote": "    bands = {\"timing_aware\": 0.5, \"effective\": 1.0, \"quoted\": 1.5}"
+    },
+    {
+      "text": "Phase 2 replaces the analytic straddle formulas with a bar-by-bar hedging simulation on 15-minute bars aggregated from 10-second VWAP data, using full Black-Scholes deltas at actual moneyness with a one-bar execution lag.",
+      "file": "src/volforecast/evaluation/discrete_straddle.py",
+      "start": 1,
+      "end": 17,
+      "focus": [3, 4],
+      "quote": "Bar-by-bar simulation using 15-min bars aggregated from 10s VWAP data.\nImplements Steps 11-15 of the realistic-dh-straddle plan."
+    },
+    {
+      "text": "Instead of a flat kurtosis assumption, the simulator computes per-day realized kurtosis from intraday 15-minute log returns as n times the sum of fourth-power returns over the squared sum of squared returns.",
+      "file": "src/volforecast/evaluation/discrete_straddle.py",
+      "start": 345,
+      "end": 360,
+      "focus": [348],
+      "quote": "    RK_t = n * sum(r^4) / (sum(r^2))^2"
+    },
+    {
+      "text": "The GSVIVS backtest runs against a registry of six implied-vol sources, including the 09:10 ET SPX AllDay mark Kvar, a transaction-cost-adjusted variant, the true-fill exec Kvar, the EDRVS prev-close 1-DTE varswap strike, and SPX ATM IV at 1-day and 1-week tenors, each flagged for calendar vs trading-day annualization.",
+      "file": "src/volforecast/evaluation/gsvivs.py",
+      "start": 38,
+      "end": 47,
+      "focus": [39, 40, 41, 42, 43, 44, 45, 46],
+      "quote": "IV_SOURCE_REGISTRY: dict[str, tuple[str, str, bool]] = {\n    \"spx_allday_vols\": (\"SPX AllDay Mark Kvar (09:10)\", \"iv_allday_kvar\", True),\n    \"spx_allday_vols_tc\": (\"SPX AllDay TC-adj Kvar (09:10)\", \"iv_allday_kvar_tc\", True),\n    \"exec_kvar\": (\"Exec Kvar (true fill)\", \"iv_exec_kvar\", True),\n    \"edrvs_prev_close_1dte\": (\"EDRVS prev-close 1-DTE\", \"iv_vs_0dte\", True),\n    \"spx_atm_iv_1d\": (\"SPX ATM IV (1d)\", \"iv_0dte_atm\", False),\n    \"spx_atm_iv_1w\": (\"SPX ATM IV (1w)\", \"iv_1w_atm\", False),\n}"
+    },
+    {
+      "text": "Graphs for the GNN models are strictly point-in-time: a graph used to forecast date t is estimated only on data up to t, re-estimated every refit_every trading days on a trailing window, and frozen between refits, which prevents look-ahead in the network structure itself.",
+      "file": "src/volforecast/graphs/base.py",
+      "start": 1,
+      "end": 14,
+      "focus": [6, 7, 8],
+      "quote": "Point-in-time protocol (Zhang et al. 2025): a graph used to forecast date t\nis estimated on data <= t only, re-estimated every ``refit_every`` trading\ndays on the trailing ``window``, and frozen between refits."
+    },
+    {
+      "text": "The correlation graph builder creates an undirected edge between two symbols whenever their absolute return correlation over the estimation window meets a threshold (default 0.3), with the absolute correlation as the edge weight.",
+      "file": "src/volforecast/graphs/correlation.py",
+      "start": 24,
+      "end": 40,
+      "focus": [26, 27, 28],
+      "quote": "@register_graph(\"corr\")\nclass CorrGraphBuilder:\n    \"\"\"Edge iff |corr| >= threshold; weight = |corr| (gnn_adjacency semantics).\"\"\""
+    },
+    {
+      "text": "The GLASSO builder estimates a sparse precision matrix by L1-penalized maximum likelihood and puts a binary undirected edge wherever the precision entry is nonzero, so edges encode conditional dependence rather than raw correlation.",
+      "file": "src/volforecast/graphs/glasso.py",
+      "start": 1,
+      "end": 12,
+      "focus": [3, 4],
+      "quote": "Theta_hat = argmin_{Theta >= 0} tr(S Theta) - log det(Theta) + lambda * sum_{j!=k} |Theta_jk|\nA_ij = 1{Theta_hat_ij != 0}, binary, undirected, zero diagonal."
+    },
+    {
+      "text": "The Diebold-Yilmaz spillover builder makes a directed graph where the weight from i to j is the normalized share of j's H-step forecast-error variance explained by shocks to i, using the order-invariant generalized FEVD of a VAR.",
+      "file": "src/volforecast/graphs/spillover.py",
+      "start": 1,
+      "end": 14,
+      "focus": [3, 4],
+      "quote": "W[i -> j] = normalized share of j's H-step forecast-error variance explained by\nshocks to i (Diebold & Yilmaz 2012 eqs. 2-3; generalized FEVD per Pesaran & Shin"
+    },
+    {
+      "text": "Model explainability combines TreeSHAP feature importance (via LightGBM's native SHAP path) with Accumulated Local Effects plots implemented from scratch in numpy, so the dashboard can explain the tree models without extra dependencies.",
+      "file": "src/volforecast/evaluation/explainability.py",
+      "start": 1,
+      "end": 12,
+      "focus": [3, 4, 5],
+      "quote": "Provides TreeSHAP-based feature importance and Accumulated Local Effects\nplots for tree-based models (LightGBM). ALE is implemented from scratch\nusing only numpy/pandas (no external dependency)."
+    },
+    {
+      "text": "The HTML report's economic value section lags implied vol by one day before generating signals, explicitly to avoid look-ahead bias when backtesting the delta-hedged straddle from stored predictions.",
+      "file": "src/volforecast/reporting/sections/economic_value.py",
+      "start": 68,
+      "end": 82,
+      "focus": [76, 77],
+      "quote": "            # IV: shift(1) to avoid look-ahead, convert from % to decimal\n            iv_series = sym_md[\"iv_1m_atm\"].reindex(common_idx).shift(1)"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "iv_rv_gap",
+      "definition": "The spread between an implied volatility measure and the model's realized vol forecast, both annualized. A positive gap means options look expensive, so the strategy sells vol; a negative gap means buy vol.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "line": 106
+    },
+    {
+      "term": "Exec Kvar",
+      "definition": "The fair volatility strike of the 1-day variance swap at the true GSVIVS execution fill, quoted in 365-calendar-day annualized vol points. It is the production IV input to the GSVIVS signal.",
+      "file": "src/volforecast/evaluation/gsvivs.py",
+      "line": 42
+    },
+    {
+      "term": "GSVIVS01",
+      "definition": "A short-volatility variance swap index. The strategy holds it long by default and goes short when the RV forecast exceeds the Kvar, with daily P&L equal to signal times next-day index return.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "line": 1188
+    },
+    {
+      "term": "Delta-hedged straddle",
+      "definition": "An ATM call plus put with the directional delta hedged away, leaving gamma P&L that pays the difference between realized and implied variance. Selling it monetizes a positive IV-RV gap.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "line": 464
+    },
+    {
+      "term": "Boyle-Emanuel hedge error",
+      "definition": "The variance of the residual P&L noise from rebalancing a delta hedge only N times per day instead of continuously. It is added to the Sharpe denominator so discrete hedging risk is not hidden.",
+      "file": "src/volforecast/evaluation/realistic_straddle.py",
+      "line": 255
+    },
+    {
+      "term": "Deflated Sharpe Ratio (DSR)",
+      "definition": "A probability in [0, 1] that the observed Sharpe exceeds the maximum expected by chance given the number of strategy configurations tried, correcting for multiple testing and non-normal returns.",
+      "file": "src/volforecast/evaluation/realistic_straddle.py",
+      "line": 616
+    },
+    {
+      "term": "Vanna",
+      "definition": "The cross-sensitivity of an option's delta to implied vol; its P&L term captures spot-vol correlation leakage in a delta-hedged straddle.",
+      "file": "src/volforecast/evaluation/realistic_straddle.py",
+      "line": 118
+    },
+    {
+      "term": "Volga",
+      "definition": "The second derivative of option value with respect to implied vol; its P&L term captures vol-of-vol convexity exposure.",
+      "file": "src/volforecast/evaluation/realistic_straddle.py",
+      "line": 163
+    },
+    {
+      "term": "GraphSnapshot",
+      "definition": "An immutable graph for one estimation date, stored as COO edge indices and float32 weights over an ordered symbol tuple, convertible to dense adjacency for linear models or torch tensors for GNNs.",
+      "file": "src/volforecast/graphs/base.py",
+      "line": 21
+    },
+    {
+      "term": "GLASSO graph",
+      "definition": "A conditional-independence graph whose edges are the nonzero off-diagonal entries of an L1-penalized precision matrix, so connected symbols are dependent even after controlling for all others.",
+      "file": "src/volforecast/graphs/glasso.py",
+      "line": 1
+    },
+    {
+      "term": "ALE (Accumulated Local Effects)",
+      "definition": "A model explanation curve that measures the average prediction change across quantile bins of a feature, avoiding the extrapolation problem of partial dependence plots.",
+      "file": "src/volforecast/evaluation/explainability.py",
+      "line": 124
+    },
+    {
+      "term": "Vol targeting",
+      "definition": "A portfolio rule that sets position size to target_vol divided by the vol forecast, capped at max leverage, so realized portfolio vol stays near the target when forecasts are good.",
+      "file": "src/volforecast/evaluation/economic_value.py",
+      "line": 541
+    }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "In kvar_rv_gap_signal, what does the GSVIVS strategy do on a day when the exec Kvar is NaN?",
+      "options": ["Defaults to long (+1)", "Goes flat (0)", "Goes short (-1)", "Drops the day from the backtest"],
+      "answer": 0,
+      "provenance": "src/volforecast/evaluation/economic_value.py:158-159 (docstring: NaN kvar defaults to +1 long) and lines 178-182 (np.ones default with NaN comparison staying False)",
+      "explanation": "The signal array starts as all ones and only flips to -1 when the gap is negative beyond the threshold; a NaN gap fails that comparison, so the default long position carries through."
+    },
+    {
+      "kind": "single",
+      "prompt": "Which position-sizing mode is the project default for the GSVIVS01 signal?",
+      "options": ["binary", "asym_long", "zscore", "long_flat"],
+      "answer": 1,
+      "provenance": "src/volforecast/evaluation/economic_value.py:190 (DEFAULT_GSVIVS_SIZING_MODE = \"asym_long\")",
+      "explanation": "asym_long scales the long side by a clipped rolling z-score up to max leverage while fixing the short side at -1, because the signal's short-side conviction proved unreliable."
+    },
+    {
+      "kind": "single",
+      "prompt": "Per the maturity-adjusted option spread schedule, an option with 6 or fewer trading days to expiry is charged what multiple of the base spread?",
+      "options": ["1x", "1.75x", "2x", "4.5x"],
+      "answer": 3,
+      "provenance": "src/volforecast/evaluation/realistic_straddle.py:63-64 (if T_rem_days <= 6: return base_spread * 4.5)",
+      "explanation": "The Doshi et al. (2025) schedule widens spreads near expiry: 4.5x under 7 days, 1.75x under 14 days, 1x beyond that. This is why the engine rolls positions before expiry."
+    },
+    {
+      "kind": "single",
+      "prompt": "Which graph builder produces a directed graph?",
+      "options": ["corr (correlation threshold)", "knn (top-K correlation)", "glasso (precision support)", "dy (Diebold-Yilmaz spillover)"],
+      "answer": 3,
+      "provenance": "src/volforecast/graphs/spillover.py:44 (directed = True on DYSpilloverGraphBuilder); corr, knn, and glasso all declare directed = False",
+      "explanation": "Spillover is inherently asymmetric: the share of j's forecast-error variance explained by shocks to i differs from the reverse, so the FEVD graph keeps direction."
+    }
+  ],
+  "confirmed_missing": [
+    "src/volforecast/config.py imported by src/volforecast/reporting/html_report.py (from volforecast.config import ExperimentConfig, line 10) but absent from the restore",
+    "src/volforecast/data/edrvol.py imported by src/volforecast/evaluation/gsvivs.py (fetch_gsvivs_index, load_iv_cache, load_edrvs_cache, load_exec_kvar_cache, load_edrvs_morning_cache) and src/volforecast/evaluation/kvar_table.py but absent from the restore"
+  ]
+}

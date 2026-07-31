@@ -1,0 +1,340 @@
+{
+  "area": "core-cli",
+  "overview": "The volforecast package is an ML realized volatility forecasting system: it progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features, mostly via gradient boosting, aiming for statistically significant QLIKE improvements and a tradeable IV-RV gap signal. This area covers its command surface. Everything funnels through one primary command, vol run --config <yaml>, which always takes the tournament code path: load an ExperimentConfig from YAML, ingest any universe symbols whose RV cache parquet is missing (skippable with --skip-ingest, and a config with mode: ingest exits after ingestion alone), then run every configured model through the tournament. The tournament trains models over rolling CV folds, optionally runs Optuna hyperparameter search that keeps the lowest-QLIKE completed trial, then computes comparison statistics (MCS bootstrap and Diebold-Mariano tests), delta-hedged straddle P&L across symbols, horizons, and models, and SHAP/ALE explainability, before writing metrics.json and an interactive Plotly dashboard and auto-updating the trial registry at workspace/research/trials.yaml. Around run sit roughly two dozen utility subcommands: eleven ingest-* fetchers for ticks, OHLCV, IV surfaces, VIX futures, GEX, cross-asset and microstructure data, plus status, audit, forecast (a live LONG/SHORT/FLAT IV-RV signal), kvar, cache tools, dashboard browsing, and three experiment-management commands. registry.py is the package hub: three dicts (models, feature layers, graph builders) filled by class decorators, imported by roughly 70 modules. Two wrappers front the CLI: the Bash ./vol script is guarded to the GS Linux Coder workspace and handles uv, venv, and nix library paths, while vol.cmd on Windows supports only the dev loop (test, lint, fmt, typecheck, exec, bg, jobs). Note for readers of this restore: config.py (ExperimentConfig), constants.py, evaluation/tournament.py, and a few registered model and feature modules are absent from disk.",
+  "modules": [
+    {
+      "path": "src/volforecast/",
+      "role": "Package root. The __init__ docstring states the project thesis: enrich HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to earn QLIKE improvements and tradeable IV-RV gap signals. __main__.py is the single CLI entry point: it builds an argparse tree with run as the primary command plus utility subcommands registered by per-module register() functions, then routes every run through ingest gating into the tournament. The run handler loads ExperimentConfig.from_yaml from volforecast.config, a module missing from this restore. _run_tournament wires dozens of progress callbacks (folds, boosting rounds, Optuna trials, multi-GPU HPO events, MCS stats, DH straddle, SHAP/ALE) into the Rich progress display and, after the run, updates the trial registry from metrics.json.",
+      "key_files": [
+        { "file": "__init__.py", "purpose": "Package docstring stating the signal-discovery thesis and __version__ 0.2.0." },
+        { "file": "__main__.py", "purpose": "CLI entry point: builds the subcommand tree and drives the ingest-then-tournament run pipeline." },
+        { "file": "registry.py", "purpose": "Decorator-based registries mapping string names to model, feature layer, and graph builder classes." }
+      ],
+      "concepts": ["HAR baselines", "QLIKE", "IV-RV gap signal", "tournament", "ingest gate", "trial registry"]
+    },
+    {
+      "path": "src/volforecast/cli/",
+      "role": "One module per subcommand, each exposing register(subparsers) so __main__ can assemble the parser lazily. console.py holds the shared Rich Console singleton and logging setup used by every command. config_picker.py gives vol run an interactive terminal menu over workspace/configs/ YAMLs, newest first, ticking configs already completed per trials.yaml. status.py summarizes the ingestion manifest, audit.py validates every cached parquet against manifest contracts and regenerates data/manifest.json, and experiment.py provides trial listing, cloning a new config from a baseline, and side-by-side trial comparison. forecast.py is the live end product: a config-driven multi-model ensemble that predicts next-day RV, compares it to live ATM IV from TSDB, and emits LONG/SHORT/FLAT; kvar.py prints GSVIVS signal performance tables (Sharpe, drawdown, hit rate) across cached IV sources.",
+      "key_files": [
+        { "file": "console.py", "purpose": "Shared Rich console singleton plus setup_logging, imported by all CLI modules to avoid conflicting live displays." },
+        { "file": "config_picker.py", "purpose": "Interactive config picker for vol run when --config is omitted." },
+        { "file": "audit.py", "purpose": "Data integrity audit of cached parquets against manifest contracts, regenerating data/manifest.json." },
+        { "file": "status.py", "purpose": "Shows the ingestion manifest: what is cached versus planned, and which universe symbols are missing." },
+        { "file": "experiment.py", "purpose": "Trial registry commands: vol experiments, vol new-experiment, vol compare against workspace/research/trials.yaml." },
+        { "file": "forecast.py", "purpose": "Live RV forecast and IV-RV gap signal: multi-model ensemble outputting weighted LONG/SHORT/FLAT." },
+        { "file": "kvar.py", "purpose": "Renders GSVIVS signal comparison tables across cached IV sources for same-day and next-day RV targets." }
+      ],
+      "concepts": ["register() pattern", "ingestion manifest", "trials.yaml", "live IV-RV signal", "GSVIVS comparison"]
+    },
+    {
+      "path": "vol (and vol.cmd)",
+      "role": "Two wrapper scripts front python -m volforecast. The Bash ./vol refuses to run anywhere but Linux (the GS Coder workspace): it bootstraps a uv venv, enables system site-packages to expose GS-internal packages like pytickclient and pyslang, computes a nix LD_LIBRARY_PATH for C extensions, and upgrades gs-quant when below 1.6.0. Its help text is the best single map of the command surface, splitting Core, Data and Ingestion, Experiment Management, Presentation, and Environment tiers, and it adds agent-oriented arms: exec (captured output with an OUTPUT_FILE sentinel), bg (fire-and-forget with an EXIT_CODE sentinel), and jobs. vol.cmd is the Windows dev-loop shim supporting only test, test-all, testlf, lint, fmt, typecheck, exec, bg, and jobs; every other arm exits 2 pointing at the Linux workspace.",
+      "key_files": [
+        { "file": "vol", "purpose": "Linux-only Bash wrapper: env bootstrap plus dispatch of every subcommand and the exec/bg/jobs agent protocol." },
+        { "file": "vol.cmd", "purpose": "Windows shim limited to the test/lint/typecheck dev loop with the same OUTPUT_FILE and EXIT_CODE sentinel protocol." }
+      ],
+      "concepts": ["OS guard", "uv venv bootstrap", "OUTPUT_FILE sentinel", "agent-safe execution"]
+    },
+    {
+      "path": "src/pyproject.toml",
+      "role": "Declares the volforecast distribution (version 0.2.0, Python 3.10 to 3.12) and the volforecast console script pointing at __main__:main. Core dependencies are the scientific stack plus rich, plotly, and simple-term-menu; the actual ML models live behind optional extras: ml (lightgbm, xgboost, optuna, shap), gpu (adds torch), graph (torch plus torch-geometric), and gs (gs-quant-internal, the GS data access layer). Pytest config defines unit, slow, integration, and formula markers; ./vol test skips slow tests while ./vol test-all runs everything.",
+      "key_files": [
+        { "file": "pyproject.toml", "purpose": "Package metadata, console script, optional extras (gs, ml, gpu, graph), and pytest marker taxonomy." }
+      ],
+      "concepts": ["optional extras", "console script", "slow test marker", "formula tests"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "The package thesis, stated in its docstring, is to progressively enrich HAR-family volatility baselines with microstructure, options-implied, and cross-asset features via gradient boosting, targeting statistically significant QLIKE improvements and tradeable IV-RV gap signals.",
+      "file": "src/volforecast/__init__.py",
+      "start": 1,
+      "end": 8,
+      "focus": [3, 4, 5],
+      "quote": "Progressively enriching HAR-family baselines with microstructure,\noptions-implied, and cross-asset features via gradient boosting to produce\nstatistically significant QLIKE improvements and tradeable IV-RV gap signals."
+    },
+    {
+      "text": "Every vol run --config invocation takes the tournament code path, whether the config names one model or many, and always produces an interactive Plotly HTML dashboard.",
+      "file": "src/volforecast/__main__.py",
+      "start": 1,
+      "end": 16,
+      "focus": [6, 7],
+      "quote": "Every `vol run --config` invocation uses the tournament code path and\nproduces an interactive Plotly HTML dashboard. Works with 1 or N models."
+    },
+    {
+      "text": "Beyond the primary run command, the CLI docstring names a utility tier (status, ingest-iv, ingest-edrvol, backfill-rk, refresh-ohlcv, audit); the parser goes on to register eleven ingest-* data fetchers plus forecast, kvar, cache, dashboard, and three experiment-management commands.",
+      "file": "src/volforecast/__main__.py",
+      "start": 12,
+      "end": 24,
+      "focus": [15, 16, 17, 18, 19, 20, 21],
+      "quote": "Utility commands:\n    vol status\n    vol ingest-iv\n    vol ingest-edrvol\n    vol backfill-rk\n    vol refresh-ohlcv\n    vol audit"
+    },
+    {
+      "text": "A config with mode: ingest performs data ingestion only and exits before any model training, so the same YAML format drives both data collection and experiments.",
+      "file": "src/volforecast/__main__.py",
+      "start": 833,
+      "end": 849,
+      "focus": [842, 843],
+      "quote": "        if config.mode == \"ingest\":\n            return _run_ingest(config, symbols_override=symbols, workers=workers)"
+    },
+    {
+      "text": "Before training, vol run applies an ingest gate: unless --skip-ingest is passed, it fetches data for exactly those universe symbols whose realized-volatility cache parquet is missing on disk.",
+      "file": "src/volforecast/__main__.py",
+      "start": 844,
+      "end": 863,
+      "focus": [845, 850],
+      "quote": "        # Ingest gate: run ingest for missing symbols unless --skip-ingest\n            missing = [s for s in universe if not rv_cache_path(s).exists()]"
+    },
+    {
+      "text": "After the ingest gate, all run modes route through the tournament: there is no separate single-model path, and parallel_models controls how many ML models train concurrently in separate processes.",
+      "file": "src/volforecast/__main__.py",
+      "start": 856,
+      "end": 873,
+      "focus": [865],
+      "quote": "        # All modes route through tournament"
+    },
+    {
+      "text": "The tournament supports two training regimes selected by config.training_mode: pooled (one model fit across the cross-section of symbols) versus the default per-symbol tournament.",
+      "file": "src/volforecast/__main__.py",
+      "start": 437,
+      "end": 452,
+      "focus": [446],
+      "quote": "            run_har_tournament_pooled if config.training_mode == \"pooled\" else run_har_tournament"
+    },
+    {
+      "text": "Model comparison is statistical, not just a leaderboard: after training, the tournament computes Model Confidence Set bootstrap and Diebold-Mariano tests over the forecasts.",
+      "file": "src/volforecast/__main__.py",
+      "start": 449,
+      "end": 465,
+      "focus": [458],
+      "quote": "        sp.log(\"Computing tournament statistics (MCS bootstrap, DM tests)...\")"
+    },
+    {
+      "text": "Forecast accuracy is translated into trading terms: the tournament computes delta-hedged straddle P&L over the full grid of symbols, horizons, and models.",
+      "file": "src/volforecast/__main__.py",
+      "start": 478,
+      "end": 496,
+      "focus": [492, 493],
+      "quote": "                f\"Computing DH straddle P&L \"\n                f\"({n_symbols} symbols × {n_horizons} horizons × {n_models} models)...\""
+    },
+    {
+      "text": "Hyperparameter search runs Optuna trials across multiple GPUs and keeps the best configuration by lowest QLIKE, counting only completed trials and ignoring pruned ones.",
+      "file": "src/volforecast/__main__.py",
+      "start": 599,
+      "end": 618,
+      "focus": [608],
+      "quote": "                    if state == \"COMPLETE\" and qlike < _hpo_best_qlike:"
+    },
+    {
+      "text": "The run handler builds its experiment definition by parsing the --config YAML through ExperimentConfig.from_yaml, imported from volforecast.config, a module that is absent from this restore.",
+      "file": "src/volforecast/__main__.py",
+      "start": 817,
+      "end": 833,
+      "focus": [827, 829],
+      "quote": "        from volforecast.config import ExperimentConfig\n        config = ExperimentConfig.from_yaml(args.config)"
+    },
+    {
+      "text": "After a tournament completes, the CLI closes the experiment loop automatically: it reads metrics.json and either updates a matching NOT_STARTED trial in the registry or registers the run as a new trial.",
+      "file": "src/volforecast/__main__.py",
+      "start": 769,
+      "end": 782,
+      "focus": [772, 778],
+      "quote": "    # Auto-update trial registry if a matching NOT_STARTED trial exists\n        updated = update_trial_from_metrics(config_basename, metrics_path)"
+    },
+    {
+      "text": "registry.py maintains three string-to-class registries, for models, feature layers, and graph builders, so YAML configs can name components without importing them.",
+      "file": "src/volforecast/registry.py",
+      "start": 1,
+      "end": 14,
+      "focus": [5, 6, 7],
+      "quote": "MODEL_REGISTRY: dict[str, type] = {}\nFEATURE_REGISTRY: dict[str, type] = {}\nGRAPH_REGISTRY: dict[str, type] = {}"
+    },
+    {
+      "text": "The registered model roster spans classical HAR-family regressions, gradient-boosted trees (LightGBM, XGBoost), an LSTM, and a family of graph models (GHAR, GNN-HAR, DCRNN-HAR, STID, GSP-HAR), all trained on the same panels and compared in the same tournament.",
+      "file": "src/volforecast/registry.py",
+      "start": 36,
+      "end": 57,
+      "focus": [38, 39, 40, 41],
+      "quote": "    import volforecast.models.har_family  # noqa: F401\n    import volforecast.models.lightgbm  # noqa: F401\n    import volforecast.models.lstm  # noqa: F401\n    import volforecast.models.xgboost  # noqa: F401"
+    },
+    {
+      "text": "Torch is optional at registration time: the GNN model import is wrapped in try/except ImportError so environments without torch still register every other model and run the full pipeline.",
+      "file": "src/volforecast/registry.py",
+      "start": 44,
+      "end": 63,
+      "focus": [47, 48],
+      "quote": "        import volforecast.models.gnn  # noqa: F401\n    except ImportError:"
+    },
+    {
+      "text": "vol forecast is the live end product: a config-driven multi-model ensemble that trains each model on full available history, predicts next-day realized volatility, compares it to current ATM implied volatility, and outputs a weighted LONG/SHORT/FLAT signal.",
+      "file": "src/volforecast/cli/forecast.py",
+      "start": 1,
+      "end": 14,
+      "focus": [3, 4, 5],
+      "quote": "Config-driven multi-model ensemble. Loads a YAML config specifying which\nmodels to run, trains each on full available history, predicts next-day\nRV, compares to current ATM IV, and outputs weighted LONG/SHORT/FLAT."
+    },
+    {
+      "text": "vol audit is the data-quality gate: it validates every cached parquet against its manifest contract, assesses per-layer readiness, and regenerates data/manifest.json while syncing data/manifest.yaml.",
+      "file": "src/volforecast/cli/audit.py",
+      "start": 1,
+      "end": 14,
+      "focus": [3, 4, 5],
+      "quote": "Audits all cached parquet files against their manifest contracts,\nvalidates integrity, detects issues, assesses per-layer readiness,\nand regenerates data/manifest.json + syncs data/manifest.yaml."
+    },
+    {
+      "text": "vol kvar benchmarks the GSVIVS trading signal across cached IV sources on two targets: same-day RV (perfect foresight upper bound) and next-day RV (the actual forecasting target), reporting Sharpe, drawdown, and hit rate per model.",
+      "file": "src/volforecast/cli/kvar.py",
+      "start": 51,
+      "end": 64,
+      "focus": [57, 59],
+      "quote": "        _render_table(\"Same-Day RV (perfect foresight for today)\", tables[\"Same-Day RV\"])\n        _render_table(\"Next-Day RV (forecasting target)\", tables[\"Next-Day RV\"])"
+    },
+    {
+      "text": "The ML models are deliberately optional: core install is the scientific Python stack, while lightgbm, xgboost, optuna, and shap arrive only via the [ml] extra, with separate gpu (torch) and graph (torch-geometric) extras and a gs extra for gs-quant-internal.",
+      "file": "src/pyproject.toml",
+      "start": 28,
+      "end": 47,
+      "focus": [32, 33, 34, 35, 36],
+      "quote": "ml = [\n    \"lightgbm>=3.3\",\n    \"xgboost>=1.7\",\n    \"optuna>=3.5\",\n    \"shap>=0.43\","
+    },
+    {
+      "text": "The ./vol wrapper is hard-guarded to the GS Linux Coder workspace and exits with an error elsewhere; on Windows only the vol.cmd dev-loop shim (test, lint, fmt, typecheck, exec, bg, jobs) is supported.",
+      "file": "vol",
+      "start": 19,
+      "end": 32,
+      "focus": [23],
+      "quote": "        echo \"ERROR: ./vol requires the GS Linux Coder workspace (nix+uv). On Windows use vol.cmd (dev loop) or VS Code tasks.\" >&2"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "QLIKE",
+      "definition": "The loss function this project optimizes and reports for volatility forecasts; the package targets statistically significant QLIKE improvements over HAR baselines, and hyperparameter search keeps the lowest-QLIKE trial.",
+      "file": "src/volforecast/__init__.py",
+      "line": 5
+    },
+    {
+      "term": "HAR",
+      "definition": "Heterogeneous autoregressive model family, the classical realized-volatility baseline built from daily, weekly, and monthly RV components; registered as har_family models and used as the reference the ML models must beat.",
+      "file": "src/volforecast/registry.py",
+      "line": 38
+    },
+    {
+      "term": "IV-RV gap",
+      "definition": "The spread between options-implied volatility and forecast realized volatility; when the forecast says IV is rich or cheap, the live signal trades it as LONG, SHORT, or FLAT.",
+      "file": "src/volforecast/cli/forecast.py",
+      "line": 5
+    },
+    {
+      "term": "Tournament",
+      "definition": "The single code path every vol run takes: all configured models train on the same folds and are compared with statistical tests, straddle P&L, and a shared dashboard, whether there is one model or many.",
+      "file": "src/volforecast/__main__.py",
+      "line": 6
+    },
+    {
+      "term": "MCS bootstrap",
+      "definition": "Model Confidence Set procedure computed after training: a bootstrap test that identifies the subset of models statistically indistinguishable from the best, per horizon.",
+      "file": "src/volforecast/__main__.py",
+      "line": 458
+    },
+    {
+      "term": "DM test",
+      "definition": "Diebold-Mariano test of equal predictive accuracy between two forecast series, computed in the tournament statistics stage alongside the MCS bootstrap.",
+      "file": "src/volforecast/__main__.py",
+      "line": 458
+    },
+    {
+      "term": "DH straddle P&L",
+      "definition": "Delta-hedged straddle profit and loss computed per symbol, horizon, and model; it converts forecast accuracy into an economic measure of trading value.",
+      "file": "src/volforecast/__main__.py",
+      "line": 492
+    },
+    {
+      "term": "ATM IV",
+      "definition": "At-the-money implied volatility; the live forecast fetches the current 1-month ATM IV from the TSDB edrvol namespace (field 1matms) to compare against the RV forecast.",
+      "file": "src/volforecast/cli/forecast.py",
+      "line": 70
+    },
+    {
+      "term": "GSVIVS",
+      "definition": "The project's IV-versus-RV trading signal family; vol kvar compares its backtest results (Sharpe, drawdown, hit rate) across the different cached IV sources.",
+      "file": "src/volforecast/cli/kvar.py",
+      "line": 1
+    },
+    {
+      "term": "ExperimentConfig",
+      "definition": "The YAML-loaded configuration object that defines a run (universe, models, horizons, CV, tuning, tournament options); imported from volforecast.config, which is missing from this restore.",
+      "file": "src/volforecast/__main__.py",
+      "line": 827
+    },
+    {
+      "term": "Trial registry",
+      "definition": "workspace/research/trials.yaml, the append-style ledger of experiments with per-horizon QLIKE numbers; vol experiments lists it, and completed runs update it automatically from metrics.json.",
+      "file": "src/volforecast/cli/experiment.py",
+      "line": 18
+    }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "You type vol run with no --config argument in an interactive terminal. What happens?",
+      "options": [
+        "An interactive picker lists YAML configs from workspace/configs/, newest first, with completed trials ticked",
+        "The command errors out immediately because --config is required",
+        "It runs a built-in default tournament config",
+        "It prompts you to type a symbol list"
+      ],
+      "answer": 0,
+      "provenance": "src/volforecast/__main__.py lines 819-825 call pick_config() when args.config is None; src/volforecast/cli/config_picker.py line 1 docstring and lines 132-156 show the mtime-sorted, tick-prefixed menu",
+      "explanation": "main() falls back to config_picker.pick_config(), which scans workspace/configs/ for YAMLs sorted by modification time and marks configs whose trials.yaml status is completed."
+    },
+    {
+      "kind": "order",
+      "prompt": "Put the stages of a vol run --config invocation in the order they execute.",
+      "options": [
+        "Load ExperimentConfig from the YAML config",
+        "Ingest gate: fetch data for universe symbols missing an RV cache",
+        "Tournament: train and compare all configured models",
+        "Update the trial registry from metrics.json"
+      ],
+      "answer": 0,
+      "provenance": "src/volforecast/__main__.py: ExperimentConfig.from_yaml at line 829, ingest gate at lines 845-863, _run_tournament dispatch at lines 865-872, trial registry update at lines 772-780 inside _run_tournament",
+      "explanation": "The run handler loads the config, ingests only missing symbols unless --skip-ingest, routes all modes through the tournament, and finally auto-updates workspace/research/trials.yaml from the produced metrics.json."
+    },
+    {
+      "kind": "single",
+      "prompt": "During Optuna hyperparameter search, which metric decides the best trial?",
+      "options": [
+        "Lowest QLIKE among completed (non-pruned) trials",
+        "Highest Sharpe ratio of the straddle backtest",
+        "Lowest MSE on the validation fold",
+        "Highest hit rate of the IV-RV signal"
+      ],
+      "answer": 0,
+      "provenance": "src/volforecast/__main__.py line 608: if state == \"COMPLETE\" and qlike < _hpo_best_qlike",
+      "explanation": "The HPO event handler only updates the best-trial tracker when a trial completed and its QLIKE beats the running minimum; pruned trials are excluded."
+    },
+    {
+      "kind": "single",
+      "prompt": "A fresh install of volforecast without extras cannot train LightGBM or XGBoost. Why?",
+      "options": [
+        "Those libraries live in the optional [ml] extra, not in core dependencies",
+        "They are vendored inside the repo and must be compiled first",
+        "They require the gs extra for GS data access",
+        "The registry disables tree models unless torch is present"
+      ],
+      "answer": 0,
+      "provenance": "src/pyproject.toml lines 28-47: [project.optional-dependencies] with ml = [lightgbm, xgboost, optuna, shap]",
+      "explanation": "Core dependencies are the scientific stack plus CLI and plotting libraries; lightgbm, xgboost, optuna, and shap are only pulled in via pip install volforecast[ml] (or ./vol sync, which uses --extra ml)."
+    }
+  ],
+  "confirmed_missing": [
+    "src/volforecast/config.py: imported by src/volforecast/__main__.py line 827 (from volforecast.config import ExperimentConfig) but no config.py file or config/ package exists under src/volforecast/",
+    "src/volforecast/constants.py: imported by src/volforecast/cli/audit.py line 26 (SYMBOL_UNIVERSE), src/volforecast/cli/status.py line 38 (DEV_UNIVERSE), and src/volforecast/cli/forecast.py line 63 (TICKER_TO_EDRVOL_RIC) but absent from disk",
+    "src/volforecast/evaluation/tournament.py: imported by src/volforecast/__main__.py lines 307-311 (display_tournament, run_har_tournament, run_har_tournament_pooled) but absent; only tournament_dashboard.py and tournament_economics.py exist in evaluation/",
+    "src/volforecast/models/har_family.py: imported by src/volforecast/registry.py line 38 but absent from src/volforecast/models/",
+    "src/volforecast/models/lstm.py: imported by src/volforecast/registry.py line 40 but absent (lstm_tuning.py exists, lstm.py does not)",
+    "src/volforecast/features/iv_surface.py: imported by src/volforecast/registry.py line 26 but absent from src/volforecast/features/",
+    "src/volforecast/features/tree_expansion.py: imported by src/volforecast/registry.py line 35 but absent (features/expansion.py exists under a different name)"
+  ]
+}
