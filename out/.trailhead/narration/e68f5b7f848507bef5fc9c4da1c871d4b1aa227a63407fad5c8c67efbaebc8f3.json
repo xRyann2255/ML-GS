@@ -1,0 +1,34 @@
+{
+  "role": [
+    "The package root states the thesis and owns the entry point. The `__init__` docstring declares it plainly: progressively enrich [[HAR]]-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting until the [[QLIKE]] improvement is statistically significant and the IV-RV gap is tradeable. `__main__.py` routes every `vol run --config` invocation through the tournament code path, one model or thirteen, and every run ends in an interactive Plotly dashboard.",
+    "A run earns its data before it trains: unless --skip-ingest is passed, an ingest gate fetches exactly the universe symbols whose realized-volatility cache parquet is missing on disk, and a config with mode: ingest exits after ingestion alone. Tuning is a command-line decision too, --tune, --no-tune, and --n-trials override the YAML's Optuna settings.",
+    "The satellite entry points are working tools, not demos: `vol audit` validates every cached parquet against its manifest contract and regenerates data/manifest.json, `vol backfill-rk` repairs NaN realized-kernel days from raw Chunk Store ticks in batched API calls, and `vol forecast` is the live product, an ensemble that predicts next-day RV, compares it to current ATM implied volatility, and prints LONG, SHORT, or FLAT."
+  ],
+  "reads": "A YAML experiment config parsed through ExperimentConfig.from_yaml (a module missing from this restore), plus argv overrides for symbols, workers, and Optuna tuning.",
+  "feeds": "Everything downstream: the ingest gate triggers data fetches, the tournament trains and ranks every configured model, and completed runs update the trial registry at workspace/research/trials.yaml.",
+  "key_files": [
+    { "file": "__main__.py", "purpose": "The entry point: config load, tuning overrides, the ingest gate, then tournament routing, all behind vol run." },
+    { "file": "__init__.py", "purpose": "Eight lines that state the whole project thesis and the package version." },
+    { "file": "forecast.py", "purpose": "The live signal: a multi-model ensemble predicting next-day RV against current ATM IV, output LONG, SHORT, or FLAT." },
+    { "file": "audit.py", "purpose": "The data-quality gate: audits every cached parquet against manifest contracts and regenerates data/manifest.json." },
+    { "file": "backfill_rk.py", "purpose": "Cache repair: finds NaN realized-kernel days, refetches raw ticks in multi-day batches, recomputes RK and noise_gap in place." },
+    { "file": "chunk_store.py", "purpose": "Tick access: batched Chunk Store queries with retry and timeout, plus the E-mini front-month roll logic." }
+  ],
+  "concepts": [
+    "tournament code path",
+    "ingest gate",
+    "QLIKE",
+    "IV-RV gap signal",
+    "realized kernel",
+    "manifest audit"
+  ],
+  "cite": {
+    "file": "src/volforecast/__main__.py",
+    "quote": "        if config.mode == \"ingest\":\n            return _run_ingest(config, symbols_override=symbols, workers=workers)\n\n        # Ingest gate: run ingest for missing symbols unless --skip-ingest\n        if not args.skip_ingest:\n            from volforecast.utils.paths import rv_cache_path\n\n            universe = symbols or config.universe\n            missing = [s for s in universe if not rv_cache_path(s).exists()]",
+    "focus": [
+      "# Ingest gate: run ingest for missing symbols unless --skip-ingest",
+      "missing = [s for s in universe if not rv_cache_path(s).exists()]"
+    ]
+  },
+  "caption": "The ingest gate: before any model trains, data is fetched for exactly the universe symbols whose RV cache is missing."
+}

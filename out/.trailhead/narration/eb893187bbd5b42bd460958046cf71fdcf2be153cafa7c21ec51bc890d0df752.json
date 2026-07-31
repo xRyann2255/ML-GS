@@ -1,0 +1,44 @@
+{
+  "role": [
+    "Eighteen registered feature layers turn daily realized measures and enriched market columns into the design matrix every tabular model trains on. The numbered spine runs from Layer 0, the [[HAR]] backbone of log [[realized variance]] lags, through asymmetry, options, microstructure, and cross-asset layers, to the Layer 5 calendar. Each layer is a class registered under a short name via `register_feature_layer`, so a config stacks layers declaratively through `FEATURE_REGISTRY` instead of importing them.",
+    "The layers here span three information sources. `options.py` extracts forward looking signals from the SPX [[implied volatility]] surface: the variance risk premium as squared ATM implied vol minus annualized realized variance, the 25-delta risk reversal, term slope, and butterfly convexity. `microstructure.py` distills order flow from cached 10 second bars: Kyle's lambda, the OLS slope of price changes on signed volume, plus the Amihud illiquidity ratio, volume concentration, and flow persistence. `calendar.py` encodes scheduled events: FOMC, NFP, and OpEx proximity in trading days.",
+    "The distinctive discipline is leakage control at the feature level: features built from market data are lagged one day before use, while calendar features are deliberately not shifted because event dates are known in advance, and `day_of_week` and `month` stay integer dtype so LightGBM treats them as categoricals. NFP is derived as the first Friday of each month and OpEx as the third, while FOMC dates are hardcoded through 2026 with a distance fallback of 30 beyond them."
+  ],
+  "reads": "Daily realized measures and IV enriched market columns from `volforecast.data`, plus per-symbol microstructure caches, daily aggregates and 10 second bar sequences, under data/raw/micro/.",
+  "feeds": "The design matrix consumed by the [[HAR]] baselines and LightGBM models in `volforecast.models`, whose forecasts the evaluation tournament ranks by [[QLIKE]].",
+  "key_files": [
+    {
+      "file": "options.py",
+      "purpose": "Layer 2, the forward looking half of the feature set: VRP, 25-delta skew, term slope, and butterfly from the SPX IV surface."
+    },
+    {
+      "file": "microstructure.py",
+      "purpose": "Layer 3: Kyle's lambda, Amihud illiquidity, VPIN, volume concentration, and flow persistence from daily aggregates and 10 second bar caches."
+    },
+    {
+      "file": "calendar.py",
+      "purpose": "Layer 5: FOMC, NFP, and OpEx proximity plus day-of-week and month dummies, unshifted because event dates are known in advance."
+    },
+    {
+      "file": "__init__.py",
+      "purpose": "Declares the layer 0-6 architecture and re-exports `FEATURE_REGISTRY`, the dict configs resolve layer names against."
+    }
+  ],
+  "concepts": [
+    "variance risk premium",
+    "Kyle's lambda",
+    "Amihud illiquidity",
+    "VPIN",
+    "FOMC/NFP/OpEx proximity",
+    "feature layer registry"
+  ],
+  "cite": {
+    "file": "src/volforecast/features/options.py",
+    "quote": "    \"\"\"Compute ex-post variance risk premium (Carr & Wu 2009 proxy).\n\n    VRP = (atm_iv_pct / 100)^2 - rv_daily * 252\n\n    This is the \"realized\" or \"ex-post\" VRP proxy that uses contemporaneous\n    realized variance. For the conditional VRP (Bollerslev, Tauchen & Zhou\n    2009, RFS), use iv_features.build_iv_feature_panel which substitutes\n    E_t[RV_{t+1:t+22}] from a HAR-CJ model.\n\n    Parameters\n    ----------\n    atm_iv : pd.Series\n        ATM implied volatility in percentage points (e.g., 20.0 = 20%).\n    rv : pd.Series\n        Daily realized variance (not annualized).\n\n    Returns\n    -------\n    pd.Series\n        Variance risk premium. Can be negative.\n    \"\"\"\n    return (atm_iv / 100.0) ** 2 - rv * 252.0",
+    "focus": [
+      "VRP = (atm_iv_pct / 100)^2 - rv_daily * 252",
+      "return (atm_iv / 100.0) ** 2 - rv * 252.0"
+    ]
+  },
+  "caption": "The flagship options feature: implied variance minus annualized realized variance, the Carr and Wu ex-post VRP proxy."
+}

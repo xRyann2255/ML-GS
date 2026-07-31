@@ -1,0 +1,253 @@
+{
+  "area": "data",
+  "overview": "The data layer is the ingestion and caching tier of the volforecast pipeline: it turns Goldman internal market data services into per-symbol parquet caches and model-ready tensors that every downstream feature layer and model consumes. Three services feed it. Chunk Store (via pytickclient) supplies raw L1 trade and quote ticks and server-side aggregated bars for the 34-symbol universe; TSDB (the eqpad_ namespace, via gs_quant_internal TSDBSymbol) supplies daily OHLCV, treasury, FX, commodity, VIX and SPX series; Marquee's EDRVOL_PERCENT dataset supplies the SPX implied volatility surface. From ticks, measures.py computes the daily realized volatility panel: realized variance from squared 5 minute returns, jump-robust bipower variation, the BNS z-test that splits RV into continuous and jump components, Patton-Sheppard semivariances, realized quarticity, and a Parzen realized kernel with a noise gap proxy for microstructure noise. rv_panel.py orchestrates calendar-aware, checkpointed streaming fetch and compute, writing per-symbol panels to data/raw/ticks/. micro.py builds 10 second signed-volume bars with BVC trade classification, daily VPIN and order-flow aggregates (data/raw/micro/) plus flat bar sequences (data/raw/micro/sequences/), which sequence_cache.py pre-stacks into padded (n_dates, max_bars, n_features) float32 tensors cached as .pt files under data/processed/sequences/ so LSTM and TCN training is pure tensor ops; a train-dates-only normaliser prevents leakage. iv_ingest.py and iv_features.py assemble the SPX IV panel (ATM 1m and 3m, 25 delta wings, skew, VIX) and derive one-day-shifted causal features such as the variance risk premium, using a HAR-CJ 22 day forecast as the conditional expectation. Specialist modules reconstruct 0DTE variance swap strikes with the CBOE discrete formula (varswap_reconstruct, gsvivs_kvar, spx_allday_vols). Note for readers: the restore is missing volforecast/constants.py, volforecast/data/edrvol.py and volforecast/models/har_family.py, all imported by files in this layer.",
+  "modules": [
+    {
+      "path": "src/volforecast/data/",
+      "role": "Ingestion, estimator, and cache layer for the vol forecasting pipeline. Fetches ticks and bars from Chunk Store (pytickclient), daily and cross-asset series from TSDB, and the SPX IV surface from Marquee EDRVOL_PERCENT, then computes daily realized volatility measures (RV, bipower variation, jump tests, semivariances, realized kernel) and microstructure aggregates (VPIN, order flow imbalance). Everything is persisted as per-symbol parquet caches under data/raw/ with atomic temp-file-then-rename writes and merge-never-discard semantics. It feeds the feature layers (har_core, asymmetry, IV features) and, through sequence_cache.py, the deep learning models with padded per-day tensors. A separate cluster of files (gsvivs_kvar, varswap_reconstruct, spx_allday_vols) applies the CBOE discrete variance swap formula to option strips for 0DTE Kvar analysis.",
+      "key_files": [
+        { "file": "measures.py", "purpose": "Canonical tick-to-scalar realized volatility estimators: RV, RQ, bipower variation, BNS and Lee-Mykland jump tests, semivariances, realized moments, and the Parzen realized kernel." },
+        { "file": "rv_panel.py", "purpose": "Streaming batch orchestrator that turns trading-calendar days into a cached daily RV panel with checkpointing and NaN sentinels for missing days." },
+        { "file": "resample.py", "purpose": "Bridges ticks and bars to the measure functions: previous-tick resampling, compute_daily_rv_from_ticks and compute_daily_rv_from_bars, plus 10s to 5-min aggregation." },
+        { "file": "chunk_store.py", "purpose": "pytickclient access to Chunk Store: L1 trades and quotes, server-side AggGroupBy 5-min bars, ES futures contract rolling, and timeout-guarded batched queries." },
+        { "file": "ticks.py", "purpose": "Public cache-aware API (ingest, save, load, cache_covers_range) wrapping rv_panel for the per-symbol tick-derived RV panel under data/raw/ticks/." },
+        { "file": "tsdb.py", "purpose": "Daily TSDB (eqpad_) fetches for OHLCV, treasury yields, FX, commodities, VIX, VIX futures term structure, and SPX index levels." },
+        { "file": "ohlcv.py", "purpose": "Split-adjusted daily OHLCV ingestion from TSDB, deriving adjusted open, high, and low from the adjusted-close factor." },
+        { "file": "micro.py", "purpose": "10 second signed-volume bar ingestion with BVC classification, daily VPIN and order-flow aggregates, and the LSTM/TCN sequences parquet with resumable staging." },
+        { "file": "sequence_cache.py", "purpose": "Pre-stacks 10s bar parquets into padded (n_dates, max_bars, n_features) torch tensors, cached as hash-keyed .pt files, with leakage-free normalisation." },
+        { "file": "iv_ingest.py", "purpose": "Fetches the filtered SPX IV surface (1m and 3m tenors, ATM plus 25 delta wings) from Marquee and assembles the raw daily IV panel with VIX." },
+        { "file": "iv_features.py", "purpose": "Transforms the raw IV panel into causal shift(1) features: VRP, term slope, butterfly, VTS, forward vol, and vol-of-VIX." },
+        { "file": "marquee.py", "purpose": "Deprecated Marquee EDRVOL_PERCENT client (chunked, retried, threaded) superseded by the missing edrvol module; still hosts fetch_vvix and a generic dataset fetcher." },
+        { "file": "gsvivs_kvar.py", "purpose": "Parses GSVIVS01 output.json option fills and applies the CBOE discrete variance swap formula to recover the exact execution Kvar sold each day." },
+        { "file": "varswap_reconstruct.py", "purpose": "Reconstructs the 0DTE variance swap strike from the EDRVOL_PERCENT_EXPIRY strike grid via Black-Scholes prices and the CBOE formula." },
+        { "file": "spx_allday_vols.py", "purpose": "Queries SPXAllDayVols marks from ChunkStore at 09:10 ET and computes a morning mark Kvar for the day's strip without execution slippage." },
+        { "file": "trading_calendar.py", "purpose": "NYSE trading day calendar (weekends plus NYSE holidays, including Juneteenth from 2022) used to decide which dates to fetch." },
+        { "file": "__init__.py", "purpose": "Declares the package as the data access layer for tick data, daily OHLCV, and IV surfaces." }
+      ],
+      "concepts": ["realized variance", "bipower variation", "jump detection", "realized kernel", "VPIN", "implied volatility surface", "variance risk premium", "variance swap strike", "parquet caching", "atomic writes"]
+    },
+    {
+      "path": "src/volforecast/utils/",
+      "role": "paths.py anchors every cache location to the repo root (found via AGENTS.md or vol.cmd marker files) so caches resolve correctly regardless of CWD. It defines the canonical data/raw/ layout: ticks/ for daily RV panels, iv/ for options-implied data, ohlcv/ for daily prices, micro/ and micro/sequences/ for microstructure aggregates and 10s bar sequences, cross_asset/ and correlation/ for the remaining layers, plus data/processed/ for feature panels and sequence tensors. Deprecated aliases keep old call sites working after the directory migration.",
+      "key_files": [
+        { "file": "paths.py", "purpose": "Repo-root-anchored resolvers for every cache directory under data/raw/, data/processed/, data/models/, and workspace/." }
+      ],
+      "concepts": ["cache directory layout", "project root resolution"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "The daily realized variance measure is the plain sum of squared intraday returns with no mean subtraction, following Andersen et al. 2003.",
+      "file": "src/volforecast/data/measures.py",
+      "start": 20,
+      "end": 29,
+      "focus": [25],
+      "quote": "    RV_t = sum(r_{t,i}^2).  No mean subtraction (Andersen et al. 2003)."
+    },
+    {
+      "text": "Bipower variation, computed as (pi/2) times the sum of adjacent absolute return products, gives a jump-robust estimate of integrated variance per Barndorff-Nielsen and Shephard 2004.",
+      "file": "src/volforecast/data/measures.py",
+      "start": 70,
+      "end": 83,
+      "focus": [75, 76],
+      "quote": "    BPV = (pi/2) * sum(|r_i| * |r_{i-1}|) for i = 2, ..., N.\n    BPV is robust to jumps and estimates integrated variance"
+    },
+    {
+      "text": "Good and bad volatility come from Patton and Sheppard 2015 realized semivariances, with RS+ using the >= 0 convention so that RS+ plus RS- always equals RV as an exhaustive partition.",
+      "file": "src/volforecast/data/measures.py",
+      "start": 48,
+      "end": 67,
+      "focus": [53, 54, 56, 57],
+      "quote": "    RS+ = sum(r_i^2 * I(r_i >= 0))\n    RS- = sum(r_i^2 * I(r_i < 0))\n    Follows Patton & Sheppard (2015): RS+ uses >= 0 so that\n    RS+ + RS- = RV always holds (exhaustive partition)."
+    },
+    {
+      "text": "Days with statistically significant jumps are flagged by the Barndorff-Nielsen and Shephard 2006 z-test, Z_BNS = (RV - BPV) / sqrt(theta * RTQ / n) with theta approximately 0.609.",
+      "file": "src/volforecast/data/measures.py",
+      "start": 105,
+      "end": 125,
+      "focus": [114, 115],
+      "quote": "    Z_BNS = (RV - BPV) / sqrt(theta * RTQ / n)\n    where theta = (pi^2/4 + pi - 5) approx 0.6090."
+    },
+    {
+      "text": "Realized variance is decomposed into a jump component J^2 = max(RV - BPV, 0) gated by the jump indicator and a continuous component C = RV - J, the raw inputs for HAR-CJ style models.",
+      "file": "src/volforecast/data/measures.py",
+      "start": 134,
+      "end": 154,
+      "focus": [141, 153],
+      "quote": "    J^2 = max(RV - BPV, 0) * jump_indicator.\n    C = RV - J (continuous variation = total minus jumps)."
+    },
+    {
+      "text": "The realized kernel estimator weights return autocovariances with a flat-top Parzen kernel (Barndorff-Nielsen, Hansen, Lunde and Shephard 2008) to stay consistent under microstructure noise, achieving the optimal n^(-1/5) MSE rate.",
+      "file": "src/volforecast/data/measures.py",
+      "start": 267,
+      "end": 282,
+      "focus": [273, 275, 276],
+      "quote": "    RK_t = sum_{h=-H}^{H} k(h/(H+1)) * gamma_hat_h\n    Uses the flat-top Parzen kernel (Barndorff-Nielsen, Hansen, Lunde &\n    Shephard 2008, Econometrica). Achieves the optimal n^{-1/5} MSE rate."
+    },
+    {
+      "text": "The fast 'bars' ingestion mode computes the full daily RV measure set from roughly 78 pre-aggregated 5 minute bars instead of millions of raw ticks, at the cost of skipping the realized kernel and noise gap which need tick-level prices.",
+      "file": "src/volforecast/data/resample.py",
+      "start": 182,
+      "end": 199,
+      "focus": [185, 186, 187],
+      "quote": "    Equivalent to compute_daily_rv_from_ticks() but operates on ~78 bars\n    instead of millions of raw ticks. Does NOT compute realized_kernel or\n    noise_gap (those require tick-level data)."
+    },
+    {
+      "text": "The RV panel builder is a streaming batch pipeline (trading calendar, batched tick fetch, daily RV computation, checkpoint) whose peak memory is bounded to one sub-batch of tick data at a time.",
+      "file": "src/volforecast/data/rv_panel.py",
+      "start": 1,
+      "end": 10,
+      "focus": [3, 7, 8],
+      "quote": "Orchestrates: trading calendar -> batch-fetch ticks -> compute daily RV -> cache.\n  For each sub-batch: fetch -> compute (optionally parallel) -> checkpoint -> release.\n  Peak memory is bounded to one sub-batch of tick data at a time."
+    },
+    {
+      "text": "Raw tick data comes from Chunk Store via pytickclient: L1 trades and quotes for all 34 symbols plus L2 order book depth for the E-mini S&P 500 future, the foundation for RV at any sampling frequency.",
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 1,
+      "end": 10,
+      "focus": [3, 4, 5, 6],
+      "quote": "Provides functions to fetch L1 trade/quote data for all 34 symbols and\nL2 order book depth data for E-mini S&P 500. Raw tick data is the\nfoundation for computing realized volatility measures at arbitrary\nfrequencies (5-min, 1-min, tick-by-tick)."
+    },
+    {
+      "text": "TSDB supplies the daily cross-asset series used for feature construction: OHLCV, treasury yields, FX rates, commodity prices, VIX, VIX futures term structure, and SPX index levels.",
+      "file": "src/volforecast/data/tsdb.py",
+      "start": 1,
+      "end": 19,
+      "focus": [3, 4, 5],
+      "quote": "Provides functions to fetch daily OHLCV data, treasury yields,\nFX rates, commodity prices, VIX, VIX futures, and SPX index data\nused for cross-asset feature construction."
+    },
+    {
+      "text": "TSDB only publishes an adjusted close, so ohlcv.py derives split-adjusted open, high, and low by scaling raw prices with the corporate-action factor adj_close / raw_close, while volume stays unadjusted.",
+      "file": "src/volforecast/data/ohlcv.py",
+      "start": 7,
+      "end": 17,
+      "focus": [13, 14, 15],
+      "quote": "    TSDB only provides adjusted close (close.adj.allincdiv). We derive\n    adjusted open/high/low by applying the same corporate-action factor:\n        adj_price = raw_price * (adj_close / raw_close)"
+    },
+    {
+      "text": "micro.py ingests server-classified tick data into 10 second signed-volume bars, producing both daily microstructure aggregates (signed volume ratio, VPIN, order flow imbalance) and per-bar sequences for the deep learning models, cached under data/raw/micro/.",
+      "file": "src/volforecast/data/micro.py",
+      "start": 1,
+      "end": 18,
+      "focus": [3, 4, 5, 6],
+      "quote": "Fetches tick data with server-side LeeReadySumVolume trade classification,\naggregates into 10-second signed-volume bars, then produces:\n  1. Daily aggregates (signed_volume_ratio, vpin, ofi) → data/raw/micro/{SYM}.parquet\n  2. 10-second bar sequences (for LSTM/TCN) → data/raw/micro/sequences/{SYM}.parquet"
+    },
+    {
+      "text": "VPIN is computed over volume-time buckets as the mean absolute buy-sell volume imbalance per bucket, following Easley, Lopez de Prado and O'Hara 2012.",
+      "file": "src/volforecast/data/micro.py",
+      "start": 323,
+      "end": 340,
+      "focus": [331, 333],
+      "quote": "    Reference: Easley, Lopez de Prado & O'Hara (2012), Eq. 1.\n    VPIN = (1/n) * Σ |V^B_i - V^S_i| / V_bucket"
+    },
+    {
+      "text": "The SPX implied volatility surface is bulk-fetched from the Marquee EDRVOL_PERCENT dataset and assembled with VIX into the daily panel behind the Layer 2 options-implied features.",
+      "file": "src/volforecast/data/iv_ingest.py",
+      "start": 1,
+      "end": 10,
+      "focus": [1, 3, 4],
+      "quote": "\"\"\"IV surface ingestion from Marquee EDRVOL_PERCENT.\nBulk-fetches the SPX implied volatility surface and VIX, assembles into\na daily panel suitable for Layer 2 feature computation."
+    },
+    {
+      "text": "Every IV-derived feature is shifted by one day before use, so the feature value at time t only reflects information available at market close t-1.",
+      "file": "src/volforecast/data/iv_features.py",
+      "start": 106,
+      "end": 123,
+      "focus": [112, 113],
+      "quote": "    All features are shifted by 1 day to enforce causality: the feature\n    value at time t uses only information available at market close t-1."
+    },
+    {
+      "text": "The variance risk premium feature is squared ATM implied volatility minus a conditional expectation of future RV, where the expectation is a HAR-CJ 22 day ahead forecast in the spirit of Bollerslev et al. 2009.",
+      "file": "src/volforecast/data/iv_features.py",
+      "start": 134,
+      "end": 146,
+      "focus": [138, 139],
+      "quote": "    # VRP = IV^2 - E_t[RV_{t+1:t+22}]\n    # Use HAR-CJ h=22 forecast as the conditional expectation (Bollerslev et al. 2009)."
+    },
+    {
+      "text": "sequence_cache.py pre-stacks the per-symbol 10 second bar parquets into a single zero-padded tensor of shape (n_dates, max_bars, n_features) so LSTM and TCN training runs as pure GPU tensor ops with no pandas or parquet overhead.",
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 1,
+      "end": 18,
+      "focus": [3, 4, 5],
+      "quote": "Pre-stacks the per-symbol 10s bar parquets under ``data/raw/micro/sequences/``\ninto a single padded tensor of shape ``(n_dates, max_bars, n_features)`` so\nthe training loop is pure GPU tensor ops with no pandas / parquet overhead."
+    },
+    {
+      "text": "The DeepVol-style multi-day builder concatenates 20 trading days of 5 minute bars into 1,560-timestep sequences ordered oldest to newest so causal convolutions see the correct time flow.",
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 422,
+      "end": 437,
+      "focus": [427, 428],
+      "quote": "    For the DeepVol paper architecture: lookback_days=20 → 20×78=1,560\n    timesteps per sequence.  Each sequence is ordered oldest→newest"
+    },
+    {
+      "text": "Sequence normalisation statistics are fit only on valid bars from training dates, with pad rows and validation and test dates excluded, so there is zero leakage into the normaliser.",
+      "file": "src/volforecast/data/sequence_cache.py",
+      "start": 644,
+      "end": 660,
+      "focus": [652, 653],
+      "quote": "    Pad rows (beyond ``lengths[i]``) and non-training dates are excluded so\n    there is zero leakage from validation / test folds into the normaliser."
+    },
+    {
+      "text": "All raw market data lands in per-source parquet caches under data/raw/: ticks/ holds the per-symbol daily RV panels, iv/ the options-implied data, and ohlcv/ the daily prices from TSDB.",
+      "file": "src/volforecast/utils/paths.py",
+      "start": 63,
+      "end": 86,
+      "focus": [64, 74, 84],
+      "quote": "    \"\"\"Absolute path to data/raw/ticks/ (daily RV panel parquets).\"\"\"\n    \"\"\"Absolute path to data/raw/iv/ (per-symbol IV from TSDB edrvol_).\"\"\"\n    \"\"\"Absolute path to data/raw/ohlcv/ (daily OHLCV from TSDB).\"\"\""
+    }
+  ],
+  "glossary": [
+    { "term": "Realized variance (RV)", "definition": "Sum of squared intraday returns over a trading day, the model target throughout the project; computed with no mean subtraction.", "file": "src/volforecast/data/measures.py", "line": 25 },
+    { "term": "Bipower variation (BPV)", "definition": "Jump-robust estimator of integrated variance built from products of adjacent absolute returns, scaled by pi/2.", "file": "src/volforecast/data/measures.py", "line": 75 },
+    { "term": "Realized semivariance (RS+ / RS-)", "definition": "The parts of RV coming from positive versus negative returns; their difference is the signed jump measure used for good and bad volatility features.", "file": "src/volforecast/data/measures.py", "line": 53 },
+    { "term": "Realized kernel (RK)", "definition": "Noise-robust integrated variance estimator that weights return autocovariances with a flat-top Parzen kernel.", "file": "src/volforecast/data/measures.py", "line": 273 },
+    { "term": "Noise gap", "definition": "(RK - RV_5min) / RV_5min, a liquidity and microstructure-noise intensity proxy comparing the kernel estimate to 5 minute RV.", "file": "src/volforecast/data/measures.py", "line": 309 },
+    { "term": "VPIN", "definition": "Volume-Synchronized Probability of Informed Trading: mean absolute buy-sell imbalance across equal-volume buckets, per Easley, Lopez de Prado and O'Hara 2012.", "file": "src/volforecast/data/micro.py", "line": 333 },
+    { "term": "BVC", "definition": "Bulk Volume Classification via the tick rule: a bar's volume counts as buy-initiated if close is above open, sell-initiated if below, split evenly if flat.", "file": "src/volforecast/data/micro.py", "line": 88 },
+    { "term": "TSDB", "definition": "GS internal Time Series Database, queried through gs_quant_internal TSDBSymbol with eqpad_ prefixed symbols; source of daily OHLCV and cross-asset series.", "file": "src/volforecast/data/tsdb.py", "line": 1 },
+    { "term": "Chunk Store", "definition": "GS internal tick store accessed via pytickclient, supplying L1 trades and quotes and server-side aggregated bars.", "file": "src/volforecast/data/chunk_store.py", "line": 1 },
+    { "term": "EDRVOL_PERCENT", "definition": "Marquee dataset carrying the SPX implied volatility surface by tenor and relative strike, the raw input for options-implied features.", "file": "src/volforecast/data/iv_ingest.py", "line": 1 },
+    { "term": "VRP", "definition": "Variance risk premium: ATM implied variance minus a conditional expectation of future realized variance, here a HAR-CJ 22 day forecast.", "file": "src/volforecast/data/iv_features.py", "line": 138 },
+    { "term": "Kvar", "definition": "The variance swap strike; gsvivs_kvar.py recovers the exact execution Kvar sold each day by applying the CBOE discrete variance swap formula to option fill prices.", "file": "src/volforecast/data/gsvivs_kvar.py", "line": 4 }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "Which estimator in measures.py is robust to jumps and estimates integrated variance?",
+      "options": ["Realized variance (RV)", "Bipower variation (BPV)", "Realized quarticity (RQ)", "Positive semivariance (RS+)"],
+      "answer": 1,
+      "provenance": "src/volforecast/data/measures.py:76-77, docstring states BPV is robust to jumps and estimates integrated variance",
+      "explanation": "The compute_bpv docstring says BPV is robust to jumps and estimates integrated variance (Barndorff-Nielsen and Shephard 2004); RV includes jump variation and RQ measures estimation quality."
+    },
+    {
+      "kind": "single",
+      "prompt": "Where are the 10 second bar sequences that feed the LSTM and TCN models cached?",
+      "options": ["data/raw/micro/sequences/{SYMBOL}.parquet", "data/raw/ticks/{SYMBOL}.parquet", "data/processed/iv_features_spx.parquet", "data/raw/ohlcv/{SYMBOL}.parquet"],
+      "answer": 0,
+      "provenance": "src/volforecast/data/micro.py:6 and src/volforecast/utils/paths.py:104",
+      "explanation": "micro.py writes 10 second bar sequences to data/raw/micro/sequences/{SYM}.parquet; sequence_cache.py then stacks them into .pt tensors under data/processed/sequences/."
+    },
+    {
+      "kind": "single",
+      "prompt": "Which internal service provides the SPX implied volatility surface?",
+      "options": ["Marquee (EDRVOL_PERCENT dataset)", "TSDB eqpad_ namespace", "Chunk Store via pytickclient", "GSVIVS01 output.json"],
+      "answer": 0,
+      "provenance": "src/volforecast/data/iv_ingest.py:1",
+      "explanation": "iv_ingest.py's module docstring is titled 'IV surface ingestion from Marquee EDRVOL_PERCENT'; TSDB supplies daily series and Chunk Store supplies ticks."
+    },
+    {
+      "kind": "order",
+      "prompt": "Put the RV panel build stages in execution order.",
+      "options": ["Resolve NYSE trading days", "Batch-fetch ticks or bars from Chunk Store", "Compute daily RV measures", "Checkpoint the panel to parquet cache"],
+      "answer": 0,
+      "provenance": "src/volforecast/data/rv_panel.py:3 and rv_panel.py:7 (the docstring lists the stages in execution order)",
+      "explanation": "rv_panel.py line 3 gives the order: trading calendar, then batch-fetch ticks, then compute daily RV, then cache; line 7 shows each sub-batch runs fetch, compute, checkpoint, release."
+    }
+  ],
+  "confirmed_missing": [
+    "volforecast/constants.py imported by data/micro.py:33, data/ohlcv.py:29, data/tsdb.py:29, data/chunk_store.py:35, data/rv_panel.py:21, and data/spx_allday_vols.py:22 but absent from src/volforecast/",
+    "volforecast/data/edrvol.py imported by data/iv_features.py:20 (load_iv_cache) and data/varswap_reconstruct.py:214 (_ensure_expiry_session), and named in data/marquee.py:4-5 as the superseding module, but absent from src/volforecast/data/",
+    "volforecast/models/har_family.py (HARCJModel) imported by data/iv_features.py:55 but absent from src/volforecast/models/"
+  ]
+}

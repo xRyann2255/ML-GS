@@ -1,0 +1,87 @@
+{
+ "claims": [
+  {
+   "text": "The data layer starts at Chunk Store, Goldman's tick service: `chunk_store.py` fetches L1 trade and quote ticks for all 34 symbols plus L2 order book depth for the E-mini S&P 500, the raw material for realized volatility at 5 minute, 1 minute, or tick-by-tick frequency.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/data/chunk_store.py",
+    "quote": "def fetch_trades_batch(\n    symbol: str,\n    dates: list[date],\n    batch_size: int = 5,\n    timeout_s: float = 120.0,\n    retries: int = 2,\n    on_fetch: Callable[[str, list[date], int, float], None] | None = None,\n) -> dict[date, pd.DataFrame]:\n    \"\"\"Fetch trades for multiple dates using batched API calls.\n\n    Groups dates into contiguous runs and issues one ``chunk_query`` per\n    batch (up to *batch_size* days), reducing total API calls.",
+    "focus": [
+     "    Groups dates into contiguous runs and issues one ``chunk_query`` per"
+    ]
+   }
+  },
+  {
+   "text": "`rv_panel.py` turns those ticks into the project's target, one realized variance number per symbol per day, running as a streaming batch pipeline, fetch then compute then checkpoint then release, so peak memory never exceeds one sub-batch of tick data.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/data/rv_panel.py",
+    "quote": "def _compute_day_record(\n    day: date,\n    trades: pd.DataFrame,\n    symbol: str,\n    freq: str,\n    min_ticks: int,\n) -> dict | tuple[date, str]:\n    \"\"\"Compute RV measures for a single day's trades.\n",
+    "focus": [
+     "    \"\"\"Compute RV measures for a single day's trades."
+    ]
+   }
+  },
+  {
+   "text": "`micro.py` adds the order-flow view: ticks become 10 second bars server-side, client-side BVC then classifies each bar buy or sell by the tick rule, and the bars feed daily aggregates (VPIN, order flow imbalance) plus per-bar sequences for the LSTM and TCN models.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/data/micro.py",
+    "quote": "def _build_processors(interval: float = MICRO_BAR_INTERVAL) -> list:\n    \"\"\"Build AggGroupBy processor for server-side 10s bar aggregation.\n\n    Client-side BVC (Bulk Volume Classification) is applied after fetch\n    to classify bars as buy/sell initiated using the tick rule.",
+    "focus": [
+     "    Client-side BVC (Bulk Volume Classification) is applied after fetch"
+    ]
+   }
+  },
+  {
+   "text": "VPIN follows Easley, Lopez de Prado and O'Hara 2012, Eq. 1: buy and sell volume is sliced into equal-volume buckets and the day's informed-trading probability is the mean absolute buy-sell imbalance across them.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/data/micro.py",
+    "quote": "def compute_vpin(\n    buy_vols: np.ndarray,\n    sell_vols: np.ndarray,\n    bucket_volume: int | float,\n    n_buckets: int = VPIN_N_BUCKETS,\n) -> float:\n    \"\"\"Compute Volume-Synchronized Probability of Informed Trading (VPIN).\n\n    Reference: Easley, Lopez de Prado & O'Hara (2012), Eq. 1.",
+    "focus": [
+     "    Reference: Easley, Lopez de Prado & O'Hara (2012), Eq. 1."
+    ]
+   }
+  },
+  {
+   "text": "A newcomer would not guess the fetch layer knows futures conventions: to pull E-mini depth it resolves each date to the correct front-month contract, rolling to the next quarterly expiry on the Thursday before the third Friday of the expiry month.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/data/chunk_store.py",
+    "quote": "def _resolve_es_symbol(trade_date: date) -> str:\n    \"\"\"Map a date to the correct front-month E-mini S&P 500 RIC.\n\n    ES contracts expire quarterly (H=Mar, M=Jun, U=Sep, Z=Dec).\n    The front contract rolls to the next quarter on the Thursday\n    before the 3rd Friday of the expiry month. Before that date,\n    the expiring contract is still the front month.\n    \"\"\"",
+    "focus": [
+     "    The front contract rolls to the next quarter on the Thursday",
+     "    before the 3rd Friday of the expiry month. Before that date,"
+    ]
+   }
+  },
+  {
+   "text": "Ingestion is crash-safe by construction: each fetched batch lands in a staging directory, and consolidation merges staging chunks with the existing sequences parquet, deduplicates, and writes the final file before staging is removed, so reruns resume instead of restarting.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/data/micro.py",
+    "quote": "def _consolidate_staging(symbol: str, *, sequences_dir: Path | None = None) -> pd.DataFrame:\n    \"\"\"Consolidate all staging parquets into the final sequences file.\n\n    Merges staging chunks with any existing sequences parquet (preserving\n    historical data), deduplicates, writes final parquet, then removes\n    the staging directory.\n\n    Returns the consolidated DataFrame (existing + new).\n    \"\"\"",
+    "focus": [
+     "    Merges staging chunks with any existing sequences parquet (preserving",
+     "    historical data), deduplicates, writes final parquet, then removes"
+    ]
+   }
+  },
+  {
+   "text": "You can audit completeness from the cache itself: `detect_gaps` compares the requested date range against the sequences parquet and returns exactly which trading days are missing, so a partial ingest is visible rather than silent.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/data/micro.py",
+    "quote": "def detect_gaps(\n    symbol: str,\n    start_date: date,\n    end_date: date,\n    *,\n    sequences_dir: Path | None = None,\n) -> list[date]:\n    \"\"\"Return trading days missing from the sequences cache.",
+    "focus": [
+     "    \"\"\"Return trading days missing from the sequences cache."
+    ]
+   }
+  },
+  {
+   "text": "What this layer does not do is model anything: it stops at cached parquet panels and bar sequences, and away from Goldman's network, where pytickclient and TSDB are unreachable, it can only serve dates the caches under data/raw/ already hold.",
+   "status": "inferred"
+  }
+ ]
+}

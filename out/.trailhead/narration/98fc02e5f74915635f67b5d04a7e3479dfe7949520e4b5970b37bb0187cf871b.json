@@ -1,0 +1,65 @@
+{
+ "claims": [
+  {
+   "text": "This repo forecasts stock market volatility one, five, and twenty two days ahead with machine learning, signal discovery in its own words: HAR baselines are progressively enriched until the QLIKE improvement is statistically significant and the IV-RV gap it implies is tradeable.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/__main__.py",
+    "quote": "    parser = argparse.ArgumentParser(\n        prog=\"vol\",\n        description=(\n            \"ML Realized Volatility Forecasting — Signal Discovery\\n\\n\"\n            \"Primary command: vol run --config <yaml>\\n\"\n            \"Runs tournament (1 or N models) and produces an interactive dashboard.\"\n        ),",
+    "focus": [
+     "\"ML Realized Volatility Forecasting — Signal Discovery\\n\\n\"",
+     "\"Runs tournament (1 or N models) and produces an interactive dashboard.\""
+    ]
+   }
+  },
+  {
+   "text": "Its raw material is GS market data, trade ticks from Chunk Store fetched in multi-day batches, daily series from TSDB, and the SPX implied vol surface from Marquee, all cached as per-symbol parquet the models train on.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/cli/backfill_rk.py",
+    "quote": "def _fetch_and_compute_rk_batch(\n    symbol: str,\n    days: list[date],\n    rv_lookup: dict[date, float | None],\n    timeout_s: float = 120.0,\n) -> list[dict]:\n    \"\"\"Fetch raw ticks for multiple days in ONE chunk_query and compute RK per day.\n\n    Batching N days into a single API call eliminates N-1 round-trips worth of",
+    "focus": [
+     "\"\"\"Fetch raw ticks for multiple days in ONE chunk_query and compute RK per day."
+    ]
+   }
+  },
+  {
+   "text": "Quality is decided by competition: every vol run is a tournament, 13 models compared with statistical tests in the full configuration, ranked on QLIKE, an asymmetric loss that punishes underestimating volatility, and only statistically significant wins over HAR count.",
+   "status": "verified",
+   "cite": {
+    "file": "README.md",
+    "quote": "# Single-model experiment (ingest + train + evaluate + dashboard)\nvol run --config workspace/configs/baseline_har.yaml\n\n# Tournament: 13 models compared with statistical tests\nvol run --config workspace/configs/tournament_full_spy.yaml",
+    "focus": [
+     "# Tournament: 13 models compared with statistical tests"
+    ]
+   }
+  },
+  {
+   "text": "The winning forecasts feed paper trading: economic_value.py turns the gap between implied and forecast volatility into a long or short vol signal, prices it as delta-hedged straddle and vol-targeting P&L, and reports Sharpe, maximum drawdown, and GSVIVS01 index performance.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/evaluation/economic_value.py",
+    "quote": "def iv_rv_gap_signal(\n    iv_forecast: np.ndarray,\n    rv_forecast: np.ndarray,\n    threshold: float = 0.0,\n    short_threshold: float | None = None,\n    default_long: bool = False,\n) -> np.ndarray:\n    \"\"\"Generate trading signal from IV-RV gap.",
+    "focus": [
+     "\"\"\"Generate trading signal from IV-RV gap."
+    ]
+   }
+  },
+  {
+   "text": "What a newcomer would not guess: GitHub Copilot agents run this repo as much as people do, and the evaluation code is written to be driven by them: the BACKTEST skill records every outcome, crash included, in a machine-readable sentinel, so no agent ever waits on a run that died.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/evaluation/economic_value.py",
+    "quote": "    except Exception as exc:  # noqa: BLE001 — every failure must reach the sentinel file\n        rc = 1\n        body = json.dumps({\"error\": f\"{type(exc).__name__}: {exc}\"})\n\n    out_file.parent.mkdir(parents=True, exist_ok=True)\n    out_file.write_text(f\"{body}\\nEXIT_CODE={rc}\\n\", encoding=\"utf-8\")\n    print(f\"OUTPUT_FILE={out_file}\")",
+    "focus": [
+     "except Exception as exc:  # noqa: BLE001 — every failure must reach the sentinel file",
+     "out_file.write_text(f\"{body}\\nEXIT_CODE={rc}\\n\", encoding=\"utf-8\")"
+    ]
+   }
+  },
+  {
+   "text": "What it is not: a live trading system, nothing listens on a socket, every entry point is a batch command that runs to completion, and the closest thing to an order it ever emits is a printed LONG, SHORT, or FLAT signal.",
+   "status": "inferred"
+  }
+ ]
+}

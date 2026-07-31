@@ -1,0 +1,52 @@
+{
+ "claims": [
+  {
+   "text": "volforecast is a command line application: main in src/volforecast/__main__.py builds an argument parser, parses argv, and prints help when no subcommand is given.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/__main__.py",
+    "quote": "def main(argv: list[str] | None = None) -> int:\n    parser = _build_parser()\n    args = parser.parse_args(argv)\n\n    if args.command is None:\n        parser.print_help()\n        return 0",
+    "focus": [
+     "    parser = _build_parser()\n    args = parser.parse_args(argv)"
+    ]
+   }
+  },
+  {
+   "text": "The primary subcommand is run, which resolves a YAML experiment file into an ExperimentConfig, offering an interactive picker when no --config is supplied.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/__main__.py",
+    "quote": "    if args.command == \"run\":\n        if args.config is None:\n            from volforecast.cli.config_picker import pick_config\n\n            selected = pick_config()\n            if selected is None:\n                return 0\n            args.config = str(selected)\n\n        from volforecast.config import ExperimentConfig\n\n        config = ExperimentConfig.from_yaml(args.config)\n        symbols = args.symbols.split(\",\") if args.symbols else None",
+    "focus": [
+     "        config = ExperimentConfig.from_yaml(args.config)"
+    ]
+   }
+  },
+  {
+   "text": "It is packaged with optional dependency groups, so the Goldman Sachs integration through gs-quant-internal and the machine learning stack through lightgbm, xgboost, optuna and shap are both installed only on request.",
+   "status": "verified",
+   "cite": {
+    "file": "src/pyproject.toml",
+    "quote": "[project.optional-dependencies]\ngs = [\n    \"gs-quant-internal>=1.7\",\n]\nml = [\n    \"lightgbm>=3.3\",\n    \"xgboost>=1.7\",\n    \"optuna>=3.5\",\n    \"shap>=0.43\",\n]",
+    "focus": [
+     "gs = [\n    \"gs-quant-internal>=1.7\",\n]"
+    ]
+   }
+  },
+  {
+   "text": "Every run reports what it produced through _print_output_summary, which takes an output directory and prints the resulting file paths.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/__main__.py",
+    "quote": "def _print_output_summary(output_dir: str, extra_files: dict[str, str] | None = None) -> None:\n    \"\"\"Print a clear output summary with file paths.\"\"\"\n    from pathlib import Path\n\n    from volforecast.cli.console import console\n\n    out = Path(output_dir)\n    lines: list[tuple[str, str]] = []",
+    "focus": [
+     "def _print_output_summary(output_dir: str, extra_files: dict[str, str] | None = None) -> None:\n    \"\"\"Print a clear output summary with file paths.\"\"\""
+    ]
+   }
+  },
+  {
+   "text": "It is not a live trading system or a service: nothing here listens on a socket, and every entry point is a batch command that runs to completion and returns an exit code.",
+   "status": "inferred"
+  }
+ ]
+}

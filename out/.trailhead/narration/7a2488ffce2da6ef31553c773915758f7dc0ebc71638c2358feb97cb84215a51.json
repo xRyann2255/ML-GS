@@ -1,0 +1,40 @@
+{
+  "role": [
+    "Where model claims go to die. statistical_tests.py turns per-model predictions into one ranked tournament table per horizon: element-wise [[QLIKE]] losses, Diebold-Mariano tests against the HAR baseline with Newey-West HAC errors that average loss differentials per date so lags never cross symbol boundaries, Mincer-Zarnowitz efficiency regressions, the Hansen Model Confidence Set via block bootstrap, and a calm versus turbulent split so you can see where a model earns its keep.",
+    "Then the forecasts are traded on paper. economic_value.py generates the IV-RV gap signal, selling vol when implied is rich against the forecast, and backtests delta-hedged straddles, vol-targeting portfolios, and the GSVIVS01 short-vol index against always-long, always-short, and random baselines that use no forecast at all. realistic_straddle.py is the honest engine: a full P&L waterfall of tenor-decayed gamma, vanna, volga, maturity-widening option spreads, and Boyle-Emanuel hedge-error variance that inflates the risk denominator rather than hiding it.",
+    "The distinctive habit is refusing to let anything look good by accident: Sharpe ratios are deflated for selection luck per Bailey and Lopez de Prado (2014), bracketed with block-bootstrap confidence intervals, and re-priced across cost bands from timing-aware to quoted spreads. Even a repaired bug is documented in place: `normalize_exec_kvar_for_horizon` is a deliberate no-op because the old sqrt(h) deflation artificially suppressed the implied side of the IV-RV gap at horizons past one day."
+  ],
+  "reads": "Out-of-sample log-RV predictions per model and horizon from the tournament, plus implied-vol series, spot prices, and GSVIVS01 index levels from the data caches.",
+  "feeds": "The ranked tournament tables, metrics.json, and the interactive Plotly dashboard that every `vol run --config` invocation ends in.",
+  "key_files": [
+    {
+      "file": "statistical_tests.py",
+      "purpose": "The tournament's referee: Diebold-Mariano, Model Confidence Set, Mincer-Zarnowitz, and the ranked QLIKE table, all panel-aware."
+    },
+    {
+      "file": "economic_value.py",
+      "purpose": "Signal generation (IV-RV and Kvar-RV gaps), straddle and vol-targeting P&L, Sharpe and drawdown metrics, the GSVIVS01 backtest and its naive baselines."
+    },
+    {
+      "file": "realistic_straddle.py",
+      "purpose": "The full-cost straddle engine: gamma, vanna, volga, the Doshi spread schedule, Boyle-Emanuel hedge error, deflated Sharpe, bootstrap CIs."
+    }
+  ],
+  "concepts": [
+    "QLIKE",
+    "Diebold-Mariano test",
+    "Model Confidence Set",
+    "IV-RV gap",
+    "delta-hedged straddle",
+    "deflated Sharpe ratio"
+  ],
+  "cite": {
+    "file": "src/volforecast/evaluation/statistical_tests.py",
+    "quote": "    \"\"\"Diebold-Mariano test for equal predictive accuracy.\n\n    Tests H0: E[d_t] = 0 where d_t = L(e_1t) - L(e_2t).\n    Uses Newey-West HAC standard errors (Bartlett kernel, bandwidth h-1)\n    for multi-step forecasts per Diebold & Mariano (1995, JBES).\n\n    Note: does NOT include the Harvey, Leybourne & Newbold (1997) small-sample\n    correction factor sqrt((T + 1 - 2h + h(h-1)/T) / T). For T > 200 this\n    correction is negligible.\n\n    Sign convention: positive DM statistic means model 2 has lower loss\n    (model 2 is better).",
+    "focus": [
+      "Uses Newey-West HAC standard errors (Bartlett kernel, bandwidth h-1)",
+      "positive DM statistic means model 2 has lower loss"
+    ]
+  },
+  "caption": "Every pairwise comparison in the tournament runs through this test, panel-aware and HAC-corrected."
+}

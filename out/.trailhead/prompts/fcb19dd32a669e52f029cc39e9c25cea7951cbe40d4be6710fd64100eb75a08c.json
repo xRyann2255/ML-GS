@@ -1,0 +1,182 @@
+{
+  "unit": "node:src-volforecast-pipeline",
+  "kind": "node",
+  "title": "Drawer: pipeline",
+  "max_claims": 1,
+  "key": "fcb19dd32a669e52f029cc39e9c25cea7951cbe40d4be6710fd64100eb75a08c",
+  "system": "You are the narration stage of Trailhead, a tool that generates a verified walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Any\nquote you return is searched for verbatim in the file on disk; anything not\nfound exactly is deleted and counted on screen. Fields that fail their checks\nare dropped, and a malformed answer is discarded whole, so answer the schema\nexactly.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else. An unknown key\n   anywhere discards the whole answer.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. Where the schema allows a `cite`, its `quote` is a VERBATIM, CONTIGUOUS copy\n   of 3-24 lines from ONE file shown below, lines joined with newlines,\n   indentation copied exactly. `focus` is an array of exact substrings of your\n   own quote. A cite is optional: omitting one is honest, inventing one is not.\n4. Prose fields are plain sentences. Backticks may mark code identifiers and\n   [[term]] or [[id|label]] may mark a glossary term. No newlines inside a\n   field, no markdown links, no `<`. Use commas instead of dashes.\n5. State substantive domain facts: what a thing is FOR, what flows through it,\n   what would surprise a newcomer. Never restate code mechanics the reader can\n   see, and never present argument parsing or CLI wiring as a purpose. When the\n   README or a package docstring states the purpose, that purpose is the story.\n6. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"appears to\", say what it is.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/volforecast/pipeline/conditional_duan.py ---\n    1| \"\"\"Conditional (heteroscedastic) Duan correction — two-stage pipeline.\n    2| \n    3| Replaces the global Duan scalar with per-sample corrections estimated\n    4| from a lightweight variance model trained on OOS residuals.\n    5| \n    6| Walk-forward protocol:\n    7|   For fold k, the variance model trains on OOS residuals from folds 1..k-1.\n    8|   This ensures no information leakage — the variance estimate for a sample\n    9|   uses only temporally prior data.\n   10| \n   11| Usage:\n   12|   Called as a post-processing step AFTER all folds complete and OOS\n   ...\n   39| @dataclass\n   40| class ConditionalDuanConfig:\n   41|     \"\"\"Configuration for the conditional Duan correction stage.\"\"\"\n   42| \n   43|     enabled: bool = False\n   44|     # Variance model hyperparameters (lightweight XGBoost)\n   45|     n_estimators: int = 500\n   46|     max_leaves: int = 8\n   47|     max_depth: int = 3\n   ...\n   72|             min_child_weight=int(raw.get(\"min_child_weight\", 200)),\n   73|             subsample=float(raw.get(\"subsample\", 0.8)),\n   74|             colsample_bytree=float(raw.get(\"colsample_bytree\", 0.8)),\n   75|             reg_lambda=float(raw.get(\"reg_lambda\", 5.0)),\n   76|             max_var=float(raw.get(\"max_var\", 1.0)),\n   77|             min_folds_for_training=int(raw.get(\"min_folds_for_training\", 2)),\n   78|             use_vvix_proxy=bool(raw.get(\"use_vvix_proxy\", False)),\n   79|         )\n   80| \n   81| \n   82| def apply_conditional_duan(\n   83|     all_preds: pd.Series,\n   84|     y: pd.Series,\n   85|     X: pd.DataFrame,\n   86|     fold_splits: list[tuple[np.ndarray, np.ndarray]],\n   87|     config: ConditionalDuanConfig,\n   88| ) -> pd.Series:\n   89|     \"\"\"Apply conditional Duan correction using walk-forward variance estimation.\n   90| \n   91|     For each fold k, trains a variance model on squared OOS residuals from\n   92|     folds 1..k-1, then predicts σ²(x) for fold k's test samples and applies:\n   93| \n   94|         pred_corrected = pred_original + σ²_hat(x) / 2\n   95| \n   96|     This redistributes the correction across samples based on estimated\n   97|     conditional variance: high-uncertainty days get more, calm days get less.\n   98| \n   99|     Parameters\n  100|     ----------\n  101|     all_preds : pd.Series\n  102|         OOS predictions (already with global Duan applied). Index aligned with y.\n  103|     y : pd.Series\n  104|         Actual log-RV values.\n  105|     X : pd.DataFrame\n  106|         Feature matrix (same index as y). Used as input to variance model.\n  107|         If VVIX proxy mode is enabled, must contain a 'vvix' column.\n  108|     fold_splits : list of (train_idx, test_idx)\n  109|         The CV fold splits used in Stage 1.\n  110|     config : ConditionalDuanConfig\n  111|         Variance model configuration.\n  112| \n  113|     Returns\n  114|     -------\n  115|     pd.Series\n  116|         Corrected predictions (same index as input all_preds, NaN where\n  117|         original was NaN).\n  118|     \"\"\"\n  119|     import xgboost as xgb\n  120| \n  121|     logger.info(\n  122|         \"Conditional Duan: enabled=%s, use_vvix_proxy=%s, \"\n  123|         \"n_folds=%d, X_shape=%s, n_preds_valid=%d\",\n  124|         config.enabled, config.use_vvix_proxy,\n  125|         len(fold_splits), X.shape,\n  126|         int(all_preds.notna().sum()),\n  127|     )\n  128| \n  129|     # VVIX direct proxy mode: skip second model, use VVIX as σ² proxy\n  130|     if config.use_vvix_proxy:\n  131|         # Look for vvix column (raw or decimal)\n   ...\n  292| def _apply_vvix_proxy(\n  293|     all_preds: pd.Series,\n  294|     y: pd.Series,\n  295|     X: pd.DataFrame,\n  296|     fold_splits: list[tuple[np.ndarray, np.ndarray]],\n  297|     config: ConditionalDuanConfig,\n  298|     vvix_col: str = \"vvix\",\n  299| ) -> pd.Series:\n  300|     \"\"\"VVIX direct proxy mode: use VVIX as conditional variance estimate.\n\n--- src/volforecast/pipeline/feature_selection.py ---\n    1| \"\"\"SHAP-based feature selection for LightGBM models.\n    2| \n    3| Implements Boruta-style shadow-feature thresholding using TreeSHAP values\n    4| computed on out-of-sample validation data. Runs inside each outer CV fold\n    5| to prevent data leakage.\n    6| \n    7| Algorithm:\n    8| 1. Fit full-feature LightGBM on training data\n    9| 2. Compute TreeSHAP on validation split (OOS from trees)\n   10| 3. Generate shadow features (random permutations of real columns)\n   11| 4. threshold = max(shadow mean|SHAP|) * threshold_multiplier\n   12| 5. Keep features where mean|SHAP| > threshold (subject to min_features)\n   ...\n   17| import logging\n   18| from dataclasses import dataclass, field\n   19| from typing import Any\n   20| \n   21| import numpy as np\n   22| import pandas as pd\n   23| \n   24| logger = logging.getLogger(__name__)\n   25| \n   26| \n   27| @dataclass\n   28| class SelectionResult:\n   29|     \"\"\"Result of SHAP feature selection for one CV fold.\"\"\"\n   30| \n   31|     selected_features: list[str]\n   32|     dropped_features: list[str]\n   33|     feature_importances: dict[str, float]  # mean |SHAP| per feature\n   34|     shadow_threshold: float\n   35|     n_rounds: int\n   36|     round_history: list[dict[str, Any]] = field(default_factory=list)\n   37| \n   38| \n   39| def select_features(\n   40|     model_cls: type,\n   41|     model_params: dict[str, Any],\n   42|     X_train: pd.DataFrame,\n   43|     y_train: pd.Series,\n   44|     config: Any,\n   45|     seed: int = 42,\n   46| ) -> SelectionResult:\n   47|     \"\"\"Run SHAP-based feature selection on a single CV fold.\n   ...\n  162| def _compute_shap(\n  163|     model: Any,\n  164|     X_val: pd.DataFrame,\n  165|     max_samples: int,\n  166|     seed: int,\n  167| ) -> np.ndarray | None:\n  168|     \"\"\"Compute TreeSHAP values, returning array of shape (n_samples, n_features).\"\"\"\n  169|     try:\n  170|         import shap\n   ...\n  192| def _compute_shadow_threshold(\n  193|     model_cls: type,\n  194|     model_params: dict[str, Any],\n  195|     X_fit: pd.DataFrame,\n  196|     y_fit: pd.Series,\n  197|     X_val: pd.DataFrame,\n  198|     current_features: list[str],\n  199|     n_shadow: int,\n  200|     shap_samples: int,\n   ...\n  270| def aggregate_fold_selections(\n  271|     fold_results: list[SelectionResult],\n  272|     stability_threshold: float = 0.8,\n  273| ) -> dict[str, Any]:\n  274|     \"\"\"Aggregate feature selection results across CV folds.\n  275| \n  276|     Parameters\n  277|     ----------\n  278|     fold_results : list of SelectionResult\n\n--- src/volforecast/pipeline/fold_cache.py ---\n    1| \"\"\"Per-fold training cache for sequence models (LSTM/TCN).\n    2| \n    3| Skips fold-level training when an identical fold has already been trained\n    4| under the same config + data + CV split + base-model predictions. Cache is\n    5| keyed on a deterministic fingerprint of every input that affects the trained\n    6| model's outputs, so any change (model params, sequence features, train dates,\n    7| base preds) invalidates the relevant entries automatically.\n    8| \n    9| Storage layout (under ``data/models/lstm_cache/{config_fp16}/{cache_key}/``):\n   10|   - ``preds.npy``  — final test predictions (Duan correction already applied)\n   11|   - ``model.pt``   — fitted model state (best-effort; absent if save fails)\n   12|   - ``meta.json``  — fold metadata + Duan correction + diagnostic info\n   ...\n   44| def _hash_dates(dates: pd.DatetimeIndex) -> str:\n   45|     \"\"\"Stable 16-hex hash of a date index (order-independent, dedup'd).\"\"\"\n   46|     unique_iso = sorted({pd.Timestamp(d).isoformat() for d in dates})\n   47|     payload = \";\".join(unique_iso).encode(\"utf-8\")\n   48|     return hashlib.sha256(payload).hexdigest()[:16]\n   49| \n   50| \n   51| def _hash_array(arr: np.ndarray | None) -> str:\n   52|     \"\"\"Stable 16-hex hash of a numpy array (or ``\"none\"`` when ``arr is None``).\"\"\"\n   53|     if arr is None:\n   54|         return \"none\"\n   55|     arr = np.ascontiguousarray(np.asarray(arr, dtype=np.float64))\n   56|     return hashlib.sha256(arr.tobytes()).hexdigest()[:16]\n   57| \n   58| \n   59| def resolve_cache_root(\n   60|     config: ExperimentConfig | None = None,\n   61|     cache_root: Path | None = None,\n   62| ) -> Path:\n   63|     \"\"\"Resolve the on-disk cache root directory.\n   64| \n   65|     Priority: explicit ``cache_root`` arg > ``config.fold_cache_dir`` >\n   66|     ``data/models/lstm_cache``.\n   67|     \"\"\"\n   68|     if cache_root is not None:\n   69|         return Path(cache_root)\n   70|     if config is not None and getattr(config, \"fold_cache_dir\", None):\n   71|         return Path(config.fold_cache_dir)  # type: ignore[arg-type]\n   72|     return models_dir() / \"lstm_cache\"\n   73| \n   74| \n   75| def config_subdir(config: ExperimentConfig) -> str:\n   76|     \"\"\"Short config-fingerprint directory name (groups all folds for one config).\"\"\"\n   77|     from volforecast.utils.persistence import _config_fingerprint\n   78| \n   79|     return _config_fingerprint(config)[:16]\n   80| \n   81| \n   82| def compute_fold_cache_key(\n   83|     config: ExperimentConfig,\n   84|     h: int,\n   85|     fold_num: int,\n   86|     train_dates: pd.DatetimeIndex,\n   87|     test_dates: pd.DatetimeIndex,\n   88|     *,\n   89|     base_preds_train: np.ndarray | None = None,\n   90|     base_preds_test: np.ndarray | None = None,\n   ...\n  113| def fold_cache_dir(\n  114|     config: ExperimentConfig, key: str, cache_root: Path | None = None\n  115| ) -> Path:\n  116|     \"\"\"Return the directory holding one fold's cached artifacts.\"\"\"\n  117|     return resolve_cache_root(config, cache_root) / config_subdir(config) / key\n   ...\n  125| def _atomic_write_bytes(path: Path, data: bytes) -> None:\n  126|     path.parent.mkdir(parents=True, exist_ok=True)\n  127|     fd, tmp = tempfile.mkstemp(suffix=\".tmp\", dir=str(path.parent))\n  128|     try:\n  129|         os.close(fd)\n  130|         with open(tmp, \"wb\") as f:\n  131|             f.write(data)\n  132|         os.replace(tmp, path)\n  133|     except BaseException:\n   ...\n  139| def _serialize_npy(arr: np.ndarray) -> bytes:\n  140|     buf = io.BytesIO()\n  141|     np.save(buf, arr)\n  142|     return buf.getvalue()\n   ...\n  150| @dataclass\n  151| class FoldCacheEntry:\n  152|     preds: np.ndarray  # final test predictions (Duan correction already applied)\n  153|     duan_correction: float\n  154|     model_path: Path | None\n  155|     meta: dict\n  156| \n  157| \n  158| def save_fold_cache(\n  159|     *,\n  160|     config: ExperimentConfig,\n  161|     key: str,\n  162|     preds: np.ndarray,\n  163|     duan_correction: float,\n  164|     model: object | None,\n  165|     train_dates: pd.DatetimeIndex,\n  166|     test_dates: pd.DatetimeIndex,\n   ...\n  217| def load_fold_cache(\n  218|     *,\n  219|     config: ExperimentConfig,\n  220|     key: str,\n  221|     cache_root: Path | None = None,\n  222| ) -> FoldCacheEntry | None:\n  223|     \"\"\"Return the cached entry for ``key``, or ``None`` on miss / corruption.\"\"\"\n  224|     target = fold_cache_dir(config, key, cache_root=cache_root)\n  225|     meta_path = target / \"meta.json\"\n   ...\n  250| def list_cached_folds(\n  251|     config: ExperimentConfig | None = None,\n  252|     cache_root: Path | None = None,\n  253| ) -> list[dict]:\n  254|     \"\"\"Inventory of cached fold entries (optionally filtered by config).\"\"\"\n  255|     root = resolve_cache_root(config, cache_root)\n  256|     if not root.exists():\n  257|         return []\n  258|     entries: list[dict] = []\n   ...\n  293| def clear_fold_cache(\n  294|     config: ExperimentConfig | None = None,\n  295|     cache_root: Path | None = None,\n  296| ) -> int:\n  297|     \"\"\"Delete cached entries for ``config`` (or the whole cache when ``config`` is None).\n  298| \n  299|     Returns the number of fold directories removed.\n  300|     \"\"\"\n  301|     root = resolve_cache_root(config, cache_root)\n\n--- src/volforecast/pipeline/__init__.py ---\n    1| \"\"\"Pipeline orchestration for ML vol forecasting.\n    2| \n    3| CLI entry points have moved to volforecast.cli.\n    4| This package retains only the orchestration runner.\n    5| \"\"\"\n\n--- README.md ---\n    1| # ml-vol-estimator\n    2| \n    3| ML realized volatility forecasting — signal discovery. Progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to produce statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.\n    4| \n    5| **Timeline:** ~20-week internship, May–Sep 2026.\n    6| \n    7| ---\n    8| \n    9| ## Quick Start\n   10| \n   11| 1. Open `ml-vol-estimator.code-workspace` in VS Code.\n   12| 2. Boot protocol loads automatically: `memory/person/user.md` + `memory/INDEX.md`.\n   13| 3. Use `/bootup` to start a session — it reads the research journal and orients you.\n   14| 4. Drive work with slash commands: `/research`, `/feature`, `/experiment`, `/backtest`.\n   15| \n   16| See [AGENTS.md](AGENTS.md) for the full project spec, and [workspace/docs/user-manual.md](workspace/docs/user-manual.md) for all commands.\n   17| \n   18| ---\n   19| \n   20| ## CLI\n   21| \n   22| The `vol` wrapper handles uv, PATH, and working directory internally.\n   23| \n   24| ### Wrapper Commands\n   25| \n   26| ```\n   27| vol test [args]               # pytest (extra args forwarded: -k, -v, --tb=short)\n   28| vol testlf [args]             # re-run last-failed tests only\n   29| vol run --config <yaml>       # primary entry point (see below)\n   30| vol status                    # show data ingestion manifest\n   31| vol lint                      # ruff check (read-only)\n   32| vol fmt                       # ruff auto-format\n   33| vol typecheck                 # mypy\n   34| vol sync                      # install/update deps\n   35| vol shell                     # REPL with volforecast importable\n   36| vol notebook                  # jupyter\n   37| vol help                      # usage\n   38| ```\n   39| \n   40| ### Primary Command: `vol run --config <yaml>`\n   41| \n   42| Every `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).\n   43| \n   44| Optional overrides: `--symbols SPY,AAPL` (override YAML universe), `--skip-ingest` (skip data fetch), `--workers 8` (thread count).\n   45| \n   46| ### Examples\n   47| \n   48| ```bash\n   49| # Single-model experiment (ingest + train + evaluate + dashboard)\n   50| vol run --config workspace/configs/baseline_har.yaml\n   51| \n   52| # Tournament: 13 models compared with statistical tests\n   53| vol run --config workspace/configs/tournament_full_spy.yaml\n   54| \n   55| # Skip ingestion (data already cached), subset of symbols\n   56| vol run --config workspace/configs/tournament_har_dev.yaml --skip-ingest --symbols SPY,AAPL\n   57| \n   58| # Ingest only\n   59| vol run --config workspace/configs/ingest_full_universe.yaml --workers 8\n   60| \n\nTASK: Drawer: pipeline\nFill the drawer for this module group. Return a JSON object with:\n  role: 2 or 3 short paragraphs saying what this group IS and DOES in\n        domain terms, and what is distinctive about how it does it.\n  reads: one sentence, what this group consumes and where it comes from.\n  feeds: one sentence, what depends on this group's output.\n  key_files: 3 to 6 entries; 'file' is copied exactly from the FILES\n        list below and 'purpose' is one line saying why a newcomer\n        would open that file.\n  concepts: 3 to 6 short terms a newcomer should recognise here.\n  cite (optional): one verbatim quote of 3-24 contiguous lines from\n        the source shown above that best captures this group, with an\n        optional one-line caption.\n\nGROUP: pipeline at src/volforecast/pipeline: 6 files, 1307 loc.\nFILES you may name in key_files (copy the name exactly):\n  - conditional_duan.py (src/volforecast/pipeline/conditional_duan.py)\n  - feature_selection.py (src/volforecast/pipeline/feature_selection.py)\n  - fold_cache.py (src/volforecast/pipeline/fold_cache.py)\n  - __init__.py (src/volforecast/pipeline/__init__.py)",
+  "windows": [
+    {
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "start": 39,
+      "end": 47
+    },
+    {
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "start": 72,
+      "end": 131
+    },
+    {
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "start": 292,
+      "end": 300
+    },
+    {
+      "file": "src/volforecast/pipeline/feature_selection.py",
+      "start": 17,
+      "end": 47
+    },
+    {
+      "file": "src/volforecast/pipeline/feature_selection.py",
+      "start": 162,
+      "end": 170
+    },
+    {
+      "file": "src/volforecast/pipeline/feature_selection.py",
+      "start": 192,
+      "end": 200
+    },
+    {
+      "file": "src/volforecast/pipeline/feature_selection.py",
+      "start": 270,
+      "end": 278
+    },
+    {
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 44,
+      "end": 90
+    },
+    {
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 113,
+      "end": 117
+    },
+    {
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 125,
+      "end": 133
+    },
+    {
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 139,
+      "end": 142
+    },
+    {
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 150,
+      "end": 166
+    },
+    {
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 217,
+      "end": 225
+    },
+    {
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 250,
+      "end": 258
+    },
+    {
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 293,
+      "end": 301
+    },
+    {
+      "file": "README.md",
+      "start": 13,
+      "end": 60
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "role",
+      "reads",
+      "feeds",
+      "key_files",
+      "concepts"
+    ],
+    "properties": {
+      "role": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 3,
+        "items": {
+          "type": "string",
+          "maxLength": 600
+        }
+      },
+      "reads": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "feeds": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "key_files": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file",
+            "purpose"
+          ],
+          "properties": {
+            "file": {
+              "type": "string",
+              "enum": [
+                "conditional_duan.py",
+                "feature_selection.py",
+                "fold_cache.py",
+                "__init__.py"
+              ]
+            },
+            "purpose": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "concepts": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "string",
+          "maxLength": 60
+        }
+      },
+      "cite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "caption": {
+        "type": "string",
+        "maxLength": 200
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\fcb19dd32a669e52f029cc39e9c25cea7951cbe40d4be6710fd64100eb75a08c.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\fcb19dd32a669e52f029cc39e9c25cea7951cbe40d4be6710fd64100eb75a08c.json"
+}

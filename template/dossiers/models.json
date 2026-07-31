@@ -1,0 +1,304 @@
+{
+  "area": "models",
+  "overview": "This area is the model zoo of the volforecast package: every forecasting model the pipeline can run, all speaking one contract so the walk-forward evaluation harness can treat a naive random walk and a graph attention network identically. A model is a class registered under a string name in MODEL_REGISTRY via the register_model decorator; volforecast.registry.ensure_registered() imports each module once so the decorators fire. All models inherit _BaseModel, which declares which feature layers the model needs (REQUIRED_LAYERS, default har_core), capability flags (supports_tuning, supports_fit_progress, supports_shap_selection, accepts_gpu_device, requires_sequences, and requires_graph on the graph models), plus joblib save/load. Prediction happens in log-RV space throughout, and essentially every trainable model optimizes QLIKE directly: LightGBM and XGBoost through hand-derived gradient and hessian custom objectives, the torch graph models through a shared _qlike_loss in gnn.py. The families: nine naive baselines that set the QLIKE floor (random walk, historical mean, rolling mean, median, EWMA, AR1, VIX-implied, ATM-IV-implied); the linear HAR family built on _BaseOLS with deterministic alpha grid tuning (its registration file har_family.py is missing from this restore); gradient boosting (lightgbm, lightgbm_dart, xgboost); a seven-model graph suite (gnn, ghar, gnnhar, dcrnn_har, stid, gsp_har, gnn_learned) built for careful attribution, where linear and edge-free controls nest the fancier models; and five ensembles or meta-models (lightgbm_bagged, lightgbm_calibrated, stacking_har_lgbm, regime_blend, blend). Optional pip extras gate the heavy dependencies: ml for boosted trees plus Optuna and SHAP, gpu for torch, graph for torch-geometric. Three import targets are confirmed missing in the restore (models/har_family.py, models/lstm.py, volforecast/config.py), so ensure_registered() would currently raise ImportError.",
+  "modules": [
+    {
+      "path": "src/volforecast/registry.py",
+      "role": "Holds the three global registries (MODEL_REGISTRY, FEATURE_REGISTRY, GRAPH_REGISTRY) and the decorator functions that populate them, raising on duplicate names. ensure_registered() imports every feature, model and graph module exactly once so decorator-based registration fires; the gnn import is wrapped in try/except ImportError so CPU-only installs without torch still register the rest of the zoo. Note that it imports volforecast.models.har_family and volforecast.models.lstm, both absent from this restore, so ensure_registered() fails on this snapshot before reaching the graph model imports.",
+      "key_files": [
+        { "file": "registry.py", "purpose": "Decorator-based registries mapping model, feature-layer and graph-builder names to classes." }
+      ],
+      "concepts": ["registry pattern", "decorator registration", "optional torch dependency"]
+    },
+    {
+      "path": "src/volforecast/models/",
+      "role": "The full model zoo: 24 registered model names across naive baselines, gradient boosting, graph neural models and ensembles, all inheriting the _BaseModel fit/predict contract defined in _base.py. Tabular models consume feature-layer DataFrames declared in REQUIRED_LAYERS; graph models set requires_graph = True and consume lists of per-date graph-dict snapshots built by gnn_adjacency.py from rolling realized correlations; sequence models would set requires_sequences = True and receive a SequenceTensor, but the LSTM file itself is missing from the restore. Nearly every trainable model optimizes QLIKE in log-RV space, so training loss equals the evaluation metric. The graph suite is engineered for attribution: ghar and gnnhar nest pooled HAR when the adjacency is zero, gsp_har nests QLIKE-HAR at initialization, and stid is an edges-ignored deflation control. Tuning is split by family: deterministic alpha grids for linear models (linear_tuning.py), Optuna for LightGBM, and multi-GPU Optuna harnesses for LSTM and GNN (lstm_tuning.py, gnn_tuning.py). The zoo feeds the pipeline runner and evaluation stack; gsvivs_classifier.py additionally turns the machinery into a precision-optimized trading signal on the GSVIVS01 index.",
+      "key_files": [
+        { "file": "__init__.py", "purpose": "Re-exports MODEL_REGISTRY and register_model as the package's public surface." },
+        { "file": "_base.py", "purpose": "_BaseModel root contract (save/load, capability flags, tune_and_fit hook), _BaseOLS for the linear HAR family, and the temporal_holdout_split helper." },
+        { "file": "naive.py", "purpose": "Nine zero-or-minimal-parameter baselines that set the QLIKE floor, from random walk to VIX-implied and per-symbol ATM-IV-implied forecasts." },
+        { "file": "linear_tuning.py", "purpose": "Deterministic Optuna-free alpha and l1_ratio grid search for ridge, lasso and elasticnet HAR variants on inner expanding-window CV." },
+        { "file": "lightgbm.py", "purpose": "LightGBM regressor with custom QLIKE objective, Optuna tuning, TreeSHAP selection, plus the lightgbm_dart dropout variant." },
+        { "file": "xgboost.py", "purpose": "XGBoost twin of the LightGBM model with the same QLIKE custom objective, an optional mse objective, and a residual-on-base-model mode." },
+        { "file": "ensemble.py", "purpose": "lightgbm_bagged K-seed bagging ensemble that averages members in log-RV space to shrink the seed-noise envelope." },
+        { "file": "calibrated.py", "purpose": "lightgbm_calibrated: post-hoc affine recalibration learned on a purged temporal holdout to fix QLIKE level bias." },
+        { "file": "stacking.py", "purpose": "stacking_har_lgbm: Ridge meta-learner over HAR and LightGBM predictions to combine discrimination with calibrated levels." },
+        { "file": "regime_blend.py", "purpose": "regime_blend: HAR plus LightGBM blend with regime-dependent weights switched on a log_rv_w percentile threshold." },
+        { "file": "blend.py", "purpose": "Generic prediction-level blend of registry sub-models with weights calibrated on a temporal holdout per BlendConfig." },
+        { "file": "gnn.py", "purpose": "gnn: GATv2 graph attention network over per-date correlation graph snapshots, plus the shared QLIKE loss and device helpers used by all torch graph models." },
+        { "file": "gnn_adjacency.py", "purpose": "Builds cached sparse edge tensors from rolling realized correlation with a causal window and absolute-correlation threshold." },
+        { "file": "ghar.py", "purpose": "ghar: pooled-OLS linear graph HAR whose zero-adjacency case recovers pooled HAR exactly, isolating the graph's contribution." },
+        { "file": "gnnhar.py", "purpose": "gnnhar: nonlinear one-hop GCN spillover channel plus linear HAR readout with per-asset intercepts and multi-seed prediction averaging." },
+        { "file": "dcrnn_har.py", "purpose": "dcrnn_har: diffusion-convolutional GRU (Li et al. 2018) over sequences of graph snapshots with a jointly trained HAR skip channel." },
+        { "file": "stid.py", "purpose": "stid: per-node identity embedding plus MLP deflation control that runs the graph harness while ignoring edges entirely." },
+        { "file": "gsp_har.py", "purpose": "gsp_har: magnetic Laplacian spectral filter model (Chi, Gao and Wang 2024) with per-refit-block eigendecomposition caching." },
+        { "file": "gnn_learned.py", "purpose": "gnn_learned: MTGNN-style learned directed adjacency with row-wise top-k sparsification feeding a one-hop GCN body." },
+        { "file": "gnn_tuning.py", "purpose": "Optuna multi-GPU tuning harness for the GATv2 and GNNHAR search spaces, coordinated via JournalStorage." },
+        { "file": "lstm_tuning.py", "purpose": "Optuna multi-GPU tuning harness for the LSTM sequence model (whose lstm.py implementation is missing from the restore)." },
+        { "file": "gsvivs_classifier.py", "purpose": "Unregistered LightGBM binary classifier producing a precision-optimized short signal on GSVIVS01 index drawdowns." }
+      ],
+      "concepts": ["realized volatility", "QLIKE", "HAR", "gradient boosting", "graph neural networks", "volatility spillovers", "ensembling", "hyperparameter tuning", "naive baselines"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "Every model self-registers under a string name into MODEL_REGISTRY through the register_model class decorator, so the pipeline can instantiate any of the 24 names registered across the models package from configuration alone.",
+      "file": "src/volforecast/registry.py",
+      "start": 66,
+      "end": 83,
+      "focus": [79],
+      "quote": "        MODEL_REGISTRY[name] = cls"
+    },
+    {
+      "text": "The registry imports the GNN module inside a try/except ImportError so a CPU-only install without torch still registers the rest of the model zoo, with torch_geometric deferred until GNN construction.",
+      "file": "src/volforecast/registry.py",
+      "start": 40,
+      "end": 58,
+      "focus": [48, 49, 50],
+      "quote": "    except ImportError:\n        # torch missing; torch_geometric imports lazily inside gnn.py\n        # (its absence surfaces later, at GNN construction)."
+    },
+    {
+      "text": "All models inherit _BaseModel, which declares the feature layers a model needs (default har_core), capability flags for tuning, fit progress, TreeSHAP selection and GPU device, and joblib save/load, giving every family one shared fit/predict contract.",
+      "file": "src/volforecast/models/_base.py",
+      "start": 18,
+      "end": 36,
+      "focus": [21, 22],
+      "quote": "    REQUIRED_LAYERS: list[str] = [\"har_core\"]\n    supports_tuning: bool = False"
+    },
+    {
+      "text": "Linear HAR-family models share _BaseOLS, which restricts the design matrix to a declared feature list, masks NaN rows, drops all-NaN columns, and exposes alpha and l1_ratio grid hooks for ridge, lasso and elasticnet variants.",
+      "file": "src/volforecast/models/_base.py",
+      "start": 101,
+      "end": 114,
+      "focus": [101, 102],
+      "quote": "class _BaseOLS(_BaseModel):\n    \"\"\"OLS/regularized regression models (HAR family).\"\"\""
+    },
+    {
+      "text": "Regularized HAR variants are tuned by a deterministic, Optuna-free grid search that scores every alpha and l1_ratio combination on an inner expanding-window CV using the same QLIKE plus Duan-correction protocol as the outer evaluation.",
+      "file": "src/volforecast/models/linear_tuning.py",
+      "start": 1,
+      "end": 14,
+      "focus": [3, 4, 5, 6],
+      "quote": "Optuna-free hyperparameter search for Ridge/Lasso/ElasticNet HAR variants.\nCalled from _BaseOLS.tune_and_fit inside each outer CV fold: scores every\n(alpha, l1_ratio) combination on an inner expanding-window CV using the same\nQLIKE + Duan-correction protocol as the outer evaluation, then returns the"
+    },
+    {
+      "text": "LightGBM trains directly on the QLIKE loss in log-RV space through a custom objective with analytic gradient 1 - exp(y_true - y_pred) and hessian exp(y_true - y_pred), so trees split to minimize the vol forecaster's actual evaluation metric.",
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 72,
+      "end": 95,
+      "focus": [75, 76, 77],
+      "quote": "    Log-space QLIKE: L = exp(y_true - y_pred) - (y_true - y_pred) - 1\n    gradient (dL/dy_pred) = 1 - exp(y_true - y_pred)\n    hessian  (d²L/dy_pred²) = exp(y_true - y_pred)"
+    },
+    {
+      "text": "The lightgbm model consumes six feature layers (har_core, asymmetry, noise_robust, options, calendar, tree_expansion) and is the most capable model in the zoo, with Optuna tuning, fit progress callbacks, TreeSHAP feature selection and GPU device selection all enabled.",
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 155,
+      "end": 175,
+      "focus": [160, 161, 162, 163, 164, 165, 166, 167],
+      "quote": "    REQUIRED_LAYERS = [\n        \"har_core\",\n        \"asymmetry\",\n        \"noise_robust\",\n        \"options\",\n        \"calendar\",\n        \"tree_expansion\",\n    ]"
+    },
+    {
+      "text": "lightgbm_dart subclasses the LightGBM model with DART dropout regularization to produce less overconfident volatility predictions, carrying its own shallower default parameter set.",
+      "file": "src/volforecast/models/lightgbm.py",
+      "start": 1163,
+      "end": 1183,
+      "focus": [1164, 1165, 1166],
+      "quote": "@register_model(\"lightgbm_dart\")\nclass DARTVolModel(LightGBMVolModel):\n    \"\"\"LightGBM DART variant: dropout regularization for less overconfident predictions.\"\"\""
+    },
+    {
+      "text": "xgboost is a parallel gradient-boosted tree implementation with the same QLIKE custom objective and the same six required feature layers, letting the pipeline cross-check LightGBM results against an independent boosting library.",
+      "file": "src/volforecast/models/xgboost.py",
+      "start": 106,
+      "end": 129,
+      "focus": [106, 107, 108],
+      "quote": "@register_model(\"xgboost\")\nclass XGBoostVolModel(_BaseModel):\n    \"\"\"XGBoost model for realized volatility forecasting."
+    },
+    {
+      "text": "Nine naive baselines (random_walk alias same_day_rv, historical_mean, rolling_mean, median_rv, ewma, ar1, vix_implied, atm_iv_implied) implement the same fit/predict interface with zero or minimal training and set the QLIKE floor any useful model must beat.",
+      "file": "src/volforecast/models/naive.py",
+      "start": 1,
+      "end": 14,
+      "focus": [3, 4, 5],
+      "quote": "These implement the fit/predict interface but require no training or minimal\ntraining (just computing a mean). They provide a floor for QLIKE comparison:\nany useful model must beat these."
+    },
+    {
+      "text": "The ewma baseline is the RiskMetrics estimator with lambda 0.94, recursively updating ewma_t = lambda * ewma_{t-1} + (1 - lambda) * log_rv_{t-1} through the test period.",
+      "file": "src/volforecast/models/naive.py",
+      "start": 126,
+      "end": 141,
+      "focus": [130, 131],
+      "quote": "    Uses lambda=0.94 (JP Morgan 1996 standard). At each test point, the\n    forecast is: ewma_t = lambda * ewma_{t-1} + (1 - lambda) * log_rv_{t-1}."
+    },
+    {
+      "text": "vix_implied converts the option market's VIX quote straight into a daily variance forecast via log_rv = 2*log(VIX/100) - log(252), a zero-parameter benchmark of implied against realized volatility.",
+      "file": "src/volforecast/models/naive.py",
+      "start": 216,
+      "end": 230,
+      "focus": [222],
+      "quote": "    The forecast: log_rv = 2*log(VIX/100) - log(252)."
+    },
+    {
+      "text": "The gnn model treats each trading date as one graph snapshot with symbols as nodes and rolling-correlation edges, learning with GATv2 attention how volatility spills across the asset network rather than through time.",
+      "file": "src/volforecast/models/gnn.py",
+      "start": 196,
+      "end": 215,
+      "focus": [200, 201],
+      "quote": "    Operates on graph snapshots: each date = one graph with N nodes\n    (symbols) and edges from rolling correlation. Integrates with the"
+    },
+    {
+      "text": "gnnhar implements the nonlinear graph HAR of Zhang, Pu, Cucuringu and Dong 2025: a GCN spillover channel with no self-loops plus a linear HAR channel, defaulting to the paper's hidden dimension of 9.",
+      "file": "src/volforecast/models/gnnhar.py",
+      "start": 105,
+      "end": 128,
+      "focus": [117],
+      "quote": "    description = \"GNNHAR: no-self-loop GCN spillover channel + linear HAR channel\""
+    },
+    {
+      "text": "stid is a deliberate deflation control, per-node identity embeddings plus an MLP that ignores graph edges, so if it matches gnnhar the honest conclusion is that pooling plus asset identity suffices, not that spillovers matter.",
+      "file": "src/volforecast/models/stid.py",
+      "start": 1,
+      "end": 14,
+      "focus": [6, 7, 8],
+      "quote": "consuming the same graph-dict harness but ignoring edges entirely. If STID\nmatches GNNHAR, the honest conclusion is \"pooling + asset identity suffices\",\nnot \"spillovers matter\"."
+    },
+    {
+      "text": "gsp_har applies a learnable complex spectral filter in the eigenbasis of a magnetic Laplacian (Chi, Gao and Wang 2024) on top of a linear HAR channel, with the filter initialized to zero so the model nests QLIKE-HAR at initialization.",
+      "file": "src/volforecast/models/gsp_har.py",
+      "start": 97,
+      "end": 112,
+      "focus": [111],
+      "quote": "    description = \"GSP-HAR: magnetic Laplacian spectral filter + linear HAR channel\""
+    },
+    {
+      "text": "gnn_learned ignores the input graph entirely and learns a directed sparse adjacency end-to-end from node embeddings using the MTGNN graph-learning layer with row-wise top-k sparsification.",
+      "file": "src/volforecast/models/gnn_learned.py",
+      "start": 121,
+      "end": 136,
+      "focus": [135],
+      "quote": "    description = \"GNN learned adjacency: MTGNN graph-learning + one-hop GCN body\""
+    },
+    {
+      "text": "lightgbm_bagged averages K seed-varied LightGBM fits because the trial-047 reseed study measured a 6.6 bps seed envelope at h=1, meaning single-seed feature-engineering deltas under roughly 10 bps are indistinguishable from seed noise.",
+      "file": "src/volforecast/models/ensemble.py",
+      "start": 31,
+      "end": 48,
+      "focus": [43, 44, 45],
+      "quote": "    The trial-047 reseed baseline measured a 6.6 bps seed envelope at h=1\n    on the trial-036 champion spec. Single-seed numbers are inside this noise\n    floor, so feature-engineering deltas <~10 bps cannot be distinguished"
+    },
+    {
+      "text": "regime_blend encodes the 2026-05-27 research finding that the optimal HAR weight in a HAR plus LightGBM blend is massively regime-dependent at h=22: about 0.05 in low-vol regimes where LightGBM dominates but about 0.80 in high-vol regimes where HAR dominates.",
+      "file": "src/volforecast/models/regime_blend.py",
+      "start": 1,
+      "end": 17,
+      "focus": [3, 4, 5, 6],
+      "quote": "Research finding (2026-05-27): Optimal blend weight is massively\nregime-dependent at h=22:\n  - Low-vol: LightGBM dominates (optimal HAR weight ~0.05)\n  - High-vol: HAR dominates (optimal HAR weight ~0.80)"
+    },
+    {
+      "text": "The graph models require the optional graph extra (torch plus torch-geometric 2.4 or newer), while the boosted-tree and tuning stack ships in the ml extra (lightgbm, xgboost, optuna, shap) and torch training in the gpu extra.",
+      "file": "src/pyproject.toml",
+      "start": 28,
+      "end": 47,
+      "focus": [44, 45, 46],
+      "quote": "graph = [\n    \"torch>=1.12\",\n    \"torch-geometric>=2.4\","
+    }
+  ],
+  "glossary": [
+    {
+      "term": "QLIKE",
+      "definition": "Quasi-likelihood loss for variance forecasts; in log-RV space L = exp(y_true - y_pred) - (y_true - y_pred) - 1, which penalizes under-predicting volatility more than over-predicting it.",
+      "file": "src/volforecast/models/lightgbm.py",
+      "line": 75
+    },
+    {
+      "term": "HAR",
+      "definition": "Heterogeneous autoregressive model: regresses future realized volatility on daily, weekly and monthly RV lags, the standard linear benchmark in vol forecasting.",
+      "file": "src/volforecast/models/naive.py",
+      "line": 176
+    },
+    {
+      "term": "MODEL_REGISTRY",
+      "definition": "Global dict mapping model name strings to model classes, populated by the register_model decorator when ensure_registered() imports the model modules.",
+      "file": "src/volforecast/registry.py",
+      "line": 5
+    },
+    {
+      "term": "requires_graph",
+      "definition": "Class flag telling the pipeline runner to dispatch per-date graph snapshots (node features plus edge tensors) instead of tabular features to this model.",
+      "file": "src/volforecast/models/gnn.py",
+      "line": 210
+    },
+    {
+      "term": "SequenceTensor",
+      "definition": "The per-symbol history tensor fed to sequence-first models when requires_sequences is True, replacing the tabular DataFrame path in the runner.",
+      "file": "src/volforecast/models/_base.py",
+      "line": 26
+    },
+    {
+      "term": "EWMA (RiskMetrics)",
+      "definition": "Exponentially weighted moving average of log-RV with lambda 0.94, the 1996 JP Morgan RiskMetrics standard, used here as a naive baseline.",
+      "file": "src/volforecast/models/naive.py",
+      "line": 128
+    },
+    {
+      "term": "GATv2",
+      "definition": "Graph attention convolution that learns attention weights over neighboring assets; the gnn model stacks two GATv2Conv layers with multi-head attention.",
+      "file": "src/volforecast/models/gnn.py",
+      "line": 7
+    },
+    {
+      "term": "Magnetic Laplacian",
+      "definition": "A complex-valued graph Laplacian whose phase encodes edge direction, giving gsp_har a spectral basis for directed volatility spillover graphs.",
+      "file": "src/volforecast/models/gsp_har.py",
+      "line": 1
+    },
+    {
+      "term": "Variance risk premium",
+      "definition": "The systematic gap by which option-implied volatility exceeds subsequently realized volatility, making IV a biased but informative RV predictor.",
+      "file": "src/volforecast/models/naive.py",
+      "line": 272
+    },
+    {
+      "term": "Seed envelope",
+      "definition": "The spread of QLIKE scores across retrainings that differ only in random seed; measured at 6.6 bps at h=1, it sets the noise floor for judging feature changes.",
+      "file": "src/volforecast/models/ensemble.py",
+      "line": 43
+    },
+    {
+      "term": "Deflation control",
+      "definition": "A baseline deliberately stripped of the mechanism under test (for stid, the graph edges) so that gains claimed for that mechanism can be attributed honestly.",
+      "file": "src/volforecast/models/stid.py",
+      "line": 5
+    }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "Nearly every trainable model in the zoo optimizes the same loss during training. Which one?",
+      "options": ["Mean squared error", "QLIKE", "Mean absolute error", "Huber"],
+      "answer": 1,
+      "provenance": "qlike_objective docstring at src/volforecast/models/lightgbm.py:75 and _qlike_loss at src/volforecast/models/gnn.py:48-52",
+      "explanation": "LightGBM and XGBoost use hand-derived QLIKE gradients and hessians as custom objectives, and the torch graph models share a _qlike_loss, so training loss matches the pipeline's evaluation metric."
+    },
+    {
+      "kind": "single",
+      "prompt": "A model class sets requires_graph = True. What does the pipeline runner feed its fit method?",
+      "options": ["A tabular pandas DataFrame", "A SequenceTensor of per-symbol histories", "A list of per-date graph-dict snapshots", "A precomputed eigendecomposition"],
+      "answer": 2,
+      "provenance": "src/volforecast/models/ghar.py:39 (Consumes Plan-02 graph-dict lists) and src/volforecast/models/gnn.py:200-210",
+      "explanation": "Graph models consume one graph per trading date, a dict of node features, edge_index and edge_attr, instead of the tabular or sequence paths."
+    },
+    {
+      "kind": "single",
+      "prompt": "Which optional pip extra must be installed before the GATv2 gnn model can be constructed?",
+      "options": ["ml", "gpu", "graph", "gs"],
+      "answer": 2,
+      "provenance": "src/pyproject.toml:44-47 defines the graph extra as torch plus torch-geometric",
+      "explanation": "The graph extra carries torch and torch-geometric; registry.py tolerates torch being absent at import time, but GNN construction needs torch_geometric."
+    }
+  ],
+  "confirmed_missing": [
+    "volforecast/models/har_family.py imported by volforecast/registry.py line 38 (registers the har/ridge/lasso/elasticnet linear family that _BaseOLS and linear_tuning.py support) but absent from the restore",
+    "volforecast/models/lstm.py imported by volforecast/registry.py line 40 and tuned by models/lstm_tuning.py, but absent from the restore",
+    "volforecast/config.py (CVConfig, TuningConfig, BlendConfig) imported by models/_base.py line 189, models/lightgbm.py line 215 and models/blend.py line 16, but absent from the restore"
+  ]
+}

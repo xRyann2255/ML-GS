@@ -1,0 +1,264 @@
+{
+  "area": "features",
+  "overview": "The features package is the middle of the volforecast pipeline: it turns cleaned daily measures (realized variance, realized quarticity, semivariances from the data layer) plus enriched market columns (the IV surface, VIX futures, credit spreads merged upstream by IVSurfaceLayer) into the design matrix consumed by the HAR OLS baselines and LightGBM models. It is organized as layers 0-6, each a class registered into FEATURE_REGISTRY via the register_feature_layer decorator with a uniform compute(daily_data, context) -> DataFrame contract, so a config can list which layers to stack. Layer 0 (har_core) is the HAR backbone: log RV at daily, weekly (5 day) and monthly (22 day) horizons plus HARQ realized-quarticity terms. Layer 1 (asymmetry) adds leverage-effect signals: positive and negative semivariances, bipower variation, jump variation. Layer 2 (options) derives forward-looking signals from the SPX IV surface: variance risk premium, 25-delta skew, term slope, 0DTE and 1W tenors, VVIX, VIX futures term structure, and IV x log RV interactions. Layer 3 (microstructure) covers order flow: VPIN, Kyle's lambda, Amihud illiquidity from 10 second bars. Layer 4 (cross_asset) plus cross_asset_momentum bring rate, FX, credit, and commodity volatility, and calendar (Layer 5) encodes FOMC, NFP, and OpEx proximity that is known in advance. Further registered layers extend the stack: dealer_gamma (SPX gamma exposure), implied_correlation and realized_correlation, gsvivs_signals (the 73-feature set of the GSVIVS01 short-variance strategy), long_memory (60 and 90 day lags for h=22), regime (Markov-switching probabilities), vol_of_vol, and noise_robust. Naming is systematic: _d is the daily value, _w a 5 day rolling mean, _m a 22 day rolling mean; momentum features use d_*_1d, d_*_5d, and z_* rolling z-scores. One quirk: the package docstring says layers 0-6, but only Layers 0-5 are named in file docstrings; no file is explicitly labelled Layer 6.",
+  "modules": [
+    {
+      "path": "src/volforecast/features/",
+      "role": "Eighteen feature-layer modules that convert daily realized measures and enriched market data into model-ready columns for vol forecasting. Each layer is a class decorated with register_feature_layer(name) from volforecast.registry, exposing compute(daily_data, context) and returning a DataFrame aligned to daily_data.index, so layers compose declaratively from config. Numbered layers 0-5 live in har.py, asymmetry.py, options.py, microstructure.py, cross_asset.py, and calendar.py; the remaining modules (dealer_gamma, gsvivs_signals, implied_correlation, realized_correlation, cross_asset_momentum, long_memory, regime, vol_of_vol, noise_robust) are registered extensions without an explicit layer number. Shared helpers live in transforms.py (safe_log with a 1e-20 floor, lagged_log_features producing the _d/_w/_m suffix families) and expansion.py (triple_expand into level/change/zscore for LightGBM only). Inputs come from volforecast.data (measures, micro, gex_ingest, options_oi caches under data/raw/); outputs feed the HAR OLS and LightGBM model stages downstream. Several layers degrade gracefully to empty or all-NaN frames when their cache or columns are missing, which matters on this restored snapshot where data/raw caches may be absent.",
+      "key_files": [
+        { "file": "__init__.py", "purpose": "Package docstring declaring feature engineering layers 0-6 and re-exporting FEATURE_REGISTRY." },
+        { "file": "har.py", "purpose": "Layer 0: HAR log RV lags at 1/5/22 days, HARQ realized-quarticity terms, and a masked overnight return." },
+        { "file": "asymmetry.py", "purpose": "Layer 1: semivariances, bipower variation, jump variation, signed and absolute daily returns for the leverage effect." },
+        { "file": "options.py", "purpose": "Layer 2: VRP, skew, term slope, butterfly, 0DTE/1W/1M/3M IV tenors, VVIX, VIX futures curve, and IV x log RV interactions." },
+        { "file": "microstructure.py", "purpose": "Layer 3: VPIN, order flow imbalance, Kyle's lambda, Amihud illiquidity, volume concentration from 10s bar caches." },
+        { "file": "cross_asset.py", "purpose": "Layer 4: treasury slope, FX and commodity vol, VIX/RV ratio, and the Diebold-Yilmaz spillover index." },
+        { "file": "calendar.py", "purpose": "Layer 5: hardcoded FOMC dates 2015-2026, NFP and OpEx proximity, day-of-week and month categoricals." },
+        { "file": "transforms.py", "purpose": "safe_log with 1e-20 floor and lagged_log_features generating the log_{name}_d/_w/_m column families." },
+        { "file": "expansion.py", "purpose": "triple_expand turns each base series into level, change, and 20 day z-score columns for LightGBM only." },
+        { "file": "dealer_gamma.py", "purpose": "Loads SPX dealer gamma exposure (GEX) and emits 5 features plus interactions with IV term slope, VRP, and VIX." },
+        { "file": "gsvivs_signals.py", "purpose": "Reproduces the 73-feature input set of the GSVIVS01 short-variance strategy from the enriched daily frame." },
+        { "file": "implied_correlation.py", "purpose": "SPX 1m options-implied correlation, correlation risk premium, and dispersion signal from a Marquee-fed parquet cache." },
+        { "file": "realized_correlation.py", "purpose": "Panel-wide rolling mean pairwise correlation of daily log returns, broadcast to every symbol as a regime signal." },
+        { "file": "cross_asset_momentum.py", "purpose": "Log levels of the top 5 cross-asset implied vols plus 1d/5d changes and 20 day z-scores per signal." },
+        { "file": "long_memory.py", "purpose": "60 and 90 day rolling RV, semivariance, and BPV lags plus a mean-reversion ratio for h=22 forecasting." },
+        { "file": "regime.py", "purpose": "Filtered two-state Markov-switching probability of the high-vol state with frozen-parameter forward filtering." },
+        { "file": "vol_of_vol.py", "purpose": "22 day trailing std of lagged log RV (SpotV2Net edge-feature proxy), shift applied before rolling." },
+        { "file": "noise_robust.py", "purpose": "TSRV, pre-averaging, and realized-kernel based features that correct for microstructure noise in tick data." }
+      ],
+      "concepts": ["HAR lags", "realized quarticity", "variance risk premium", "IV term structure", "0DTE implied vol", "dealer gamma exposure", "implied correlation", "microstructure order flow", "cross-asset spillover", "feature registry", "suffix naming (_d/_w/_m)"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "The feature engineering package is organized as layers 0-6 for realized volatility forecasting, with every layer class registered in a FEATURE_REGISTRY dict rather than imported directly.",
+      "file": "src/volforecast/features/__init__.py",
+      "start": 1,
+      "end": 9,
+      "focus": [1, 3],
+      "quote": "\"\"\"Feature engineering layers 0-6 for realized volatility forecasting.\nAccess registered layers via ``FEATURE_REGISTRY`` dict."
+    },
+    {
+      "text": "Layer 0 is the HAR core: it computes heterogeneous autoregressive features, log realized variance at daily, weekly, and monthly horizons, plus realized quarticity for measurement quality.",
+      "file": "src/volforecast/features/har.py",
+      "start": 1,
+      "end": 14,
+      "focus": [1, 4],
+      "quote": "\"\"\"HAR-family feature computation (Layer 0: HAR core + measurement quality).\n- log RV at daily, weekly, monthly horizons"
+    },
+    {
+      "text": "The HAR weekly lag is the mean of the last 5 daily RV observations and the monthly lag the mean of the last 22, producing the log_rv_d, log_rv_w, log_rv_m feature trio.",
+      "file": "src/volforecast/features/har.py",
+      "start": 37,
+      "end": 50,
+      "focus": [43, 44],
+      "quote": "    rv_w = rv_up_to.iloc[-5:].mean()\n    rv_m = rv_up_to.iloc[-22:].mean()"
+    },
+    {
+      "text": "The HARQ extension adds sqrt_rq_d (square root of realized quarticity) and rq_rv_interaction_d (log RV times sqrt RQ) so models can downweight noisy RV measurements.",
+      "file": "src/volforecast/features/har.py",
+      "start": 62,
+      "end": 76,
+      "focus": [73, 74],
+      "quote": "        \"sqrt_rq_d\": sqrt_rq_d,\n        \"rq_rv_interaction_d\": log_rv[\"log_rv_d\"] * sqrt_rq_d,"
+    },
+    {
+      "text": "Feature names follow a suffix convention: _d is the daily value, and rolling windows of 5 and 22 days map to the _w and _m suffixes, as in log_rv_d, log_rv_w, log_rv_m.",
+      "file": "src/volforecast/features/transforms.py",
+      "start": 41,
+      "end": 58,
+      "focus": [48, 50],
+      "quote": "        Base name for output columns (e.g., \"rv\" -> \"log_rv_d\", \"log_rv_w\", \"log_rv_m\").\n        Rolling windows. Default [5, 22]. Window 5 maps to \"_w\", 22 maps to \"_m\"."
+    },
+    {
+      "text": "The variance risk premium feature is computed as squared ATM implied vol (in decimal) minus annualized daily realized variance, VRP = (atm_iv/100)^2 - rv*252, the Carr and Wu 2009 ex-post proxy.",
+      "file": "src/volforecast/features/options.py",
+      "start": 28,
+      "end": 47,
+      "focus": [30, 47],
+      "quote": "    VRP = (atm_iv_pct / 100)^2 - rv_daily * 252\n    return (atm_iv / 100.0) ** 2 - rv * 252.0"
+    },
+    {
+      "text": "When 0DTE ATM implied vol is available the options layer emits log_atm_iv_0dte_d as an exact tenor match for one-day-ahead forecasting, plus an ultra-short term slope iv_term_slope_0dte1w_d (1W minus 0DTE IV).",
+      "file": "src/volforecast/features/options.py",
+      "start": 193,
+      "end": 210,
+      "focus": [196, 199],
+      "quote": "            result[\"log_atm_iv_0dte_d\"] = safe_log(atm_iv_0dte)\n                result[\"iv_term_slope_0dte1w_d\"] = daily_data[\"iv_1w_atm\"] - atm_iv_0dte"
+    },
+    {
+      "text": "Interactions of ATM implied vol and VIX with log RV at daily, weekly, and monthly horizons (atm_iv_x_log_rv_d and friends) are flagged in the code as the number one source of ML gain per a 2023 study.",
+      "file": "src/volforecast/features/options.py",
+      "start": 283,
+      "end": 306,
+      "focus": [283, 299],
+      "quote": "        # --- IV × log(RV) interactions (CSV 2023: #1 ML gain source) ---\n            result[\"atm_iv_x_log_rv_d\"] = atm_iv * log_rv_d"
+    },
+    {
+      "text": "The dealer gamma layer loads SPX gamma exposure from a parquet cache and produces exactly 5 ML features: gex_sign_d, gex_zscore_d, gex_quintile_d, gex_regime_d, and gex_momentum_d, broadcast market-wide to all symbols.",
+      "file": "src/volforecast/features/dealer_gamma.py",
+      "start": 24,
+      "end": 37,
+      "focus": [30, 31],
+      "quote": "    Computes 5 features via build_gex_features():\n        gex_sign_d, gex_zscore_d, gex_quintile_d, gex_regime_d, gex_momentum_d"
+    },
+    {
+      "text": "The cross-asset momentum layer keeps five log-level signals chosen by ablation: xasset_rate_vol (1y10y swaption vol), xasset_credit_cdx, xasset_fx_usdjpy, xasset_fx_eurusd, and xasset_gvz (gold vol index).",
+      "file": "src/volforecast/features/cross_asset_momentum.py",
+      "start": 38,
+      "end": 51,
+      "focus": [45, 46, 47, 48, 49],
+      "quote": "    \"xasset_rate_vol\": (\"rates\", \"rate_vol_1y10y\"),\n    \"xasset_credit_cdx\": (\"credit\", \"credit_vol_cdx\"),\n    \"xasset_fx_usdjpy\": (\"fx\", \"fx_iv_usdjpy\"),\n    \"xasset_fx_eurusd\": (\"fx\", \"fx_iv_eurusd\"),\n    \"xasset_gvz\": (\"commodity\", \"gvz\"),"
+    },
+    {
+      "text": "Cross-asset momentum features follow their own naming scheme: d_{name}_1d and d_{name}_5d are 1 and 5 day differences and z_{name} is a rolling z-score over a 20 trading day window.",
+      "file": "src/volforecast/features/cross_asset_momentum.py",
+      "start": 66,
+      "end": 79,
+      "focus": [72, 73, 77],
+      "quote": "    result[f\"d_{name}_1d\"] = series.diff(1)\n    result[f\"d_{name}_5d\"] = series.diff(5)\n    result[f\"z_{name}\"] = (series - rolling_mean) / rolling_std"
+    },
+    {
+      "text": "The implied correlation layer supplies six market-wide columns from SPX index options: implied_corr_spx_1m, realized_corr_spx_1m, corr_risk_premium, dispersion_signal, corr_momentum, and corr_zscore.",
+      "file": "src/volforecast/features/implied_correlation.py",
+      "start": 30,
+      "end": 43,
+      "focus": [35, 36, 37, 38, 39, 40],
+      "quote": "    \"implied_corr_spx_1m\",\n    \"realized_corr_spx_1m\",\n    \"corr_risk_premium\",\n    \"dispersion_signal\",\n    \"corr_momentum\",\n    \"corr_zscore\","
+    },
+    {
+      "text": "Layer 1 captures asymmetric volatility, the leverage effect and jump dynamics, via realized semivariances split into positive and negative components and bipower variation for the continuous part.",
+      "file": "src/volforecast/features/asymmetry.py",
+      "start": 1,
+      "end": 12,
+      "focus": [1, 4, 5],
+      "quote": "\"\"\"Asymmetric volatility features (Layer 1).\n- Realized semivariances (positive/negative components)\n- Bipower variation (BPV) for continuous variation"
+    },
+    {
+      "text": "Layer 5 encodes scheduled macro events that move volatility: FOMC meeting proximity, Non-Farm Payrolls proximity, and options expiration effects, all known in advance so no lag shift is applied.",
+      "file": "src/volforecast/features/calendar.py",
+      "start": 1,
+      "end": 14,
+      "focus": [1, 4, 5, 6],
+      "quote": "\"\"\"Calendar and event features (Layer 5).\n- FOMC meeting proximity\n- Non-Farm Payrolls (NFP) proximity\n- Options expiration (OpEx) effects"
+    },
+    {
+      "text": "Event dates are derived deterministically: NFP is the first Friday of the month and OpEx the third Friday, while FOMC statement dates 2015 through 2026 are hardcoded as a list.",
+      "file": "src/volforecast/features/calendar.py",
+      "start": 186,
+      "end": 206,
+      "focus": [189, 204],
+      "quote": "    \"\"\"Find next NFP date on or after target. NFP = first Friday of month.\"\"\"\n    \"\"\"Find next OpEx date on or after target. OpEx = third Friday of month.\"\"\""
+    },
+    {
+      "text": "Layer 3 computes microstructure features from cached daily aggregates (signed volume ratio, VPIN, order flow imbalance) and from intraday 10 second bars (Kyle's lambda, Amihud illiquidity, volume concentration).",
+      "file": "src/volforecast/features/microstructure.py",
+      "start": 1,
+      "end": 16,
+      "focus": [1, 6, 8],
+      "quote": "\"\"\"Microstructure features (Layer 3).\n   - signed_volume_ratio, vpin, order_flow_imbalance, volumes\n   - Kyle's lambda, Amihud illiquidity, volume concentration,"
+    },
+    {
+      "text": "Layer 4 captures volatility transmission from other asset classes: the treasury yield curve slope, FX vol, and a Diebold-Yilmaz connectedness index built from a rolling VAR on the log-RV panel.",
+      "file": "src/volforecast/features/cross_asset.py",
+      "start": 1,
+      "end": 10,
+      "focus": [1, 4, 8],
+      "quote": "\"\"\"Cross-asset spillover features (Layer 4).\n- Treasury yield curve slope (10y-2y)\n- DY spillover index (Diebold-Yilmaz connectedness)"
+    },
+    {
+      "text": "The gsvivs_signals layer reproduces the exact 73-feature input set of the GSVIVS01 short-variance strategy: returns and realized vol on SPX, VIX, and VX1, VIX vol-of-vol and option skew, term structure, SPX put-skew dynamics, and credit CDS returns.",
+      "file": "src/volforecast/features/gsvivs_signals.py",
+      "start": 1,
+      "end": 14,
+      "focus": [1, 3, 4],
+      "quote": "\"\"\"GSVIVS01 strategy signal features (73 features).\nProduces the feature set used by the GSVIVS01 short-variance strategy:\nreturns / realized volatility on SPX / VIX / VX1, VIX vol-of-vol dynamics,"
+    },
+    {
+      "text": "The long-memory layer adds 60 and 90 day rolling averages of RV and semivariances because the standard HAR monthly (22 day) lag is insufficient for h=22 forecasting.",
+      "file": "src/volforecast/features/long_memory.py",
+      "start": 1,
+      "end": 12,
+      "focus": [3, 8],
+      "quote": "Adds 60-day and 90-day rolling averages of RV and semivariances,\nfor h=22 forecasting where the standard monthly (22d) lag is"
+    },
+    {
+      "text": "The realized correlation layer emits four panel-wide columns, panel_corr_22d, panel_corr_5d, panel_corr_d, and panel_corr_z, measuring how synchronously the stock universe moves, a regime signal that typically precedes market-wide vol spikes.",
+      "file": "src/volforecast/features/realized_correlation.py",
+      "start": 15,
+      "end": 29,
+      "focus": [21, 22, 23, 24],
+      "quote": "    panel_corr_22d    -- rolling 22d average off-diagonal correlation\n    panel_corr_5d     -- rolling 5d average off-diagonal correlation\n    panel_corr_d      -- d/d change in panel_corr_22d (innovation signal)\n    panel_corr_z      -- 60d z-score of panel_corr_22d (regime indicator)"
+    }
+  ],
+  "glossary": [
+    { "term": "HAR", "definition": "Heterogeneous autoregressive model: forecasts volatility from realized variance averaged at daily, weekly (5d), and monthly (22d) horizons.", "file": "src/volforecast/features/har.py", "line": 3 },
+    { "term": "Realized quarticity (RQ)", "definition": "A fourth-moment measure of intraday returns used as a measurement-quality proxy; HARQ interacts it with RV so the model trusts noisy RV less.", "file": "src/volforecast/features/har.py", "line": 5 },
+    { "term": "Variance risk premium (VRP)", "definition": "Option-implied variance minus realized variance, here (atm_iv/100)^2 - rv*252; usually positive because investors pay a premium for vol protection.", "file": "src/volforecast/features/options.py", "line": 30 },
+    { "term": "0DTE IV", "definition": "Implied volatility of options expiring the same day; an exact tenor match for one-day-ahead RV forecasting.", "file": "src/volforecast/features/options.py", "line": 193 },
+    { "term": "VVIX", "definition": "CBOE index of the implied volatility of VIX options: the market's vol-of-vol gauge, used here in levels, innovations, and a risk-premium spread.", "file": "src/volforecast/features/options.py", "line": 129 },
+    { "term": "GEX (dealer gamma exposure)", "definition": "Aggregate gamma of SPX option dealers; its sign and regime shape how dealer hedging dampens or amplifies realized volatility.", "file": "src/volforecast/features/dealer_gamma.py", "line": 1 },
+    { "term": "Bipower variation (BPV)", "definition": "A jump-robust estimator of the continuous part of daily variance built from products of adjacent absolute returns.", "file": "src/volforecast/features/asymmetry.py", "line": 5 },
+    { "term": "Realized semivariance", "definition": "Realized variance split into components from positive and negative intraday returns, capturing the leverage effect asymmetry.", "file": "src/volforecast/features/asymmetry.py", "line": 4 },
+    { "term": "VPIN", "definition": "Volume-synchronized probability of informed trading, a daily order-flow toxicity measure loaded from the microstructure cache.", "file": "src/volforecast/features/microstructure.py", "line": 6 },
+    { "term": "Kyle's lambda", "definition": "Price impact coefficient: the OLS slope of price changes on signed order flow; higher values mean less liquidity or more informed trading.", "file": "src/volforecast/features/microstructure.py", "line": 43 },
+    { "term": "Diebold-Yilmaz spillover index", "definition": "Total connectedness of a multi-asset RV panel from a rolling VAR forecast error variance decomposition; high values flag systemic vol transmission.", "file": "src/volforecast/features/cross_asset.py", "line": 111 },
+    { "term": "TSRV", "definition": "Two-Scales Realized Volatility: combines all-tick and subsampled return grids to cancel microstructure noise bias in the variance estimate.", "file": "src/volforecast/features/noise_robust.py", "line": 29 }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "Which feature layer is Layer 0, the foundation of the volforecast feature stack?",
+      "options": [
+        "har_core: HAR log RV lags plus realized quarticity",
+        "options: the SPX implied vol surface",
+        "calendar: FOMC and OpEx proximity",
+        "microstructure: order flow and liquidity"
+      ],
+      "answer": 0,
+      "provenance": "src/volforecast/features/har.py:1 docstring names Layer 0 as HAR core + measurement quality",
+      "explanation": "har.py line 1 reads 'HAR-family feature computation (Layer 0: HAR core + measurement quality)'. Everything else stacks on top of the HAR lags."
+    },
+    {
+      "kind": "single",
+      "prompt": "In a feature name like log_rv_w, what does the _w suffix mean?",
+      "options": [
+        "A 5 trading day (weekly) rolling mean",
+        "A 22 trading day (monthly) rolling mean",
+        "A winsorized version of the feature",
+        "A cross-sectional weighting"
+      ],
+      "answer": 0,
+      "provenance": "src/volforecast/features/transforms.py:50 states window 5 maps to _w and 22 maps to _m",
+      "explanation": "transforms.py line 50: 'Default [5, 22]. Window 5 maps to \"_w\", 22 maps to \"_m\".' So _w is the 5 day rolling mean and _m the 22 day."
+    },
+    {
+      "kind": "single",
+      "prompt": "How is the variance risk premium feature vrp_d computed?",
+      "options": [
+        "(ATM IV / 100)^2 minus RV times 252",
+        "ATM IV minus the VIX level",
+        "RV times 252 minus (ATM IV / 100)^2",
+        "25-delta put IV minus 25-delta call IV"
+      ],
+      "answer": 0,
+      "provenance": "src/volforecast/features/options.py:47 return (atm_iv / 100.0) ** 2 - rv * 252.0",
+      "explanation": "compute_vrp returns squared decimal implied vol minus annualized realized variance, the Carr and Wu 2009 ex-post VRP proxy. The last option is the skew feature."
+    },
+    {
+      "kind": "order",
+      "prompt": "Put these feature layers in ascending layer number order (Layer 0 first).",
+      "options": [
+        "har_core (har.py)",
+        "asymmetry (asymmetry.py)",
+        "options (options.py)",
+        "microstructure (microstructure.py)",
+        "cross_asset (cross_asset.py)",
+        "calendar (calendar.py)"
+      ],
+      "answer": 0,
+      "provenance": "Layer numbers in module docstrings: har.py:1 (Layer 0), asymmetry.py:1 (Layer 1), options.py:1 (Layer 2), microstructure.py:1 (Layer 3), cross_asset.py:1 (Layer 4), calendar.py:1 (Layer 5)",
+      "explanation": "Each file's first docstring line states its layer number: HAR is Layer 0, asymmetry Layer 1, options Layer 2, microstructure Layer 3, cross_asset Layer 4, calendar Layer 5."
+    }
+  ],
+  "confirmed_missing": []
+}

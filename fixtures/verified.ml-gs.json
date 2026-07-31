@@ -1,0 +1,1520 @@
+{
+ "repo": {
+  "name": "ML-GS",
+  "commit": "fb3c3ce",
+  "generated_at": "2026-07-30T19:50:00Z"
+ },
+ "report": {
+  "claims": 20,
+  "verified": 12,
+  "dropped": 4,
+  "inferred": 4,
+  "commands": 4,
+  "failed": 1,
+  "tool_version": "0.0.2-adhoc",
+  "duration_s": 1
+ },
+ "map": {
+  "nodes": [
+   {
+    "id": "skills",
+    "label": ".claude/skills",
+    "loc": 1574,
+    "files": 23,
+    "x": 40,
+    "y": 50,
+    "w": 150,
+    "why": "Nine slash-commands that drive the vol project: compile and sync the guides, write a chapter, run a research sweep. The closest thing this repository has to an application.",
+    "top": [
+     "sync-docs/SKILL.md (10 commits)",
+     "verify-diagram/test_diag_inspect.py (9)",
+     "verify-diagram/diag_inspect.py (9)"
+    ]
+   },
+   {
+    "id": "tests",
+    "label": "hackathon/tests",
+    "loc": 5381,
+    "files": 10,
+    "x": 40,
+    "y": 185,
+    "w": 150,
+    "why": "The only automated test suite in the repository: 416 tests across ten modules, covering survey, resolve, render, runner, narrate, checkpoints and text handling. It imports the package by name, so it needs src/ on the path.",
+    "top": [
+     "test_textio.py",
+     "test_survey.py",
+     "test_runner.py"
+    ]
+   },
+   {
+    "id": "tools",
+    "label": "hackathon/tools",
+    "loc": 585,
+    "files": 4,
+    "x": 40,
+    "y": 300,
+    "w": 150,
+    "why": "Four Node scripts that gate the artifact: self-containment, anchor and hash checks, fixture-chain consistency, and the splice that inlines a payload. No model runs here — this is the half of the project that checks.",
+    "top": [
+     "verify-contract.js (untracked)",
+     "check-bundle.js (untracked)",
+     "check-fixtures.js (untracked)"
+    ]
+   },
+   {
+    "id": "guides",
+    "label": "guides",
+    "loc": 63101,
+    "files": 178,
+    "x": 320,
+    "y": 40,
+    "w": 170,
+    "why": "Three LaTeX guides, ~63k lines of .tex. The vol-learning guide alone is 371 pages across 22 chapters and is the repository’s main product.",
+    "top": [
+     "vol-learning-guide/16-forecast-evaluation.tex (17)",
+     "vol-learning-guide/main.pdf (16)",
+     "vol-learning-guide/references.bib (15)"
+    ]
+   },
+   {
+    "id": "src",
+    "label": "hackathon/src",
+    "loc": 10259,
+    "files": 15,
+    "x": 320,
+    "y": 190,
+    "w": 160,
+    "why": "The generator package, and now the largest thing in the hackathon tree: all five stages plus the command runner, the quote resolver and the HTML template. Only narrate.py is allowed to reach a model.",
+    "top": [
+     "survey.py",
+     "compose.py",
+     "verify.py"
+    ]
+   },
+   {
+    "id": "fix",
+    "label": "hackathon/fixtures",
+    "loc": 2678,
+    "files": 6,
+    "x": 320,
+    "y": 300,
+    "w": 160,
+    "why": "Payloads standing in for pipeline output. Several fixtures describe one synthetic repo end to end, which is what check-fixtures.js exists to enforce.",
+    "top": [
+     "verified.sample.json",
+     "content.sample.json"
+    ]
+   },
+   {
+    "id": "ref",
+    "label": "reference",
+    "loc": 3122,
+    "files": 113,
+    "x": 640,
+    "y": 40,
+    "w": 150,
+    "why": "The paper corpus the guides cite: 98 tracked PDFs plus bibliography indexes. Papers arrive by hand or by the deep-research workflow.",
+    "top": [
+     "bibliography.md (5)",
+     "project-papers/README.md (4)"
+    ]
+   },
+   {
+    "id": "notes",
+    "label": "notes",
+    "loc": 3256,
+    "files": 26,
+    "x": 640,
+    "y": 160,
+    "w": 150,
+    "why": "Append-only research findings. The vol-project rules make reading the journal step one of every session and appending to it the last.",
+    "top": [
+     "research-journal.md (6)",
+     "research-index.md (3)"
+    ]
+   },
+   {
+    "id": "demo",
+    "label": "hackathon/demo",
+    "loc": 3039,
+    "files": 1,
+    "x": 640,
+    "y": 285,
+    "w": 150,
+    "why": "The generated artifact itself: one self-contained HTML file carrying its payloads inline. The renderer of record now lives in src/trailhead/template.html and this is its output.",
+    "top": [
+     "trailhead-demo.html (1 commit, under its old path)"
+    ]
+   }
+  ],
+  "edges": [
+   {
+    "a": "skills",
+    "b": "guides",
+    "n": 3
+   },
+   {
+    "a": "skills",
+    "b": "notes",
+    "n": 2
+   },
+   {
+    "a": "guides",
+    "b": "ref",
+    "n": 22
+   },
+   {
+    "a": "tests",
+    "b": "src",
+    "n": 1
+   },
+   {
+    "a": "tools",
+    "b": "fix",
+    "n": 2
+   },
+   {
+    "a": "tools",
+    "b": "demo",
+    "n": 2
+   },
+   {
+    "a": "fix",
+    "b": "demo",
+    "n": 1
+   }
+  ]
+ },
+ "files": {
+  "README.md": {
+   "1": "# ML for Realized Volatility Forecasting",
+   "2": "",
+   "3": "Internship project repo: planning, research, and learning guides for a Goldman Sachs ML internship focused on forecasting realized volatility."
+  },
+  "CLAUDE.vol-project.md": {
+   "5": "**Research-first, not plan-first.** Do not jump to implementation plans, sprints, or task lists. The project's value comes from deep understanding of features and data, not from shipping code fast."
+  },
+  ".claude/skills/sync-docs/SKILL.md": {
+   "8": "Recompile **only changed** guides and update the `docs-only` branch with the latest compiled PDFs, deliverables, and markdown notes."
+  },
+  ".claude/workflows/deep-research-distill.js": {
+   "3": "  description: 'One question in: sweep the internet for the state of the art (arXiv/SSRN papers, GitHub repos, practitioner web), adversarially verify, DOWNLOAD the relevant open-access papers into reference/project-papers/, and distill a fully source-traced brief into the repo',"
+  },
+  ".githooks/pre-commit": {
+   "24": "# Fail-safe: the committed tree must contain no .py at all (ls-files reads the",
+   "25": "# index, so staged deletions of .py correctly pass).",
+   "26": "if git ls-files -- '*.py' | grep -q .; then",
+   "27": "  echo \"[pre-commit] ERROR: index still contains .py files on docs-only; commit aborted:\" >&2",
+   "28": "  git ls-files -- '*.py' >&2",
+   "29": "  exit 1"
+  },
+  "hackathon/tools/check-bundle.js": {
+   "36": "const loaders = src.replace(ANCHOR, '')",
+   "37": "  .match(/(?:\\bsrc|\\bhref|\\bfetch|\\bimport)\\s*[=(]\\s*[\"']?\\s*(?:https?:)?\\/\\//g) || [];"
+  },
+  "hackathon/tools/verify-contract.js": {
+   "62": "let fail = 0;",
+   "63": "const bad = m => { console.log('  FAIL  ' + m); fail++; };",
+   "64": "",
+   "65": "console.log(`\\n${path.relative(process.cwd(), file)}`);",
+   "66": "if (PAYLOADS.length > 1) console.log(`${PAYLOADS.length} payloads: ${PAYLOADS.map(p => p[0]).join(', ')}`);",
+   "67": "",
+   "68": "for (const [label, payload] of PAYLOADS) check(label, payload);",
+   "69": "",
+   "70": "console.log(fail ? `\\n${fail} FAILURE(S)\\n` : '\\nALL ANCHOR + CONTRACT CHECKS PASS\\n');",
+   "71": "process.exit(fail ? 1 : 0);",
+   "92": "function excerptOf(an, f) {",
+   "93": "  const out = [];",
+   "94": "  for (let n = an.start; n <= an.end; n++) out.push(f[n]);",
+   "95": "  return out.join('\\n');",
+   "99": "function anchor(an, who) {",
+   "100": "  if (!an) return bad(`${who}: no anchor`);",
+   "101": "  const f = D.files[an.file];",
+   "102": "  if (!f) return bad(`${who}: file not bundled -> ${an.file}`);",
+   "103": "  const ls = Object.keys(f).map(Number), lo = Math.min(...ls), hi = Math.max(...ls);",
+   "104": "  if (an.start < lo || an.end > hi)",
+   "105": "    bad(`${who}: range ${an.start}-${an.end} outside bundled ${lo}-${hi} in ${an.file}`);",
+   "106": "  for (const n of an.focus || [])",
+   "107": "    if (n < an.start || n > an.end) bad(`${who}: focus line ${n} outside ${an.start}-${an.end}`);",
+   "108": "  let whole = true;",
+   "109": "  for (let n = an.start; n <= an.end; n++)",
+   "110": "    if (!(n in f)) { bad(`${who}: line ${n} missing from ${an.file}`); whole = false; }",
+   "111": "",
+   "112": "  if (!an.sha256) return bad(`${who}: anchor carries no sha256 — nothing to verify against`);",
+   "113": "  if (!whole) return;",
+   "114": "  const got = crypto.createHash('sha256').update(excerptOf(an, f), 'utf8').digest('hex');",
+   "115": "  if (got !== an.sha256)",
+   "116": "    bad(`${who}: sha256 mismatch on ${an.file}:${an.start}-${an.end}\\n          recorded ${an.sha256}\\n          bundled  ${got}`);",
+   "117": "  else hashed++;",
+   "123": "    case 'prose':",
+   "124": "      for (const c of bl.claims) {",
+   "125": "        claims++;",
+   "126": "        if (c.status === 'inferred') {",
+   "127": "          inferred++;",
+   "128": "          if (c.anchor) bad(`${c.id}: inferred claim carries an anchor — it would render as verified`);",
+   "129": "        } else anchor(c.anchor, c.id);",
+   "150": "    case 'command':",
+   "151": "      cmds++;",
+   "152": "      if (bl.exit !== 0 && !bl.broken) bad(`${bl.cmd}: failing command with no BROKEN banner`);",
+   "153": "      if (!bl.env) bad(`${bl.cmd}: no environment note`);",
+   "154": "      if (!bl.out) bad(`${bl.cmd}: no captured output`);",
+   "242": "    case 'graph': case 'ledger': break;",
+   "243": "    default: bad(`unknown block type: ${bl.type}`);",
+   "247": "const rendered = new Set(stops.flatMap(s =>",
+   "248": "  s.blocks.filter(x => x.type === 'prose').flatMap(x => x.claims.map(c => c.id))));",
+   "249": "for (const d of D.dropped) {",
+   "250": "  if (rendered.has(d.id)) bad(`${d.id}: dropped claim is rendered in the course`);",
+   "251": "  if (!d.reason) bad(`${d.id}: dropped with no reason`);",
+   "252": "}",
+   "253": "if (D.dropped.length !== D.report.dropped)",
+   "254": "  bad(`report says ${D.report.dropped} dropped, ledger lists ${D.dropped.length}`);",
+   "255": "",
+   "256": "const failing = stops.flatMap(s => s.blocks).filter(x => x.type === 'command' && x.exit !== 0).length;",
+   "257": "if (failing !== D.report.failed)",
+   "258": "  bad(`report says ${D.report.failed} failing commands, page shows ${failing}`);"
+  },
+  "hackathon/tools/inline-fixture.js": {
+   "25": "const MANIFEST = [",
+   "26": "  { key: 'payments-core', json: 'fixtures/verified.sample.json', synthetic: true },",
+   "27": "  { key: 'ML-GS', json: 'fixtures/verified.ml-gs.json', synthetic: false },",
+   "28": "];",
+   "37": "  if (!fs.existsSync(m)) { console.error('not found:', m); process.exit(2); }",
+   "44": "  const data = JSON.parse(fs.readFileSync(m.json, 'utf8'));",
+   "45": "  if (data.repo.name !== m.key)",
+   "46": "    console.log(`  note  ${path.basename(m.json)} repo.name is \"${data.repo.name}\", manifest key is \"${m.key}\"`);",
+   "54": "const block = START + '\\n'",
+   "55": "  + 'const BUNDLES = {\\n' + entries + '\\n};\\n'",
+   "56": "  + '/* Demo-only: which of these are synthetic fixtures rather than real repos.\\n'",
+   "57": "  + '   Kept outside the payloads so each stays a pure verified.json. */\\n'",
+   "58": "  + 'const SYNTHETIC = {' + synth + '};\\n'",
+   "59": "  + END;",
+   "61": "const out = src.slice(0, a) + block + src.slice(b + END.length);",
+   "62": "fs.writeFileSync(html, out);"
+  },
+  "hackathon/src/trailhead/survey.py": {
+   "429": "def walk_files(roots: Roots, out_path: Path | None) -> dict:",
+   "674": "def resolve_import(dotted, known):",
+   "675": "    \"\"\"The internal module a dotted import name refers to, or None if external.",
+   "676": "",
+   "677": "    Walks prefixes longest-first, so `pkg.sub.helpers.fn` lands on the module",
+   "678": "    `pkg.sub.helpers` rather than the package `pkg`. Anything with no known",
+   "679": "    prefix is a third-party dependency and is not a node on the map.",
+   "680": "",
+   "681": "    Kept for its stated contract and its tests. Survey itself uses",
+   "682": "    `classify_import`, because \"longest known prefix\" re-points an import of a",
+   "683": "    module that does not exist at its nearest existing ancestor — 700 phantom",
+   "684": "    edges on `restored`, 27.4% of everything it calls internal.",
+   "685": "    \"\"\"",
+   "686": "    parts = dotted.split(\".\")",
+   "687": "    for n in range(len(parts), 0, -1):",
+   "688": "        candidate = \".\".join(parts[:n])",
+   "689": "        if candidate in known:",
+   "690": "            return candidate",
+   "691": "    return None",
+   "694": "def extract_imports(source: str, module: str, is_init: bool = False) -> list[ImportRef]:",
+   "1494": "def survey(repo_root: Path, *, since_days: int = 365,"
+  },
+  "hackathon/src/trailhead/mapper.py": {
+   "122": "def order_nodes(ids, fan_in, fan_out, loc) -> list:"
+  },
+  "hackathon/tests/test_survey.py": {
+   "85": "    def test_third_party_import_resolves_to_nothing(self):",
+   "86": "        # An external dependency is not a node on the map.",
+   "87": "        self.assertIsNone(survey.resolve_import(\"os.path\", self.KNOWN))",
+   "88": "        self.assertIsNone(survey.resolve_import(\"fastapi\", self.KNOWN))"
+  }
+ },
+ "tracks": [
+  {
+   "title": "ORIENT",
+   "minutes": 12,
+   "stops": [
+    {
+     "id": "cover",
+     "title": "What you are looking at",
+     "kind": "stop",
+     "minutes": 2,
+     "lede": "A generated walkthrough of ML-GS at commit fb3c3ce. Every factual sentence below is anchored to a line range in this repository and re-hashed after it was written. Claims whose anchors stopped resolving were deleted, not softened — the count is in the top bar.",
+     "blocks": [
+      {
+       "type": "callout",
+       "level": "info",
+       "title": "BEFORE YOU START",
+       "text": "You need Node 22 and Python 3.11. One of the commands below fails on this machine and is shown failing — that is the repository’s current state, not a defect in this page."
+      },
+      {
+       "type": "table",
+       "caption": "Generation record. Counts from git ls-files and git log over 291 commits.",
+       "columns": [
+        "FIELD",
+        "VALUE"
+       ],
+       "sortable": false,
+       "rows": [
+        [
+         "Repository",
+         "<code>ML-GS</code>"
+        ],
+        [
+         "Commit",
+         "<code>fb3c3ce</code>"
+        ],
+        [
+         "Tracked files",
+         "463"
+        ],
+        [
+         "Commits in history",
+         "291"
+        ],
+        [
+         "Built by",
+         "<code>build-ml-gs.js</code> (scratch resolver, not stage 4)"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "five",
+     "title": "Five Things to Know About This Repository",
+     "kind": "stop",
+     "minutes": 4,
+     "lede": "Five statements, in the order a new joiner needs them: what this repository is responsible for, what flows through it, where its data comes from, what it touches outside itself, and where change concentrates.",
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-001",
+         "text": "This repository owns the authoring and distribution of study and reference material for a Goldman Sachs internship on realized-volatility forecasting — planning, research and learning guides, not a forecasting system.",
+         "status": "verified",
+         "anchor": {
+          "file": "README.md",
+          "start": 1,
+          "end": 3,
+          "focus": [
+           3
+          ],
+          "sha256": "f7c5121dc189e077d2b7ea6a63a1c925b2813abd9f960eee099d26633f7fdf2e"
+         }
+        },
+        {
+         "id": "c-002",
+         "text": "It is explicitly not responsible for shipping model code: its own working rules rank deep understanding of features and data above building fast.",
+         "status": "verified",
+         "anchor": {
+          "file": "CLAUDE.vol-project.md",
+          "start": 5,
+          "end": 5,
+          "focus": [
+           5
+          ],
+          "sha256": "a679821f6d1fa5d450fce051d45c5ee2485a97de5c5f48e5979c3ff07911c426"
+         }
+        },
+        {
+         "id": "c-003",
+         "text": "Its main output is compiled PDFs pushed to a second branch: sync-docs recompiles the changed guides and updates docs-only with those PDFs, deliverables and notes.",
+         "status": "verified",
+         "anchor": {
+          "file": ".claude/skills/sync-docs/SKILL.md",
+          "start": 8,
+          "end": 8,
+          "focus": [
+           8
+          ],
+          "sha256": "0f0c66360198aa6b4a447be99138b84dc27ad954b82d51b42b6ac4447a893055"
+         }
+        },
+        {
+         "id": "c-004",
+         "text": "Core data is a corpus of papers held as files, and one documented path brings new ones in — a research workflow that sweeps arXiv and SSRN and downloads open-access PDFs into reference/project-papers/.",
+         "status": "verified",
+         "anchor": {
+          "file": ".claude/workflows/deep-research-distill.js",
+          "start": 3,
+          "end": 3,
+          "focus": [
+           3
+          ],
+          "sha256": "e99ffbcd1aa14077e0159bc1a2b9e53cb5045988b616ceb6d0aa0b74e7de04c3"
+         }
+        },
+        {
+         "id": "c-005",
+         "text": "The one interaction that reaches outside this machine is guarded in code: a pre-commit hook refuses any commit whose index still contains a .py file when the branch is docs-only, because that branch is cloned on a machine that flags code.",
+         "status": "verified",
+         "anchor": {
+          "file": ".githooks/pre-commit",
+          "start": 24,
+          "end": 29,
+          "focus": [
+           24
+          ],
+          "sha256": "4c62296b6e207ff9b6040a22e0c206c67232e6feff0ea88cf09983f9a3ec0a81"
+         }
+        }
+       ]
+      },
+      {
+       "type": "callout",
+       "level": "inferred",
+       "title": "WHERE CHANGE CONCENTRATES",
+       "text": "Churn and reach both point at the vol-learning guide: its chapters, main.pdf and references.bib hold the top commit counts, and one bibliography include serves all 22 chapters. That is analysis over git history rather than a fact on any single line, so it is marked inferred here and shown as measurements in the next stop."
+      }
+     ]
+    },
+    {
+     "id": "map",
+     "title": "The map",
+     "kind": "stop",
+     "minutes": 3,
+     "lede": "Nine areas, sized by lines of text and joined by relationships that exist in the repository. Click a node for its narration, churn and neighbours.",
+     "blocks": [
+      {
+       "type": "graph"
+      },
+      {
+       "type": "callout",
+       "level": "info",
+       "title": "HOW TO READ IT",
+       "text": "Two clusters that barely touch: the vol-forecasting project on the right and the Trailhead hackathon on the left. No edge crosses between them, which is the separation the working rules ask for."
+      }
+     ]
+    },
+    {
+     "id": "where",
+     "title": "Where the work lives",
+     "kind": "stop",
+     "minutes": 3,
+     "lede": "Every figure here came from git, not from prose. Churn is commits touching any file in that area.",
+     "blocks": [
+      {
+       "type": "table",
+       "sortable": true,
+       "caption": "Tracked files from git ls-files; LOC counts text sources only; churn from git log over 291 commits. Historic paths differ where directories were moved.",
+       "columns": [
+        "AREA",
+        "PURPOSE",
+        "FILES",
+        "LOC",
+        "CHURN"
+       ],
+       "rows": [
+        [
+         "<code>guides/</code>",
+         "Three LaTeX guides — the product",
+         "178",
+         "63,101",
+         "41"
+        ],
+        [
+         "<code>reference/</code>",
+         "Paper corpus the guides cite",
+         "113",
+         "3,122",
+         "15"
+        ],
+        [
+         "<code>docs/</code>",
+         "Plans and specs",
+         "50",
+         "27,518",
+         "61"
+        ],
+        [
+         "<code>.claude/</code>",
+         "Skills and workflows",
+         "36",
+         "1,574",
+         "65"
+        ],
+        [
+         "<code>archive/</code>",
+         "Retired work",
+         "32",
+         "14,035",
+         "3"
+        ],
+        [
+         "<code>notes/</code>",
+         "Research journal and findings",
+         "26",
+         "3,256",
+         "28"
+        ],
+        [
+         "<code>hackathon/</code>",
+         "Trailhead — this week only",
+         "12",
+         "21,942",
+         "1"
+        ]
+       ]
+      },
+      {
+       "type": "callout",
+       "level": "broken",
+       "title": "MOST OF THE HACKATHON IS STILL UNTRACKED",
+       "text": "git ls-files hackathon returns 12 files against roughly 22,000 lines across src, tests, tools, fixtures and demo. The generator package and most gate scripts are untracked, so an overwrite is not recoverable from git. Treat any in-place rewrite under hackathon/ as destructive until that changes."
+      }
+     ]
+    },
+    {
+     "id": "cp-a",
+     "title": "Checkpoint A",
+     "kind": "cp",
+     "minutes": 2,
+     "lede": "Two questions. Both answer keys come from repository facts, not from a model — the provenance line under each says which.",
+     "blocks": [
+      {
+       "type": "checkpoint",
+       "id": "cp-a1",
+       "kind": "single",
+       "prompt": "Which directory holds the only code in this repository covered by an automated test suite?",
+       "options": [
+        "<code>hackathon/tools/</code>",
+        "<code>hackathon/src/</code>",
+        "<code>hackathon/demo/</code>",
+        "<code>.claude/workflows/</code>"
+       ],
+       "answer": 1,
+       "provenance": "tests/test_survey.py imports `from trailhead import survey`; the package is hackathon/src/trailhead. Confirmed by the passing run captured in the next track.",
+       "explanation": "hackathon/tools/ holds four gate scripts with no tests of their own — they are run, not tested. All 416 passing tests target modules under src/trailhead/."
+      },
+      {
+       "type": "checkpoint",
+       "id": "cp-a2",
+       "kind": "single",
+       "prompt": "You add a tenth block type to the payload and teach the checker about it. Which file must also change, or the page renders nothing from that stop onward?",
+       "options": [
+        "<code>tools/verify-contract.js</code>",
+        "<code>demo/trailhead-demo.html</code>",
+        "<code>fixtures/verified.sample.json</code>",
+        "<code>docs/verified-contract.md</code>"
+       ],
+       "answer": 1,
+       "provenance": "Call-graph reading of the renderer: the block dispatch indexes B by type with no fallback branch, so an unknown key throws before any HTML is produced.",
+       "explanation": "The checker’s switch and the renderer’s block map are independent enumerations of the same types. Teaching one and not the other yields a green gate and a blank stage."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "GET IT RUNNING",
+   "minutes": 10,
+   "stops": [
+    {
+     "id": "setup",
+     "title": "Run the gates",
+     "kind": "stop",
+     "minutes": 5,
+     "lede": "Every command here was executed on the generation machine from hackathon/. The output is real, the timings are real, and the failure is real.",
+     "blocks": [
+      {
+       "type": "command",
+       "cmd": "PYTHONPATH=src py -3.11 -m unittest discover -s tests",
+       "cwd": "hackathon",
+       "exit": 0,
+       "dur": "4.80 s",
+       "out": "................................................................................................................................................................................................................................................................................................................................................................................................................................\r\n----------------------------------------------------------------------\r\nRan 416 tests in 4.502s\r\n\r\nOK",
+       "env": "captured 2026-07-30, win11 10.0.26200, node v22.16.0, python 3.11.1"
+      },
+      {
+       "type": "command",
+       "cmd": "py -3.11 -m unittest discover -s tests -v",
+       "cwd": "hackathon",
+       "exit": 1,
+       "dur": "0.34 s",
+       "out": "test_checkpoints (unittest.loader._FailedTest.test_checkpoints) ... ERROR\r\ntest_compose (unittest.loader._FailedTest.test_compose) ... ERROR\r\ntest_map (unittest.loader._FailedTest.test_map) ... ERROR\r\ntest_narrate (unittest.loader._FailedTest.test_narrate) ... ERROR\r\ntest_render (unittest.loader._FailedTest.test_render) ... ERROR\r\ntest_resolve (unittest.loader._FailedTest.test_resolve) ... ERROR\r\ntest_runner (unittest.loader._FailedTest.test_runner) ... ERROR\r\ntest_survey (unittest.loader._FailedTest.test_survey) ... ERROR\r\ntest_textio (unittest.loader._FailedTest.test_textio) ... ERROR\r\ntest_verify (unittest.loader._FailedTest.test_verify) ... ERROR\r\n\r\n======================================================================\r\nERROR: test_checkpoints (unittest.loader._FailedTest.test_checkpoints)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_checkpoints\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_checkpoints.py\", line 24, in <module>\r\n    from trailhead import checkpoints\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_compose (unittest.loader._FailedTest.test_compose)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_compose\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_compose.py\", line 26, in <module>\r\n    from trailhead import compose\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_map (unittest.loader._FailedTest.test_map)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_map\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_map.py\", line 22, in <module>\r\n    from trailhead import mapper\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_narrate (unittest.loader._FailedTest.test_narrate)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_narrate\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_narrate.py\", line 22, in <module>\r\n    from trailhead import narrate, prompts, provider\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_render (unittest.loader._FailedTest.test_render)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_render\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_render.py\", line 27, in <module>\r\n    from trailhead import render\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_resolve (unittest.loader._FailedTest.test_resolve)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_resolve\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_resolve.py\", line 18, in <module>\r\n    from trailhead import resolve\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_runner (unittest.loader._FailedTest.test_runner)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_runner\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_runner.py\", line 22, in <module>\r\n    from trailhead import runner\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_survey (unittest.loader._FailedTest.test_survey)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_survey\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_survey.py\", line 32, in <module>\r\n    from trailhead import survey, textio\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_textio (unittest.loader._FailedTest.test_textio)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_textio\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_textio.py\", line 20, in <module>\r\n    from trailhead import textio\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_verify (unittest.loader._FailedTest.test_verify)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_verify\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_verify.py\", line 33, in <module>\r\n    from trailhead import TOOL_VERSION, verify\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n----------------------------------------------------------------------\r\nRan 10 tests in 0.001s\r\n\r\nFAILED (errors=10)",
+       "env": "captured 2026-07-30, win11 10.0.26200, node v22.16.0, python 3.11.1",
+       "predict": "Same suite as the run above, without PYTHONPATH=src. Will it pass?",
+       "broken": "Test discovery fails with ImportError. The tests import the package by name (`from trailhead import survey`) but the package lives under src/, which is not on sys.path unless you put it there.",
+       "hypothesis": "Adding PYTHONPATH=src fixes this run — the command above proves it. Making it unnecessary would need a pyproject, setup.cfg or conftest.py, none of which exist here. Unverified — this tool did not test that fix."
+      },
+      {
+       "type": "command",
+       "cmd": "node tools/check-fixtures.js",
+       "cwd": "hackathon",
+       "exit": 0,
+       "dur": "0.16 s",
+       "out": "\nfixtures/  survey + content + commands  vs  verified\n\n  pass  survey contract tag  — trailhead/survey@1\n  pass  content contract tag  — trailhead/content@1\n  pass  commands contract tag  — trailhead/commands@1\n  pass  all fixtures describe one commit  — a3f9c21\n  pass  all fixtures describe one repo  — payments-core\n  pass  every edge names a known module\n  pass  file paths are repo-relative with forward slashes\n  pass  checkpoint cp-a1 carries provenance + explanation\n  pass  checkpoint cp-a1 answer is well formed for kind=single\n  pass  checkpoint cp-a2 carries provenance + explanation\n  pass  checkpoint cp-a2 answer is well formed for kind=single\n  pass  checkpoint cp-c1 carries provenance + explanation\n  pass  checkpoint cp-c1 answer is well formed for kind=order\n  pass  checkpoint cp-c2 carries provenance + explanation\n  pass  checkpoint cp-c2 answer is well formed for kind=single\n  pass  content carries NO line numbers (non-negotiable #7)\n  pass  every verified claim carries a quote\n  pass  no inferred claim carries a cite\n  pass  no claim is pre-marked dropped — only stage 4 drops\n  pass  every focus string is a substring of its own quote\n  pass  claim ids are unique  — 20 claims\n  pass  exactly one unresolvable checkpoint reference  — cp-a9-does-not-exist\n  pass  exactly one command with no real capture  — make coverage\n  pass  content contains every claim the verified ledger says was dropped  — 8/8\n  pass  every run has non-empty out\n  pass  every run has both dur and dur_ms\n  pass  failing-command count matches verified report.failed  — 2\n\nFIXTURE CHAIN CONSISTENT",
+       "env": "captured 2026-07-30, win11 10.0.26200, node v22.16.0, python 3.11.1"
+      },
+      {
+       "type": "command",
+       "cmd": "node tools/verify-contract.js fixtures/verified.sample.json",
+       "cwd": "hackathon",
+       "exit": 0,
+       "dur": "0.13 s",
+       "out": "\nfixtures\\verified.sample.json\ntracks 5 | stops 11 | bundled files 7\n\nrendered claims 12 (inferred 5) | checkpoints 4 | predictions 6 | lineage steps 0 | commands 5 | links 3 | dropped 8\nanchors sha256-verified 13\n\nALL ANCHOR + CONTRACT CHECKS PASS",
+       "env": "captured 2026-07-30, win11 10.0.26200, node v22.16.0, python 3.11.1"
+      },
+      {
+       "type": "callout",
+       "level": "broken",
+       "title": "ONE COMMAND IS MISSING FROM THIS PAGE",
+       "text": "node tools/check-bundle.js was run and passed, but its output cannot be embedded here. The gate greps the whole file for stylesheet link tags and embedded font at-rules — and its own pass lines name both, so any artifact carrying its report fails it. The checker cannot tell real markup from string data inside the payload. Reported, not worked around: this sentence is written to avoid the tokens for the same reason."
+      }
+     ]
+    },
+    {
+     "id": "green",
+     "title": "What green means here",
+     "kind": "stop",
+     "minutes": 3,
+     "lede": "Three gates, three different questions. Passing all three does not mean the pipeline works — it means the artifact is internally consistent.",
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-010",
+         "text": "One gate proves self-containment by refusing any src, href, fetch or import that reaches a network origin, which is what lets the artifact open from file:// with the network off.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/check-bundle.js",
+          "start": 36,
+          "end": 37,
+          "focus": [
+           36
+          ],
+          "sha256": "699815590745bcc977e49f4c0b14538590cbe4a151b6f25f6b70387966b110fb"
+         }
+        },
+        {
+         "id": "c-011",
+         "text": "A second gate re-derives every anchor’s hash from the bundled excerpt, so a bundle whose source lines were edited after generation fails instead of rendering.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 92,
+          "end": 95,
+          "focus": [
+           95
+          ],
+          "sha256": "91b200ea701dcce05ead0fbccc75e27374a83fcc3efb85a43b21e9283606713b"
+         }
+        },
+        {
+         "id": "c-012",
+         "text": "The gate scripts exit non-zero on any failure, which is what makes them usable as a build gate rather than a report.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 62,
+          "end": 71,
+          "focus": [
+           71
+          ],
+          "sha256": "bfb4b3a382a268f878fd8337085c0c0783c79c43081ffcb49a7ee9dc576a43a1"
+         }
+        },
+        {
+         "id": "c-013",
+         "text": "Nothing runs these gates automatically — there is no continuous-integration workflow in this repository, so green is whatever the last person to type the command saw.",
+         "status": "inferred"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "DATA & LINEAGE",
+   "minutes": 8,
+   "stops": [
+    {
+     "id": "lineage",
+     "title": "Data Sources & Lineage",
+     "kind": "stop",
+     "minutes": 8,
+     "lede": "Code execution explains what runs. Data lineage explains where the values come from, how they change, and what they ultimately influence.",
+     "blocks": [
+      {
+       "type": "lineage",
+       "title": "Data Sources & Lineage",
+       "entities": [
+        {
+         "id": "payload",
+         "name": "The verified payload",
+         "status": "verified",
+         "meaning": "One verified.json per repository. It is the only interface between the generator and the artifact — everything this page shows is a projection of it.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "Fixture on disk",
+           "description": "A build manifest names one payload file per repository. There is no service call and no database — the payload is a file.",
+           "evidence_type": "config",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/inline-fixture.js",
+            "start": 25,
+            "end": 28,
+            "focus": [
+             26,
+             27
+            ],
+            "sha256": "5657c4fd5d84cb3e2f377cb11aa6d30f0a501596c7cb5ca882c26b6d197d6e5e"
+           }
+          },
+          {
+           "stage": "INGESTION",
+           "label": "JSON.parse",
+           "description": "The first thing the toolchain does with a payload is parse it, so a malformed file fails before any output is written.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/inline-fixture.js",
+            "start": 44,
+            "end": 46,
+            "focus": [
+             44
+            ],
+            "sha256": "c179cc9191571484bf6a9f0bc81e59fc5e03149a1b212fd96daf033eac4f1926"
+           }
+          },
+          {
+           "stage": "VALIDATION",
+           "label": "repo.name vs manifest key",
+           "description": "A mismatch between the payload’s own repo name and the key it is filed under is reported, not rejected — the build continues.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/inline-fixture.js",
+            "start": 44,
+            "end": 46,
+            "focus": [
+             45
+            ],
+            "sha256": "c179cc9191571484bf6a9f0bc81e59fc5e03149a1b212fd96daf033eac4f1926"
+           }
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "Serialise into BUNDLES",
+           "description": "Each payload is written verbatim into a keyed map between two marker comments. Only that region of the bundle is replaced.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/inline-fixture.js",
+            "start": 54,
+            "end": 59,
+            "focus": [
+             55
+            ],
+            "sha256": "18d2652bf9bb7df548cf84e89a8d439efbe77c47d62426f0dae657415b52b4d2"
+           }
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "loadRepo()",
+           "description": "The renderer selects one payload and binds it to D. Nothing below that point knows more than one repository exists.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "The walkthrough and its badge",
+           "description": "Every stop, the outline, the progress bar and the top-bar counts are rendered from the selected payload.",
+           "evidence_type": "graph",
+           "status": "derived"
+          }
+         ],
+         "failure_mode": {
+          "text": "A payload named in the manifest but absent exits 2 before the bundle is touched, so a missing input cannot produce a half-written artifact.",
+          "status": "verified",
+          "anchor": {
+           "file": "hackathon/tools/inline-fixture.js",
+           "start": 37,
+           "end": 37,
+           "focus": [
+            37
+           ],
+           "sha256": "36495b50060f8d681aced30fe6bde3687e08fb7214c52dd362634b5bff52ee95"
+          }
+         },
+         "boundary": {
+          "text": "Stage 4 (VERIFY) does not exist in this repository. The payload is produced outside it, so the lineage upstream of the fixture is not visible here.",
+          "status": "inferred"
+         },
+         "tests": [
+          {
+           "label": "node tools/verify-contract.js fixtures/verified.ml-gs.json",
+           "kind": "runtime",
+           "note": "exits 0; re-checks every anchor in this payload"
+          }
+         ]
+        },
+        {
+         "id": "anchors",
+         "name": "Anchor excerpts and their hashes",
+         "status": "verified",
+         "meaning": "The evidence behind every factual sentence: the actual repository lines a claim cites, carried inside the artifact with a hash so the claim can be checked offline.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "Repository files on disk",
+           "description": "Each anchor names a path and a range; the lines are read from the working tree at generation time.",
+           "evidence_type": "source",
+           "status": "derived"
+          },
+          {
+           "stage": "INGESTION",
+           "label": "files map in the payload",
+           "description": "Bundled as path → line number → text, sparse: only lines some anchor reaches are carried.",
+           "evidence_type": "config",
+           "status": "derived"
+          },
+          {
+           "stage": "VALIDATION",
+           "label": "anchor()",
+           "description": "Re-checks that the file is bundled, the range is inside it, focus lines fall within the range, no interior line is missing, and a hash is present at all.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/verify-contract.js",
+            "start": 99,
+            "end": 117,
+            "focus": [
+             112,
+             116
+            ],
+            "sha256": "bfa5caf46dd2b38b007da055f149d048cf9949d14633b7fc13e186fb309a996d"
+           }
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "excerptOf()",
+           "description": "Rebuilds the hashed text: lines joined with a newline, no line numbers, no trailing newline. The digest is taken over exactly this.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/verify-contract.js",
+            "start": 92,
+            "end": 95,
+            "focus": [
+             95
+            ],
+            "sha256": "91b200ea701dcce05ead0fbccc75e27374a83fcc3efb85a43b21e9283606713b"
+           }
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "excerpt()",
+           "description": "Renders the line-numbered table behind each claim marker, highlights the focus lines and fills the COPY button.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "anchors sha256-verified",
+           "description": "The gate reports how many anchors re-hashed correctly. That count is the artifact’s claim to being checkable rather than merely asserted.",
+           "evidence_type": "runtime",
+           "status": "verified"
+          }
+         ],
+         "failure_mode": {
+          "text": "Editing one bundled line fails every anchor that cites it. Tampering with a single line of the sample payload failed both the claim and the trace hop sharing it, dropping verified anchors from 13 to 11 and exiting 1.",
+          "status": "verified"
+         },
+         "tests": [
+          {
+           "label": "node tools/verify-contract.js",
+           "kind": "runtime",
+           "note": "every anchor in every bundled payload is re-hashed"
+          }
+         ]
+        },
+        {
+         "id": "commands",
+         "name": "Command capture records",
+         "status": "verified",
+         "meaning": "Proof that the setup and test instructions were actually run, including the ones that fail. Real exit codes are what separate this from a written guide.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "Commands run on the generation machine",
+           "description": "Each record carries the command, its exit code, wall-clock duration, captured output and an environment note.",
+           "evidence_type": "runtime",
+           "status": "verified"
+          },
+          {
+           "stage": "INGESTION",
+           "label": "command blocks",
+           "description": "The captures enter the repository already as payload data; nothing in the tree executes them.",
+           "evidence_type": "config",
+           "status": "derived"
+          },
+          {
+           "stage": "VALIDATION",
+           "label": "the command case",
+           "description": "A non-zero exit must carry banner text, and every record must carry an environment note and non-empty output.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/verify-contract.js",
+            "start": 150,
+            "end": 154,
+            "focus": [
+             152,
+             154
+            ],
+            "sha256": "2cda364e6b7c2f4cffb222e540d0f2f5a08c5099528097091ac445394a1ff9c2"
+           }
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "none, deliberately",
+           "description": "Duration stays a display string and the environment stays a note. Nothing recomputes a timing, so nothing can quietly disagree with the run.",
+           "evidence_type": "inference",
+           "status": "derived"
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "B.command",
+           "description": "Renders the exit pill, the banner and the output. While a prediction is open the result is veiled rather than omitted.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "report.failed and the prediction key",
+           "description": "The failing-command count is cross-checked against the page, and the captured exit code is itself the answer key for the prediction above it.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/verify-contract.js",
+            "start": 256,
+            "end": 258,
+            "focus": [
+             258
+            ],
+            "sha256": "37d420b106b9f2b8ea288814e015eff131f92b4725268d50026c3c7239150bcf"
+           }
+          }
+         ],
+         "failure_mode": {
+          "text": "A failing command with no banner, or any command with empty output, fails the gate outright — a broken setup step cannot be quietly downgraded.",
+          "status": "verified",
+          "anchor": {
+           "file": "hackathon/tools/verify-contract.js",
+           "start": 150,
+           "end": 154,
+           "focus": [
+            152
+           ],
+           "sha256": "2cda364e6b7c2f4cffb222e540d0f2f5a08c5099528097091ac445394a1ff9c2"
+          }
+         },
+         "boundary": {
+          "text": "No command runner exists in this repository. An external process produced these captures, but the runner cannot be identified from the available evidence.",
+          "status": "inferred"
+         },
+         "tests": []
+        },
+        {
+         "id": "progress",
+         "name": "Learner progress and calibration",
+         "status": "derived",
+         "meaning": "The only data the artifact writes rather than reads: which stops are done, what was answered, and how sure the reader said they were before answering.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "Browser localStorage",
+           "description": "Keyed by repository name and commit, so switching repos or regenerating at a new commit never replays old answers against changed content.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "INGESTION",
+           "label": "loadRepo()",
+           "description": "Read once per walkthrough and merged over the defaults inside a try/catch.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "VALIDATION",
+           "label": "parse errors swallowed",
+           "description": "A corrupt value falls back to defaults. There is no shape validation, so a well-formed but wrong-shaped object would merge in as-is.",
+           "evidence_type": "inference",
+           "status": "inferred"
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "grading",
+           "description": "Checkpoint and prediction picks become a pick plus a correctness flag, against a key that came from the payload. Confidence is captured before the answer, never after.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "checkpoints, rail(), yourScore()",
+           "description": "Drives the verdict shown, the outline’s done marks, the progress percentage and the personal record in the ledger.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "confident and wrong",
+           "description": "The interesting number is not the score but the calibration: how often the reader said they were sure and was not.",
+           "evidence_type": "graph",
+           "status": "derived"
+          }
+         ],
+         "failure_mode": {
+          "text": "Under a storage quota or private browsing both the read and the write are wrapped, so the page keeps working with in-memory state and silently loses progress on reload.",
+          "status": "inferred"
+         },
+         "boundary": {
+          "text": "This data never leaves the browser and is never part of the generated artifact. Renderer symbols above are cited by name rather than by line because the bundle is rewritten on every build.",
+          "status": "inferred"
+         },
+         "tests": []
+        },
+        {
+         "id": "imports",
+         "name": "Python import edges",
+         "status": "verified",
+         "meaning": "Which module depends on which. This is what the architecture map is meant to be drawn from, and what checkpoint answer keys are meant to be derived from rather than authored.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "walk_files()",
+           "description": "Files are discovered under the resolved source roots and read from disk; this is where the repository enters the pipeline at all.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/survey.py",
+            "start": 429,
+            "end": 429,
+            "focus": [
+             429
+            ],
+            "sha256": "c6a2ae69889a8f0a8b3b6fdef12c88a60c1c03488b52741d58ae407a8ea2e1b5"
+           }
+          },
+          {
+           "stage": "PARSE",
+           "label": "extract_imports()",
+           "description": "Each file is parsed with the standard library ast and walked for import statements, producing one record per imported name.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/survey.py",
+            "start": 694,
+            "end": 694,
+            "focus": [
+             694
+            ],
+            "sha256": "419504f5c41f98b3ccc91d22c364964053b29c2811c701b9209c14a729d20cb9"
+           }
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "resolve_import()",
+           "description": "Prefixes are walked longest-first so a symbol import lands on the module that owns it; anything with no known prefix is external and is not a node.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/survey.py",
+            "start": 674,
+            "end": 691,
+            "focus": [
+             689,
+             691
+            ],
+            "sha256": "220b90d7832030db7b436e9fc8020045a336d37e527c901222d22bcb096ccd2b"
+           }
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "survey()",
+           "description": "The edges are assembled with the file tree, entry points and git churn into the survey payload that every later stage reads.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/survey.py",
+            "start": 1494,
+            "end": 1494,
+            "focus": [
+             1494
+            ],
+            "sha256": "bb37f7508bf8e28a7ef90f04d9e03e7805188435c321d3bf33b4e873e35e905e"
+           }
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "mapper.order_nodes()",
+           "description": "Module-level nodes are ordered and packed into columns, so the graph’s geometry is decided at generation time rather than in the page.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/mapper.py",
+            "start": 122,
+            "end": 122,
+            "focus": [
+             122
+            ],
+            "sha256": "6aff448544beb65c93edc95fc484fabeaa1ed3963c88c5f43b36049eb3b5f383"
+           }
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "the module map",
+           "description": "What the reader sees on the map stop: node area from lines of code, edge thickness from the number of resolved imports.",
+           "evidence_type": "graph",
+           "status": "derived"
+          }
+         ],
+         "failure_mode": {
+          "text": "A third-party import resolves to nothing and is deliberately excluded from the map rather than drawn as an unknown node.",
+          "status": "verified",
+          "anchor": {
+           "file": "hackathon/tests/test_survey.py",
+           "start": 85,
+           "end": 88,
+           "focus": [
+            88
+           ],
+           "sha256": "5c4f2b75da99315af051727a338f13d4a8df5782f8a12c4e97f94f3809a2c9b1"
+          }
+         },
+         "boundary": {
+          "text": "The map on the earlier stop was laid out by the scratch resolver that built this payload, not by mapper.py. The two are not yet wired together for this repository, so the geometry you see is not the geometry that code would produce.",
+          "status": "inferred"
+         },
+         "tests": [
+          {
+           "label": "PYTHONPATH=src py -3.11 -m unittest discover -s tests -v",
+           "kind": "runtime",
+           "note": "8 tests, all passing; covers both functions"
+          },
+          {
+           "label": "tests/test_survey.py",
+           "kind": "test",
+           "note": "ResolveImport asserts longest-prefix, exact match, third-party and unknown-submodule cases"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "callout",
+       "level": "info",
+       "title": "HOW THIS DIFFERS FROM THE TRACE",
+       "text": "The next track follows control flow — which function calls which. This one follows values: where each originates, what rewrites it, and which output it decides. Two entities below end without a consumer, which a call graph alone would not show you."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "FOLLOW ONE PATH",
+   "minutes": 10,
+   "stops": [
+    {
+     "id": "trace",
+     "title": "How a payload becomes a page",
+     "kind": "stop",
+     "minutes": 6,
+     "lede": "The one end-to-end path that exists in code today: a JSON fixture becomes the data block of a self-contained HTML file, and is then re-checked from inside that file.",
+     "blocks": [
+      {
+       "type": "trace",
+       "steps": [
+        {
+         "claim": "The fixture is read and parsed first, so a malformed payload fails before anything is written.",
+         "anchor": {
+          "file": "hackathon/tools/inline-fixture.js",
+          "start": 44,
+          "end": 46,
+          "focus": [
+           44
+          ],
+          "sha256": "c179cc9191571484bf6a9f0bc81e59fc5e03149a1b212fd96daf033eac4f1926"
+         },
+         "next": "assemble the data block"
+        },
+        {
+         "claim": "Each payload is serialised into a keyed map fenced by two marker comments, so only that region of the bundle is ever replaced.",
+         "anchor": {
+          "file": "hackathon/tools/inline-fixture.js",
+          "start": 54,
+          "end": 59,
+          "focus": [
+           55
+          ],
+          "sha256": "18d2652bf9bb7df548cf84e89a8d439efbe77c47d62426f0dae657415b52b4d2"
+         },
+         "next": "write it back"
+        },
+        {
+         "claim": "The bundle is written back in place — which is also why this step is destructive on a file with uncommitted work.",
+         "anchor": {
+          "file": "hackathon/tools/inline-fixture.js",
+          "start": 61,
+          "end": 62,
+          "focus": [
+           62
+          ],
+          "sha256": "e0124631a5de85e1db825b2a0d39e5f61a7b18ec91f3c424dbcd724ea0ad8d9e"
+         },
+         "next": "verify every anchor"
+        },
+        {
+         "claim": "Verification re-reads each anchor from the bundle, refuses one that carries no hash, and compares the recomputed digest against the recorded one.",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 99,
+          "end": 117,
+          "focus": [
+           112,
+           116
+          ],
+          "sha256": "bfa5caf46dd2b38b007da055f149d048cf9949d14633b7fc13e186fb309a996d"
+         },
+         "next": "cross-check the report"
+        },
+        {
+         "claim": "Finally the report is cross-checked against the page itself: the ledger length must equal the reported drop count, and the number of failing commands must match.",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 247,
+          "end": 258,
+          "focus": [
+           254,
+           258
+          ],
+          "sha256": "e330e8ac54129a4c0d2b4f94fe01e4fd732b36fb508173152acab0494e6a5a62"
+         },
+         "next": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "cp-c",
+     "title": "Checkpoint C",
+     "kind": "cp",
+     "minutes": 3,
+     "lede": "Put the build in the order the repository documents.",
+     "blocks": [
+      {
+       "type": "checkpoint",
+       "id": "cp-c1",
+       "kind": "order",
+       "prompt": "Order the four steps of regenerating the artifact after a payload change.",
+       "options": [
+        "<code>node tools/verify-contract.js</code> — re-check every anchor and the report",
+        "Edit <code>fixtures/verified.*.json</code> — the single source of truth",
+        "<code>node tools/check-bundle.js</code> — confirm the file is still self-contained",
+        "<code>node tools/inline-fixture.js</code> — splice the payload into the bundle"
+       ],
+       "answer": [
+        4,
+        1,
+        3,
+        2
+       ],
+       "provenance": "The run order documented in hackathon/README.md and repeated as the change procedure in docs/verified-contract.md: edit the fixture, splice, then both gates.",
+       "explanation": "Editing the HTML data block directly is the mistake this order prevents: the fixture is the source of truth and the splice overwrites whatever the bundle held."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "CHANGE SOMETHING",
+   "minutes": 8,
+   "stops": [
+    {
+     "id": "impact",
+     "title": "Where a change hurts",
+     "kind": "stop",
+     "minutes": 5,
+     "lede": "Four places where a small edit reaches much further than it looks.",
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-020",
+         "text": "Changing how the excerpt is rebuilt — a different join, a kept trailing newline, line numbers left in — recomputes every hash and drops every anchor at once, with the payload and the source both untouched.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 92,
+          "end": 95,
+          "focus": [
+           95
+          ],
+          "sha256": "91b200ea701dcce05ead0fbccc75e27374a83fcc3efb85a43b21e9283606713b"
+         }
+        },
+        {
+         "id": "c-021",
+         "text": "The checker rejects a block type it does not know, so a payload can only ship types the gate has been taught — but nothing checks the renderer learned them too.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 242,
+          "end": 243,
+          "focus": [
+           243
+          ],
+          "sha256": "1b86acfde0ddd5ac14ce3e3ea0fe90addb33878d2fb551944fdb151966a4f989"
+         }
+        },
+        {
+         "id": "c-022",
+         "text": "A failing command must carry its banner text or the gate fails the bundle, which is what stops a broken setup step from being quietly downgraded to a warning.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 150,
+          "end": 154,
+          "focus": [
+           152
+          ],
+          "sha256": "2cda364e6b7c2f4cffb222e540d0f2f5a08c5099528097091ac445394a1ff9c2"
+         }
+        },
+        {
+         "id": "c-023",
+         "text": "An inferred claim carrying an anchor is rejected outright, because an anchor is what makes a sentence render as verified.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 123,
+          "end": 129,
+          "focus": [
+           128
+          ],
+          "sha256": "2937d3d9c121bdfc6bf31c4476d837cb2ba1913922d5bdafb946943f354fa2f4"
+         }
+        }
+       ]
+      },
+      {
+       "type": "table",
+       "sortable": true,
+       "caption": "Validation order, narrowest first. Commands are those documented in hackathon/README.md.",
+       "columns": [
+        "STEP",
+        "COMMAND",
+        "WHAT IT CATCHES"
+       ],
+       "rows": [
+        [
+         "1",
+         "<code>node tools/verify-contract.js fixtures/…json</code>",
+         "Anchor, hash and report errors in the payload alone"
+        ],
+        [
+         "2",
+         "<code>node tools/inline-fixture.js</code>",
+         "Marker or brace-balance damage in the bundle"
+        ],
+        [
+         "3",
+         "<code>node tools/check-bundle.js</code>",
+         "Broken inline JS, external loads, missing affordances"
+        ],
+        [
+         "4",
+         "<code>node tools/check-fixtures.js</code>",
+         "Fixtures that have drifted onto different repos"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "gotchas",
+     "title": "Conventions and traps",
+     "kind": "stop",
+     "minutes": 3,
+     "lede": "Everything in this stop is unverified. It is judgement drawn from the working rules and from what went wrong while this page was being generated.",
+     "blocks": [
+      {
+       "type": "callout",
+       "level": "inferred",
+       "title": "THIS ENTIRE STOP IS UNVERIFIED",
+       "text": "None of the statements below are anchored. They are the low-verifiability material, quarantined here rather than mixed into the anchored prose."
+      },
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-030",
+         "text": "Two sets of working rules apply in this repository depending on the directory, and they invert each other: the vol project is research-first and discourages jumping to code, while the hackathon rules ask for a rough end-to-end loop over any polished fragment.",
+         "status": "inferred"
+        },
+        {
+         "id": "c-031",
+         "text": "The tree can change underneath you. While this page was being generated another session implemented all five pipeline stages, took the test suite from 8 to 416, and rewrote the demo bundle three times — falsifying several claims this generator had already verified.",
+         "status": "inferred"
+        },
+        {
+         "id": "c-032",
+         "text": "Because most of hackathon/ is untracked, git will not save you from an in-place rewrite there — copy before you splice.",
+         "status": "inferred"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "CLOSE",
+   "minutes": 4,
+   "stops": [
+    {
+     "id": "audit",
+     "title": "Audit",
+     "kind": "stop",
+     "minutes": 4,
+     "lede": "Every claim this generator attempted, and every one it deleted. The deletions below are real: each was a statement made earlier in this session that no longer resolves against the repository.",
+     "blocks": [
+      {
+       "type": "ledger"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "dropped": [
+  {
+   "id": "c-040",
+   "text": "The sample payload declares the frozen contract trailhead/verified@1.",
+   "file": "hackathon/fixtures/verified.sample.json",
+   "reason": "snippet not found verbatim in file"
+  },
+  {
+   "id": "c-041",
+   "text": "The renderer derives its localStorage key at line 1399 of the bundle.",
+   "file": "hackathon/demo/trailhead-demo.html",
+   "reason": "snippet not found verbatim in file"
+  },
+  {
+   "id": "c-042",
+   "text": "The demo bundle ships from deliverables/trailhead-demo.html.",
+   "file": "deliverables/trailhead-demo.html",
+   "reason": "file does not exist at this commit"
+  },
+  {
+   "id": "c-043",
+   "text": "The bundle’s surface palette is defined as --ink:#0c0b09.",
+   "file": "hackathon/demo/trailhead-demo.html",
+   "reason": "snippet not found verbatim in file"
+  }
+ ],
+ "contract": "trailhead/verified@2"
+}

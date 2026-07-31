@@ -1,0 +1,327 @@
+{
+  "unit": "gloss",
+  "kind": "gloss",
+  "title": "Glossary",
+  "max_claims": 14,
+  "key": "4fee597da5ea6e86af4108453b11ff1ea15a3db0b0954c4916ebaca2de28fd42",
+  "system": "You are the narration stage of Trailhead, a tool that generates a verified walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Any\nquote you return is searched for verbatim in the file on disk; anything not\nfound exactly is deleted and counted on screen. Fields that fail their checks\nare dropped, and a malformed answer is discarded whole, so answer the schema\nexactly.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else. An unknown key\n   anywhere discards the whole answer.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. Where the schema allows a `cite`, its `quote` is a VERBATIM, CONTIGUOUS copy\n   of 3-24 lines from ONE file shown below, lines joined with newlines,\n   indentation copied exactly. `focus` is an array of exact substrings of your\n   own quote. A cite is optional: omitting one is honest, inventing one is not.\n4. Prose fields are plain sentences. Backticks may mark code identifiers and\n   [[term]] or [[id|label]] may mark a glossary term. No newlines inside a\n   field, no markdown links, no `<`. Use commas instead of dashes.\n5. State substantive domain facts: what a thing is FOR, what flows through it,\n   what would surprise a newcomer. Never restate code mechanics the reader can\n   see, and never present argument parsing or CLI wiring as a purpose. When the\n   README or a package docstring states the purpose, that purpose is the story.\n6. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"appears to\", say what it is.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/tests/conftest.py ---\n    1| \"\"\"Shared pytest fixtures for volforecast tests.\n    2| \n    3| Provides reusable synthetic data generators for pipeline, feature, and evaluation tests.\n    4| Uses deterministic seeds for reproducibility.\n    5| \"\"\"\n    6| \n    7| from __future__ import annotations\n    8| \n    9| from datetime import date, datetime, timedelta\n   10| from pathlib import Path\n   11| from unittest.mock import patch\n   12| \n   ...\n   18| @pytest.fixture(autouse=True)\n   19| def _skip_pyslang_session():\n   20|     \"\"\"Prevent tests from starting a real pyslang subprocess.\"\"\"\n   21|     import volforecast.data.chunk_store as _cs\n   22| \n   23|     with patch.object(_cs, \"_session_started\", True):\n   24|         yield\n   25| \n   26| \n   27| @pytest.fixture(autouse=True)\n   28| def _mock_processor_if_missing():\n   29|     \"\"\"Ensure _processor is not None so fetch_bars tests can exercise logic.\n   30| \n   31|     On machines without pytickclient (e.g., Linux CI), the module-level\n   32|     `from pytickclient import processor` sets _processor = None.\n   33|     Tests that patch `query` also need _processor to be non-None.\n   34|     \"\"\"\n   35|     from unittest.mock import MagicMock\n   ...\n   43| @pytest.fixture\n   44| def synthetic_log_prices() -> np.ndarray:\n   45|     \"\"\"Simulate GBM log-prices for one trading day (23400 ticks, no jumps).\n   46| \n   47|     Returns n_ticks+1 log-prices (so n_ticks log-returns).\n   48|     True daily annualized vol = 0.20.\n   49|     \"\"\"\n   50|     n_ticks = 23400\n   51|     sigma_annual = 0.20\n   ...\n   63| @pytest.fixture\n   64| def synthetic_daily_rv_series() -> pd.Series:\n   65|     \"\"\"Generate synthetic daily log-RV series (500 business days).\n   66| \n   67|     Mimics realistic HAR dynamics with daily/weekly/monthly persistence.\n   68|     \"\"\"\n   69|     rng = np.random.default_rng(123)\n   70|     n_days = 500\n   71|     dates = pd.bdate_range(start=\"2022-01-03\", periods=n_days)\n   ...\n   82| @pytest.fixture\n   83| def synthetic_predictions_actuals() -> tuple[np.ndarray, np.ndarray]:\n   84|     \"\"\"Generate synthetic prediction/actual pairs for evaluation tests.\n   85| \n   86|     Returns (predictions, actuals) in RV space (not log).\n   87|     \"\"\"\n   88|     rng = np.random.default_rng(456)\n   89|     n = 200\n   90|     actuals = np.exp(-4.0 + 0.3 * rng.standard_normal(n))  # realistic RV values\n   91|     noise = 0.2 * rng.standard_normal(n)\n   92|     predictions = actuals * np.exp(noise)  # predictions with multiplicative noise\n   93|     return predictions, actuals\n   94| \n   95| \n   96| def make_synthetic_ticks(\n   97|     trade_date: date = date(2024, 1, 2),\n   98|     n_ticks: int = 5000,\n   99|     price_start: float = 450.0,\n  100|     sigma: float = 0.0005,\n  101|     seed: int = 42,\n  102| ) -> pd.DataFrame:\n  103|     \"\"\"Create synthetic tick DataFrame matching fetch_trades output format.\n  104| \n  105|     Parameters\n  106|     ----------\n  107|     trade_date : date\n  108|         Trading day to simulate.\n  109|     n_ticks : int\n  110|         Number of ticks to generate.\n  111|     price_start : float\n  112|         Starting price level.\n  113|     sigma : float\n  114|         Per-tick return volatility.\n  115|     seed : int\n  116|         Random seed for reproducibility.\n  117| \n  118|     Returns\n  119|     -------\n  120|     pd.DataFrame\n  121|         Tick DataFrame with DatetimeIndex (tz=America/New_York),\n  122|         columns: price, size.\n  123|     \"\"\"\n  124|     rng = np.random.default_rng(seed)\n  125| \n  126|     market_open = datetime(trade_date.year, trade_date.month, trade_date.day, 9, 30, 0)\n  127|     market_close = datetime(trade_date.year, trade_date.month, trade_date.day, 16, 0, 0)\n  128|     total_seconds = (market_close - market_open).total_seconds()\n  129| \n  130|     offsets = np.sort(rng.uniform(0, total_seconds, n_ticks))\n  131|     timestamps = pd.to_datetime(\n  132|         [market_open + timedelta(seconds=float(s)) for s in offsets]\n  133|     ).tz_localize(\"America/New_York\")\n  134| \n  135|     log_returns = rng.normal(0, sigma, n_ticks)\n  136|     log_prices = np.log(price_start) + np.cumsum(log_returns)\n  137|     prices = np.exp(log_prices)\n  138|     sizes = rng.integers(1, 500, n_ticks)\n  139| \n  140|     return pd.DataFrame({\"price\": prices, \"size\": sizes}, index=timestamps)\n  141| \n  142| \n  143| @pytest.fixture\n  144| def synthetic_tick_df() -> pd.DataFrame:\n  145|     \"\"\"Create synthetic tick DataFrame with timestamps, prices, sizes.\"\"\"\n  146|     return make_synthetic_ticks()\n  147| \n  148| \n  149| @pytest.fixture\n  150| def synthetic_ohlcv_df() -> pd.DataFrame:\n  151|     \"\"\"Generate synthetic OHLCV daily data (252 trading days).\"\"\"\n  152|     rng = np.random.default_rng(789)\n  153|     n_days = 252\n  154|     dates = pd.bdate_range(start=\"2023-01-03\", periods=n_days)\n  155| \n  156|     close = 100.0 * np.exp(np.cumsum(rng.normal(0, 0.01, n_days)))\n  157|     high = close * (1 + rng.uniform(0, 0.02, n_days))\n   ...\n  173| def _simulate_gbm_prices(\n  174|     n_ticks: int = 23400,\n  175|     sigma_annual: float = 0.20,\n  176|     dt_fraction: float = 1.0 / 252.0,\n  177|     seed: int = 42,\n  178| ) -> np.ndarray:\n  179|     \"\"\"Simulate log-prices from a GBM (no jumps) for one trading day.\"\"\"\n  180|     rng = np.random.default_rng(seed)\n  181|     dt_per_tick = dt_fraction / n_ticks\n   ...\n  190| def _simulate_gbm_with_jump(\n  191|     n_ticks: int = 23400,\n  192|     sigma_annual: float = 0.20,\n  193|     jump_size: float = 0.03,\n  194|     jump_index: int = 10000,\n  195|     seed: int = 42,\n  196| ) -> np.ndarray:\n  197|     \"\"\"Simulate log-prices with one injected jump.\"\"\"\n  198|     log_prices = _simulate_gbm_prices(n_ticks, sigma_annual, seed=seed)\n   ...\n  203| def _sample_returns(log_prices: np.ndarray, freq: int) -> np.ndarray:\n  204|     \"\"\"Sample returns at a given tick frequency.\"\"\"\n  205|     sampled_prices = log_prices[::freq]\n  206|     return np.diff(sampled_prices)\n  207| \n  208| \n  209| @pytest.fixture\n  210| def gbm_log_prices():\n  211|     \"\"\"23401 log-prices from GBM with sigma=20%, no jumps.\"\"\"\n  212|     return _simulate_gbm_prices(n_ticks=23400, sigma_annual=0.20, seed=42)\n  213| \n  214| \n  215| @pytest.fixture\n  216| def gbm_5min_returns(gbm_log_prices):\n  217|     \"\"\"78 five-minute returns (23400 ticks / 300 ticks per 5min).\"\"\"\n  218|     return _sample_returns(gbm_log_prices, freq=300)\n  219| \n  220| \n  221| @pytest.fixture\n  222| def jump_log_prices():\n  223|     \"\"\"Log-prices with one 3% jump injected at tick 10000.\"\"\"\n  224|     return _simulate_gbm_with_jump(n_ticks=23400, sigma_annual=0.20, jump_size=0.03, seed=42)\n  225| \n  226| \n  227| @pytest.fixture\n  228| def jump_5min_returns(jump_log_prices):\n  229|     \"\"\"5-min returns from the jump path.\"\"\"\n  230|     return _sample_returns(jump_log_prices, freq=300)\n  231| \n  232| \n  233| @pytest.fixture\n  234| def synthetic_rv_series():\n  235|     \"\"\"~500 days of daily RV with realistic autocorrelation.\"\"\"\n  236|     rng = np.random.default_rng(123)\n  237|     n_days = 500\n  238|     log_rv = np.zeros(n_days)\n  239|     log_rv[0] = np.log(1e-4)\n  240|     for t in range(1, n_days):\n  241|         log_rv[t] = -0.5 + 0.6 * log_rv[t - 1] + 0.3 * rng.standard_normal()\n   ...\n  251| @pytest.fixture\n  252| def sample_feature_df():\n  253|     \"\"\"1000-row feature DataFrame mimicking HAR + extra features.\"\"\"\n  254|     rng = np.random.default_rng(99)\n  255|     n = 1000\n  256|     dates = pd.bdate_range(\"2018-01-02\", periods=n)\n  257|     log_rv_d = -9.0 + 0.5 * rng.standard_normal(n)\n  258|     log_rv_w = -9.0 + 0.4 * rng.standard_normal(n)\n  259|     log_rv_m = -9.0 + 0.3 * rng.standard_normal(n)\n   ...\n  273| @pytest.fixture\n  274| def sample_target(sample_feature_df):\n  275|     \"\"\"Target series (log RV_{t+1}) aligned with sample_feature_df.\"\"\"\n  276|     rng = np.random.default_rng(77)\n  277|     n = len(sample_feature_df)\n  278|     target = (\n  279|         -1.0\n  280|         + 0.4 * sample_feature_df[\"log_rv_d\"].values\n  281|         + 0.3 * sample_feature_df[\"log_rv_w\"].values\n   ...\n  293| @pytest.fixture\n  294| def tmp_workspace(tmp_path: Path) -> Path:\n  295|     \"\"\"Temporary project root with workspace sub-directories pre-created.\"\"\"\n  296|     for sub in (\"data/raw/ticks\", \"data/models\", \"workspace/tmp\"):\n  297|         (tmp_path / sub).mkdir(parents=True)\n  298|     return tmp_path\n\n--- src/tests/integration/test_data_pipeline.py ---\n    1| \"\"\"Tests for the data pipeline: Chunk Store access, tick resampling, daily RV computation.\n    2| \n    3| TDD: Tests written first, implementations follow.\n    4| Uses mocked Chunk Store (pytickclient not available outside GS network).\n    5| \"\"\"\n    6| \n    7| from __future__ import annotations\n    8| \n    9| import tempfile\n   10| from datetime import date, datetime, timedelta\n   11| from pathlib import Path\n   12| from unittest.mock import MagicMock, patch\n   ...\n   31| from volforecast.data.resample import (\n   32|     compute_daily_rv_from_ticks,\n   33|     resample_trades_to_bars,\n   34| )\n   35| \n   36| # ---------------------------------------------------------------------------\n   37| # Fixtures\n   38| # ---------------------------------------------------------------------------\n   39| \n   40| \n   41| @pytest.fixture\n   42| def synthetic_ticks():\n   43|     return make_synthetic_ticks(date(2024, 1, 2))\n   44| \n   45| \n   46| @pytest.fixture\n   47| def synthetic_ticks_sparse():\n   48|     \"\"\"Very few ticks to test edge cases.\"\"\"\n   49|     return make_synthetic_ticks(date(2024, 1, 2), n_ticks=50, seed=99)\n   50| \n   51| \n   52| # ---------------------------------------------------------------------------\n   53| # Tests: Symbol Universe & E-mini Contract Rolling\n   54| # ---------------------------------------------------------------------------\n   55| \n   56| \n   57| class TestSymbolUniverse:\n   58|     def test_universe_has_34_plus_es(self):\n   59|         assert \"SPY\" in SYMBOL_UNIVERSE\n   60|         assert \"AAPL\" in SYMBOL_UNIVERSE\n   61|         assert \"ES\" in SYMBOL_UNIVERSE\n   62|         assert len(SYMBOL_UNIVERSE) >= 35  # 30 equities + 4 ETFs + ES\n   63| \n   64|     def test_unknown_symbol_raises(self):\n   65|         with pytest.raises(ValueError, match=\"not in.*universe\"):\n   ...\n   69| class TestESContractRolling:\n   70|     def test_jan_uses_h_contract(self):\n   71|         # Jan -> front month is March (H)\n   72|         symbol = _resolve_es_symbol(date(2024, 1, 15))\n   73|         assert symbol.startswith(\"ES\")\n   74|         assert \"H\" in symbol\n   75| \n   76|     def test_mar_early_still_h(self):\n   77|         # March 1 2024 is before 3rd Friday (Mar 15) -> still H (March) contract\n   ...\n  118| class TestTradingDays:\n  119|     def test_excludes_weekends(self):\n  120|         # Jan 6 2024 is Saturday, Jan 7 is Sunday\n  121|         days = _generate_trading_days(date(2024, 1, 5), date(2024, 1, 8))\n  122|         dates_list = list(days)\n  123|         for d in dates_list:\n  124|             assert d.weekday() < 5\n  125| \n  126|     def test_single_day(self):\n   ...\n  143| def _mock_chunk_query(symbols, st, et, chunkdb, fields=None):\n  144|     \"\"\"Return synthetic Chunk Store response dict.\"\"\"\n  145|     n = 100\n  146|     base_time = st\n  147|     times = [base_time + timedelta(seconds=i * 10) for i in range(n)]\n  148|     rng = np.random.default_rng(42)\n  149| \n  150|     result = {\n  151|         \"Time\": times,\n   ...\n  162| class TestFetchTrades:\n  163|     @patch(\"volforecast.data.chunk_store.query\")\n  164|     def test_returns_dataframe(self, mock_query_module):\n  165|         mock_query_module.chunk_query = MagicMock(side_effect=_mock_chunk_query)\n  166|         df = fetch_trades(\"SPY\", date(2024, 1, 2), date(2024, 1, 2))\n  167|         assert isinstance(df, pd.DataFrame)\n  168|         assert \"price\" in df.columns\n  169|         assert \"size\" in df.columns\n  170| \n   ...\n  204| class TestFetchQuotes:\n  205|     @patch(\"volforecast.data.chunk_store.query\")\n  206|     def test_returns_quote_columns(self, mock_query_module):\n  207|         mock_query_module.chunk_query = MagicMock(side_effect=_mock_chunk_query)\n  208|         df = fetch_quotes(\"SPY\", date(2024, 1, 2), date(2024, 1, 2))\n  209|         assert isinstance(df, pd.DataFrame)\n  210|         assert \"bid_price\" in df.columns\n  211|         assert \"ask_price\" in df.columns\n  212|         assert \"bid_size\" in df.columns\n   ...\n  216| class TestFetchDepth:\n  217|     @patch(\"volforecast.data.chunk_store.query\")\n  218|     def test_returns_depth_data(self, mock_query_module):\n  219|         \"\"\"fetch_depth should return L2 book data for E-mini.\"\"\"\n  220| \n  221|         # Mock depth query\n  222|         def depth_mock(symbols, st, et, chunkdb, fields=None):\n  223|             n = 50\n  224|             base_time = st\n   ...\n  246| class TestResampleTradesToBars:\n  247|     def test_output_columns(self, synthetic_ticks):\n  248|         bars = resample_trades_to_bars(synthetic_ticks)\n  249|         assert \"price\" in bars.columns\n  250|         assert \"log_return\" in bars.columns\n  251| \n  252|     def test_frequency_default_5min(self, synthetic_ticks):\n  253|         bars = resample_trades_to_bars(synthetic_ticks)\n  254|         # 6.5h trading session / 5min = 78 bars\n   ...\n  296| class TestComputeDailyRVFromTicks:\n  297|     def test_returns_all_measures(self, synthetic_ticks):\n  298|         result = compute_daily_rv_from_ticks(synthetic_ticks)\n  299|         expected_keys = {\n  300|             \"rv\",\n  301|             \"log_rv\",\n  302|             \"rq\",\n  303|             \"bpv\",\n  304|             \"rs_positive\",\n   ...\n  369| class TestGroupContiguousDates:\n  370|     def test_single_date(self):\n  371|         groups = _group_contiguous_dates([date(2024, 1, 2)])\n  372|         assert groups == [[date(2024, 1, 2)]]\n  373| \n  374|     def test_contiguous_weekdays(self):\n  375|         dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]\n  376|         groups = _group_contiguous_dates(dates)\n  377|         assert len(groups) == 1\n   ...\n  401| def _mock_chunk_query_multiday(symbols, st, et, chunkdb, fields=None):\n  402|     \"\"\"Return synthetic data spanning the full st->et range (multi-day).\"\"\"\n  403|     rng = np.random.default_rng(42)\n  404|     all_times: list[datetime] = []\n  405|     cur = st\n  406|     while cur < et:\n  407|         if 9 * 60 + 30 <= cur.hour * 60 + cur.minute < 16 * 60:\n  408|             all_times.append(cur)\n  409|         cur += timedelta(seconds=10)\n   ...\n  432| class TestFetchTradesBatch:\n  433|     @patch(\"volforecast.data.chunk_store.query\")\n  434|     def test_returns_dict_of_date_to_df(self, mock_query_module):\n  435|         mock_query_module.chunk_query = MagicMock(side_effect=_mock_chunk_query_multiday)\n  436|         dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]\n  437|         result = fetch_trades_batch(\"SPY\", dates)\n  438|         assert isinstance(result, dict)\n  439|         for d in dates:\n  440|             assert d in result\n   ...\n  512| class TestBuildRvPanelCheckpoint:\n  513|     @patch(\"volforecast.data.chunk_store.query\")\n  514|     def test_checkpoint_writes_cache(self, mock_query_module):\n  515|         \"\"\"Checkpoint saves should write cache mid-run.\"\"\"\n  516|         mock_query_module.chunk_query = MagicMock(side_effect=_mock_chunk_query_multiday)\n  517|         from volforecast.data.rv_panel import build_rv_panel\n  518| \n  519|         with tempfile.TemporaryDirectory() as tmpdir:\n  520|             cache_dir = Path(tmpdir)\n   ...\n  571| class TestFetchTradesBatchCallback:\n  572|     @patch(\"volforecast.data.chunk_store.query\")\n  573|     def test_callback_fires_start_and_done(self, mock_query_module):\n  574|         \"\"\"on_fetch should fire 'start' then 'done' for each chunk query.\"\"\"\n  575|         mock_query_module.chunk_query = MagicMock(side_effect=_mock_chunk_query_multiday)\n  576|         dates = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]\n  577|         events: list[tuple] = []\n  578| \n  579|         def recorder(event, chunk_dates, n_ticks, elapsed_s):\n\n--- src/tests/integration/test_pipeline.py ---\n    1| \"\"\"Smoke test for the Pipeline class.\n    2| \n    3| Validates end-to-end config → registry → train → evaluate flow\n    4| using synthetic daily data and the HAR model.\n    5| \"\"\"\n    6| \n    7| from __future__ import annotations\n    8| \n    9| import numpy as np\n   10| import pandas as pd\n   11| import pytest\n   12| \n   13| pytestmark = pytest.mark.integration\n   14| \n   15| from volforecast.config import CVConfig, ExperimentConfig, ModelConfig\n   16| from volforecast.features.asymmetry import AsymmetryLayer  # noqa: F401 — triggers registration\n   17| from volforecast.features.har import HARCoreLayer  # noqa: F401 — triggers registration\n   18| from volforecast.models.har_family import HARModel  # noqa: F401 — triggers registration\n   19| from volforecast.pipeline.runner import Pipeline\n   20| \n   21| \n   22| @pytest.fixture\n   23| def synthetic_daily_data() -> pd.DataFrame:\n   24|     \"\"\"Generate synthetic daily data with rv, rq columns (500 days).\"\"\"\n   25|     rng = np.random.default_rng(42)\n   26|     n = 500\n   27|     dates = pd.bdate_range(\"2020-01-02\", periods=n)\n   28| \n   29|     # AR(1) log-RV with mean-reversion\n   30|     log_rv = np.zeros(n)\n   31|     log_rv[0] = np.log(1e-4)\n   32|     for t in range(1, n):\n   33|         log_rv[t] = -0.5 + 0.6 * log_rv[t - 1] + 0.3 * rng.standard_normal()\n   34| \n   35|     rv = np.exp(log_rv)\n   36|     rq = rv**2 * 3  # synthetic RQ proportional to RV^2\n   37| \n   38|     return pd.DataFrame({\"rv\": rv, \"rq\": rq}, index=dates)\n   39| \n   40| \n   41| @pytest.fixture\n   42| def har_config() -> ExperimentConfig:\n   43|     return ExperimentConfig(\n   44|         name=\"smoke_test\",\n   45|         universe=[\"SYNTHETIC\"],\n   46|         date_range=(\"2020-01-02\", \"2022-01-01\"),\n   47|         horizons=[1],\n   48|         feature_layers=[\"har_core\"],\n   49|         model=ModelConfig(name=\"har\"),\n   ...\n   54| class TestPipeline:\n   55|     def test_smoke_run(self, har_config, synthetic_daily_data):\n   56|         \"\"\"Pipeline.run returns results with expected keys.\"\"\"\n   57|         results = Pipeline(har_config).run(synthetic_daily_data)\n   58|         assert 1 in results\n   59|         assert \"metrics\" in results[1]\n   60|         assert \"predictions\" in results[1]\n   61|         assert \"qlike\" in results[1][\"metrics\"]\n   62|         assert \"mse\" in results[1][\"metrics\"]\n   ...\n  159| class TestPurgeGapEnforcement:\n  160|     \"\"\"Verify effective_purge = max(config.purge_gap, h) per horizon.\"\"\"\n  161| \n  162|     @pytest.fixture\n  163|     def multi_horizon_data(self) -> pd.DataFrame:\n  164|         \"\"\"Synthetic daily data long enough for multi-horizon CV.\"\"\"\n  165|         rng = np.random.default_rng(77)\n  166|         n = 800\n  167|         dates = pd.bdate_range(\"2019-01-02\", periods=n)\n   ...\n  238| class TestPipelineContext:\n  239|     \"\"\"Tests for the context kwarg in Pipeline.run().\"\"\"\n  240| \n  241|     def test_run_with_context_none(self, har_config, synthetic_daily_data):\n  242|         \"\"\"Pipeline.run() works with explicit context=None (backward compat).\"\"\"\n  243|         results = Pipeline(har_config).run(synthetic_daily_data, context=None)\n  244|         assert 1 in results\n  245|         assert \"qlike\" in results[1][\"metrics\"]\n  246| \n   ...\n  255| class TestDevUniverse:\n  256|     \"\"\"Tests for DEV_UNIVERSE constant.\"\"\"\n  257| \n  258|     def test_dev_universe_is_subset(self):\n  259|         from volforecast.constants import DEV_UNIVERSE, SYMBOL_UNIVERSE\n  260| \n  261|         assert DEV_UNIVERSE.issubset(SYMBOL_UNIVERSE)\n  262| \n  263|     def test_dev_universe_size(self):\n   ...\n  274| class TestInfGuard:\n  275|     \"\"\"Verify that ±inf values in features are replaced with NaN before training.\"\"\"\n  276| \n  277|     def test_inf_in_features_dropped_not_fitted(self):\n  278|         \"\"\"Rows with inf in features should be dropped, not passed to model.\"\"\"\n  279|         rng = np.random.default_rng(55)\n  280|         n = 500\n  281|         dates = pd.bdate_range(\"2020-01-02\", periods=n)\n  282| \n   ...\n  334| class TestPooledPipeline:\n  335|     \"\"\"Tests for Pipeline.run_pooled() — panel/multi-symbol training.\"\"\"\n  336| \n  337|     @pytest.fixture\n  338|     def panel_data(self) -> dict[str, pd.DataFrame]:\n  339|         \"\"\"3 symbols of synthetic daily data (300 days each).\"\"\"\n  340|         rng = np.random.default_rng(99)\n  341|         n = 300\n  342|         dates = pd.bdate_range(\"2020-01-02\", periods=n)\n   ...\n  492| class TestNestedCVPipeline:\n  493|     \"\"\"Tests for Pipeline with tuning.enabled=True (nested CV / Optuna per fold).\"\"\"\n  494| \n  495|     lgb = pytest.importorskip(\"lightgbm\")\n  496|     optuna = pytest.importorskip(\"optuna\")\n  497| \n  498|     @pytest.fixture\n  499|     def synthetic_lgbm_data(self) -> pd.DataFrame:\n  500|         \"\"\"Synthetic data large enough for nested CV (800 days).\"\"\"\n\n--- src/tests/integration/test_rv_pipeline.py ---\n    1| \"\"\"End-to-end tests for RV computation, features, and HAR baseline.\n    2| \n    3| Uses synthetic GBM price paths to validate:\n    4| 1. RV computation matches known analytical values\n    5| 2. BPV ≈ RV in no-jump case, BPV < RV with jumps\n    6| 3. Semivariances sum to RV\n    7| 4. BNS test detects injected jumps\n    8| 5. Realized Kernel converges to true IV\n    9| 6. TSRV and pre-averaging produce reasonable estimates\n   10| 7. Volatility signature plot shows expected shape\n   11| 8. HAR model fits and predicts on synthetic RV series\n   12| 9. QLIKE metric properties (minimum at truth, penalizes asymmetrically)\n   ...\n   51|     HARModel,\n   52|     LassoHARModel,\n   53|     RidgeHARModel,\n   54| )\n   55| \n   56| # ---------------------------------------------------------------------------\n   57| # Tests: Realized Variance (har.py)\n   58| # ---------------------------------------------------------------------------\n   59| \n   60| \n   61| class TestRealizedVariance:\n   62|     def test_rv_sum_of_squares(self, gbm_5min_returns):\n   63|         \"\"\"RV should equal sum of squared returns.\"\"\"\n   64|         rv = compute_realized_variance(pd.Series(gbm_5min_returns))\n   65|         expected = float(np.sum(gbm_5min_returns**2))\n   66|         assert rv == pytest.approx(expected, rel=1e-10)\n   67| \n   68|     def test_rv_positive(self, gbm_5min_returns):\n   69|         rv = compute_realized_variance(pd.Series(gbm_5min_returns))\n   70|         assert rv > 0\n   71| \n   72|     def test_rv_annualized_magnitude(self, gbm_5min_returns):\n   73|         \"\"\"Annualized vol should be roughly 20% for sigma=0.20 GBM.\"\"\"\n   74|         rv = compute_realized_variance(pd.Series(gbm_5min_returns))\n   75|         annual_vol = np.sqrt(rv * 252)\n   76|         # Allow wide tolerance since it's one day\n   77|         assert 0.05 < annual_vol < 0.50\n   78| \n   79|     def test_rv_zero_returns(self):\n   80|         rv = compute_realized_variance(pd.Series([0.0, 0.0, 0.0]))\n   81|         assert rv == 0.0\n   82| \n   83| \n   84| class TestRealizedQuarticity:\n   85|     def test_rq_positive(self, gbm_5min_returns):\n   86|         rq = compute_rq(pd.Series(gbm_5min_returns))\n   87|         assert rq > 0\n   88| \n   89|     def test_rq_formula(self, gbm_5min_returns):\n   90|         \"\"\"RQ = (n/3) * sum(r^4).\"\"\"\n   91|         r = gbm_5min_returns\n   92|         n = len(r)\n   ...\n   98| class TestLogRVFeatures:\n   99|     def test_features_shape(self, synthetic_rv_series):\n  100|         date = synthetic_rv_series.index[100]\n  101|         features = compute_log_rv_features(synthetic_rv_series, date)\n  102|         assert set(features.keys()) == {\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"}\n  103| \n  104|     def test_daily_equals_log_rv(self, synthetic_rv_series):\n  105|         date = synthetic_rv_series.index[100]\n  106|         features = compute_log_rv_features(synthetic_rv_series, date)\n   ...\n  124| class TestHARDesignMatrix:\n  125|     def test_design_matrix_columns(self, synthetic_rv_series):\n  126|         X = build_har_design_matrix(synthetic_rv_series)\n  127|         assert list(X.columns) == [\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"]\n  128| \n  129|     def test_design_matrix_nan_first_rows(self, synthetic_rv_series):\n  130|         X = build_har_design_matrix(synthetic_rv_series)\n  131|         # First 22 rows should have NaN (need 22 days lookback + 1 shift)\n  132|         assert X.iloc[0].isna().any()\n   ...\n  148| class TestSemivariances:\n  149|     def test_sum_equals_rv(self, gbm_5min_returns):\n  150|         \"\"\"RS+ + RS- should equal RV (ignoring zero returns).\"\"\"\n  151|         rv = compute_realized_variance(pd.Series(gbm_5min_returns))\n  152|         semivars = compute_semivariances(pd.Series(gbm_5min_returns))\n  153|         assert semivars[\"rs_positive\"] + semivars[\"rs_negative\"] == pytest.approx(rv, rel=1e-10)\n  154| \n  155|     def test_both_positive(self, gbm_5min_returns):\n  156|         semivars = compute_semivariances(pd.Series(gbm_5min_returns))\n   ...\n  161| class TestBPV:\n  162|     def test_bpv_close_to_rv_no_jumps(self, gbm_5min_returns):\n  163|         \"\"\"Without jumps, BPV should approximate RV.\"\"\"\n  164|         rv = compute_realized_variance(pd.Series(gbm_5min_returns))\n  165|         bpv = compute_bpv(pd.Series(gbm_5min_returns))\n  166|         # BPV should be within ~30% of RV for a single day\n  167|         assert abs(bpv - rv) / rv < 0.50\n  168| \n  169|     def test_bpv_less_than_rv_with_jump(self, jump_5min_returns):\n   ...\n  180| class TestJumpDetection:\n  181|     def test_no_jump_detected_in_gbm(self, gbm_5min_returns):\n  182|         \"\"\"BNS test should NOT detect a jump in pure GBM.\"\"\"\n  183|         rv = compute_realized_variance(pd.Series(gbm_5min_returns))\n  184|         bpv = compute_bpv(pd.Series(gbm_5min_returns))\n  185|         rtq = compute_realized_tripower_quarticity(pd.Series(gbm_5min_returns))\n  186|         result = detect_jumps(rv, bpv, rtq, len(gbm_5min_returns), alpha=0.999)\n  187|         # In pure GBM, expect no jump (though small chance of false positive)\n  188|         assert \"z_stat\" in result\n   ...\n  218| class TestBuildAsymmetryFeatures:\n  219|     def test_all_keys_present(self, gbm_5min_returns):\n  220|         rv = compute_realized_variance(pd.Series(gbm_5min_returns))\n  221|         rq = compute_rq(pd.Series(gbm_5min_returns))\n  222|         features = build_asymmetry_features(pd.Series(gbm_5min_returns), rv, rq)\n  223|         expected_keys = {\n  224|             \"rs_positive\",\n  225|             \"rs_negative\",\n  226|             \"signed_jump\",\n   ...\n  242| def _make_gbm_log_prices(n_ticks: int, sigma_annual: float, seed: int) -> np.ndarray:\n  243|     \"\"\"Inline GBM simulator for noise tests that need custom parameters.\"\"\"\n  244|     rng = np.random.default_rng(seed)\n  245|     dt_per_tick = (1.0 / 252.0) / n_ticks\n  246|     increments = sigma_annual * np.sqrt(dt_per_tick) * rng.standard_normal(n_ticks)\n  247|     log_prices = np.zeros(n_ticks + 1)\n  248|     log_prices[0] = np.log(100.0)\n  249|     log_prices[1:] = log_prices[0] + np.cumsum(increments)\n  250|     return log_prices\n  251| \n  252| \n  253| class TestRealizedKernel:\n  254|     def test_rk_close_to_rv_no_noise(self, gbm_log_prices, gbm_5min_returns):\n  255|         \"\"\"RK from clean GBM prices should approximate 5-min RV.\"\"\"\n  256|         rk = realized_kernel(gbm_log_prices)\n  257|         rv_5min = compute_realized_variance(pd.Series(gbm_5min_returns))\n  258|         # Should be in the same ballpark\n  259|         assert rk > 0\n  260|         assert abs(rk - rv_5min) / rv_5min < 1.0\n  261| \n   ...\n  281| class TestTSRV:\n  282|     def test_tsrv_positive(self, gbm_log_prices):\n  283|         result = tsrv(gbm_log_prices)\n  284|         assert result > 0\n  285| \n  286|     def test_tsrv_reasonable_magnitude(self, gbm_log_prices, gbm_5min_returns):\n  287|         \"\"\"TSRV should be in the same order of magnitude as 5-min RV.\"\"\"\n  288|         result = tsrv(gbm_log_prices)\n  289|         rv_5min = compute_realized_variance(pd.Series(gbm_5min_returns))\n   ...\n  293| class TestPreAveragedRV:\n  294|     def test_pre_avg_positive(self, gbm_log_prices):\n  295|         result = pre_averaged_rv(gbm_log_prices)\n  296|         assert result > 0\n  297| \n  298|     def test_pre_avg_reasonable(self, gbm_log_prices, gbm_5min_returns):\n  299|         result = pre_averaged_rv(gbm_log_prices)\n  300|         rv_5min = compute_realized_variance(pd.Series(gbm_5min_returns))\n  301|         assert 0.1 * rv_5min < result < 10.0 * rv_5min\n  302| \n  303| \n  304| class TestVolSigPlot:\n  305|     def test_returns_dataframe(self, gbm_log_prices):\n  306|         df = volatility_signature_plot_data(gbm_log_prices)\n  307|         assert isinstance(df, pd.DataFrame)\n  308|         assert \"freq_ticks\" in df.columns\n  309|         assert \"rv\" in df.columns\n  310|         assert len(df) > 5\n  311| \n  312|     def test_rv_increases_at_very_high_freq_with_noise(self):\n   ...\n  326| class TestNoiseGap:\n  327|     def test_positive_when_rk_exceeds_rv(self):\n  328|         assert noise_gap(1.5e-4, 1.0e-4) == pytest.approx(0.5)\n  329| \n  330|     def test_negative_when_rv_exceeds_rk(self):\n  331|         assert noise_gap(0.8e-4, 1.0e-4) == pytest.approx(-0.2)\n  332| \n  333|     def test_zero_rv_returns_zero(self):\n  334|         assert noise_gap(1e-4, 0.0) == 0.0\n   ...\n  342| class TestHARModel:\n  343|     def test_fit_predict_roundtrip(self, synthetic_rv_series):\n  344|         \"\"\"HAR should fit on synthetic data and produce predictions.\"\"\"\n  345|         X = build_har_design_matrix(synthetic_rv_series)\n  346|         y = np.log(synthetic_rv_series)\n  347| \n  348|         # Drop NaN rows\n  349|         valid = ~(X.isna().any(axis=1) | y.isna())\n  350|         X_valid = X.loc[valid]\n   ...\n  405| class TestRidgeLassoHAR:\n  406|     def test_ridge_fits(self, synthetic_rv_series):\n  407|         X = build_har_design_matrix(synthetic_rv_series)\n  408|         y = np.log(synthetic_rv_series)\n  409|         valid = ~(X.isna().any(axis=1) | y.isna())\n  410| \n  411|         model = RidgeHARModel(alpha=1.0)\n  412|         model.fit(X.loc[valid], y.loc[valid])\n  413|         preds = model.predict(X.loc[valid])\n   ...\n  432| class TestQLIKE:\n  433|     def test_perfect_prediction_is_zero(self):\n  434|         y = np.array([-8.0, -9.0, -7.5, -8.5])\n  435|         assert qlike(y, y, log_space=True) == pytest.approx(0.0, abs=1e-15)\n  436| \n  437|     def test_positive_for_imperfect(self):\n  438|         y = np.array([-8.0, -9.0, -7.5, -8.5])\n  439|         h = y + 0.5\n  440|         assert qlike(y, h, log_space=True) > 0\n   ...\n  458| class TestMSE:\n  459|     def test_zero_for_perfect(self):\n  460|         y = np.array([1.0, 2.0, 3.0])\n  461|         assert mse(y, y) == 0.0\n  462| \n  463|     def test_known_value(self):\n  464|         y = np.array([1.0, 2.0])\n  465|         h = np.array([1.5, 2.5])\n  466|         assert mse(y, h) == pytest.approx(0.25)\n  467| \n  468| \n  469| class TestRSquared:\n  470|     def test_perfect_is_one(self):\n  471|         y = np.array([1.0, 2.0, 3.0, 4.0])\n  472|         assert r_squared(y, y) == pytest.approx(1.0)\n  473| \n  474|     def test_mean_is_zero(self):\n  475|         y = np.array([1.0, 2.0, 3.0, 4.0])\n  476|         h = np.full_like(y, np.mean(y))\n  477|         assert r_squared(y, h) == pytest.approx(0.0)\n  478| \n  479| \n  480| class TestQLIKEImprovement:\n  481|     def test_improvement_positive_when_model_better(self):\n  482|         assert qlike_improvement_bps(0.10, 0.09) > 0\n  483| \n  484|     def test_improvement_negative_when_model_worse(self):\n  485|         assert qlike_improvement_bps(0.10, 0.11) < 0\n  486| \n  487|     def test_improvement_zero_when_equal(self):\n  488|         assert qlike_improvement_bps(0.10, 0.10) == 0.0\n  489| \n  490| \n  491| class TestComputeAll:\n  492|     def test_all_keys_present(self):\n  493|         y = np.array([-8.0, -9.0, -7.5, -8.5])\n  494|         h = y + 0.1\n  495|         result = compute_all(y, h)\n  496|         assert set(result.keys()) == {\"qlike\", \"mse\", \"mae\", \"r_squared\"}\n  497| \n  498|     def test_with_model_name(self):\n  499|         y = np.array([-8.0, -9.0, -7.5])\n   ...\n  510| class TestEndToEnd:\n  511|     def test_full_pipeline_synthetic(self):\n  512|         \"\"\"Full pipeline: simulate prices → compute RV & features → fit HAR → evaluate.\"\"\"\n  513|         rng = np.random.default_rng(42)\n  514|         n_days = 300\n  515|         n_returns_per_day = 78  # 5-min\n  516| \n  517|         # Simulate persistent log-IV via AR(1) with ρ=0.93 (realistic)\n  518|         log_iv = np.zeros(n_days)\n   ...\n  577| class TestDuanCorrection:\n  578|     \"\"\"Verify Pipeline applies per-fold Duan retransformation correction.\"\"\"\n  579| \n  580|     def _make_synthetic_rv_df(self, n_days=400, seed=42):\n  581|         \"\"\"Create synthetic daily RV DataFrame mimicking real data.\"\"\"\n  582|         rng = np.random.default_rng(seed)\n  583|         # Simulated persistent log-RV via AR(1)\n  584|         log_rv = np.zeros(n_days)\n  585|         log_rv[0] = -9.0\n\n--- src/tests/research/test_per_symbol_qlike.py ---\n    1| \"\"\"Test: per-symbol QLIKE decomposition produces consistent results.\n    2| \n    3| Verifies that the per-symbol QLIKE analysis script logic is correct:\n    4| - Per-symbol QLIKE values weighted by obs count should equal pooled QLIKE\n    5| - Every symbol contributes a valid QLIKE > 0\n    6| - Improvement (bps) computation is arithmetic-correct\n    7| \"\"\"\n    8| \n    9| import numpy as np\n   10| import pandas as pd\n   11| \n   12| from volforecast.evaluation.metrics import qlike\n   13| \n   14| \n   15| def _make_predictions(n_symbols: int = 5, n_dates: int = 100, seed: int = 42):\n   16|     \"\"\"Create synthetic MultiIndex predictions for testing.\"\"\"\n   17|     rng = np.random.default_rng(seed)\n   18|     symbols = [f\"SYM{i}\" for i in range(n_symbols)]\n   19|     dates = pd.bdate_range(\"2020-01-01\", periods=n_dates)\n   20| \n   21|     # Build MultiIndex series\n   22|     idx_tuples = [(d, s) for s in symbols for d in dates]\n   23|     mi = pd.MultiIndex.from_tuples(idx_tuples, names=[\"date\", \"symbol\"])\n   ...\n   31| \n   32|     # HAR predictions: actuals + noise\n   33|     har_preds = actuals + rng.normal(0, 0.3, len(actuals))\n   34| \n   35|     # LightGBM predictions: closer to actuals (better)\n   36|     lgbm_preds = actuals + rng.normal(0, 0.2, len(actuals))\n   37| \n   38|     return actuals, har_preds, lgbm_preds, symbols\n   39| \n   40| \n   41| def test_pooled_equals_weighted_per_symbol():\n   42|     \"\"\"Pooled QLIKE should equal observation-weighted mean of per-symbol QLIKEs.\"\"\"\n   43|     actuals, har_preds, _, symbols = _make_predictions()\n   44| \n   45|     # Pooled QLIKE\n   46|     pooled_q = qlike(actuals.values, har_preds.values, log_space=True)\n   47| \n   48|     # Per-symbol QLIKE, then weighted average\n   49|     total_obs = 0\n   50|     weighted_sum = 0.0\n   51|     for sym in symbols:\n   52|         mask = actuals.index.get_level_values(\"symbol\") == sym\n   53|         y_true_sym = actuals.values[mask]\n   54|         y_pred_sym = har_preds.values[mask]\n   55|         q_sym = qlike(y_true_sym, y_pred_sym, log_space=True)\n   56|         n = mask.sum()\n   57|         weighted_sum += q_sym * n\n   58|         total_obs += n\n   59| \n   60|     weighted_avg = weighted_sum / total_obs\n   61| \n   62|     # Should be exactly equal (same formula, same data, just different grouping)\n   63|     assert abs(pooled_q - weighted_avg) < 1e-12, (\n   64|         f\"Pooled {pooled_q:.10f} != weighted avg {weighted_avg:.10f}\"\n   65|     )\n   66| \n   67| \n   68| def test_per_symbol_improvement_bps():\n   69|     \"\"\"Improvement in bps should be (baseline - model) / baseline * 10000.\"\"\"\n   70|     actuals, har_preds, lgbm_preds, symbols = _make_predictions()\n   71| \n   72|     for sym in symbols:\n   73|         mask = actuals.index.get_level_values(\"symbol\") == sym\n   74|         y_true = actuals.values[mask]\n   75|         q_har = qlike(y_true, har_preds.values[mask], log_space=True)\n   76|         q_lgbm = qlike(y_true, lgbm_preds.values[mask], log_space=True)\n   ...\n   83| def test_all_symbols_have_valid_qlike():\n   84|     \"\"\"Every symbol must produce QLIKE > 0.\"\"\"\n   85|     actuals, har_preds, _, symbols = _make_predictions()\n   86| \n   87|     for sym in symbols:\n   88|         mask = actuals.index.get_level_values(\"symbol\") == sym\n   89|         q = qlike(actuals.values[mask], har_preds.values[mask], log_space=True)\n   90|         assert q > 0, f\"{sym}: QLIKE must be > 0, got {q}\"\n   91|         assert np.isfinite(q), f\"{sym}: QLIKE must be finite, got {q}\"\n   92| \n   93| \n   94| def test_unequal_symbol_counts():\n   95|     \"\"\"Pooled metric should handle unequal obs counts per symbol correctly.\"\"\"\n   96|     rng = np.random.default_rng(123)\n   97| \n   98|     # Symbol A: 200 obs, Symbol B: 50 obs\n   99|     dates_a = pd.bdate_range(\"2020-01-01\", periods=200)\n  100|     dates_b = pd.bdate_range(\"2020-01-01\", periods=50)\n  101| \n  102|     idx_a = pd.MultiIndex.from_arrays([dates_a, [\"A\"] * 200], names=[\"date\", \"symbol\"])\n\n--- README.md ---\n    1| # ml-vol-estimator\n    2| \n    3| ML realized volatility forecasting — signal discovery. Progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to produce statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.\n    4| \n    5| **Timeline:** ~20-week internship, May–Sep 2026.\n    6| \n    7| ---\n    8| \n    9| ## Quick Start\n   10| \n   11| 1. Open `ml-vol-estimator.code-workspace` in VS Code.\n   12| 2. Boot protocol loads automatically: `memory/person/user.md` + `memory/INDEX.md`.\n   13| 3. Use `/bootup` to start a session — it reads the research journal and orients you.\n   14| 4. Drive work with slash commands: `/research`, `/feature`, `/experiment`, `/backtest`.\n   15| \n   16| See [AGENTS.md](AGENTS.md) for the full project spec, and [workspace/docs/user-manual.md](workspace/docs/user-manual.md) for all commands.\n   17| \n   18| ---\n   19| \n   20| ## CLI\n   21| \n   22| The `vol` wrapper handles uv, PATH, and working directory internally.\n   23| \n   24| ### Wrapper Commands\n   25| \n   26| ```\n   27| vol test [args]               # pytest (extra args forwarded: -k, -v, --tb=short)\n   28| vol testlf [args]             # re-run last-failed tests only\n   29| vol run --config <yaml>       # primary entry point (see below)\n   30| vol status                    # show data ingestion manifest\n   31| vol lint                      # ruff check (read-only)\n   32| vol fmt                       # ruff auto-format\n   33| vol typecheck                 # mypy\n   34| vol sync                      # install/update deps\n   35| vol shell                     # REPL with volforecast importable\n   36| vol notebook                  # jupyter\n   37| vol help                      # usage\n   38| ```\n   39| \n   40| ### Primary Command: `vol run --config <yaml>`\n   41| \n   42| Every `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).\n   43| \n   44| Optional overrides: `--symbols SPY,AAPL` (override YAML universe), `--skip-ingest` (skip data fetch), `--workers 8` (thread count).\n   45| \n   46| ### Examples\n   47| \n   48| ```bash\n   49| # Single-model experiment (ingest + train + evaluate + dashboard)\n   50| vol run --config workspace/configs/baseline_har.yaml\n   51| \n   52| # Tournament: 13 models compared with statistical tests\n   53| vol run --config workspace/configs/tournament_full_spy.yaml\n   54| \n   55| # Skip ingestion (data already cached), subset of symbols\n   56| vol run --config workspace/configs/tournament_har_dev.yaml --skip-ingest --symbols SPY,AAPL\n   57| \n   58| # Ingest only\n   59| vol run --config workspace/configs/ingest_full_universe.yaml --workers 8\n   60| \n\nTASK: Glossary\nIdentify up to 14 terms of art a newcomer to this repo\nmust know: domain concepts, internal names, systems, metrics. For each,\nreturn 'term' (at most 40 characters, spelled the way the codebase\nspells it) and 'def' (one or two plain sentences, at most 300\ncharacters, that teach the concept rather than the code). Add a 'cite'\nwith a verbatim quote where the repo defines or computes the thing,\nwhen the source shown above contains one.\nPrefer terms the repo's own README, docstrings, and file names use.\nSkip generic programming vocabulary.",
+  "windows": [
+    {
+      "file": "src/tests/conftest.py",
+      "start": 18,
+      "end": 35
+    },
+    {
+      "file": "src/tests/conftest.py",
+      "start": 43,
+      "end": 51
+    },
+    {
+      "file": "src/tests/conftest.py",
+      "start": 63,
+      "end": 71
+    },
+    {
+      "file": "src/tests/conftest.py",
+      "start": 82,
+      "end": 157
+    },
+    {
+      "file": "src/tests/conftest.py",
+      "start": 173,
+      "end": 181
+    },
+    {
+      "file": "src/tests/conftest.py",
+      "start": 190,
+      "end": 198
+    },
+    {
+      "file": "src/tests/conftest.py",
+      "start": 203,
+      "end": 241
+    },
+    {
+      "file": "src/tests/conftest.py",
+      "start": 251,
+      "end": 259
+    },
+    {
+      "file": "src/tests/conftest.py",
+      "start": 273,
+      "end": 281
+    },
+    {
+      "file": "src/tests/conftest.py",
+      "start": 293,
+      "end": 298
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 31,
+      "end": 65
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 69,
+      "end": 77
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 118,
+      "end": 126
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 143,
+      "end": 151
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 162,
+      "end": 170
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 204,
+      "end": 212
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 216,
+      "end": 224
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 246,
+      "end": 254
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 296,
+      "end": 304
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 369,
+      "end": 377
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 401,
+      "end": 409
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 432,
+      "end": 440
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 512,
+      "end": 520
+    },
+    {
+      "file": "src/tests/integration/test_data_pipeline.py",
+      "start": 571,
+      "end": 579
+    },
+    {
+      "file": "src/tests/integration/test_pipeline.py",
+      "start": 13,
+      "end": 49
+    },
+    {
+      "file": "src/tests/integration/test_pipeline.py",
+      "start": 54,
+      "end": 62
+    },
+    {
+      "file": "src/tests/integration/test_pipeline.py",
+      "start": 159,
+      "end": 167
+    },
+    {
+      "file": "src/tests/integration/test_pipeline.py",
+      "start": 238,
+      "end": 246
+    },
+    {
+      "file": "src/tests/integration/test_pipeline.py",
+      "start": 255,
+      "end": 263
+    },
+    {
+      "file": "src/tests/integration/test_pipeline.py",
+      "start": 274,
+      "end": 282
+    },
+    {
+      "file": "src/tests/integration/test_pipeline.py",
+      "start": 334,
+      "end": 342
+    },
+    {
+      "file": "src/tests/integration/test_pipeline.py",
+      "start": 492,
+      "end": 500
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 51,
+      "end": 92
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 98,
+      "end": 106
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 124,
+      "end": 132
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 148,
+      "end": 156
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 161,
+      "end": 169
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 180,
+      "end": 188
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 218,
+      "end": 226
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 242,
+      "end": 261
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 281,
+      "end": 289
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 293,
+      "end": 312
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 326,
+      "end": 334
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 342,
+      "end": 350
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 405,
+      "end": 413
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 432,
+      "end": 440
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 458,
+      "end": 499
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 510,
+      "end": 518
+    },
+    {
+      "file": "src/tests/integration/test_rv_pipeline.py",
+      "start": 577,
+      "end": 585
+    },
+    {
+      "file": "src/tests/research/test_per_symbol_qlike.py",
+      "start": 13,
+      "end": 23
+    },
+    {
+      "file": "src/tests/research/test_per_symbol_qlike.py",
+      "start": 31,
+      "end": 76
+    },
+    {
+      "file": "src/tests/research/test_per_symbol_qlike.py",
+      "start": 83,
+      "end": 102
+    },
+    {
+      "file": "README.md",
+      "start": 13,
+      "end": 60
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "terms"
+    ],
+    "properties": {
+      "terms": {
+        "type": "array",
+        "maxItems": 14,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "term",
+            "def"
+          ],
+          "properties": {
+            "term": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "def": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "cite": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "focus": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\4fee597da5ea6e86af4108453b11ff1ea15a3db0b0954c4916ebaca2de28fd42.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\4fee597da5ea6e86af4108453b11ff1ea15a3db0b0954c4916ebaca2de28fd42.json"
+}

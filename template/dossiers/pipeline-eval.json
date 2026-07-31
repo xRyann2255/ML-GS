@@ -1,0 +1,334 @@
+{
+  "area": "pipeline-eval",
+  "overview": "This subsystem is the experiment engine of the vol forecasting project: it decides how models are trained without cheating, and how their forecasts are judged once they exist. An experiment run walks forward through time using the splitters in utils/cv.py (purged k-fold, blocked k-fold, expanding and rolling windows, plus a panel-aware expanding window that splits on unique dates so every symbol for a given date lands in the same fold). Random k-fold is explicitly banned because it leaks future information. Inside each fold, pipeline code prepares model inputs: norm.py fits per-symbol z-score normalisers from training data only, feature_selection.py runs Boruta-style SHAP shadow-feature selection inside the fold, and graph_data.py converts the pooled (date, symbol) panel into per-date graph dicts for GNN models. Because sequence models are expensive, fold_cache.py fingerprints every input that affects a fold (config, horizon, fold number, train and test date hashes, base-model prediction hashes) and skips retraining on an exact match; evaluation/checkpoint.py separately persists each completed model's predictions atomically so an interrupted tournament resumes from the last finished model. Forecasts are made in log-RV space, so metrics.py supplies the Duan retransformation (smearing) to undo the exp bias, and conditional_duan.py upgrades the global correction to a per-sample one using a walk-forward variance model or a VVIX proxy. Scoring is a model tournament: statistical_tests.py computes QLIKE (the primary loss, chosen because it punishes underestimating volatility more than overestimating it), runs panel-aware Diebold-Mariano tests against a baseline (usually HAR), Mincer-Zarnowitz efficiency regressions, and the Hansen Model Confidence Set, then ranks models by QLIKE. tournament_economics.py appends vol-targeting and delta-hedged straddle Sharpe metrics plus five naive baseline rows, aggregate.py persists metrics.json, and tournament_dashboard.py renders an interactive HTML dashboard with per-symbol drill-down and graph diagnostics.",
+  "modules": [
+    {
+      "path": "src/volforecast/pipeline/",
+      "role": "Fold-level orchestration helpers that sit between the CV splitters and the models. fold_cache.py gives sequence models (LSTM/TCN) a content-addressed training cache keyed on a deterministic fingerprint of config, horizon, fold, date hashes and base-model prediction hashes, so unchanged folds are never retrained. norm.py fits and applies per-symbol z-score normalisers computed only from that symbol's training rows, preventing one symbol's vol regime from contaminating another's scaling. conditional_duan.py is a post-processing stage that replaces the global Duan log-to-level correction with per-sample corrections from a walk-forward variance model (or a VVIX proxy). feature_selection.py runs Boruta-style TreeSHAP shadow-feature selection inside each outer CV fold, and graph_data.py bridges the pooled panel into the per-date graph dicts GNN models consume. It feeds trained-model predictions into the evaluation package.",
+      "key_files": [
+        { "file": "fold_cache.py", "purpose": "Skips LSTM/TCN fold training when an identical (config, horizon, fold, split, base preds) fingerprint has already been trained and cached." },
+        { "file": "norm.py", "purpose": "Fits per-symbol (mean, std) normalisers from training data only and applies z-scoring with pad positions re-zeroed." },
+        { "file": "conditional_duan.py", "purpose": "Replaces the global Duan scalar with per-sample sigma squared over 2 corrections estimated walk-forward from prior-fold OOS residuals or a VVIX proxy." },
+        { "file": "feature_selection.py", "purpose": "Boruta-style SHAP shadow-feature selection run inside each CV fold, thresholding real features against permuted shadow importances." },
+        { "file": "graph_data.py", "purpose": "Converts the pooled (date, symbol) panel into one graph dict per date with a fixed node order for GNN models." }
+      ],
+      "concepts": ["fold cache fingerprint", "per-symbol normalisation", "conditional Duan correction", "Jensen gap", "shadow features", "walk-forward residuals"]
+    },
+    {
+      "path": "src/volforecast/utils/",
+      "role": "Hosts the cross-validation protocol layer in cv.py. All splitters are time-ordered: PurgedKFoldCV removes observations within a purge gap of the test block so overlapping RV windows cannot leak, BlockedKFoldCV uses contiguous blocks, ExpandingWindowCV and RollingWindowCV implement walk-forward evaluation, and PanelExpandingWindowCV defines splits on unique dates so all symbols sharing a date fall in the same fold. Every splitter supports an optional embargo that also excludes the window just after each test block from later training sets. The module docstring flags random k-fold as catastrophic look-ahead bias. These splits feed both model training in the pipeline package and the fold-wise correction logic in conditional_duan.py.",
+      "key_files": [
+        { "file": "cv.py", "purpose": "Purged, blocked, expanding, rolling and panel-aware expanding-window CV splitters with purge-gap and embargo controls." }
+      ],
+      "concepts": ["walk-forward CV", "purge gap", "embargo", "look-ahead bias", "panel splitting on dates"]
+    },
+    {
+      "path": "src/volforecast/evaluation/",
+      "role": "Scores forecasts and runs the model tournament. metrics.py defines QLIKE (primary), MSE, MAE, R squared, and the Duan retransformation from log-RV predictions back to variance levels. statistical_tests.py turns per-model predictions into a ranked tournament table: element-wise QLIKE losses, Diebold-Mariano tests vs a baseline with Newey-West HAC errors (panel-aware date averaging), Mincer-Zarnowitz efficiency regressions, the Hansen Model Confidence Set via block bootstrap, plus turbulence-split conditional QLIKE and DM diagnostics. checkpoint.py gives tournaments crash-safe resume at model granularity, aggregate.py persists per-model per-horizon metrics.json, tournament_economics.py appends vol-targeting and delta-hedged straddle economics plus naive baseline rows, and tournament_dashboard.py renders the interactive HTML dashboard with per-symbol delta-hedge drill-down and graph-quality panels.",
+      "key_files": [
+        { "file": "metrics.py", "purpose": "QLIKE, MSE, MAE, R squared, Duan retransformation and the conditional per-sample Duan correction formula." },
+        { "file": "statistical_tests.py", "purpose": "Diebold-Mariano, Model Confidence Set, Mincer-Zarnowitz, the tournament_table builder and turbulence-split diagnostics." },
+        { "file": "checkpoint.py", "purpose": "Atomic per-model checkpoint save/load/list so interrupted tournament runs resume from the last completed model." },
+        { "file": "aggregate.py", "purpose": "Extracts per-model, per-horizon metrics from tournament DataFrames and persists them as metrics.json." },
+        { "file": "tournament_economics.py", "purpose": "Appends vol-targeting and delta-hedged straddle metrics plus five naive DH baseline rows to the stats table." },
+        { "file": "tournament_dashboard.py", "purpose": "Builds the tournament dashboard HTML with per-symbol delta-hedge stats, GSVIVS signal panels and graph diagnostics." }
+      ],
+      "concepts": ["QLIKE", "Diebold-Mariano test", "Model Confidence Set", "Mincer-Zarnowitz regression", "Duan retransformation", "delta-hedged straddle", "vol targeting", "turbulence split"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "The primary evaluation loss is QLIKE, computed in log space as mean(exp(y_true - y_pred) - (y_true - y_pred) - 1), which is algebraically identical to the variance-space form mean(RV/h - log(RV/h) - 1).",
+      "file": "src/volforecast/evaluation/metrics.py",
+      "start": 15,
+      "end": 33,
+      "focus": [22, 23],
+      "quote": "    In variance space: QLIKE = mean(RV/h - log(RV/h) - 1)\n    In log space: QLIKE = mean(exp(y_true - y_pred) - (y_true - y_pred) - 1)"
+    },
+    {
+      "text": "QLIKE is preferred over symmetric losses like RMSE because it penalizes underestimating volatility more severely than overestimating it, matching the economic asymmetry of vol forecasting where being short of realized vol is the expensive mistake.",
+      "file": "src/volforecast/evaluation/metrics.py",
+      "start": 1,
+      "end": 12,
+      "focus": [6, 7],
+      "quote": "QLIKE penalizes underestimation more severely than overestimation,\naligning with the economic asymmetry of volatility forecasting."
+    },
+    {
+      "text": "The QLIKE implementation follows Patton (2011, JBES) on imperfect volatility proxies, and evaluates in log space because it is algebraically equivalent to variance space while avoiding numerical issues.",
+      "file": "src/volforecast/evaluation/metrics.py",
+      "start": 35,
+      "end": 53,
+      "focus": [39, 40, 41],
+      "quote": "        # Per Patton (2011, \"Volatility Forecast Comparison Using Imperfect\n        # Volatility Proxies\", JBES). Log-space and variance-space are\n        # algebraically equivalent; log-space avoids numerical issues."
+    },
+    {
+      "text": "Because models forecast log RV, converting back to variance levels needs the Duan (1995) retransformation: the preferred non-parametric smearing multiplies exp(prediction) by mean(exp(residuals)), with a parametric exp(sigma squared over 2) fallback, since plain exponentiation is systematically biased low.",
+      "file": "src/volforecast/evaluation/metrics.py",
+      "start": 101,
+      "end": 120,
+      "focus": [108, 109],
+      "quote": "    Non-parametric (preferred): RV_hat = exp(log_RV_hat) * mean(exp(residuals))\n    Parametric (fallback):      RV_hat = exp(log_RV_hat + sigma^2 / 2)"
+    },
+    {
+      "text": "The conditional Duan stage exists because the QLIKE-optimal forecast is E[log RV | X] plus half the conditional variance of log RV: when forecast uncertainty varies between calm and spike days a single global scalar under-corrects high-uncertainty days and over-corrects calm ones.",
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "start": 11,
+      "end": 24,
+      "focus": [19],
+      "quote": "    pred_optimal = E[log RV | X] + Var[log RV | X] / 2"
+    },
+    {
+      "text": "The conditional Duan variance model is trained walk-forward: for fold k it fits only on out-of-sample residuals from folds 1 through k-1, so the per-sample variance estimate never uses data from the sample's own time period or later.",
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "start": 1,
+      "end": 14,
+      "focus": [7],
+      "quote": "  For fold k, the variance model trains on OOS residuals from folds 1..k-1."
+    },
+    {
+      "text": "In VVIX proxy mode the conditional Duan correction skips the second XGBoost model entirely and calibrates a linear map from squared VVIX (vol of vol) to residual variance, using VVIX as a direct measure of how uncertain the vol forecast is.",
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "start": 296,
+      "end": 311,
+      "focus": [303, 304],
+      "quote": "    Instead of training a second model, we calibrate a simple linear mapping:\n        σ²(x) = alpha * vvix_squared"
+    },
+    {
+      "text": "The cross-validation module hard-bans random k-fold on time-series data because shuffling puts future observations into training sets, which the docstring calls catastrophic look-ahead bias.",
+      "file": "src/volforecast/utils/cv.py",
+      "start": 1,
+      "end": 17,
+      "focus": [9, 10],
+      "quote": "CRITICAL: Never use random k-fold on time-series data.\nRandom k-fold causes catastrophic look-ahead bias."
+    },
+    {
+      "text": "PurgedKFoldCV deletes observations within a purge-gap window on both sides of each test block, specifically because realized-volatility targets are computed over overlapping windows that would otherwise leak information across the train/test boundary.",
+      "file": "src/volforecast/utils/cv.py",
+      "start": 45,
+      "end": 64,
+      "focus": [48, 49, 50],
+      "quote": "    Splits data into k contiguous folds and purges observations\n    within a gap window between training and test sets to prevent\n    information leakage from overlapping RV windows."
+    },
+    {
+      "text": "PanelExpandingWindowCV splits the multi-symbol panel on unique dates rather than rows, so every symbol observed on a given date lands in the same fold and no fold can train on one symbol's data from a date it is tested on for another symbol.",
+      "file": "src/volforecast/utils/cv.py",
+      "start": 204,
+      "end": 221,
+      "focus": [207, 208, 209],
+      "quote": "    Splits are defined on **unique dates** in the index, then mapped\n    to all rows sharing those dates. This ensures all symbols for a\n    given date land in the same fold, preventing cross-temporal leakage."
+    },
+    {
+      "text": "The fold cache skips retraining sequence models when an identical fold has already been trained: entries are keyed on a deterministic fingerprint of every input affecting the trained model, so changing model params, features, train dates or base predictions invalidates the right entries automatically.",
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 1,
+      "end": 16,
+      "focus": [3, 4, 5, 6, 7],
+      "quote": "Skips fold-level training when an identical fold has already been trained\nunder the same config + data + CV split + base-model predictions. Cache is\nkeyed on a deterministic fingerprint of every input that affects the trained\nmodel's outputs, so any change (model params, sequence features, train dates,\nbase preds) invalidates the relevant entries automatically."
+    },
+    {
+      "text": "When residual stacking is active the fold cache key hashes the per-fold base-model predictions, so retraining or changing the base model automatically invalidates the cached LSTM folds built on top of it.",
+      "file": "src/volforecast/pipeline/fold_cache.py",
+      "start": 88,
+      "end": 110,
+      "focus": [94, 95, 96],
+      "quote": "    Includes hashes of the per-fold base-model predictions (when residual\n    stacking is active) so a change in the base model auto-invalidates the\n    LSTM cache."
+    },
+    {
+      "text": "With norm_mode set to per_symbol, sequence features are z-scored using statistics computed only from that symbol's own training data, so one symbol's volatility regime (the docstring's example is NVDA) cannot dilute another symbol's normaliser (SPY).",
+      "file": "src/volforecast/pipeline/norm.py",
+      "start": 1,
+      "end": 12,
+      "focus": [3, 4, 5, 6],
+      "quote": "When ``norm_mode=\"per_symbol\"``, each symbol's rows are normalised using\nstatistics computed only from that symbol's training data. This avoids\nblending regimes across symbols (e.g. NVDA's vol characteristics diluting\nSPY's normaliser)."
+    },
+    {
+      "text": "Tournament runs are resumable at model granularity: each completed model's per-horizon predictions and actuals are written as parquet plus a meta.json manifest using write-to-tmp then os.replace for crash safety, so an interrupted run restarts from the last finished model.",
+      "file": "src/volforecast/evaluation/checkpoint.py",
+      "start": 38,
+      "end": 52,
+      "focus": [43, 44],
+      "quote": "    Writes parquet files for each horizon plus a meta.json manifest.\n    Uses write-to-tmp + os.replace() for crash safety."
+    },
+    {
+      "text": "Model pairs are compared with the Diebold-Mariano test of equal predictive accuracy on their loss differential, using Newey-West HAC standard errors with a Bartlett kernel and bandwidth h-1 to handle the serial correlation that multi-step forecasts induce.",
+      "file": "src/volforecast/evaluation/statistical_tests.py",
+      "start": 30,
+      "end": 49,
+      "focus": [34, 35, 36],
+      "quote": "    Tests H0: E[d_t] = 0 where d_t = L(e_1t) - L(e_2t).\n    Uses Newey-West HAC standard errors (Bartlett kernel, bandwidth h-1)\n    for multi-step forecasts per Diebold & Mariano (1995, JBES)."
+    },
+    {
+      "text": "For multi-symbol panels the DM test averages loss differentials per date before computing the HAC variance, preventing Newey-West lags from spuriously crossing symbol boundaries in the pooled array.",
+      "file": "src/volforecast/evaluation/statistical_tests.py",
+      "start": 50,
+      "end": 68,
+      "focus": [57, 58, 59],
+      "quote": "        Number of cross-sectional units (symbols) in a panel. When provided\n        and > 1, loss differentials are averaged per date before computing HAC\n        variance, preventing Newey-West lags from crossing symbol boundaries."
+    },
+    {
+      "text": "Beyond pairwise tests, the Hansen et al. (2011) Model Confidence Set identifies the subset of models containing the best one at a given confidence level, by sequentially eliminating the worst model using the range statistic and a block bootstrap.",
+      "file": "src/volforecast/evaluation/statistical_tests.py",
+      "start": 143,
+      "end": 162,
+      "focus": [149, 150, 151],
+      "quote": "    Identifies the set of models that contains the best model\n    with (1-alpha) confidence via sequential elimination using the\n    range statistic T_R and block bootstrap."
+    },
+    {
+      "text": "The model tournament is a single ranked table (sorted by QLIKE ascending) that combines QLIKE, MSE, R squared, the Diebold-Mariano test against a baseline, Mincer-Zarnowitz efficiency regression, and Model Confidence Set membership for every competing model.",
+      "file": "src/volforecast/evaluation/statistical_tests.py",
+      "start": 474,
+      "end": 490,
+      "focus": [480, 481],
+      "quote": "    Combines QLIKE, MSE, R-squared, Diebold-Mariano test, Mincer-Zarnowitz\n    regression, and Model Confidence Set into a single ranked table."
+    },
+    {
+      "text": "Regime-conditional scoring splits QLIKE into calm and turbulent buckets by date: a date is turbulent when market RV sits in the top decile, all symbols on that date share the bucket, implementing the Zhang et al. (2025) GNNHAR Table 2 protocol.",
+      "file": "src/volforecast/evaluation/statistical_tests.py",
+      "start": 646,
+      "end": 669,
+      "focus": [655, 656, 657, 658],
+      "quote": "    Bucket membership is decided on DATES: an observation is turbulent if its\n    date's market RV is in the top ``quantile`` of all dates. All symbols on a\n    turbulent date share the turbulent bucket. This implements the Zhang\n    et al. (2025) \"GNNHAR\" Table 2 protocol (top-decile SPY-RV split)."
+    },
+    {
+      "text": "Economic evaluation appends five naive delta-hedged straddle baseline rows (always long, always short, always flat, random, and random without flipping) to the tournament table, so any model's delta-hedged Sharpe can be read against strategies that use no forecast at all.",
+      "file": "src/volforecast/evaluation/tournament_economics.py",
+      "start": 382,
+      "end": 398,
+      "focus": [391],
+      "quote": "    \"\"\"Append 5 naive DH baseline rows: always_long/short/flat/random/random_no_flip.\"\"\""
+    }
+  ],
+  "glossary": [
+    {
+      "term": "QLIKE",
+      "definition": "Quasi-likelihood loss for volatility forecasts, mean(RV/h - log(RV/h) - 1). It is robust to noisy volatility proxies and punishes underestimating volatility more than overestimating it, which is why it is the primary ranking metric.",
+      "file": "src/volforecast/evaluation/metrics.py",
+      "line": 22
+    },
+    {
+      "term": "Duan retransformation",
+      "definition": "Bias correction applied when converting log-space RV forecasts back to variance levels, since exp of an unbiased log forecast is biased low. The non-parametric smearing form multiplies by mean(exp(residuals)).",
+      "file": "src/volforecast/evaluation/metrics.py",
+      "line": 106
+    },
+    {
+      "term": "Conditional Duan correction",
+      "definition": "Per-sample version of the Duan correction: adds half the estimated conditional residual variance to each log prediction, giving high-uncertainty days a larger correction than calm days.",
+      "file": "src/volforecast/evaluation/metrics.py",
+      "line": 143
+    },
+    {
+      "term": "Diebold-Mariano test",
+      "definition": "Hypothesis test of equal predictive accuracy between two forecast models, run on their per-observation loss differential with HAC standard errors. Positive statistics here mean the second model has lower loss.",
+      "file": "src/volforecast/evaluation/statistical_tests.py",
+      "line": 32
+    },
+    {
+      "term": "Model Confidence Set",
+      "definition": "Hansen et al. (2011) procedure that returns the set of models statistically indistinguishable from the best at a chosen confidence level, via sequential bootstrap elimination.",
+      "file": "src/volforecast/evaluation/statistical_tests.py",
+      "line": 147
+    },
+    {
+      "term": "Mincer-Zarnowitz regression",
+      "definition": "Regression of realized variance on forecast variance; an efficient forecast has intercept 0 and slope 1 jointly, tested with HAC standard errors.",
+      "file": "src/volforecast/evaluation/statistical_tests.py",
+      "line": 381
+    },
+    {
+      "term": "Purge gap",
+      "definition": "Window of observations removed around each test block during CV so overlapping realized-volatility windows cannot leak information between train and test sets.",
+      "file": "src/volforecast/utils/cv.py",
+      "line": 49
+    },
+    {
+      "term": "Embargo",
+      "definition": "CV option that also excludes the window just after each test block from the training sets of all subsequent folds, on top of the purge gap.",
+      "file": "src/volforecast/utils/cv.py",
+      "line": 52
+    },
+    {
+      "term": "Walk-forward CV",
+      "definition": "Expanding-window evaluation where the training window grows through time and the test window always lies strictly after it, mimicking live deployment.",
+      "file": "src/volforecast/utils/cv.py",
+      "line": 135
+    },
+    {
+      "term": "VVIX proxy",
+      "definition": "Mode of the conditional Duan stage that uses squared VVIX (the vol-of-vol index) scaled by a walk-forward calibrated alpha as the conditional variance estimate, instead of training a second model.",
+      "file": "src/volforecast/pipeline/conditional_duan.py",
+      "line": 302
+    },
+    {
+      "term": "Delta-hedged straddle",
+      "definition": "Options position whose profit isolates the gap between realized and implied volatility; the tournament uses its Sharpe ratio to translate forecast accuracy into economic value.",
+      "file": "src/volforecast/evaluation/tournament_economics.py",
+      "line": 42
+    },
+    {
+      "term": "Turbulence split",
+      "definition": "Regime-conditional diagnostic that buckets dates into calm vs turbulent by market RV quantile and reports QLIKE and DM results separately per bucket.",
+      "file": "src/volforecast/evaluation/statistical_tests.py",
+      "line": 653
+    }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "Which loss function ranks models in the tournament, and why that one?",
+      "options": [
+        "RMSE, because it is the standard regression loss",
+        "QLIKE, because it penalizes underestimating volatility more than overestimating it",
+        "MAE, because it is robust to outliers",
+        "R squared, because it is easiest to interpret"
+      ],
+      "answer": 1,
+      "provenance": "src/volforecast/evaluation/metrics.py:3-7 names QLIKE as the primary metric and states the asymmetry; src/volforecast/evaluation/statistical_tests.py:609 sorts the tournament table by qlike ascending.",
+      "explanation": "metrics.py declares QLIKE the primary metric because it penalizes underestimation more severely, matching the economic asymmetry of vol forecasting, and tournament_table sorts models by QLIKE ascending."
+    },
+    {
+      "kind": "single",
+      "prompt": "Why does this repo forbid random k-fold cross validation?",
+      "options": [
+        "It is slower than blocked k-fold",
+        "It produces folds of unequal size",
+        "It leaks future information into training, causing look-ahead bias",
+        "It cannot handle multiple symbols"
+      ],
+      "answer": 2,
+      "provenance": "src/volforecast/utils/cv.py:9-10 states never use random k-fold on time-series data because it causes catastrophic look-ahead bias.",
+      "explanation": "Shuffled folds put future observations in the training set of earlier test periods; cv.py calls this catastrophic look-ahead bias and provides purged, blocked and walk-forward splitters instead."
+    },
+    {
+      "kind": "single",
+      "prompt": "For fold k, the conditional Duan variance model trains on which data?",
+      "options": [
+        "Fold k's own test residuals",
+        "Out-of-sample residuals from folds 1 through k-1",
+        "In-sample training residuals from all folds",
+        "The full sample of residuals including future folds"
+      ],
+      "answer": 1,
+      "provenance": "src/volforecast/pipeline/conditional_duan.py:7 states the variance model for fold k trains on OOS residuals from folds 1..k-1.",
+      "explanation": "The walk-forward protocol guarantees each sample's variance estimate uses only temporally prior data, so the correction itself cannot leak."
+    },
+    {
+      "kind": "single",
+      "prompt": "Under this repo's Diebold-Mariano sign convention, a positive DM statistic means what?",
+      "options": [
+        "Model 1 has lower loss (model 1 better)",
+        "Model 2 has lower loss (model 2 better)",
+        "The two models are exactly tied",
+        "The test failed to converge"
+      ],
+      "answer": 1,
+      "provenance": "src/volforecast/evaluation/statistical_tests.py:42-43 states the sign convention: positive DM statistic means model 2 has lower loss.",
+      "explanation": "The statistic is built from d = loss_1 - loss_2, so a positive mean differential means model 1's losses are larger and model 2 is better."
+    }
+  ],
+  "confirmed_missing": [
+    "volforecast/config.py (ExperimentConfig) imported by src/volforecast/pipeline/fold_cache.py:33 and src/volforecast/evaluation/checkpoint.py:17 but absent from the restore",
+    "volforecast/data/edrvol.py (load_edrvs_cache, load_iv_cache) imported by src/volforecast/evaluation/tournament_dashboard.py:18 but absent from the restore",
+    "volforecast/visualization/dashboard.py (build_tournament_dashboard, save_tournament_dashboard) imported inside generate_dashboard at src/volforecast/evaluation/tournament_dashboard.py:264-267 but absent (visualization/ contains only __init__.py and lineage.py)"
+  ]
+}

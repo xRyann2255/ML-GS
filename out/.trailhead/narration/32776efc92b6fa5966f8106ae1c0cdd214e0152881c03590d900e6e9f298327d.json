@@ -1,0 +1,29 @@
+{
+  "role": [
+    "Point-in-time graph construction for the graph-based volatility models. The rule that defines the package: a graph used to forecast date t is estimated on data up to t only, re-estimated every 21 trading days on a trailing 252-day window, and frozen between refits, so the network structure itself cannot leak the future. `build_graph_schedule` turns any builder into such a schedule, and dates with too little history get an empty snapshot rather than a peek ahead.",
+    "Every builder satisfies the `GraphBuilder` protocol and returns an immutable `GraphSnapshot`: COO edge indices and float32 weights over an ordered symbol tuple. Numpy-first by design: linear models like GHAR consume dense adjacencies without importing torch, and neural models call `to_torch()`. Estimated builders (correlation threshold, kNN, GLASSO, the directed Diebold-Yilmaz spillover graph) sit alongside the structural controls in simple.py, where identity is the no-graph control: GHAR on the identity graph equals plain pooled [[HAR]].",
+    "diagnostics.py watches two published failure modes, crisis density explosion of thresholded correlation graphs and GLASSO edge instability across refits, tracked as consecutive-refit edge-set Jaccard. It also supplies the magnetic Laplacian and graph signal energy diagnostics that back the GSP-HAR model."
+  ],
+  "reads": "Trailing windows of the daily returns panel from `data`, pre-sliced so a builder only ever sees rows at or before its estimation date.",
+  "feeds": "GraphSnapshot schedules feed the GHAR and GNN models in `models`: dense adjacencies for the linear models, torch tensors for the neural ones.",
+  "key_files": [
+    { "file": "base.py", "purpose": "GraphSnapshot, the GraphBuilder protocol, and build_graph_schedule, the point-in-time scheduler with window=252 and refit_every=21 defaults." },
+    { "file": "diagnostics.py", "purpose": "Density and degree stats, refit-to-refit edge Jaccard stability, and the magnetic Laplacian and graph signal energy behind GSP-HAR." },
+    { "file": "simple.py", "purpose": "Structural builders needing no estimation: identity (the no-graph control), full with uniform 1/(N-1) weights, and the GICS sector graph." },
+    { "file": "__init__.py", "purpose": "Re-exports the snapshot, protocol, and scheduler that every graph consumer imports." }
+  ],
+  "concepts": [
+    "point-in-time protocol",
+    "GraphSnapshot",
+    "GraphBuilder protocol",
+    "edge Jaccard",
+    "magnetic Laplacian",
+    "no-graph control"
+  ],
+  "cite": {
+    "file": "src/volforecast/graphs/base.py",
+    "quote": "def build_graph_schedule(\n    returns: pd.DataFrame,\n    dates: list[Any],\n    builder: GraphBuilder,\n    *,\n    window: int = 252,\n    refit_every: int = 21,\n    min_history: int = 60,\n    on_progress: Any | None = None,",
+    "focus": ["window: int = 252", "refit_every: int = 21"]
+  },
+  "caption": "The point-in-time scheduler: refit every 21 trading days on a trailing 252-day window."
+}

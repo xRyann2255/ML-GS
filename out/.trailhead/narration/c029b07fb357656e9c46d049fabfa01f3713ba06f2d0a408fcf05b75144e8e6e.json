@@ -1,0 +1,86 @@
+{
+ "claims": [
+  {
+   "text": "Every horizon is judged against implied vol of matching maturity: one day ahead uses the prev close 1 DTE varswap fair vol captured with no lookahead, weekly horizons the 1 week ATM tenor, monthly the 1 month, so the IV-RV gap always compares like with like.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/evaluation/economic_value.py",
+    "quote": "    \"\"\"Map forecast horizon to the appropriate IV column and tenor days.\n\n    Uses the closest available tenor to match the forecast window:\n      - h == 1:  iv_vs_0dte with tenor_days=1 (prev-close 1-DTE varswap\n                 from EDRVS_EXPIRY_INTRADAY — correct measure for GSVIVS\n                 signal. Captured at 16:00 ET day before, no lookahead.)\n      - h <= 5:  iv_1w_atm with tenor_days=5 (weekly straddle)\n      - h > 5:   iv_1m_atm with tenor_days=22 (monthly straddle)",
+    "focus": [
+     "      - h == 1:  iv_vs_0dte with tenor_days=1 (prev-close 1-DTE varswap"
+    ]
+   }
+  },
+  {
+   "text": "The units here have already survived one real bug: Kvar and the RV forecast are both annualized, an earlier sqrt(h) deflation artificially suppressed the implied side of the gap beyond one day, and the fix is documented as a deliberate no-op.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/evaluation/economic_value.py",
+    "quote": "    \"\"\"No-op — Kvar is already in annualized vol and needs no horizon scaling.\n\n    Previously this divided by sqrt(h) to convert the 24h-tenor Kvar into a\n    multi-day proxy.  That was incorrect: both the Kvar (annualized from T=24h)\n    and the RV forecast (annualized via sqrt(252 * daily_var)) are already in\n    the same units regardless of forecast horizon h.  The sqrt(h) deflation\n    artificially suppressed the implied-vol side of the IV-RV gap at h>1.\n",
+    "focus": [
+     "    artificially suppressed the implied-vol side of the IV-RV gap at h>1."
+    ]
+   }
+  },
+  {
+   "text": "The GSVIVS signal ships four sizing variants as one dashboard toggle, `binary`, `asym_long`, `zscore`, and `long_flat`, each a frozen spec, so every variant a reader meets in a results table is reproducible from config.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/evaluation/economic_value.py",
+    "quote": "@dataclass(frozen=True)\nclass GsvivsSizingSpec:\n    \"\"\"A single GSVIVS signal-sizing configuration.\n\n    One spec drives one variant of the trading signal in the dashboard. The\n    default 4-element list (:data:`DEFAULT_GSVIVS_SIZING_SPECS`) is the\n    four-option toggle exposed on the GSVIVS table: ``binary``,\n    ``asym_long`` (L=2), ``zscore`` (L=1), ``long_flat``.",
+    "focus": [
+     "    four-option toggle exposed on the GSVIVS table: ``binary``,"
+    ]
+   }
+  },
+  {
+   "text": "Model comparison is panel aware: the Diebold-Mariano test averages loss differentials per date before its Newey-West variance, so serial correlation lags never cross symbol boundaries in a pooled multi-symbol panel.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/evaluation/statistical_tests.py",
+    "quote": "    n_cross_sections : int | None\n        Number of cross-sectional units (symbols) in a panel. When provided\n        and > 1, loss differentials are averaged per date before computing HAC\n        variance, preventing Newey-West lags from crossing symbol boundaries.",
+    "focus": [
+     "        and > 1, loss differentials are averaged per date before computing HAC"
+    ]
+   }
+  },
+  {
+   "text": "Every run ends in a tournament: all models score against a named baseline, `har` by default, and a [[Model Confidence Set]] bootstrapped 10,000 times says which models are statistically indistinguishable from the best.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/evaluation/statistical_tests.py",
+    "quote": "def tournament_table(\n    predictions: dict[str, np.ndarray],\n    y_true: np.ndarray,\n    baseline: str = \"har\",\n    horizon: int = 1,\n    mcs_alpha: float = 0.10,\n    mcs_bootstrap: int = 10_000,",
+    "focus": [
+     "    baseline: str = \"har\",",
+     "    mcs_bootstrap: int = 10_000,"
+    ]
+   }
+  },
+  {
+   "text": "Costs are honest: option spreads follow the Doshi et al. 2025 schedule, 4.5 times base inside 6 remaining trading days and 1.75 times inside 13, which is exactly why the realistic backtest rolls positions before expiry.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/evaluation/realistic_straddle.py",
+    "quote": "    if T_rem_days <= 6:\n        return base_spread * 4.5\n    elif T_rem_days <= 13:\n        return base_spread * 1.75\n    else:\n        return base_spread",
+    "focus": [
+     "        return base_spread * 4.5"
+    ]
+   }
+  },
+  {
+   "text": "Discrete hedging risk is priced rather than ignored: a Boyle-Emanuel 1980 variance term for 26 rebalances a day inflates the Sharpe denominator, so a strategy cannot look sharp by pretending it hedges continuously.",
+   "status": "verified",
+   "cite": {
+    "file": "src/volforecast/evaluation/realistic_straddle.py",
+    "quote": "def compute_hedge_error_variance(\n    gamma: np.ndarray,\n    spot: np.ndarray,\n    iv: np.ndarray,\n    kappa: float = 4.0,\n    N: int = 26,\n) -> np.ndarray:\n    \"\"\"Per-day discrete hedging error variance (Boyle-Emanuel 1980).",
+    "focus": [
+     "    \"\"\"Per-day discrete hedging error variance (Boyle-Emanuel 1980)."
+    ]
+   }
+  },
+  {
+   "text": "What this package does not do is trade: every number is a backtest over cached data, and its most actionable output is a Sharpe ratio with honest error bars, not an order.",
+   "status": "inferred"
+  }
+ ]
+}

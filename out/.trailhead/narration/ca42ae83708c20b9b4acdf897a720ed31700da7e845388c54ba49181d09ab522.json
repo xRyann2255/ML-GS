@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "id": "n-src-volforecast-models",
+      "text": "The model zoo: 22 files behind `MODEL_REGISTRY`, from HAR baselines through LightGBM and LSTM to `gnn.py`, a Graph Attention Network treating each date as a graph of symbols with rolling-correlation edges. Its training loss is QLIKE in log-RV space, exp(diff) minus diff minus 1, the same metric the whole project is judged on."
+    },
+    {
+      "id": "n-src-volforecast-cli",
+      "text": "The operator console: 28 modules, one per subcommand, each exposing `register(subparsers)` so `__main__` can assemble the parser lazily. `audit.py` alone is the data-quality gate: it checks every cached parquet against manifest contracts, grades per-layer readiness, and appends its findings to the research journal."
+    },
+    {
+      "id": "n-src-volforecast-features",
+      "text": "Feature engineering layers 0 to 6, registered via `FEATURE_REGISTRY`. `calendar.py` is Layer 5 and shows the leakage discipline: FOMC, NFP, and OpEx proximity are known in advance, so unlike market-derived features they get no shift(1) lag, and day_of_week stays an integer dtype so LightGBM treats it as categorical."
+    },
+    {
+      "id": "n-src-volforecast-reporting",
+      "text": "The honest gap: `html_report.py` defines `generate_report`, meant to assemble metrics, predictions, and Plotly sections into one HTML file per experiment, but its body raises NotImplementedError and points at workspace/plans/html-report.md for the plan. Experiment visuals come from the tournament dashboard instead."
+    },
+    {
+      "id": "n-src-volforecast-visualization",
+      "text": "Reporting's small companion: `lineage.py` turns a lineage spec of base_model plus feature_stack into a Mermaid flowchart, so a reader can see which sequence model fed which engineered features into the main model. `_build_model_sublabel` stamps real hyperparameters like hidden_dim and layer count onto each node."
+    },
+    {
+      "id": "n-src-volforecast-pipeline",
+      "text": "Post-processing with a leakage guarantee: `conditional_duan.py` swaps the global Duan bias correction for a per-sample one, training a lightweight variance model on prior folds' OOS residuals and adding half the predicted variance to each forecast. Fold k only ever sees residuals from folds 1 to k-1, so nothing flows backward in time."
+    },
+    {
+      "id": "n-src-volforecast-data",
+      "text": "The supply side: 21 files and 9195 lines that fetch and cache ticks, OHLCV, IV surfaces, and cross-asset series as parquet, with fan-in 8. Every forecast starts here, and the run pipeline's ingest gate consults this cache, fetching only universe symbols whose RV parquet is missing from disk."
+    },
+    {
+      "id": "n-src-volforecast",
+      "text": "The package root states the thesis: progressively enrich HAR-family baselines with microstructure, options-implied, and cross-asset features toward QLIKE gains and a tradeable IV-RV gap signal. `__main__.py` is the sole entry point behind the volforecast console script, and `registry.py` is the hub roughly 70 modules import from."
+    },
+    {
+      "id": "n-src-volforecast-evaluation",
+      "text": "Where forecasts are judged: 7031 lines computing QLIKE metrics, MCS bootstrap and Diebold-Mariano tests, and delta-hedged straddle P&L that turns accuracy into money. `economic_value.py` runs standalone under its own main guard; the central tournament.py the CLI imports is absent from this restore, one of 14 dangling imports."
+    },
+    {
+      "id": "n-src-volforecast-graphs",
+      "text": "The adjacency half of the GNN story: registered graph builders construct one snapshot per date, symbols as nodes and edges where rolling correlation clears a threshold, the defaults `gnn.py` passes being a 60-day window and 0.3 cutoff. Cross-asset volatility spillover enters the models here, as structure rather than as features."
+    },
+    {
+      "id": "n-src-volforecast-utils",
+      "text": "The quiet dependency hub: fan-in 10, higher than any other package, so models, data, features, and evaluation all lean on these seven files. Conventions set in its 1552 lines propagate everywhere, which makes it the first place to look when the same behavior shows up across otherwise unrelated parts of the pipeline."
+    }
+  ]
+}

@@ -1,0 +1,159 @@
+{
+  "unit": "dive:src-volforecast-features",
+  "kind": "dive",
+  "title": "Inside features",
+  "max_claims": 8,
+  "key": "4d2d25b90ff3a1517211bf7da6ce12216778392d48d467bb6b8df93e0a6dfade",
+  "system": "You are the narration stage of Trailhead, a tool that generates a walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Every\nquote you return is searched for verbatim in the file on disk; anything that is\nnot found exactly is deleted and counted on screen. You cannot talk your way\npast the checker, so do not try: an honest \"inferred\" sentence survives, an\ninvented quote does not.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. `cite.quote` is a VERBATIM, CONTIGUOUS copy of 3-24 lines from ONE file,\n   lines joined with newlines. Copy the leading indentation exactly, character\n   for character. Do not reflow, re-indent, elide, or add an ellipsis.\n4. Quote only code you were shown below. Quoting something you inferred exists\n   is the single most expensive thing you can do here.\n5. `cite.focus` is an array of exact substrings of your own `cite.quote`, the\n   one or two lines that actually carry the point.\n6. If you cannot support a sentence with a quote, set `\"status\": \"inferred\"` and\n   omit `cite` entirely. That is a legitimate, visible answer, not a failure.\n7. `text` is one plain sentence, at most 280 characters. Backticks may mark\n   code identifiers and [[term]] or [[id|label]] may mark a glossary term.\n   No newlines, no markdown links, no `<`. Use commas instead of dashes.\n8. Say what the system DOES in its own domain's terms. When the README or a\n   package docstring states the project's purpose, that purpose is the story;\n   argument parsing, CLI wiring, and directory layout are never what a repo\n   is for.\n9. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"this codebase appears to\", say what it does.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/volforecast/features/calendar.py ---\n    1| \"\"\"Calendar and event features (Layer 5).\n    2| \n    3| Captures scheduled macro events and calendar effects on volatility:\n    4| - FOMC meeting proximity\n    5| - Non-Farm Payrolls (NFP) proximity\n    6| - Options expiration (OpEx) effects\n    7| - Day-of-week and month effects\n    8| \n    9| Calendar features are KNOWN IN ADVANCE — no .shift(1) applied.\n   10| day_of_week and month are CATEGORICAL (integer dtype for LightGBM).\n   11| \n   12| Key functions:\n   ...\n  153| def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:\n  154|     \"\"\"Return the nth occurrence of weekday in month.\n  155| \n  156|     Parameters\n  157|     ----------\n  158|     year : int\n  159|     month : int\n  160|     weekday : int\n  161|         0=Monday, 4=Friday.\n   ...\n  180| def _next_fomc(target: date) -> date | None:\n  181|     \"\"\"Find next FOMC date on or after target.\"\"\"\n  182|     for d in _FOMC_DATES:\n  183|         if d >= target:\n  184|             return d\n  185|     return None\n  186| \n  187| \n  188| def _next_nfp(target: date) -> date:\n  189|     \"\"\"Find next NFP date on or after target. NFP = first Friday of month.\"\"\"\n  190|     year, month = target.year, target.month\n  191|     nfp = _nth_weekday(year, month, 4, 1)  # First Friday\n  192|     if nfp < target:\n  193|         # Move to next month\n  194|         if month == 12:\n  195|             year += 1\n  196|             month = 1\n   ...\n  203| def _next_opex(target: date) -> date:\n  204|     \"\"\"Find next OpEx date on or after target. OpEx = third Friday of month.\"\"\"\n  205|     year, month = target.year, target.month\n  206|     opex = _nth_weekday(year, month, 4, 3)  # Third Friday\n  207|     if opex < target:\n  208|         # Move to next month\n  209|         if month == 12:\n  210|             year += 1\n  211|             month = 1\n   ...\n  218| def _busday_count(start: date, end: date) -> int:\n  219|     \"\"\"Count business days between start (exclusive) and end (inclusive).\"\"\"\n  220|     return int(np.busday_count(start, end))\n  221| \n  222| \n  223| # ---------------------------------------------------------------------------\n  224| # Public compute functions\n  225| # ---------------------------------------------------------------------------\n  226| \n  227| \n  228| def compute_fomc_proximity(dates: pd.DatetimeIndex) -> pd.DataFrame:\n  229|     \"\"\"Compute FOMC proximity features for a date index.\n  230| \n  231|     Returns\n  232|     -------\n  233|     pd.DataFrame\n  234|         Columns: days_to_fomc (trading days), fomc_week (bool->int), fomc_day (bool->int).\n  235|     \"\"\"\n  236|     days_to = []\n  237|     fomc_week = []\n  238|     fomc_day = []\n  239| \n  240|     for dt in dates:\n  241|         d = dt.date() if hasattr(dt, \"date\") else dt\n  242|         is_fomc = d in _FOMC_SET\n  243|         nxt = _next_fomc(d)\n  244|         if nxt is None:\n  245|             dist = 30  # fallback for dates beyond 2026\n  246|         elif nxt == d:\n  247|             dist = 0\n  248|         else:\n  249|             dist = _busday_count(d, nxt)\n  250| \n  251|         days_to.append(dist)\n  252|         fomc_week.append(1 if dist <= 5 else 0)\n  253|         fomc_day.append(1 if is_fomc else 0)\n  254| \n  255|     return pd.DataFrame(\n  256|         {\"days_to_fomc\": days_to, \"fomc_week\": fomc_week, \"fomc_day\": fomc_day},\n  257|         index=dates,\n  258|     )\n  259| \n  260| \n  261| def compute_nfp_proximity(dates: pd.DatetimeIndex) -> pd.DataFrame:\n  262|     \"\"\"Compute NFP proximity features for a date index.\n  263| \n  264|     Returns\n  265|     -------\n  266|     pd.DataFrame\n  267|         Columns: days_to_nfp (trading days), nfp_week (bool->int).\n  268|     \"\"\"\n  269|     days_to = []\n   ...\n  285| def compute_opex_proximity(dates: pd.DatetimeIndex) -> pd.DataFrame:\n  286|     \"\"\"Compute options expiration proximity features for a date index.\n  287| \n  288|     Returns\n  289|     -------\n  290|     pd.DataFrame\n  291|         Columns: days_to_opex (trading days), opex_week (bool->int).\n  292|     \"\"\"\n  293|     days_to = []\n   ...\n  309| def compute_calendar_dummies(dates: pd.DatetimeIndex) -> pd.DataFrame:\n  310|     \"\"\"Compute calendar dummy features.\n  311| \n  312|     Returns\n  313|     -------\n  314|     pd.DataFrame\n  315|         Columns: day_of_week (0-4, int), month (1-12, int),\n  316|         quarter_end (1 if in last 5 trading days of quarter),\n  317|         year_end (1 if in last 10 trading days of December).\n   ...\n  362| @register_feature_layer(\"calendar\")\n  363| class CalendarLayer:\n  364|     \"\"\"Calendar/event feature layer (Layer 5).\n  365| \n  366|     Calendar features are known in advance — no shift(1) applied.\n  367|     Context is accepted but ignored.\n  368|     \"\"\"\n  369| \n  370|     name = \"calendar\"\n\n--- src/volforecast/features/microstructure.py ---\n    1| \"\"\"Microstructure features (Layer 3).\n    2| \n    3| Computes daily features from two cached data sources:\n    4| 1. Daily aggregates (data/raw/micro/{SYM}.parquet):\n    5|    - signed_volume_ratio, vpin, order_flow_imbalance, volumes\n    6| 2. Intraday 10s bar sequences (data/raw/micro/sequences/{SYM}.parquet):\n    7|    - Kyle's lambda, Amihud illiquidity, volume concentration,\n    8|      intraday vol ratio, flow persistence\n    9| \n   10| Key functions:\n   11|     compute_kyle_lambda         — Price impact (OLS slope of Δprice on net_flow)\n   12|     compute_amihud              — Amihud (2002) illiquidity ratio\n   ...\n   27| from volforecast.registry import register_feature_layer\n   28| \n   29| logger = logging.getLogger(__name__)\n   30| \n   31| \n   32| # ---------------------------------------------------------------------------\n   33| # Intraday feature computation functions\n   34| # ---------------------------------------------------------------------------\n   35| \n   36| \n   37| def compute_kyle_lambda(\n   38|     price_changes: np.ndarray,\n   39|     net_flow: np.ndarray,\n   40| ) -> float:\n   41|     \"\"\"Compute Kyle's lambda (price impact coefficient).\n   42| \n   43|     OLS regression: Δprice_i = λ * net_flow_i + ε_i\n   44|     λ = Cov(Δp, Q) / Var(Q)\n   45| \n   46|     Higher λ indicates more price impact per unit of signed volume,\n   47|     implying more informed trading or less liquidity.\n   48| \n   49|     Parameters\n   50|     ----------\n   51|     price_changes : ndarray\n   52|         Per-bar price changes (log returns or absolute).\n   53|     net_flow : ndarray\n   54|         Per-bar signed volume (buy - sell).\n   55| \n   56|     Returns\n   57|     -------\n   58|     float\n   59|         Kyle's lambda. NaN if net_flow has zero variance.\n   60|     \"\"\"\n   61|     price_changes = np.asarray(price_changes, dtype=np.float64)\n   62|     net_flow = np.asarray(net_flow, dtype=np.float64)\n   63| \n   64|     # Remove NaN pairs\n   65|     mask = np.isfinite(price_changes) & np.isfinite(net_flow)\n   66|     if mask.sum() < 10:\n   67|         return float(\"nan\")\n   68| \n   69|     dp = price_changes[mask]\n   70|     q = net_flow[mask]\n   71| \n   72|     var_q = np.var(q)\n   73|     if var_q < 1e-20:\n   74|         return float(\"nan\")\n   75| \n   76|     cov_dp_q = np.cov(dp, q, ddof=1)[0, 1]\n   77|     return float(cov_dp_q / var_q)\n   78| \n   79| \n   80| def compute_amihud(\n   81|     returns: np.ndarray,\n   82|     volumes: np.ndarray,\n   83| ) -> float:\n   84|     \"\"\"Compute Amihud (2002) illiquidity ratio.\n   85| \n   86|     ILLIQ = mean(|r_i| / volume_i)\n   87| \n   88|     Higher values indicate less liquid markets (larger price impact per\n   ...\n  114| def compute_volume_concentration(\n  115|     bar_volumes: np.ndarray,\n  116|     n_bins: int = 10,\n  117| ) -> float:\n  118|     \"\"\"Compute Herfindahl index of volume concentration across time bins.\n  119| \n  120|     Divides the trading day into n_bins equal time slots and computes\n  121|     the Herfindahl-Hirschman Index (HHI) of volume shares.\n  122| \n   ...\n  160| def compute_intraday_vol_ratio(\n  161|     prices: np.ndarray,\n  162| ) -> float:\n  163|     \"\"\"Compute ratio of first-half to second-half realized variance.\n  164| \n  165|     RV_ratio = RV(first half) / RV(second half)\n  166| \n  167|     High values indicate more information arrival in the morning (open\n  168|     auction, overnight news digestion). Literature shows this is\n   ...\n  199| def compute_flow_persistence(\n  200|     net_flows: np.ndarray,\n  201| ) -> float:\n  202|     \"\"\"Compute AR(1) coefficient of net order flow.\n  203| \n  204|     persistence = Corr(flow_t, flow_{t-1})\n  205| \n  206|     High persistence indicates herding or momentum in order flow;\n  207|     low persistence indicates mean-reversion or balanced trading.\n   ...\n  242| def _compute_intraday_features_for_day(day_bars: pd.DataFrame) -> dict[str, float]:\n  243|     \"\"\"Compute all intraday features for a single day's 10s bars.\n  244| \n  245|     Parameters\n  246|     ----------\n  247|     day_bars : DataFrame\n  248|         Columns: buy_vol, sell_vol, net_flow, vwap, n_trades.\n  249| \n  250|     Returns\n   ...\n  306| def _build_intraday_features(\n  307|     sequences: pd.DataFrame,\n  308|     index: pd.DatetimeIndex,\n  309| ) -> pd.DataFrame:\n  310|     \"\"\"Compute per-day intraday features from sequence bars.\n  311| \n  312|     Parameters\n  313|     ----------\n  314|     sequences : DataFrame\n   ...\n  353| @register_feature_layer(\"microstructure\")\n  354| class MicrostructureLayer:\n  355|     \"\"\"Microstructure feature layer (Layer 3).\n  356| \n  357|     Loads per-symbol daily aggregates and intraday sequences from cache,\n  358|     then computes rolling and derived features. Requires context[\"symbol\"].\n  359| \n  360|     Output features:\n  361|     - log_svr_d, log_svr_w: log signed volume ratio (daily + 5d)\n\n--- src/volforecast/features/options.py ---\n    1| \"\"\"Options-implied features (Layer 2).\n    2| \n    3| Extracts forward-looking information from the SPX IV surface:\n    4| - ATM implied volatility at multiple tenors\n    5| - Variance risk premium (VRP = IV^2 - RV)\n    6| - Volatility skew (25-delta risk reversal)\n    7| - Term structure slope\n    8| - Butterfly spread\n    9| \n   10| Key functions:\n   11|     compute_vrp        — Variance risk premium\n   12|     compute_skew       — 25-delta skew (risk reversal)\n   13|     compute_term_slope — IV term structure slope\n   14|     compute_butterfly  — Butterfly spread (convexity)\n   15| \"\"\"\n   16| \n   17| from __future__ import annotations\n   18| \n   19| import pandas as pd\n   20| \n   21| from volforecast.features.transforms import lagged_log_features, safe_log\n   22| from volforecast.registry import register_feature_layer\n   23| \n   24| \n   25| def compute_vrp(atm_iv: pd.Series, rv: pd.Series) -> pd.Series:\n   26|     \"\"\"Compute ex-post variance risk premium (Carr & Wu 2009 proxy).\n   27| \n   28|     VRP = (atm_iv_pct / 100)^2 - rv_daily * 252\n   29| \n   30|     This is the \"realized\" or \"ex-post\" VRP proxy that uses contemporaneous\n   31|     realized variance. For the conditional VRP (Bollerslev, Tauchen & Zhou\n   32|     2009, RFS), use iv_features.build_iv_feature_panel which substitutes\n   33|     E_t[RV_{t+1:t+22}] from a HAR-CJ model.\n   34| \n   35|     Parameters\n   36|     ----------\n   37|     atm_iv : pd.Series\n   38|         ATM implied volatility in percentage points (e.g., 20.0 = 20%).\n   39|     rv : pd.Series\n   40|         Daily realized variance (not annualized).\n   41| \n   42|     Returns\n   43|     -------\n   44|     pd.Series\n   45|         Variance risk premium. Can be negative.\n   46|     \"\"\"\n   47|     return (atm_iv / 100.0) ** 2 - rv * 252.0\n   48| \n   49| \n   50| def compute_skew(iv_put_25d: pd.Series, iv_call_25d: pd.Series) -> pd.Series:\n   51|     \"\"\"Compute 25-delta risk reversal (skew).\n   52| \n   53|     Skew = IV(25d put) - IV(25d call).\n   54|     Positive skew indicates higher demand for downside protection.\n   55| \n   56|     Parameters\n   57|     ----------\n   58|     iv_put_25d : pd.Series\n   ...\n   71| def compute_term_slope(atm_short: pd.Series, atm_long: pd.Series) -> pd.Series:\n   72|     \"\"\"Compute IV term structure slope.\n   73| \n   74|     Slope = ATM_3m - ATM_1m.\n   75|     Positive = contango (normal). Negative = backwardation (stress).\n   76| \n   77|     Parameters\n   78|     ----------\n   79|     atm_short : pd.Series\n   ...\n   92| def compute_butterfly(\n   93|     iv_put_25d: pd.Series, iv_call_25d: pd.Series, iv_atm: pd.Series\n   94| ) -> pd.Series:\n   95|     \"\"\"Compute butterfly spread (convexity of smile).\n   96| \n   97|     Butterfly = 0.5 * (IV_25dP + IV_25dC) - IV_ATM.\n   98|     Measures kurtosis premium / tail risk pricing.\n   99| \n  100|     Parameters\n   ...\n  117| @register_feature_layer(\"options\")\n  118| class OptionsLayer:\n  119|     \"\"\"Options-implied feature layer (Layer 2).\n  120| \n  121|     Reads IV columns from daily_data (pre-merged by IVSurfaceLayer) or from\n  122|     the legacy context[\"iv_surface\"] path. Computes derived features:\n  123|     VRP, skew, term slope, IV-RV gap, VVIX-derived, VIX interaction.\n  124| \n  125|     Expected daily_data columns (from IVSurfaceLayer):\n\n--- src/volforecast/features/__init__.py ---\n    1| \"\"\"Feature engineering layers 0-6 for realized volatility forecasting.\n    2| \n    3| Access registered layers via ``FEATURE_REGISTRY`` dict.\n    4| Call ``volforecast.registry.ensure_registered()`` to populate registries.\n    5| \"\"\"\n    6| \n    7| from volforecast.registry import FEATURE_REGISTRY, register_feature_layer\n    8| \n    9| __all__ = [\"FEATURE_REGISTRY\", \"register_feature_layer\"]\n\n--- README.md ---\n    1| # ml-vol-estimator\n    2| \n    3| ML realized volatility forecasting — signal discovery. Progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to produce statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.\n    4| \n    5| **Timeline:** ~20-week internship, May–Sep 2026.\n    6| \n    7| ---\n    8| \n    9| ## Quick Start\n   10| \n   11| 1. Open `ml-vol-estimator.code-workspace` in VS Code.\n   12| 2. Boot protocol loads automatically: `memory/person/user.md` + `memory/INDEX.md`.\n   13| 3. Use `/bootup` to start a session — it reads the research journal and orients you.\n   14| 4. Drive work with slash commands: `/research`, `/feature`, `/experiment`, `/backtest`.\n   15| \n   16| See [AGENTS.md](AGENTS.md) for the full project spec, and [workspace/docs/user-manual.md](workspace/docs/user-manual.md) for all commands.\n   17| \n   18| ---\n   19| \n   20| ## CLI\n   21| \n   22| The `vol` wrapper handles uv, PATH, and working directory internally.\n   23| \n   24| ### Wrapper Commands\n   25| \n   26| ```\n   27| vol test [args]               # pytest (extra args forwarded: -k, -v, --tb=short)\n   28| vol testlf [args]             # re-run last-failed tests only\n   29| vol run --config <yaml>       # primary entry point (see below)\n   30| vol status                    # show data ingestion manifest\n   31| vol lint                      # ruff check (read-only)\n   32| vol fmt                       # ruff auto-format\n   33| vol typecheck                 # mypy\n   34| vol sync                      # install/update deps\n   35| vol shell                     # REPL with volforecast importable\n   36| vol notebook                  # jupyter\n   37| vol help                      # usage\n   38| ```\n   39| \n   40| ### Primary Command: `vol run --config <yaml>`\n   41| \n   42| Every `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).\n   43| \n   44| Optional overrides: `--symbols SPY,AAPL` (override YAML universe), `--skip-ingest` (skip data fetch), `--workers 8` (thread count).\n   45| \n   46| ### Examples\n   47| \n   48| ```bash\n   49| # Single-model experiment (ingest + train + evaluate + dashboard)\n   50| vol run --config workspace/configs/baseline_har.yaml\n   51| \n   52| # Tournament: 13 models compared with statistical tests\n   53| vol run --config workspace/configs/tournament_full_spy.yaml\n   54| \n   55| # Skip ingestion (data already cached), subset of symbols\n   56| vol run --config workspace/configs/tournament_har_dev.yaml --skip-ingest --symbols SPY,AAPL\n   57| \n   58| # Ingest only\n   59| vol run --config workspace/configs/ingest_full_universe.yaml --workers 8\n   60| \n\nTASK: Inside features\nWrite 6 to 8 sentences that take a new joiner INSIDE this\npart of the repo: what it is for in domain terms, what flows in and out,\nthe mechanism that makes it work, how you can tell it is correct, and\nanything a newcomer would not guess. Substantive facts only; never\nrestate code mechanics the reader can see in the excerpt.\nQuote from the files shown above wherever a sentence can be anchored,\nand mark honest readings 'inferred'. One inferred sentence about what\nthis part does NOT do is welcome.\n\nGROUP: features at src/volforecast/features: 18 files, 3110 loc.",
+  "windows": [
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 153,
+      "end": 161
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 180,
+      "end": 196
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 203,
+      "end": 211
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 218,
+      "end": 269
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 285,
+      "end": 293
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 309,
+      "end": 317
+    },
+    {
+      "file": "src/volforecast/features/calendar.py",
+      "start": 362,
+      "end": 370
+    },
+    {
+      "file": "src/volforecast/features/microstructure.py",
+      "start": 27,
+      "end": 88
+    },
+    {
+      "file": "src/volforecast/features/microstructure.py",
+      "start": 114,
+      "end": 122
+    },
+    {
+      "file": "src/volforecast/features/microstructure.py",
+      "start": 160,
+      "end": 168
+    },
+    {
+      "file": "src/volforecast/features/microstructure.py",
+      "start": 199,
+      "end": 207
+    },
+    {
+      "file": "src/volforecast/features/microstructure.py",
+      "start": 242,
+      "end": 250
+    },
+    {
+      "file": "src/volforecast/features/microstructure.py",
+      "start": 306,
+      "end": 314
+    },
+    {
+      "file": "src/volforecast/features/microstructure.py",
+      "start": 353,
+      "end": 361
+    },
+    {
+      "file": "src/volforecast/features/options.py",
+      "start": 13,
+      "end": 58
+    },
+    {
+      "file": "src/volforecast/features/options.py",
+      "start": 71,
+      "end": 79
+    },
+    {
+      "file": "src/volforecast/features/options.py",
+      "start": 92,
+      "end": 100
+    },
+    {
+      "file": "src/volforecast/features/options.py",
+      "start": 117,
+      "end": 125
+    },
+    {
+      "file": "README.md",
+      "start": 13,
+      "end": 60
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "claims"
+    ],
+    "properties": {
+      "claims": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "status",
+            "cite"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "inferred"
+              ]
+            },
+            "cite": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "focus": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\4d2d25b90ff3a1517211bf7da6ce12216778392d48d467bb6b8df93e0a6dfade.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\4d2d25b90ff3a1517211bf7da6ce12216778392d48d467bb6b8df93e0a6dfade.json"
+}

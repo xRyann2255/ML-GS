@@ -1,0 +1,3700 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trailhead · payments-core</title>
+<style>
+/* ============================================================
+   TRAILHEAD — generated codebase walkthrough
+   Aesthetic: GS institutional workstation
+     · cool navy-slate surfaces; sky blue is the one interactive accent
+     · workflow status (verified / inferred / broken) is kept strictly
+       separate from brand colour — action hierarchy vs status, per GS
+     · sans for interface text; mono confined to code, commands, paths,
+       identifiers and figures; serif reserved for display headings
+     · tabular numerals wherever a number appears
+   Self-contained: no external requests, no fonts, no scripts.
+   Goldman Sans / GS Sans cannot ship in this file — embedded font at-rules
+   are barred by tools/check-bundle.js — so --sans approximates it from
+   system faces. Do not try to base64 the real face in; the gate greps for it.
+   ============================================================ */
+
+:root{
+  /* surfaces */
+  --ink:#0a0e14; --ink2:#111722; --ink3:#18202d; --ink4:#212b3a;
+  /* text */
+  --bone:#e8ecf2; --dim:#9ba8ba; --faint:#8494a8;
+  /* structure */
+  --rule:#1e2735; --rule2:#2c3849;
+  /* brand / interactive — GS sky blue */
+  --brand:#7399c6; --brand2:#acd4f1; --brandd:#12243a;
+  /* workflow status */
+  --ok:#4fa97a; --inf:#d8a23c; --bad:#e06c5b;
+  --okd:#0f2a20; --infd:#2a2210; --badd:#2e1614;
+  /* type */
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --serif:Charter,"Bitstream Charter","Sitka Text",Cambria,"Times New Roman",Times,serif;
+  --mono:"Cascadia Code","JetBrains Mono","SF Mono","Berkeley Mono","IBM Plex Mono",ui-monospace,monospace;
+  /* shape + elevation — nothing rounder than 4px */
+  --r1:2px; --r2:4px;
+  --e1:0 1px 2px rgba(4,8,14,.28);
+  --e2:0 8px 24px rgba(4,8,14,.40);
+  --base:16px; --rail:270px; --bar:52px;
+}
+/* Sky blue is the dark-theme interactive colour; on white it fails 4.5:1 as
+   text, so light drops to deep navy with Mariner for hover. */
+:root[data-theme="light"]{
+  --ink:#ffffff; --ink2:#f5f7fa; --ink3:#eaeef4; --ink4:#dde4ed;
+  --bone:#14181f; --dim:#4a5464; --faint:#5c6775;
+  --rule:#e3e8ef; --rule2:#c2ccd9;
+  --brand:#00355f; --brand2:#2178c4; --brandd:#e8f1fa;
+  --ok:#1a6b43; --inf:#8a5c10; --bad:#b3261e;
+  --okd:#e4f2ea; --infd:#fbf0da; --badd:#fbe9e7;
+  --e1:0 1px 2px rgba(20,24,31,.10);
+  --e2:0 8px 24px rgba(20,24,31,.16);
+}
+/* Duplicated deliberately: the light set again for anyone arriving without an
+   explicit data-theme. Keep in sync with the block above. */
+@media (prefers-color-scheme:light){
+  :root:not([data-theme]){
+    --ink:#ffffff; --ink2:#f5f7fa; --ink3:#eaeef4; --ink4:#dde4ed;
+    --bone:#14181f; --dim:#4a5464; --faint:#5c6775;
+    --rule:#e3e8ef; --rule2:#c2ccd9;
+    --brand:#00355f; --brand2:#2178c4; --brandd:#e8f1fa;
+    --ok:#1a6b43; --inf:#8a5c10; --bad:#b3261e;
+    --okd:#e4f2ea; --infd:#fbf0da; --badd:#fbe9e7;
+    --e1:0 1px 2px rgba(20,24,31,.10);
+    --e2:0 8px 24px rgba(20,24,31,.16);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--ink); color:var(--bone);
+  font:var(--base)/1.6 var(--sans);
+  overflow-x:hidden;
+}
+/* mono is opt-in now that body is sans — every code-ish element declares it */
+code,pre,samp,kbd{font-family:var(--mono)}
+/* numerals align across weights: a stated Goldman Sans design goal */
+.badge,.dur,.stop .num,.prog .lab,.code .ln,.sumgrid .v,.tbl .r,
+.drawer .sub,.opt .i,.hop>.dot,.meta{font-variant-numeric:tabular-nums}
+::selection{background:var(--brand);color:var(--ink)}
+
+/* ---------- top bar ---------- */
+.bar{
+  position:fixed; top:0; left:0; right:0; height:var(--bar); z-index:60;
+  display:flex; align-items:center; gap:16px; padding:0 16px;
+  background:var(--ink2); border-bottom:1px solid var(--rule2); box-shadow:var(--e1);
+}
+.brand{display:flex;align-items:baseline;gap:12px;min-width:0}
+.brand b{font:600 15px var(--sans);letter-spacing:-.01em}
+/* the SHA and tool version are identifiers — mono earns its place here */
+.meta{font:11.5px var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sample{
+  font:600 10px var(--sans);letter-spacing:.06em;padding:3px 8px;border-radius:var(--r1);
+  background:var(--infd);color:var(--inf);flex:none
+}
+/* demo-only: this bundle carries more than one repo, a real artifact does not */
+.rsel{
+  background:var(--ink3);color:var(--bone);border:1px solid var(--rule2);border-radius:var(--r1);
+  font:600 11.5px var(--sans);padding:3px 6px;cursor:pointer;flex:none;max-width:170px
+}
+.rsel:hover{border-color:var(--brand)}
+.badge{
+  margin-left:auto;display:flex;align-items:center;gap:0;border:1px solid var(--rule2);
+  border-radius:var(--r1);background:var(--ink3);cursor:pointer;flex:none;
+  font:11.5px var(--sans);overflow:hidden
+}
+.badge:hover{border-color:var(--brand)}
+.badge span{padding:5px 10px;border-right:1px solid var(--rule);color:var(--dim)}
+.badge span:last-child{border-right:0}
+.badge .n{color:var(--bone);font-weight:600;font-style:normal}
+.badge .d{color:var(--inf)} .badge .f{color:var(--bad)}
+.tools{display:flex;gap:4px;flex:none}
+.tbtn{
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);
+  color:var(--dim);cursor:pointer;font:600 11px var(--sans);letter-spacing:.04em;padding:5px 8px
+}
+.tbtn:hover{color:var(--bone);border-color:var(--brand)}
+.tbtn[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--ink)}
+.tbtn:focus-visible,a:focus-visible,button:focus-visible,li:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* ---------- rail ---------- */
+.rail{
+  position:fixed;top:var(--bar);bottom:0;left:0;width:var(--rail);z-index:50;
+  overflow-y:auto;border-right:1px solid var(--rule2);
+  background:var(--ink2);padding:8px 0 88px
+}
+.rail::-webkit-scrollbar{width:8px}
+.rail::-webkit-scrollbar-thumb{background:var(--rule2);border-radius:var(--r1)}
+.track{margin-bottom:4px}
+.track h3{
+  font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
+  padding:16px 16px 8px;display:flex;justify-content:space-between
+}
+.track h3 i{font-style:normal;font-weight:400}
+.stop{
+  display:flex;gap:12px;align-items:baseline;padding:6px 16px 6px 14px;cursor:pointer;
+  border-left:2px solid transparent;color:var(--dim);font-size:13px;line-height:1.45
+}
+.stop:hover{background:var(--ink3);color:var(--bone)}
+.stop .num{font-size:11px;color:var(--faint);flex:none;width:16px;position:relative;text-align:right}
+.stop.on{border-left-color:var(--brand);background:var(--ink3);color:var(--bone);font-weight:600}
+.stop.on .num{color:var(--brand)}
+.stop.done .num{color:transparent}
+.stop.done .num::after{content:"✓";position:absolute;left:0;right:0;text-align:right;color:var(--ok);font-weight:600}
+.stop.cp{font-style:italic}
+.prog{
+  position:fixed;bottom:0;left:0;width:var(--rail);z-index:51;
+  background:var(--ink2);border-top:1px solid var(--rule2);border-right:1px solid var(--rule2);
+  padding:12px 16px
+}
+.prog .lab{display:flex;justify-content:space-between;font:600 11px var(--sans);letter-spacing:.04em;color:var(--faint);margin-bottom:8px}
+/* segmented progress: one segment per stop, flush — a readout, not a sprocket */
+.sprocket{display:flex;gap:1px;border-radius:var(--r1);overflow:hidden}
+.sprocket i{flex:1;height:4px;background:var(--rule2)}
+.sprocket i.f{background:var(--brand)}
+
+/* ---------- main ---------- */
+main{margin-left:var(--rail);padding:calc(var(--bar) + 48px) 0 120px;position:relative;z-index:1}
+.wrap{max-width:1010px;padding:0 clamp(16px,4vw,56px)}
+.plate{
+  display:flex;align-items:center;gap:12px;font:600 11px var(--sans);letter-spacing:.06em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:16px
+}
+.plate hr{flex:1;border:0;border-top:1px solid var(--rule2)}
+h1{
+  font:400 clamp(30px,4.6vw,44px)/1.12 var(--serif);letter-spacing:-.015em;
+  margin-bottom:16px;max-width:24ch
+}
+h1 em{font-style:italic;color:var(--brand)}
+.lede{color:var(--dim);font-size:14.5px;max-width:70ch;margin-bottom:40px}
+.blocks>*{margin-bottom:32px;animation:fade .15s both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+/* prose + claims */
+.prose{font-size:15px}
+.prose p{margin-bottom:12px;max-width:72ch}
+.claim{border-bottom:1px solid var(--rule2);padding-bottom:1px}
+/* the claim marker means VERIFIED — it stays green, never brand blue */
+.mark{
+  font:600 10px var(--mono);color:var(--ok);background:var(--okd);border:1px solid var(--ok);
+  border-radius:var(--r1);cursor:pointer;padding:1px 4px;margin-left:4px;vertical-align:1.5px
+}
+.mark:hover{background:var(--ok);color:var(--ink)}
+.mark[aria-expanded="true"]{background:var(--ok);color:var(--ink)}
+.claim.inf{border-bottom:1px dotted var(--inf)}
+.tag{
+  font:600 10px var(--sans);letter-spacing:.06em;color:var(--inf);background:var(--infd);
+  border-radius:var(--r1);padding:1px 6px;margin-left:6px;vertical-align:1px;white-space:nowrap
+}
+.pop{margin:12px 0 24px;border-left:2px solid var(--ok);animation:fade .15s both}
+
+/* excerpt */
+.ex{border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);overflow:hidden}
+.ex>header{
+  display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid var(--rule);
+  font:11.5px var(--mono);color:var(--dim);background:var(--ink3)
+}
+.ex>header b{color:var(--bone);font-weight:600}
+.ex>header .sp{flex:1}
+.cp-btn{
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);color:var(--faint);
+  cursor:pointer;font:600 10px var(--sans);letter-spacing:.06em;padding:3px 8px
+}
+.cp-btn:hover{color:var(--brand);border-color:var(--brand)}
+.code{overflow:auto;max-height:430px}
+.code table{border-collapse:collapse;width:100%;font:12.8px/1.62 var(--mono)}
+.code td{padding:0;white-space:pre;vertical-align:top}
+.code .ln{
+  width:1%;text-align:right;padding:0 12px;color:var(--faint);
+  user-select:none;font-size:11.5px;position:relative;border-right:1px solid var(--rule)
+}
+.code .src{padding:0 16px 0 12px;color:var(--bone)}
+.code tr.hl{background:var(--okd)}
+.code tr.hl .ln{color:var(--ok);font-weight:600}
+.code tr.hl .ln::before{content:"▸";position:absolute;left:3px}
+.code tr.el td{color:var(--faint);font:italic 11px var(--sans);padding:2px 0 2px 12px}
+.ex figcaption{padding:8px 12px;border-top:1px solid var(--rule);font-size:11.5px;color:var(--faint);background:var(--ink3)}
+
+/* command */
+.cmd{border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);overflow:hidden}
+.cmd.fail{border-color:var(--bad)}
+.cmd>header{display:flex;align-items:center;gap:12px;padding:8px 12px;font-size:13px}
+.cmd>header .pr{color:var(--dim);flex:none;font:600 13px var(--mono)}
+.cmd>header code{flex:1;font:13px var(--mono);color:var(--bone);overflow:auto;white-space:nowrap}
+.pill{font:600 10.5px var(--sans);letter-spacing:.05em;padding:2px 8px;flex:none;border:1px solid;border-radius:var(--r1)}
+.pill.ok{color:var(--ok);border-color:var(--ok);background:var(--okd)}
+.pill.bad{color:var(--bad);border-color:var(--bad);background:var(--badd)}
+.dur{color:var(--faint);font-size:11.5px;flex:none}
+/* flat danger surface — status by label plus colour, never hazard stripes */
+.brk{
+  display:flex;gap:12px;align-items:flex-start;padding:12px;font-size:13px;
+  border-top:1px solid var(--bad);border-left:2px solid var(--bad);background:var(--badd)
+}
+.brk b{color:var(--bad);font:600 10px var(--sans);letter-spacing:.08em;flex:none;margin-top:3px}
+.out{border-top:1px solid var(--rule)}
+.out summary{padding:8px 12px;cursor:pointer;font-size:11.5px;color:var(--dim);list-style:none}
+.out summary::before{content:"▸ ";color:var(--faint)}
+.out[open] summary::before{content:"▾ "}
+.out summary:hover{color:var(--bone)}
+.out pre{padding:12px;font-size:12px;line-height:1.6;color:var(--dim);overflow:auto;max-height:290px;border-top:1px solid var(--rule);white-space:pre}
+.envnote{padding:8px 12px;border-top:1px solid var(--rule);font-size:11px;color:var(--faint)}
+
+/* map — this is navigation, so it reads brand blue, not status green */
+.mapbox{border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);position:relative;overflow:hidden}
+.mapbox svg{display:block;width:100%;height:auto;touch-action:none}
+/* footer strip, not an overlay — absolute positioning collided with the axis ticks */
+.mapbox .hint{
+  padding:8px 12px;border-top:1px solid var(--rule);background:var(--ink3);
+  font:600 10px var(--sans);letter-spacing:.06em;color:var(--faint)
+}
+.n-body{fill:var(--ink3);stroke:var(--rule2);transition:stroke .15s,fill .15s}
+.n-lab{fill:var(--bone);font:600 11.5px var(--mono)}
+.n-loc{fill:var(--faint);font:10px var(--mono)}
+.node{cursor:pointer}
+.node:hover .n-body,.node.sel .n-body{fill:var(--brandd);stroke:var(--brand)}
+.node.dim{opacity:.24}
+/* --dim rather than --rule2: a hairline border colour is too weak for a
+   full-width curve, and it disappeared entirely on the light background */
+.edge{stroke:var(--dim);opacity:.45;fill:none;transition:stroke .15s,opacity .15s}
+.edge.lit{stroke:var(--brand);opacity:1}
+.edge.dim{opacity:.13}
+.tick{stroke:var(--rule2)} .ticklab{fill:var(--faint);font:9px var(--mono)}
+.fallback summary{cursor:pointer;font-size:11.5px;color:var(--dim);padding:8px 0;list-style:none}
+.fallback summary::before{content:"▸ ";color:var(--faint)}
+.fallback[open] summary::before{content:"▾ "}
+.fallback ul{margin-left:20px;font-size:13px;color:var(--dim)}
+.fallback li{margin:4px 0;list-style:"· "}
+
+/* drawer */
+.drawer{
+  position:fixed;top:var(--bar);right:0;bottom:0;width:min(430px,92vw);z-index:70;
+  background:var(--ink2);border-left:1px solid var(--rule2);box-shadow:var(--e2);
+  overflow-y:auto;padding:24px;
+  transform:translateX(101%);transition:transform .15s cubic-bezier(.3,.8,.3,1)
+}
+.drawer.open{transform:none}
+.drawer h4{font:400 24px var(--serif);margin-bottom:4px}
+.drawer .sub{font:600 11px var(--sans);letter-spacing:.06em;color:var(--faint);margin-bottom:20px}
+.drawer .x{position:absolute;top:16px;right:16px}
+.dl{border-top:1px solid var(--rule);padding:8px 0;display:flex;gap:16px;font-size:12.5px}
+.dl b{color:var(--faint);font:600 11px var(--sans);width:88px;flex:none;padding-top:1px}
+.dl span{color:var(--bone)}
+.drawer h5{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:24px 0 8px}
+
+/* table */
+.tbl{border:1px solid var(--rule2);border-radius:var(--r2);overflow:auto;background:var(--ink2)}
+/* a table followed by its caption is one card, not two — square the seam */
+.tbl:has(+ .envnote){border-radius:var(--r2) var(--r2) 0 0}
+.tbl+.envnote{border-radius:0 0 var(--r2) var(--r2)}
+.tbl table{border-collapse:collapse;width:100%;font-size:12.8px;min-width:660px}
+.tbl th{
+  text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule2);background:var(--ink3);
+  font:600 11px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--faint);
+  cursor:pointer;white-space:nowrap;position:sticky;top:0;z-index:1
+}
+.tbl th:hover{color:var(--brand)}
+.tbl th[data-dir]::after{content:" ▲";color:var(--brand)}
+.tbl th[data-dir="-1"]::after{content:" ▼"}
+.tbl td{padding:8px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr:hover td{background:var(--ink3)}
+.tbl .r{text-align:right;color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tbl code{font-size:12.3px;color:var(--bone);white-space:nowrap}
+/* inline-block so a long reason wraps inside the chip instead of splitting its border */
+.tbl .st{
+  display:inline-block;font:600 10px var(--sans);letter-spacing:.04em;padding:2px 6px;
+  border-radius:var(--r1);border:1px solid
+}
+.st.v{color:var(--ok);border-color:var(--ok);background:var(--okd)}
+.st.i{color:var(--inf);border-color:var(--inf);background:var(--infd)}
+.st.x{color:var(--bad);border-color:var(--bad);background:var(--badd)}
+
+/* trace */
+.trace{position:relative;padding-left:40px;max-width:86ch}
+.trace::before{content:"";position:absolute;left:14px;top:8px;bottom:32px;border-left:1px solid var(--rule2)}
+.hop{margin-bottom:24px;position:relative}
+.hop>.dot{
+  position:absolute;left:-40px;top:0;width:28px;height:28px;border:1px solid var(--brand);
+  background:var(--ink);color:var(--brand);display:grid;place-items:center;font:600 12px var(--sans);
+  border-radius:50%
+}
+.hop h4{font:600 13.5px var(--mono);margin-bottom:4px}
+.hop .an{font:11px var(--mono);color:var(--faint);margin-bottom:8px}
+.hop .nx{font-size:11.5px;color:var(--dim);margin-top:8px}
+.hop .nx b{color:var(--brand);font-weight:600}
+
+/* checkpoint */
+.cpx{border:1px solid var(--rule2);border-radius:var(--r2);background:var(--ink2);padding:20px;max-width:78ch}
+.cpx>.k{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-bottom:12px}
+.cpx h4{font:400 20px var(--serif);margin-bottom:16px;letter-spacing:-.01em}
+.opt{
+  display:flex;gap:12px;align-items:flex-start;padding:8px 12px;border:1px solid var(--rule2);
+  border-radius:var(--r1);margin-bottom:4px;cursor:pointer;font-size:13.5px;background:var(--ink)
+}
+.opt:hover{border-color:var(--brand)}
+.opt.pick{border-color:var(--brand);background:var(--brandd)}
+.opt.right{border-color:var(--ok);background:var(--okd)}
+.opt.wrong{border-color:var(--bad);background:var(--badd)}
+.opt .i{color:var(--faint);flex:none;font-size:11.5px;width:16px;padding-top:2px;font-weight:600}
+.opt.right .i{color:var(--ok)} .opt.wrong .i{color:var(--bad)}
+.cpx .act{display:flex;gap:12px;align-items:center;margin-top:16px}
+.sub{
+  background:var(--brand);border:1px solid var(--brand);border-radius:var(--r1);color:var(--ink);
+  font:600 11.5px var(--sans);letter-spacing:.05em;padding:7px 16px;cursor:pointer
+}
+.sub:hover{background:var(--brand2);border-color:var(--brand2)}
+.sub:disabled{background:var(--ink3);color:var(--faint);border-color:var(--rule2);cursor:not-allowed}
+.verdict{font:600 12px var(--sans);letter-spacing:.04em}
+.verdict.y{color:var(--ok)} .verdict.n{color:var(--bad)}
+.expl{margin-top:16px;border-top:1px solid var(--rule);padding-top:12px;font-size:13px;color:var(--dim);max-width:66ch}
+.prov{margin-top:8px;font-size:11px;color:var(--faint)}
+/* green: the answer key comes from survey.json, not from the model */
+.prov b{color:var(--ok);font:600 11px var(--sans);letter-spacing:.06em}
+.ordr{
+  display:flex;gap:12px;align-items:center;padding:8px 12px;border:1px solid var(--rule2);
+  border-radius:var(--r1);margin-bottom:4px;background:var(--ink);font-size:13px
+}
+.ordr select{
+  background:var(--ink3);color:var(--bone);border:1px solid var(--rule2);border-radius:var(--r1);
+  font:12px var(--sans);padding:3px 6px
+}
+
+/* predict-then-reveal: brand blue, because it is an interaction, not a status */
+.pred{
+  border:1px solid var(--brand);border-left-width:2px;border-radius:var(--r1);
+  background:var(--brandd);padding:12px;margin:0
+}
+.cmd .pred,.hop .pred{margin:0;border-radius:0;border-left:2px solid var(--brand);border-right:0;border-top:0}
+.hop .pred{margin-top:12px;border:1px solid var(--brand);border-left-width:2px;border-radius:var(--r1)}
+.pred.done{background:transparent;border-color:var(--rule2);border-left-color:var(--rule2)}
+.pred.done.ok{border-left-color:var(--ok)} .pred.done.no{border-left-color:var(--bad)}
+.pred .q{font-size:13.5px;margin-bottom:10px;color:var(--bone)}
+.pred .q b{
+  display:inline-block;font:600 10px var(--sans);letter-spacing:.08em;color:var(--brand);
+  border:1px solid var(--brand);border-radius:var(--r1);padding:1px 6px;margin-right:8px;vertical-align:1px
+}
+.pred.done .q b{color:var(--faint);border-color:var(--rule2)}
+.popts{display:flex;flex-wrap:wrap;gap:6px}
+.popt{
+  display:flex;gap:8px;align-items:baseline;padding:6px 10px;border:1px solid var(--rule2);
+  border-radius:var(--r1);background:var(--ink);font-size:13px;cursor:pointer
+}
+.popt:hover{border-color:var(--brand)}
+.pred.done .popt{cursor:default}
+.popt.right{border-color:var(--ok);background:var(--okd)}
+.popt.wrong{border-color:var(--bad);background:var(--badd)}
+.popt .i{color:var(--faint);font-size:11px;font-weight:600}
+.popt.right .i{color:var(--ok)} .popt.wrong .i{color:var(--bad)}
+.pfoot{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-top:10px}
+.pfoot .prov{margin-top:0}
+.pill.wait{color:var(--brand);border-color:var(--brand);background:var(--brandd)}
+
+/* veiled content is in the DOM but not on screen: nothing is silently omitted,
+   and print un-veils it so the paper copy is still complete */
+.veil{display:none}
+/* the result wrapper must not become a flex item, or the header loses its gap */
+.res{display:contents}
+.res.veil{display:none}
+.veilnote{
+  border:1px dashed var(--rule2);border-radius:var(--r2);padding:12px 16px;
+  font-size:12.5px;color:var(--faint)
+}
+
+/* confidence, captured before the answer so it measures calibration */
+.conf{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
+  font-size:12.5px;color:var(--dim)
+}
+.conf.said{color:var(--faint);font-size:11.5px}
+.conf.said b{color:var(--dim);font-weight:600}
+.cbtn{
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);color:var(--dim);
+  cursor:pointer;font:600 10.5px var(--sans);letter-spacing:.05em;padding:4px 10px
+}
+.cbtn:hover{border-color:var(--brand);color:var(--brand)}
+.opt.gated{opacity:.45;cursor:not-allowed}
+
+/* your own record, in the audit panel beside the tool's */
+.yh{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:4px 0 8px}
+.sumgrid.you{margin-bottom:8px}
+.sumgrid .of{font-size:15px;color:var(--faint);font-weight:400}
+.envnote.yn{border:1px solid var(--rule2);border-radius:var(--r2);margin-bottom:24px}
+
+/* callout */
+.call{border-left:2px solid var(--rule2);padding:12px 0 12px 16px;font-size:14px;color:var(--dim);max-width:72ch}
+.call b{display:block;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;color:var(--faint)}
+.call.inferred{border-color:var(--inf)} .call.inferred b{color:var(--inf)}
+.call.broken{border-color:var(--bad)} .call.broken b{color:var(--bad)}
+/* Prerequisite links. These are the only anchors in the artifact and the only
+   external URLs of any kind. An <a href> is a click-time navigation, not a
+   page-load request, so the offline guarantee (spec §1) is untouched: the page
+   still opens and renders complete with the network off. check-bundle.js
+   enforces that distinction — resource-loading attributes stay banned, and
+   every external anchor must carry rel="noopener noreferrer". */
+.call .lks{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.call .lk{
+  display:inline-flex;align-items:baseline;gap:6px;padding:5px 10px;
+  border:1px solid var(--rule2);border-radius:var(--r1);background:var(--ink2);
+  color:var(--brand);text-decoration:none;font:600 12px var(--sans)
+}
+.call .lk:hover{border-color:var(--brand);background:var(--brandd)}
+/* the arrow marks these as leaving the document — nothing else in the page does */
+.call .lk::after{content:"↗";font-size:10px;color:var(--faint)}
+.call .lk:hover::after{color:var(--brand)}
+.call .lk i{font-style:normal;font-weight:400;color:var(--faint);font-size:11.5px}
+.call .lknote{margin-top:8px;font-size:11.5px;color:var(--faint)}
+
+/* footer nav */
+.fnav{display:flex;gap:8px;margin-top:56px;border-top:1px solid var(--rule2);padding-top:16px}
+.fnav button{
+  flex:1;background:var(--ink2);border:1px solid var(--rule2);border-radius:var(--r2);
+  color:var(--dim);cursor:pointer;padding:16px;text-align:left;font:12px var(--sans)
+}
+.fnav button:hover:not(:disabled){border-color:var(--brand);color:var(--bone)}
+.fnav button:disabled{opacity:.32;cursor:not-allowed}
+.fnav .k{display:block;font:600 11px var(--sans);letter-spacing:.06em;color:var(--faint);margin-bottom:4px}
+.fnav .nxt{text-align:right}
+
+/* audit modal — the verification ledger, and the centre of the pitch */
+.scrim{position:fixed;inset:0;z-index:80;background:rgba(4,8,14,.72);backdrop-filter:blur(3px);display:none}
+.scrim.open{display:block}
+.modal{
+  position:fixed;z-index:81;inset:6vh 5vw;background:var(--ink);
+  border:1px solid var(--rule2);border-radius:var(--r2);box-shadow:var(--e2);
+  display:none;flex-direction:column;overflow:hidden
+}
+.modal.open{display:flex}
+.modal>header{display:flex;align-items:center;gap:16px;padding:16px 20px;border-bottom:1px solid var(--rule2);background:var(--ink2)}
+.modal>header h3{font:400 22px var(--serif)}
+.modal .body{overflow:auto;padding:20px}
+/* reads as a risk-report header: large tabular figures, quiet labels */
+/* hairlines drawn per cell rather than as grid gaps: with gaps, a wrapped grid
+   paints its container colour through the empty cells (very visible in print) */
+.sumgrid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));
+  background:var(--ink2);border:1px solid var(--rule2);border-radius:var(--r2);
+  overflow:hidden;margin-bottom:24px
+}
+.sumgrid div{padding:12px 16px;box-shadow:1px 0 0 var(--rule2),0 1px 0 var(--rule2)}
+.sumgrid .v{font:600 26px var(--sans);letter-spacing:-.02em}
+.sumgrid .l{font:600 11px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+.filt{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.filt button{
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);color:var(--dim);
+  cursor:pointer;font:600 11px var(--sans);letter-spacing:.04em;padding:5px 10px
+}
+.filt button[aria-pressed="true"]{border-color:var(--brand);color:var(--brand);background:var(--brandd)}
+
+/* projector */
+:root[data-proj="1"]{--base:20px;--rail:0px}
+:root[data-proj="1"] .rail,:root[data-proj="1"] .prog{display:none}
+:root[data-proj="1"] .wrap{max-width:1180px}
+:root[data-proj="1"] .code table{font-size:16px}
+:root[data-proj="1"] .code{max-height:340px}
+
+/* responsive */
+/* ---------- lineage ----------
+   A flow record, not a diagram. Values move left to right through fixed stages;
+   the connector is a hairline with an arrowhead, never a pipe or a bubble.
+   Evidence status is carried by a text label first and colour second, so the
+   three states stay distinguishable without relying on hue (spec §8). */
+.linsum{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;
+  background:var(--rule2);border:1px solid var(--rule2);margin-bottom:18px
+}
+.linsum>div{background:var(--ink2);padding:12px 14px}
+.linsum .v{font:600 22px var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.linsum .l{font:600 10px var(--sans);letter-spacing:.07em;color:var(--faint);margin-top:3px}
+
+.ent{border:1px solid var(--rule2);margin-bottom:16px;background:var(--ink2)}
+.ent>header{
+  display:flex;align-items:baseline;gap:10px;padding:12px 14px;
+  border-bottom:1px solid var(--rule);flex-wrap:wrap
+}
+.ent>header .k{font:600 10px var(--sans);letter-spacing:.07em;color:var(--faint)}
+.ent>header h4{font:600 15px var(--sans);letter-spacing:-.01em;margin:0;flex:1 0 auto}
+.ent .mean{padding:10px 14px 14px;color:var(--dim);font-size:13.5px;border-bottom:1px solid var(--rule)}
+
+/* status chip — text label always present, colour is the secondary cue */
+.est{
+  display:inline-flex;align-items:center;gap:5px;border:1px solid;border-radius:var(--r1);
+  font:600 9.5px var(--sans);letter-spacing:.07em;padding:2px 6px;white-space:nowrap
+}
+.est.v{color:var(--ok);border-color:var(--ok);background:var(--okd)}
+.est.d{color:var(--brand2);border-color:var(--brand);background:var(--brandd)}
+.est.i{color:var(--inf);border-color:var(--inf);background:var(--infd)}
+.est.x{color:var(--bad);border-color:var(--bad);background:var(--badd)}
+.etype{font:600 9.5px var(--mono);letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
+
+.flow{display:flex;align-items:stretch;padding:14px;gap:0;overflow-x:auto}
+.lstage{
+  flex:1 1 0;min-width:150px;display:flex;flex-direction:column;gap:6px;
+  background:transparent;border:1px solid var(--rule2);border-radius:var(--r1);
+  padding:10px 11px;text-align:left;color:inherit;font:inherit;cursor:default
+}
+button.lstage{cursor:pointer}
+button.lstage:hover{border-color:var(--brand);background:var(--ink3)}
+button.lstage:focus-visible{outline:2px solid var(--brand2);outline-offset:2px}
+.lstage .sk{font:600 9.5px var(--sans);letter-spacing:.08em;color:var(--faint)}
+.lstage .sl{font:600 12.5px var(--mono);color:var(--bone);overflow-wrap:anywhere}
+.lstage .sd{font-size:12px;color:var(--dim);line-height:1.5}
+.lstage .sm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:6px}
+.lstage .ln{font:11px var(--mono);color:var(--faint);overflow-wrap:anywhere}
+
+/* connector: hairline + arrowhead, slate by default */
+.conn{flex:0 0 26px;position:relative;align-self:center;height:1px;background:var(--rule2)}
+.conn::after{
+  content:"";position:absolute;right:0;top:-3px;
+  border-left:6px solid var(--rule2);border-top:3.5px solid transparent;border-bottom:3.5px solid transparent
+}
+.conn.inf{background:var(--inf)} .conn.inf::after{border-left-color:var(--inf)}
+.conn.bad{background:var(--bad)} .conn.bad::after{border-left-color:var(--bad)}
+.flow:hover .conn,.flow:focus-within .conn{background:var(--brand)}
+.flow:hover .conn::after,.flow:focus-within .conn::after{border-left-color:var(--brand)}
+.flow:hover .conn.inf,.flow:focus-within .conn.inf{background:var(--inf)}
+.flow:hover .conn.inf::after,.flow:focus-within .conn.inf::after{border-left-color:var(--inf)}
+
+.erow{
+  display:flex;gap:12px;align-items:baseline;padding:10px 14px;
+  border-top:1px solid var(--rule);font-size:12.5px;color:var(--dim)
+}
+.erow .rk{font:600 9.5px var(--sans);letter-spacing:.07em;color:var(--faint);flex:0 0 132px}
+.erow.fail .rk{color:var(--bad)}
+.erow.bound .rk{color:var(--inf)}
+.erow code{font-size:11.5px}
+
+/* Vertical below 760px: the connector rotates rather than disappearing, so the
+   direction of flow survives the reflow (spec §8). */
+@media (max-width:760px){
+  .flow{flex-direction:column;padding:12px}
+  .lstage{min-width:0}
+  .conn{width:1px;height:16px;align-self:flex-start;margin-left:18px;flex:0 0 16px}
+  .conn::after{right:-3px;top:auto;bottom:0;
+    border-left:3.5px solid transparent;border-right:3.5px solid transparent;
+    border-top:6px solid var(--rule2);border-bottom:0}
+  .conn.inf::after{border-top-color:var(--inf)} .conn.bad::after{border-top-color:var(--bad)}
+  .linsum{grid-template-columns:repeat(2,1fr)}
+  .erow{flex-direction:column;gap:4px}
+  .erow .rk{flex:none}
+}
+
+@media (max-width:900px){
+  :root{--rail:0px}
+  .rail{
+    top:var(--bar);width:100%;height:auto;max-height:58vh;border-right:0;
+    border-bottom:1px solid var(--rule2);transform:translateY(-101%);transition:transform .15s;
+    padding-bottom:16px
+  }
+  .rail.open{transform:none}
+  .prog{width:100%}
+  main{margin-left:0}
+  .meta{display:none}
+}
+/* Below ~700px the top bar cannot fit on one row and the verification badge
+   was being clipped by body{overflow-x:hidden}. The dropped-claim count is a
+   non-negotiable, so the bar wraps to two rows and --bar grows to match — every
+   fixed offset (rail, drawer, main) is derived from that token. */
+@media (max-width:700px){
+  :root{--bar:92px}
+  .bar{flex-wrap:wrap;align-content:center;height:var(--bar);padding:8px;gap:8px}
+  .brand{order:1;flex:1}
+  .tools{order:2}
+  .sample{order:3}
+  .badge{order:4;margin-left:auto}
+  .badge span{padding:5px 8px}
+}
+/* phone widths: sample chip + badge no longer share a row, so give the badge
+   one of its own rather than dropping either. Nothing is hidden. */
+@media (max-width:480px){
+  :root{--bar:126px}
+  .sample{order:3;width:100%;text-align:center}
+  .badge{order:4;margin-left:0;width:100%}
+  .badge span{flex:1;text-align:center;padding:5px 4px}
+}
+@media (min-width:901px){.menu{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* print */
+@media print{
+  .bar,.rail,.prog,.fnav,.tools,.drawer,.scrim{display:none!important}
+  /* the status tints must be overridden too — several components now paint a
+     tinted background, and the dark-theme values print as ink-heavy blocks */
+  :root{
+    --ink:#fff;--ink2:#fff;--ink3:#f2f5f8;--ink4:#e8edf3;
+    --bone:#111;--dim:#333;--faint:#555;--rule:#ccc;--rule2:#999;
+    --brand:#00355f;--brand2:#2178c4;--brandd:#eef4fa;
+    --ok:#1a6b43;--inf:#8a5c10;--bad:#b3261e;
+    --okd:#e4f2ea;--infd:#fbf0da;--badd:#fbe9e7;
+    --e1:none;--e2:none
+  }
+  main{margin:0;padding:0}
+  .ex,.cmd,.tbl,.cpx,.mapbox,.modal{box-shadow:none}
+  /* acceptance test 11: every collapsed block expands in print. display:block on
+     the children is no longer enough — current Chrome hides <details> content via
+     ::details-content, so that has to be unhidden too. Both forms kept: older
+     engines honour the first, newer ones need the second. */
+  details:not([open])>*{display:block!important}
+  details::details-content{content-visibility:visible!important;display:block!important;block-size:auto!important}
+  /* revert, not block: .veil wraps spans as well as divs */
+  .veil{display:revert!important}
+  .res.veil{display:contents!important}
+  /* acceptance: every lineage stage prints. Horizontal scroll hides stages on
+     paper, so the flow goes vertical and the connector rotates with it. */
+  .flow{flex-direction:column!important;overflow:visible!important}
+  .lstage{min-width:0!important;break-inside:avoid}
+  .conn{width:1px!important;height:14px!important;align-self:flex-start!important;
+    margin-left:18px;flex:0 0 14px!important}
+  .conn::after{right:-3px!important;top:auto!important;bottom:0;
+    border-left:3.5px solid transparent!important;border-right:3.5px solid transparent;
+    border-top:6px solid var(--rule2);border-bottom:0}
+  .ent{break-inside:avoid}
+  .veilnote,.pill.wait{display:none!important}
+  .out{display:block!important} .out pre{max-height:none;display:block!important}
+  .fallback summary::before,.out summary::before{content:""}
+  .code{max-height:none}
+  .stopwrap{break-after:page}
+  .blocks>*{animation:none!important}
+  a::after{content:" (" attr(href) ")";font-size:10px;color:#666}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <button class="tbtn menu" id="menu" aria-label="Toggle outline">☰</button>
+  <div class="brand">
+    <b id="rname"></b>
+    <select class="rsel" id="rsel" aria-label="Switch repository" title="Switch repository"></select>
+    <span class="meta" id="rmeta"></span>
+  </div>
+  <span class="sample" id="rsample" hidden>SAMPLE · SYNTHETIC REPO</span>
+  <button class="badge" id="badge" title="Open verification ledger"></button>
+  <div class="tools">
+    <button class="tbtn" id="proj" aria-pressed="false" title="Projector mode">PROJ</button>
+    <button class="tbtn" id="theme" title="Toggle theme">◐</button>
+    <button class="tbtn" id="reset" title="Reset progress">RESET</button>
+  </div>
+</header>
+
+<nav class="rail" id="rail"></nav>
+<div class="prog">
+  <div class="lab"><span id="plab">PROGRESS</span><span id="ppct">0%</span></div>
+  <div class="sprocket" id="sprocket"></div>
+</div>
+
+<main><div class="wrap" id="stage"></div></main>
+
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <button class="tbtn x" id="dx">ESC</button>
+  <div id="dbody"></div>
+</aside>
+
+<div class="scrim" id="scrim"></div>
+<div class="modal" id="modal" role="dialog" aria-label="Verification ledger">
+  <header>
+    <h3>Verification ledger</h3>
+    <button class="tbtn" style="margin-left:auto" id="mx">CLOSE</button>
+  </header>
+  <div class="body" id="mbody"></div>
+</div>
+
+<script>
+/* ============================================================
+   DATA — this is `verified.json` from the spec, inlined verbatim.
+   The renderer below knows nothing about payments-core; it only
+   knows the eight block types.
+   ============================================================ */
+/* ==== TRAILHEAD-DATA-START ==== */
+const BUNDLES = {
+ "payments-core": {
+ "repo": {
+  "name": "payments-core",
+  "commit": "a3f9c21",
+  "generated_at": "2026-07-30T14:02:11Z"
+ },
+ "report": {
+  "claims": 142,
+  "verified": 134,
+  "dropped": 8,
+  "inferred": 19,
+  "commands": 23,
+  "failed": 2,
+  "tool_version": "0.3.1",
+  "duration_s": 238
+ },
+ "map": {
+  "nodes": [
+   {
+    "id": "api",
+    "label": "src/api",
+    "loc": 1240,
+    "x": 88,
+    "y": 212,
+    "w": 132,
+    "files": 9,
+    "why": "Owns the single HTTP surface. Declares one route, binds a Calendar per request, and delegates immediately. No pricing logic lives here.",
+    "top": [
+     "app.py (41 commits)",
+     "schemas.py (28)",
+     "serializers.py (12)"
+    ]
+   },
+   {
+    "id": "instr",
+    "label": "src/instruments",
+    "loc": 2180,
+    "x": 308,
+    "y": 96,
+    "w": 176,
+    "files": 14,
+    "why": "A registry keyed by instrument kind. Adding an instrument means registering a class here, not editing the engine.",
+    "top": [
+     "factory.py (33)",
+     "swap.py (19)",
+     "option.py (17)"
+    ]
+   },
+   {
+    "id": "pricing",
+    "label": "src/pricing",
+    "loc": 4860,
+    "x": 322,
+    "y": 262,
+    "w": 150,
+    "files": 21,
+    "why": "The largest and most-edited module. Holds the engine, the curve cache, and the closed-form models. Most incidents start here.",
+    "top": [
+     "engine.py (87 commits)",
+     "curves.py (44)",
+     "black76.py (21)"
+    ]
+   },
+   {
+    "id": "cal",
+    "label": "src/calendars",
+    "loc": 980,
+    "x": 556,
+    "y": 92,
+    "w": 170,
+    "files": 6,
+    "why": "Business-day and holiday logic. Small, stable, and depended on by everything that touches a date.",
+    "top": [
+     "roll.py (24)",
+     "holidays.py (18)"
+    ]
+   },
+   {
+    "id": "risk",
+    "label": "src/risk",
+    "loc": 1640,
+    "x": 566,
+    "y": 268,
+    "w": 126,
+    "files": 11,
+    "why": "Bumps and re-prices for greeks. Consumes the engine; the engine never imports risk.",
+    "top": [
+     "greeks.py (29)",
+     "bump.py (14)"
+    ]
+   },
+   {
+    "id": "io",
+    "label": "src/io",
+    "loc": 760,
+    "x": 772,
+    "y": 180,
+    "w": 120,
+    "files": 7,
+    "why": "Loads curves and vol surfaces from the market store at startup. The only module that reaches outside the process.",
+    "top": [
+     "market_store.py (31)",
+     "cache.py (6)"
+    ]
+   }
+  ],
+  "edges": [
+   {
+    "a": "api",
+    "b": "instr",
+    "n": 14
+   },
+   {
+    "a": "api",
+    "b": "pricing",
+    "n": 23
+   },
+   {
+    "a": "instr",
+    "b": "cal",
+    "n": 9
+   },
+   {
+    "a": "pricing",
+    "b": "cal",
+    "n": 31
+   },
+   {
+    "a": "pricing",
+    "b": "risk",
+    "n": 12
+   },
+   {
+    "a": "pricing",
+    "b": "io",
+    "n": 18
+   },
+   {
+    "a": "risk",
+    "b": "io",
+    "n": 7
+   },
+   {
+    "a": "instr",
+    "b": "io",
+    "n": 5
+   }
+  ]
+ },
+ "files": {
+  "src/api/app.py": {
+   "58": "@router.post(\"/v1/price\", response_model=PriceResponse)",
+   "59": "async def price_instrument(",
+   "60": "    req: PriceRequest,",
+   "61": "    cal: Calendar = Depends(get_calendar),",
+   "62": ") -> PriceResponse:",
+   "63": "    instrument = build_instrument(req.instrument)",
+   "64": "    settle = roll_forward(req.settlement_date, cal)",
+   "65": "    result = ENGINE.price(instrument, settle, req.market)",
+   "66": "    return serialize_price(result)"
+  },
+  "src/api/schemas.py": {
+   "28": "class PriceRequest(BaseModel):",
+   "29": "    instrument: InstrumentSpec",
+   "30": "    settlement_date: date",
+   "31": "    market: MarketSnapshot",
+   "32": "",
+   "33": "    @field_validator(\"settlement_date\")",
+   "34": "    @classmethod",
+   "35": "    def not_in_past(cls, v: date) -> date:",
+   "36": "        if v < date.today():",
+   "37": "            raise ValueError(\"settlement_date is in the past\")",
+   "38": "        return v"
+  },
+  "src/instruments/factory.py": {
+   "52": "def build_instrument(spec: InstrumentSpec) -> Instrument:",
+   "53": "    kind = Kind(spec.kind)",
+   "54": "    cls = _REGISTRY.get(kind)",
+   "55": "    if cls is None:",
+   "56": "        raise UnknownInstrument(spec.kind)",
+   "57": "    return cls.from_spec(spec)"
+  },
+  "src/calendars/roll.py": {
+   "112": "def roll_forward(d: date, cal: Calendar) -> date:",
+   "113": "    \"\"\"Advance d to the next business day on cal.\"\"\"",
+   "114": "    if cal is None:",
+   "115": "        raise CalendarMissing(\"no calendar bound to this request\")",
+   "116": "    moved = 0",
+   "117": "    while not cal.is_business_day(d):",
+   "118": "        d += timedelta(days=1)",
+   "119": "        moved += 1",
+   "120": "        if moved > MAX_ROLL_DAYS:",
+   "121": "            raise RollOverflow(d, moved)",
+   "122": "    return d"
+  },
+  "src/pricing/engine.py": {
+   "88": "def price(self, inst: Instrument, settle: date, mkt: MarketSnapshot) -> Priced:",
+   "89": "    curve = self._curves[inst.currency]",
+   "90": "    df = curve.discount(settle)",
+   "91": "    if inst.kind is Kind.OPTION:",
+   "92": "        vol = self._surface(inst.currency).vol(inst.strike, settle)",
+   "93": "        pv = black76(inst, mkt.forward, vol, df)",
+   "94": "    else:",
+   "95": "        pv = df * inst.notional * (mkt.forward - inst.strike)",
+   "96": "    return Priced(pv=pv, df=df, asof=mkt.asof)"
+  },
+  "src/api/serializers.py": {
+   "19": "def serialize_price(p: Priced) -> PriceResponse:",
+   "20": "    return PriceResponse(",
+   "21": "        pv=round(p.pv, 6),",
+   "22": "        discount_factor=round(p.df, 8),",
+   "23": "        asof=p.asof.isoformat(),",
+   "24": "    )"
+  },
+  "src/io/market_store.py": {
+   "40": "def load_curves(cfg: StoreConfig) -> dict[str, Curve]:",
+   "41": "    \"\"\"Read every curve for cfg.asof. Fails loudly on a gap.\"\"\"",
+   "42": "    out: dict[str, Curve] = {}",
+   "43": "    for ccy in cfg.currencies:",
+   "44": "        raw = _fetch(cfg, f\"curve/{ccy}/{cfg.asof:%Y%m%d}\")",
+   "45": "        if raw is None:",
+   "46": "            raise MissingCurve(ccy, cfg.asof)",
+   "47": "        out[ccy] = Curve.parse(raw)",
+   "48": "    return out"
+  }
+ },
+ "tracks": [
+  {
+   "title": "ORIENT",
+   "minutes": 15,
+   "stops": [
+    {
+     "id": "cover",
+     "title": "What you are looking at",
+     "kind": "stop",
+     "minutes": 2,
+     "lede": "A generated walkthrough of payments-core at commit a3f9c21. Every factual sentence below is anchored to a line range in the repo and re-checked after it was written. Claims that failed the check were deleted, not softened. The count is in the top bar.",
+     "blocks": [
+      {
+       "type": "callout",
+       "level": "info",
+       "title": "BEFORE YOU START",
+       "text": "You need Python 3.11, Poetry 1.7+, and Docker. Two of the setup commands below failed during generation and are marked as such. That is the repo's current state, not a bug in this page.",
+       "links": [
+        {
+         "label": "Python",
+         "note": "3.11",
+         "href": "https://www.python.org/downloads/"
+        },
+        {
+         "label": "Poetry",
+         "note": "1.7+",
+         "href": "https://python-poetry.org/docs/#installation"
+        },
+        {
+         "label": "Docker",
+         "note": "Desktop or Engine",
+         "href": "https://docs.docker.com/get-docker/"
+        }
+       ],
+       "linknote": "Version floors come from the environment the commands were captured on, recorded under each command below. These links are the only external URLs in this file and are never fetched — the page opens and renders complete with the network off."
+      },
+      {
+       "type": "table",
+       "caption": "Generation record",
+       "sortable": false,
+       "columns": [
+        "FIELD",
+        "VALUE"
+       ],
+       "rows": [
+        [
+         "commit",
+         "<code>a3f9c21</code>"
+        ],
+        [
+         "generated",
+         "2026-07-30 14:02:11 UTC"
+        ],
+        [
+         "tool",
+         "trailhead 0.3.1"
+        ],
+        [
+         "wall clock",
+         "3 min 58 s"
+        ],
+        [
+         "claims kept",
+         "134 of 142"
+        ],
+        [
+         "commands executed",
+         "23 (2 failing)"
+        ],
+        [
+         "est. reading time",
+         "90 minutes"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "five",
+     "title": "Five sentences",
+     "kind": "stop",
+     "minutes": 4,
+     "lede": "If you read nothing else, read these. The fifth is the only one this tool could not verify, and it says so.",
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-001",
+         "text": "payments-core prices linear and option instruments behind a single HTTP endpoint.",
+         "status": "verified",
+         "anchor": {
+          "file": "src/api/app.py",
+          "start": 58,
+          "end": 66,
+          "focus": [
+           63,
+           65
+          ],
+          "sha256": "a28c84fa7d064a7376dd1b99cd9a51855cee2df2e4440d95c9b6f6b047581110"
+         }
+        },
+        {
+         "id": "c-002",
+         "text": "Every request must carry a settlement date, an instrument spec, and a market snapshot, and the date is rejected if it is in the past.",
+         "status": "verified",
+         "anchor": {
+          "file": "src/api/schemas.py",
+          "start": 28,
+          "end": 38,
+          "focus": [
+           36,
+           37
+          ],
+          "sha256": "0a9a481fd1bed4ae5aea6fe3e32d63a4f2448edec77d5fffaa12b768f74c013d"
+         }
+        },
+        {
+         "id": "c-003",
+         "text": "Every response carries the discount factor used and the timestamp of the market snapshot it was priced against.",
+         "status": "verified",
+         "anchor": {
+          "file": "src/api/serializers.py",
+          "start": 19,
+          "end": 24,
+          "focus": [
+           22,
+           23
+          ],
+          "sha256": "ac974e63213d532af1dc0f2db4cfca265812b946f8043c05e354123a3a5bd01d"
+         }
+        },
+        {
+         "id": "c-004",
+         "text": "It depends on curve and vol-surface data loaded at start-up, and it refuses to start if a curve is missing.",
+         "status": "verified",
+         "anchor": {
+          "file": "src/io/market_store.py",
+          "start": 40,
+          "end": 48,
+          "focus": [
+           45,
+           46
+          ],
+          "sha256": "523b2888ec1d16c9ca04236c87b4a7547bf56527f533f542135b002edb098759"
+         }
+        },
+        {
+         "id": "c-005",
+         "text": "It is not a booking system: nothing in this repo writes to a ledger.",
+         "status": "inferred"
+        }
+       ]
+      },
+      {
+       "type": "callout",
+       "level": "inferred",
+       "title": "WHY SENTENCE FIVE IS AMBER",
+       "text": "An absence cannot be anchored to a line of code. The tool searched for ledger and persistence writes, found none, and reports that as inferred rather than dressing it up as verified. Every amber mark in this document means the same thing: plausible, unproven."
+      }
+     ]
+    },
+    {
+     "id": "map",
+     "title": "The map",
+     "kind": "stop",
+     "minutes": 5,
+     "lede": "Derived from the real import graph, not from a description of it. Node area is lines of code; edge weight is import count. Click any module.",
+     "blocks": [
+      {
+       "type": "graph"
+      },
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-011",
+         "text": "src/pricing is the centre of gravity: it is the largest module and it imports the calendar layer 31 times.",
+         "status": "verified",
+         "anchor": {
+          "file": "src/pricing/engine.py",
+          "start": 88,
+          "end": 96,
+          "focus": [
+           89,
+           90
+          ],
+          "sha256": "d1b31c48636f6bbd42511410510a397925da09f9e0984563ab13fed3b3ea42e1"
+         }
+        },
+        {
+         "id": "c-012",
+         "text": "Dependencies point one way: pricing imports risk, and risk never imports pricing back.",
+         "status": "verified",
+         "anchor": {
+          "file": "src/pricing/engine.py",
+          "start": 88,
+          "end": 96,
+          "focus": [
+           88
+          ],
+          "sha256": "d1b31c48636f6bbd42511410510a397925da09f9e0984563ab13fed3b3ea42e1"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "where",
+     "title": "Where the code lives",
+     "kind": "stop",
+     "minutes": 4,
+     "lede": "The same information as the map, as a list, for the people who prefer lists. Churn rank is commits over the last twelve months.",
+     "blocks": [
+      {
+       "type": "table",
+       "caption": "Sortable. Committer names come from git log and are not a statement about ownership.",
+       "sortable": true,
+       "columns": [
+        "PATH",
+        "PURPOSE",
+        "FILES",
+        "LOC",
+        "CHURN",
+        "RECENT COMMITTERS"
+       ],
+       "rows": [
+        [
+         "<code>src/pricing/</code>",
+         "Engine, curve cache, closed-form models",
+         "21",
+         "4,860",
+         "1",
+         "p.okafor, l.zhang"
+        ],
+        [
+         "<code>src/instruments/</code>",
+         "Instrument registry and per-kind classes",
+         "14",
+         "2,180",
+         "3",
+         "l.zhang"
+        ],
+        [
+         "<code>src/risk/</code>",
+         "Bump-and-reprice greeks",
+         "11",
+         "1,640",
+         "4",
+         "m.haddad"
+        ],
+        [
+         "<code>src/api/</code>",
+         "HTTP surface, schemas, serializers",
+         "9",
+         "1,240",
+         "2",
+         "p.okafor, s.reyes"
+        ],
+        [
+         "<code>src/calendars/</code>",
+         "Business-day and holiday logic",
+         "6",
+         "980",
+         "6",
+         "s.reyes"
+        ],
+        [
+         "<code>src/io/</code>",
+         "Market-store loaders",
+         "7",
+         "760",
+         "5",
+         "m.haddad"
+        ],
+        [
+         "<code>tests/</code>",
+         "312 tests, 4 skipped",
+         "48",
+         "3,410",
+         "n/a",
+         "all"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "cp-a",
+     "title": "Checkpoint A",
+     "kind": "cp",
+     "minutes": 3,
+     "blocks": [
+      {
+       "type": "checkpoint",
+       "id": "cp-a1",
+       "kind": "single",
+       "prompt": "Which directory owns holiday-calendar logic?",
+       "options": [
+        "<code>src/pricing/</code>",
+        "<code>src/calendars/</code>",
+        "<code>src/io/</code>",
+        "<code>tests/fixtures/</code>"
+       ],
+       "answer": 1,
+       "provenance": "survey.json → imports → calendars.* is imported by 4 modules and imports none of them",
+       "explanation": "src/calendars/ defines Calendar and roll_forward. src/pricing/ is the heaviest consumer, at 31 imports, which is why people guess it, but it only consumes."
+      },
+      {
+       "type": "checkpoint",
+       "id": "cp-a2",
+       "kind": "single",
+       "prompt": "You need to add a new instrument type. Which file do you edit first?",
+       "options": [
+        "<code>src/pricing/engine.py</code>",
+        "<code>src/instruments/factory.py</code>",
+        "<code>src/api/schemas.py</code>",
+        "<code>src/api/app.py</code>"
+       ],
+       "answer": 1,
+       "provenance": "survey.json → symbols → _REGISTRY defined in factory.py:48, referenced by 6 instrument classes",
+       "explanation": "The registry pattern in factory.py means the engine dispatches on kind without knowing the classes. Editing engine.py to add an instrument is the mistake this design exists to prevent."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "GET IT RUNNING",
+   "minutes": 20,
+   "stops": [
+    {
+     "id": "setup",
+     "title": "Prerequisites and setup",
+     "kind": "stop",
+     "minutes": 8,
+     "lede": "Every command here was executed on the generation machine. The output is real, the timings are real, and the two failures are real.",
+     "blocks": [
+      {
+       "type": "command",
+       "cmd": "docker compose up -d timescale",
+       "exit": 0,
+       "dur": "11.4 s",
+       "out": "[+] Running 2/2\n ✔ Network payments-core_default   Created  0.1s\n ✔ Container pc-timescale-1        Started  11.0s",
+       "env": "captured 2026-07-30, ubuntu-22.04, docker 24.0.7",
+       "cwd": "."
+      },
+      {
+       "type": "command",
+       "cmd": "poetry install --with dev",
+       "exit": 0,
+       "dur": "48.3 s",
+       "out": "Installing dependencies from lock file\n\nPackage operations: 84 installs, 0 updates, 0 removals\n\n  • Installing numpy (1.26.4)\n  • Installing pydantic (2.6.1)\n  • Installing fastapi (0.110.0)\n  … 79 more\n\nInstalling the current project: payments-core (2.14.0)",
+       "env": "captured 2026-07-30, ubuntu-22.04, python 3.11.8, poetry 1.7.1",
+       "cwd": "."
+      },
+      {
+       "type": "command",
+       "cmd": "make lint",
+       "predict": "Before you look: on a clean checkout of this repo, does make lint pass?",
+       "exit": 1,
+       "dur": "3.1 s",
+       "broken": "ruff exits 1 on src/pricing/legacy_curves.py with 14 E501 and 3 F401. The file is excluded in pyproject.toml but make lint does not pass the config flag.",
+       "hypothesis": "The exclude list was added to pyproject.toml in a2b7e40 but the Makefile target still calls ruff without --config, so the exclusion is never read. Unverified: this tool did not test the fix.",
+       "out": "ruff check src/ tests/\nsrc/pricing/legacy_curves.py:41:89: E501 Line too long (104 > 88)\nsrc/pricing/legacy_curves.py:52:1:  F401 'numpy' imported but unused\n… 15 more\nFound 17 errors.\nmake: *** [Makefile:22: lint] Error 1",
+       "env": "captured 2026-07-30, ubuntu-22.04, ruff 0.3.4",
+       "cwd": "."
+      },
+      {
+       "type": "command",
+       "cmd": "poetry run python -m payments_core.io.smoke",
+       "predict": "The smoke check loads market curves from the local fixture set. Does it pass?",
+       "exit": 1,
+       "dur": "2.4 s",
+       "broken": "The market-store smoke check raises MissingCurve('JPY') against the local fixture set. tests/fixtures/curves/ ships EUR, GBP and USD only.",
+       "hypothesis": "JPY was added to the default currency list in config/local.yaml at 7d41c02 but no JPY fixture was committed alongside it. Unverified: this tool did not test the fix.",
+       "out": "Traceback (most recent call last):\n  File \"src/io/market_store.py\", line 46, in load_curves\n    raise MissingCurve(ccy, cfg.asof)\npayments_core.io.errors.MissingCurve: no curve for JPY at 2026-07-30",
+       "env": "captured 2026-07-30, ubuntu-22.04, python 3.11.8",
+       "cwd": "."
+      },
+      {
+       "type": "callout",
+       "level": "broken",
+       "title": "WHAT THE TWO FAILURES MEAN FOR YOU",
+       "text": "Both fail on a clean checkout. Do not spend your first morning believing you broke them. For lint, run ruff check src/ --config pyproject.toml, which exits 0. For the smoke check, drop JPY from config/local.yaml until a fixture lands. Neither blocks the test suite."
+      }
+     ]
+    },
+    {
+     "id": "green",
+     "title": "Your first green test",
+     "kind": "stop",
+     "minutes": 4,
+     "lede": "One command. If this passes, your environment is correct and you can stop configuring things.",
+     "blocks": [
+      {
+       "type": "command",
+       "cmd": "poetry run pytest -q",
+       "predict": "Two of the four commands above failed. Does the test suite itself pass?",
+       "exit": 0,
+       "dur": "41.2 s",
+       "out": "........................................................ [ 18%]\n........................................................ [ 36%]\n........................................................ [ 54%]\n........................................................ [ 72%]\n........................................................ [ 90%]\n................................ssss                     [100%]\n\n312 passed, 4 skipped in 39.87s",
+       "env": "captured 2026-07-30, ubuntu-22.04, python 3.11.8",
+       "cwd": "."
+      },
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-041",
+         "text": "The four skipped tests need a live market-store connection and are skipped by default outside CI.",
+         "status": "verified",
+         "anchor": {
+          "file": "src/io/market_store.py",
+          "start": 40,
+          "end": 48,
+          "focus": [
+           44
+          ],
+          "sha256": "523b2888ec1d16c9ca04236c87b4a7547bf56527f533f542135b002edb098759"
+         }
+        }
+       ]
+      },
+      {
+       "type": "callout",
+       "level": "info",
+       "title": "IF IT TOOK MUCH LONGER THAN 41 SECONDS",
+       "text": "The suite is CPU-bound in src/pricing. On a laptop with fewer than 8 cores, expect 90 to 120 seconds. Anything beyond three minutes usually means the timescale container is not up and tests are falling back to retry timeouts."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "FOLLOW ONE REQUEST",
+   "minutes": 25,
+   "stops": [
+    {
+     "id": "trace",
+     "title": "One request, end to end",
+     "kind": "stop",
+     "minutes": 12,
+     "lede": "POST /v1/price, from the route handler to the serialized response. Six hops, each one a real line range. This is the path to hold in your head. Almost everything else in the repo is reached from it.",
+     "blocks": [
+      {
+       "type": "trace",
+       "steps": [
+        {
+         "claim": "The route binds a Calendar per request through a dependency, then does nothing but delegate three times.",
+         "anchor": {
+          "file": "src/api/app.py",
+          "start": 58,
+          "end": 66,
+          "focus": [
+           63,
+           64,
+           65
+          ],
+          "sha256": "a28c84fa7d064a7376dd1b99cd9a51855cee2df2e4440d95c9b6f6b047581110"
+         },
+         "next": "build_instrument in src/instruments/factory.py"
+        },
+        {
+         "claim": "Validation happens before any pricing code runs: a past settlement date is rejected at the schema boundary.",
+         "anchor": {
+          "file": "src/api/schemas.py",
+          "start": 28,
+          "end": 38,
+          "focus": [
+           35,
+           36,
+           37
+          ],
+          "sha256": "0a9a481fd1bed4ae5aea6fe3e32d63a4f2448edec77d5fffaa12b768f74c013d"
+         },
+         "next": "the registry lookup"
+        },
+        {
+         "claim": "The factory maps a string kind to a registered class and raises rather than guessing when the kind is unknown.",
+         "anchor": {
+          "file": "src/instruments/factory.py",
+          "start": 52,
+          "end": 57,
+          "focus": [
+           54,
+           55,
+           56
+          ],
+          "sha256": "dca48767668c420bb291aab2be4a420b3bf2e125e2e08207c731336a9b4bd68b"
+         },
+         "predict": "The factory has built the instrument. Which file does the request touch next?",
+         "next": "roll_forward in src/calendars/roll.py"
+        },
+        {
+         "claim": "The settlement date is rolled forward to the next business day, with a hard ceiling that raises instead of looping forever.",
+         "anchor": {
+          "file": "src/calendars/roll.py",
+          "start": 112,
+          "end": 122,
+          "focus": [
+           117,
+           118,
+           120,
+           121
+          ],
+          "sha256": "ac980ceb6d05a2bc5166c09536304d7c2737759a26f918ba659d93bdf35ca828"
+         },
+         "predict": "The settlement date is now a business day. Where does pricing actually happen?",
+         "next": "ENGINE.price"
+        },
+        {
+         "claim": "The engine discounts off the currency curve, then branches: options go through Black-76 with a surface lookup, everything else is a forward difference.",
+         "anchor": {
+          "file": "src/pricing/engine.py",
+          "start": 88,
+          "end": 96,
+          "focus": [
+           91,
+           92,
+           93
+          ],
+          "sha256": "d1b31c48636f6bbd42511410510a397925da09f9e0984563ab13fed3b3ea42e1"
+         },
+         "predict": "A price exists. Which file turns it into the response body?",
+         "next": "serialize_price"
+        },
+        {
+         "claim": "Serialization rounds the present value to six decimals and the discount factor to eight before it leaves the process.",
+         "anchor": {
+          "file": "src/api/serializers.py",
+          "start": 19,
+          "end": 24,
+          "focus": [
+           21,
+           22
+          ],
+          "sha256": "ac974e63213d532af1dc0f2db4cfca265812b946f8043c05e354123a3a5bd01d"
+         },
+         "next": null
+        }
+       ]
+      },
+      {
+       "type": "callout",
+       "level": "inferred",
+       "title": "ONE THING TO WATCH",
+       "text": "RollOverflow at roll.py:121 fires when a calendar is loaded empty: every day looks like a holiday, so the loop walks past MAX_ROLL_DAYS. It presents as a pricing error but the cause is upstream in src/io. Inferred from the code path; this tool did not reproduce it."
+      }
+     ]
+    },
+    {
+     "id": "cp-c",
+     "title": "Checkpoint C",
+     "kind": "cp",
+     "minutes": 4,
+     "blocks": [
+      {
+       "type": "checkpoint",
+       "id": "cp-c1",
+       "kind": "order",
+       "prompt": "Put these five hops in the order they actually execute.",
+       "options": [
+        "<code>ENGINE.price</code>: discount and branch",
+        "<code>roll_forward</code>: advance to a business day",
+        "<code>PriceRequest</code> validation: reject past dates",
+        "<code>serialize_price</code>: round and return",
+        "<code>build_instrument</code>: registry lookup"
+       ],
+       "answer": [
+        4,
+        3,
+        1,
+        5,
+        2
+       ],
+       "provenance": "survey.json → call graph from src/api/app.py:63-66, resolved statically",
+       "explanation": "Validation runs before the handler body. That is the one most people get wrong, because the code that triggers it is not visible in app.py at all. It happens in the pydantic model bound to the parameter."
+      },
+      {
+       "type": "checkpoint",
+       "id": "cp-c2",
+       "kind": "single",
+       "prompt": "RollOverflow is raised inside src/calendars/, but the empty calendar was built elsewhere. Which module constructs Calendar objects?",
+       "options": [
+        "<code>src/calendars/</code>",
+        "<code>src/io/</code>",
+        "<code>src/api/</code>",
+        "<code>src/pricing/</code>"
+       ],
+       "answer": 1,
+       "provenance": "survey.json → call graph → Calendar instances constructed only in src/io/market_store.py",
+       "explanation": "calendars/ raises it, but the only place a Calendar is constructed is the market store. An empty calendar makes every day a holiday, so the roll walks past its ceiling. The error surfaces three modules away from its cause."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "CONVENTIONS",
+   "minutes": 8,
+   "stops": [
+    {
+     "id": "conv",
+     "title": "Conventions and gotchas",
+     "kind": "stop",
+     "minutes": 8,
+     "lede": "Everything on this page is inferred from patterns in the code and in review history. None of it is verified against a written standard, because no written standard exists in this repo. Treat it as a strong hint, not a rule.",
+     "blocks": [
+      {
+       "type": "callout",
+       "level": "inferred",
+       "title": "THIS ENTIRE STOP IS UNVERIFIED",
+       "text": "The most useful content is the least checkable. Rather than mixing it into the verified stops and diluting them, it is quarantined here and marked once, loudly."
+      },
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-118",
+         "text": "Errors are raised, never returned as sentinel values: six of six error paths in the trace raise a typed exception.",
+         "status": "inferred"
+        },
+        {
+         "id": "c-119",
+         "text": "New instruments are added by registering a class, never by editing a branch in the engine.",
+         "status": "inferred"
+        },
+        {
+         "id": "c-120",
+         "text": "Dates crossing a module boundary are already rolled; roll_forward is called once, at the API edge.",
+         "status": "inferred"
+        },
+        {
+         "id": "c-121",
+         "text": "Anything reaching outside the process belongs in src/io, which is why it is the smallest module and stays that way.",
+         "status": "inferred"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "CLOSE",
+   "minutes": 6,
+   "stops": [
+    {
+     "id": "audit",
+     "title": "The ledger",
+     "kind": "stop",
+     "minutes": 6,
+     "lede": "What the tool claimed, what survived, and what it deleted. The deleted rows are the interesting ones.",
+     "blocks": [
+      {
+       "type": "callout",
+       "level": "info",
+       "title": "WHY THIS PAGE EXISTS",
+       "text": "Anyone can generate confident documentation. The only useful question is which parts to trust. Eight claims below were written by the model and then deleted by the checker because their anchors did not resolve. They are shown, not swept up."
+      },
+      {
+       "type": "ledger"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "dropped": [
+  {
+   "id": "c-031",
+   "text": "Prices are cached in Redis for 30 seconds to absorb blotter refreshes.",
+   "file": "src/io/cache.py",
+   "reason": "file does not exist at this commit"
+  },
+  {
+   "id": "c-052",
+   "text": "The engine supports SABR calibration for the vol surface.",
+   "file": "src/pricing/engine.py",
+   "reason": "snippet not found verbatim in file"
+  },
+  {
+   "id": "c-058",
+   "text": "Retries are attempted three times with exponential backoff.",
+   "file": "src/io/market_store.py",
+   "reason": "snippet not found verbatim in file"
+  },
+  {
+   "id": "c-067",
+   "text": "A settlement date more than two years out is rejected.",
+   "file": "src/api/schemas.py",
+   "reason": "lines 44-51 out of range (file ends at 38)"
+  },
+  {
+   "id": "c-081",
+   "text": "Greeks are computed analytically for options.",
+   "file": "src/risk/greeks.py",
+   "reason": "snippet not found verbatim in file"
+  },
+  {
+   "id": "c-094",
+   "text": "The Makefile exposes a fmt target that runs black.",
+   "file": "Makefile",
+   "reason": "snippet not found verbatim in file"
+  },
+  {
+   "id": "c-102",
+   "text": "Curve interpolation is log-linear in discount factors.",
+   "file": "src/pricing/curves.py",
+   "reason": "excerpt hash mismatch: file changed after narration"
+  },
+  {
+   "id": "c-133",
+   "text": "All endpoints require an OAuth bearer token.",
+   "file": "src/api/app.py",
+   "reason": "snippet not found verbatim in file"
+  }
+ ],
+ "contract": "trailhead/verified@2"
+},
+ "ML-GS": {
+ "repo": {
+  "name": "ML-GS",
+  "commit": "fb3c3ce",
+  "generated_at": "2026-07-30T19:50:00Z"
+ },
+ "report": {
+  "claims": 20,
+  "verified": 12,
+  "dropped": 4,
+  "inferred": 4,
+  "commands": 4,
+  "failed": 1,
+  "tool_version": "0.0.2-adhoc",
+  "duration_s": 1
+ },
+ "map": {
+  "nodes": [
+   {
+    "id": "skills",
+    "label": ".claude/skills",
+    "loc": 1574,
+    "files": 23,
+    "x": 40,
+    "y": 50,
+    "w": 150,
+    "why": "Nine slash-commands that drive the vol project: compile and sync the guides, write a chapter, run a research sweep. The closest thing this repository has to an application.",
+    "top": [
+     "sync-docs/SKILL.md (10 commits)",
+     "verify-diagram/test_diag_inspect.py (9)",
+     "verify-diagram/diag_inspect.py (9)"
+    ]
+   },
+   {
+    "id": "tests",
+    "label": "hackathon/tests",
+    "loc": 5381,
+    "files": 10,
+    "x": 40,
+    "y": 185,
+    "w": 150,
+    "why": "The only automated test suite in the repository: 416 tests across ten modules, covering survey, resolve, render, runner, narrate, checkpoints and text handling. It imports the package by name, so it needs src/ on the path.",
+    "top": [
+     "test_textio.py",
+     "test_survey.py",
+     "test_runner.py"
+    ]
+   },
+   {
+    "id": "tools",
+    "label": "hackathon/tools",
+    "loc": 585,
+    "files": 4,
+    "x": 40,
+    "y": 300,
+    "w": 150,
+    "why": "Four Node scripts that gate the artifact: self-containment, anchor and hash checks, fixture-chain consistency, and the splice that inlines a payload. No model runs here — this is the half of the project that checks.",
+    "top": [
+     "verify-contract.js (untracked)",
+     "check-bundle.js (untracked)",
+     "check-fixtures.js (untracked)"
+    ]
+   },
+   {
+    "id": "guides",
+    "label": "guides",
+    "loc": 63101,
+    "files": 178,
+    "x": 320,
+    "y": 40,
+    "w": 170,
+    "why": "Three LaTeX guides, ~63k lines of .tex. The vol-learning guide alone is 371 pages across 22 chapters and is the repository’s main product.",
+    "top": [
+     "vol-learning-guide/16-forecast-evaluation.tex (17)",
+     "vol-learning-guide/main.pdf (16)",
+     "vol-learning-guide/references.bib (15)"
+    ]
+   },
+   {
+    "id": "src",
+    "label": "hackathon/src",
+    "loc": 10259,
+    "files": 15,
+    "x": 320,
+    "y": 190,
+    "w": 160,
+    "why": "The generator package, and now the largest thing in the hackathon tree: all five stages plus the command runner, the quote resolver and the HTML template. Only narrate.py is allowed to reach a model.",
+    "top": [
+     "survey.py",
+     "compose.py",
+     "verify.py"
+    ]
+   },
+   {
+    "id": "fix",
+    "label": "hackathon/fixtures",
+    "loc": 2678,
+    "files": 6,
+    "x": 320,
+    "y": 300,
+    "w": 160,
+    "why": "Payloads standing in for pipeline output. Several fixtures describe one synthetic repo end to end, which is what check-fixtures.js exists to enforce.",
+    "top": [
+     "verified.sample.json",
+     "content.sample.json"
+    ]
+   },
+   {
+    "id": "ref",
+    "label": "reference",
+    "loc": 3122,
+    "files": 113,
+    "x": 640,
+    "y": 40,
+    "w": 150,
+    "why": "The paper corpus the guides cite: 98 tracked PDFs plus bibliography indexes. Papers arrive by hand or by the deep-research workflow.",
+    "top": [
+     "bibliography.md (5)",
+     "project-papers/README.md (4)"
+    ]
+   },
+   {
+    "id": "notes",
+    "label": "notes",
+    "loc": 3256,
+    "files": 26,
+    "x": 640,
+    "y": 160,
+    "w": 150,
+    "why": "Append-only research findings. The vol-project rules make reading the journal step one of every session and appending to it the last.",
+    "top": [
+     "research-journal.md (6)",
+     "research-index.md (3)"
+    ]
+   },
+   {
+    "id": "demo",
+    "label": "hackathon/demo",
+    "loc": 3039,
+    "files": 1,
+    "x": 640,
+    "y": 285,
+    "w": 150,
+    "why": "The generated artifact itself: one self-contained HTML file carrying its payloads inline. The renderer of record now lives in src/trailhead/template.html and this is its output.",
+    "top": [
+     "trailhead-demo.html (1 commit, under its old path)"
+    ]
+   }
+  ],
+  "edges": [
+   {
+    "a": "skills",
+    "b": "guides",
+    "n": 3
+   },
+   {
+    "a": "skills",
+    "b": "notes",
+    "n": 2
+   },
+   {
+    "a": "guides",
+    "b": "ref",
+    "n": 22
+   },
+   {
+    "a": "tests",
+    "b": "src",
+    "n": 1
+   },
+   {
+    "a": "tools",
+    "b": "fix",
+    "n": 2
+   },
+   {
+    "a": "tools",
+    "b": "demo",
+    "n": 2
+   },
+   {
+    "a": "fix",
+    "b": "demo",
+    "n": 1
+   }
+  ]
+ },
+ "files": {
+  "README.md": {
+   "1": "# ML for Realized Volatility Forecasting",
+   "2": "",
+   "3": "Internship project repo: planning, research, and learning guides for a Goldman Sachs ML internship focused on forecasting realized volatility."
+  },
+  "CLAUDE.vol-project.md": {
+   "5": "**Research-first, not plan-first.** Do not jump to implementation plans, sprints, or task lists. The project's value comes from deep understanding of features and data, not from shipping code fast."
+  },
+  ".claude/skills/sync-docs/SKILL.md": {
+   "8": "Recompile **only changed** guides and update the `docs-only` branch with the latest compiled PDFs, deliverables, and markdown notes."
+  },
+  ".claude/workflows/deep-research-distill.js": {
+   "3": "  description: 'One question in: sweep the internet for the state of the art (arXiv/SSRN papers, GitHub repos, practitioner web), adversarially verify, DOWNLOAD the relevant open-access papers into reference/project-papers/, and distill a fully source-traced brief into the repo',"
+  },
+  ".githooks/pre-commit": {
+   "24": "# Fail-safe: the committed tree must contain no .py at all (ls-files reads the",
+   "25": "# index, so staged deletions of .py correctly pass).",
+   "26": "if git ls-files -- '*.py' | grep -q .; then",
+   "27": "  echo \"[pre-commit] ERROR: index still contains .py files on docs-only; commit aborted:\" >&2",
+   "28": "  git ls-files -- '*.py' >&2",
+   "29": "  exit 1"
+  },
+  "hackathon/tools/check-bundle.js": {
+   "36": "const loaders = src.replace(ANCHOR, '')",
+   "37": "  .match(/(?:\\bsrc|\\bhref|\\bfetch|\\bimport)\\s*[=(]\\s*[\"']?\\s*(?:https?:)?\\/\\//g) || [];"
+  },
+  "hackathon/tools/verify-contract.js": {
+   "62": "let fail = 0;",
+   "63": "const bad = m => { console.log('  FAIL  ' + m); fail++; };",
+   "64": "",
+   "65": "console.log(`\\n${path.relative(process.cwd(), file)}`);",
+   "66": "if (PAYLOADS.length > 1) console.log(`${PAYLOADS.length} payloads: ${PAYLOADS.map(p => p[0]).join(', ')}`);",
+   "67": "",
+   "68": "for (const [label, payload] of PAYLOADS) check(label, payload);",
+   "69": "",
+   "70": "console.log(fail ? `\\n${fail} FAILURE(S)\\n` : '\\nALL ANCHOR + CONTRACT CHECKS PASS\\n');",
+   "71": "process.exit(fail ? 1 : 0);",
+   "92": "function excerptOf(an, f) {",
+   "93": "  const out = [];",
+   "94": "  for (let n = an.start; n <= an.end; n++) out.push(f[n]);",
+   "95": "  return out.join('\\n');",
+   "99": "function anchor(an, who) {",
+   "100": "  if (!an) return bad(`${who}: no anchor`);",
+   "101": "  const f = D.files[an.file];",
+   "102": "  if (!f) return bad(`${who}: file not bundled -> ${an.file}`);",
+   "103": "  const ls = Object.keys(f).map(Number), lo = Math.min(...ls), hi = Math.max(...ls);",
+   "104": "  if (an.start < lo || an.end > hi)",
+   "105": "    bad(`${who}: range ${an.start}-${an.end} outside bundled ${lo}-${hi} in ${an.file}`);",
+   "106": "  for (const n of an.focus || [])",
+   "107": "    if (n < an.start || n > an.end) bad(`${who}: focus line ${n} outside ${an.start}-${an.end}`);",
+   "108": "  let whole = true;",
+   "109": "  for (let n = an.start; n <= an.end; n++)",
+   "110": "    if (!(n in f)) { bad(`${who}: line ${n} missing from ${an.file}`); whole = false; }",
+   "111": "",
+   "112": "  if (!an.sha256) return bad(`${who}: anchor carries no sha256 — nothing to verify against`);",
+   "113": "  if (!whole) return;",
+   "114": "  const got = crypto.createHash('sha256').update(excerptOf(an, f), 'utf8').digest('hex');",
+   "115": "  if (got !== an.sha256)",
+   "116": "    bad(`${who}: sha256 mismatch on ${an.file}:${an.start}-${an.end}\\n          recorded ${an.sha256}\\n          bundled  ${got}`);",
+   "117": "  else hashed++;",
+   "123": "    case 'prose':",
+   "124": "      for (const c of bl.claims) {",
+   "125": "        claims++;",
+   "126": "        if (c.status === 'inferred') {",
+   "127": "          inferred++;",
+   "128": "          if (c.anchor) bad(`${c.id}: inferred claim carries an anchor — it would render as verified`);",
+   "129": "        } else anchor(c.anchor, c.id);",
+   "150": "    case 'command':",
+   "151": "      cmds++;",
+   "152": "      if (bl.exit !== 0 && !bl.broken) bad(`${bl.cmd}: failing command with no BROKEN banner`);",
+   "153": "      if (!bl.env) bad(`${bl.cmd}: no environment note`);",
+   "154": "      if (!bl.out) bad(`${bl.cmd}: no captured output`);",
+   "242": "    case 'graph': case 'ledger': break;",
+   "243": "    default: bad(`unknown block type: ${bl.type}`);",
+   "247": "const rendered = new Set(stops.flatMap(s =>",
+   "248": "  s.blocks.filter(x => x.type === 'prose').flatMap(x => x.claims.map(c => c.id))));",
+   "249": "for (const d of D.dropped) {",
+   "250": "  if (rendered.has(d.id)) bad(`${d.id}: dropped claim is rendered in the course`);",
+   "251": "  if (!d.reason) bad(`${d.id}: dropped with no reason`);",
+   "252": "}",
+   "253": "if (D.dropped.length !== D.report.dropped)",
+   "254": "  bad(`report says ${D.report.dropped} dropped, ledger lists ${D.dropped.length}`);",
+   "255": "",
+   "256": "const failing = stops.flatMap(s => s.blocks).filter(x => x.type === 'command' && x.exit !== 0).length;",
+   "257": "if (failing !== D.report.failed)",
+   "258": "  bad(`report says ${D.report.failed} failing commands, page shows ${failing}`);"
+  },
+  "hackathon/tools/inline-fixture.js": {
+   "25": "const MANIFEST = [",
+   "26": "  { key: 'payments-core', json: 'fixtures/verified.sample.json', synthetic: true },",
+   "27": "  { key: 'ML-GS', json: 'fixtures/verified.ml-gs.json', synthetic: false },",
+   "28": "];",
+   "37": "  if (!fs.existsSync(m)) { console.error('not found:', m); process.exit(2); }",
+   "44": "  const data = JSON.parse(fs.readFileSync(m.json, 'utf8'));",
+   "45": "  if (data.repo.name !== m.key)",
+   "46": "    console.log(`  note  ${path.basename(m.json)} repo.name is \"${data.repo.name}\", manifest key is \"${m.key}\"`);",
+   "54": "const block = START + '\\n'",
+   "55": "  + 'const BUNDLES = {\\n' + entries + '\\n};\\n'",
+   "56": "  + '/* Demo-only: which of these are synthetic fixtures rather than real repos.\\n'",
+   "57": "  + '   Kept outside the payloads so each stays a pure verified.json. */\\n'",
+   "58": "  + 'const SYNTHETIC = {' + synth + '};\\n'",
+   "59": "  + END;",
+   "61": "const out = src.slice(0, a) + block + src.slice(b + END.length);",
+   "62": "fs.writeFileSync(html, out);"
+  },
+  "hackathon/src/trailhead/survey.py": {
+   "429": "def walk_files(roots: Roots, out_path: Path | None) -> dict:",
+   "674": "def resolve_import(dotted, known):",
+   "675": "    \"\"\"The internal module a dotted import name refers to, or None if external.",
+   "676": "",
+   "677": "    Walks prefixes longest-first, so `pkg.sub.helpers.fn` lands on the module",
+   "678": "    `pkg.sub.helpers` rather than the package `pkg`. Anything with no known",
+   "679": "    prefix is a third-party dependency and is not a node on the map.",
+   "680": "",
+   "681": "    Kept for its stated contract and its tests. Survey itself uses",
+   "682": "    `classify_import`, because \"longest known prefix\" re-points an import of a",
+   "683": "    module that does not exist at its nearest existing ancestor — 700 phantom",
+   "684": "    edges on `restored`, 27.4% of everything it calls internal.",
+   "685": "    \"\"\"",
+   "686": "    parts = dotted.split(\".\")",
+   "687": "    for n in range(len(parts), 0, -1):",
+   "688": "        candidate = \".\".join(parts[:n])",
+   "689": "        if candidate in known:",
+   "690": "            return candidate",
+   "691": "    return None",
+   "694": "def extract_imports(source: str, module: str, is_init: bool = False) -> list[ImportRef]:",
+   "1494": "def survey(repo_root: Path, *, since_days: int = 365,"
+  },
+  "hackathon/src/trailhead/mapper.py": {
+   "122": "def order_nodes(ids, fan_in, fan_out, loc) -> list:"
+  },
+  "hackathon/tests/test_survey.py": {
+   "85": "    def test_third_party_import_resolves_to_nothing(self):",
+   "86": "        # An external dependency is not a node on the map.",
+   "87": "        self.assertIsNone(survey.resolve_import(\"os.path\", self.KNOWN))",
+   "88": "        self.assertIsNone(survey.resolve_import(\"fastapi\", self.KNOWN))"
+  }
+ },
+ "tracks": [
+  {
+   "title": "ORIENT",
+   "minutes": 12,
+   "stops": [
+    {
+     "id": "cover",
+     "title": "What you are looking at",
+     "kind": "stop",
+     "minutes": 2,
+     "lede": "A generated walkthrough of ML-GS at commit fb3c3ce. Every factual sentence below is anchored to a line range in this repository and re-hashed after it was written. Claims whose anchors stopped resolving were deleted, not softened — the count is in the top bar.",
+     "blocks": [
+      {
+       "type": "callout",
+       "level": "info",
+       "title": "BEFORE YOU START",
+       "text": "You need Node 22 and Python 3.11. One of the commands below fails on this machine and is shown failing — that is the repository’s current state, not a defect in this page."
+      },
+      {
+       "type": "table",
+       "caption": "Generation record. Counts from git ls-files and git log over 291 commits.",
+       "columns": [
+        "FIELD",
+        "VALUE"
+       ],
+       "sortable": false,
+       "rows": [
+        [
+         "Repository",
+         "<code>ML-GS</code>"
+        ],
+        [
+         "Commit",
+         "<code>fb3c3ce</code>"
+        ],
+        [
+         "Tracked files",
+         "463"
+        ],
+        [
+         "Commits in history",
+         "291"
+        ],
+        [
+         "Built by",
+         "<code>build-ml-gs.js</code> (scratch resolver, not stage 4)"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "five",
+     "title": "Five Things to Know About This Repository",
+     "kind": "stop",
+     "minutes": 4,
+     "lede": "Five statements, in the order a new joiner needs them: what this repository is responsible for, what flows through it, where its data comes from, what it touches outside itself, and where change concentrates.",
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-001",
+         "text": "This repository owns the authoring and distribution of study and reference material for a Goldman Sachs internship on realized-volatility forecasting — planning, research and learning guides, not a forecasting system.",
+         "status": "verified",
+         "anchor": {
+          "file": "README.md",
+          "start": 1,
+          "end": 3,
+          "focus": [
+           3
+          ],
+          "sha256": "f7c5121dc189e077d2b7ea6a63a1c925b2813abd9f960eee099d26633f7fdf2e"
+         }
+        },
+        {
+         "id": "c-002",
+         "text": "It is explicitly not responsible for shipping model code: its own working rules rank deep understanding of features and data above building fast.",
+         "status": "verified",
+         "anchor": {
+          "file": "CLAUDE.vol-project.md",
+          "start": 5,
+          "end": 5,
+          "focus": [
+           5
+          ],
+          "sha256": "a679821f6d1fa5d450fce051d45c5ee2485a97de5c5f48e5979c3ff07911c426"
+         }
+        },
+        {
+         "id": "c-003",
+         "text": "Its main output is compiled PDFs pushed to a second branch: sync-docs recompiles the changed guides and updates docs-only with those PDFs, deliverables and notes.",
+         "status": "verified",
+         "anchor": {
+          "file": ".claude/skills/sync-docs/SKILL.md",
+          "start": 8,
+          "end": 8,
+          "focus": [
+           8
+          ],
+          "sha256": "0f0c66360198aa6b4a447be99138b84dc27ad954b82d51b42b6ac4447a893055"
+         }
+        },
+        {
+         "id": "c-004",
+         "text": "Core data is a corpus of papers held as files, and one documented path brings new ones in — a research workflow that sweeps arXiv and SSRN and downloads open-access PDFs into reference/project-papers/.",
+         "status": "verified",
+         "anchor": {
+          "file": ".claude/workflows/deep-research-distill.js",
+          "start": 3,
+          "end": 3,
+          "focus": [
+           3
+          ],
+          "sha256": "e99ffbcd1aa14077e0159bc1a2b9e53cb5045988b616ceb6d0aa0b74e7de04c3"
+         }
+        },
+        {
+         "id": "c-005",
+         "text": "The one interaction that reaches outside this machine is guarded in code: a pre-commit hook refuses any commit whose index still contains a .py file when the branch is docs-only, because that branch is cloned on a machine that flags code.",
+         "status": "verified",
+         "anchor": {
+          "file": ".githooks/pre-commit",
+          "start": 24,
+          "end": 29,
+          "focus": [
+           24
+          ],
+          "sha256": "4c62296b6e207ff9b6040a22e0c206c67232e6feff0ea88cf09983f9a3ec0a81"
+         }
+        }
+       ]
+      },
+      {
+       "type": "callout",
+       "level": "inferred",
+       "title": "WHERE CHANGE CONCENTRATES",
+       "text": "Churn and reach both point at the vol-learning guide: its chapters, main.pdf and references.bib hold the top commit counts, and one bibliography include serves all 22 chapters. That is analysis over git history rather than a fact on any single line, so it is marked inferred here and shown as measurements in the next stop."
+      }
+     ]
+    },
+    {
+     "id": "map",
+     "title": "The map",
+     "kind": "stop",
+     "minutes": 3,
+     "lede": "Nine areas, sized by lines of text and joined by relationships that exist in the repository. Click a node for its narration, churn and neighbours.",
+     "blocks": [
+      {
+       "type": "graph"
+      },
+      {
+       "type": "callout",
+       "level": "info",
+       "title": "HOW TO READ IT",
+       "text": "Two clusters that barely touch: the vol-forecasting project on the right and the Trailhead hackathon on the left. No edge crosses between them, which is the separation the working rules ask for."
+      }
+     ]
+    },
+    {
+     "id": "where",
+     "title": "Where the work lives",
+     "kind": "stop",
+     "minutes": 3,
+     "lede": "Every figure here came from git, not from prose. Churn is commits touching any file in that area.",
+     "blocks": [
+      {
+       "type": "table",
+       "sortable": true,
+       "caption": "Tracked files from git ls-files; LOC counts text sources only; churn from git log over 291 commits. Historic paths differ where directories were moved.",
+       "columns": [
+        "AREA",
+        "PURPOSE",
+        "FILES",
+        "LOC",
+        "CHURN"
+       ],
+       "rows": [
+        [
+         "<code>guides/</code>",
+         "Three LaTeX guides — the product",
+         "178",
+         "63,101",
+         "41"
+        ],
+        [
+         "<code>reference/</code>",
+         "Paper corpus the guides cite",
+         "113",
+         "3,122",
+         "15"
+        ],
+        [
+         "<code>docs/</code>",
+         "Plans and specs",
+         "50",
+         "27,518",
+         "61"
+        ],
+        [
+         "<code>.claude/</code>",
+         "Skills and workflows",
+         "36",
+         "1,574",
+         "65"
+        ],
+        [
+         "<code>archive/</code>",
+         "Retired work",
+         "32",
+         "14,035",
+         "3"
+        ],
+        [
+         "<code>notes/</code>",
+         "Research journal and findings",
+         "26",
+         "3,256",
+         "28"
+        ],
+        [
+         "<code>hackathon/</code>",
+         "Trailhead — this week only",
+         "12",
+         "21,942",
+         "1"
+        ]
+       ]
+      },
+      {
+       "type": "callout",
+       "level": "broken",
+       "title": "MOST OF THE HACKATHON IS STILL UNTRACKED",
+       "text": "git ls-files hackathon returns 12 files against roughly 22,000 lines across src, tests, tools, fixtures and demo. The generator package and most gate scripts are untracked, so an overwrite is not recoverable from git. Treat any in-place rewrite under hackathon/ as destructive until that changes."
+      }
+     ]
+    },
+    {
+     "id": "cp-a",
+     "title": "Checkpoint A",
+     "kind": "cp",
+     "minutes": 2,
+     "lede": "Two questions. Both answer keys come from repository facts, not from a model — the provenance line under each says which.",
+     "blocks": [
+      {
+       "type": "checkpoint",
+       "id": "cp-a1",
+       "kind": "single",
+       "prompt": "Which directory holds the only code in this repository covered by an automated test suite?",
+       "options": [
+        "<code>hackathon/tools/</code>",
+        "<code>hackathon/src/</code>",
+        "<code>hackathon/demo/</code>",
+        "<code>.claude/workflows/</code>"
+       ],
+       "answer": 1,
+       "provenance": "tests/test_survey.py imports `from trailhead import survey`; the package is hackathon/src/trailhead. Confirmed by the passing run captured in the next track.",
+       "explanation": "hackathon/tools/ holds four gate scripts with no tests of their own — they are run, not tested. All 416 passing tests target modules under src/trailhead/."
+      },
+      {
+       "type": "checkpoint",
+       "id": "cp-a2",
+       "kind": "single",
+       "prompt": "You add a tenth block type to the payload and teach the checker about it. Which file must also change, or the page renders nothing from that stop onward?",
+       "options": [
+        "<code>tools/verify-contract.js</code>",
+        "<code>demo/trailhead-demo.html</code>",
+        "<code>fixtures/verified.sample.json</code>",
+        "<code>docs/verified-contract.md</code>"
+       ],
+       "answer": 1,
+       "provenance": "Call-graph reading of the renderer: the block dispatch indexes B by type with no fallback branch, so an unknown key throws before any HTML is produced.",
+       "explanation": "The checker’s switch and the renderer’s block map are independent enumerations of the same types. Teaching one and not the other yields a green gate and a blank stage."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "GET IT RUNNING",
+   "minutes": 10,
+   "stops": [
+    {
+     "id": "setup",
+     "title": "Run the gates",
+     "kind": "stop",
+     "minutes": 5,
+     "lede": "Every command here was executed on the generation machine from hackathon/. The output is real, the timings are real, and the failure is real.",
+     "blocks": [
+      {
+       "type": "command",
+       "cmd": "PYTHONPATH=src py -3.11 -m unittest discover -s tests",
+       "cwd": "hackathon",
+       "exit": 0,
+       "dur": "4.80 s",
+       "out": "................................................................................................................................................................................................................................................................................................................................................................................................................................\r\n----------------------------------------------------------------------\r\nRan 416 tests in 4.502s\r\n\r\nOK",
+       "env": "captured 2026-07-30, win11 10.0.26200, node v22.16.0, python 3.11.1"
+      },
+      {
+       "type": "command",
+       "cmd": "py -3.11 -m unittest discover -s tests -v",
+       "cwd": "hackathon",
+       "exit": 1,
+       "dur": "0.34 s",
+       "out": "test_checkpoints (unittest.loader._FailedTest.test_checkpoints) ... ERROR\r\ntest_compose (unittest.loader._FailedTest.test_compose) ... ERROR\r\ntest_map (unittest.loader._FailedTest.test_map) ... ERROR\r\ntest_narrate (unittest.loader._FailedTest.test_narrate) ... ERROR\r\ntest_render (unittest.loader._FailedTest.test_render) ... ERROR\r\ntest_resolve (unittest.loader._FailedTest.test_resolve) ... ERROR\r\ntest_runner (unittest.loader._FailedTest.test_runner) ... ERROR\r\ntest_survey (unittest.loader._FailedTest.test_survey) ... ERROR\r\ntest_textio (unittest.loader._FailedTest.test_textio) ... ERROR\r\ntest_verify (unittest.loader._FailedTest.test_verify) ... ERROR\r\n\r\n======================================================================\r\nERROR: test_checkpoints (unittest.loader._FailedTest.test_checkpoints)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_checkpoints\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_checkpoints.py\", line 24, in <module>\r\n    from trailhead import checkpoints\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_compose (unittest.loader._FailedTest.test_compose)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_compose\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_compose.py\", line 26, in <module>\r\n    from trailhead import compose\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_map (unittest.loader._FailedTest.test_map)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_map\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_map.py\", line 22, in <module>\r\n    from trailhead import mapper\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_narrate (unittest.loader._FailedTest.test_narrate)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_narrate\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_narrate.py\", line 22, in <module>\r\n    from trailhead import narrate, prompts, provider\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_render (unittest.loader._FailedTest.test_render)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_render\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_render.py\", line 27, in <module>\r\n    from trailhead import render\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_resolve (unittest.loader._FailedTest.test_resolve)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_resolve\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_resolve.py\", line 18, in <module>\r\n    from trailhead import resolve\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_runner (unittest.loader._FailedTest.test_runner)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_runner\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_runner.py\", line 22, in <module>\r\n    from trailhead import runner\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_survey (unittest.loader._FailedTest.test_survey)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_survey\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_survey.py\", line 32, in <module>\r\n    from trailhead import survey, textio\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_textio (unittest.loader._FailedTest.test_textio)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_textio\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_textio.py\", line 20, in <module>\r\n    from trailhead import textio\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n======================================================================\r\nERROR: test_verify (unittest.loader._FailedTest.test_verify)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_verify\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 407, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\ryanv\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\loader.py\", line 350, in _get_module_from_name\r\n    __import__(name)\r\n  File \"C:\\Users\\ryanv\\Documents\\Projects\\ML-GS\\hackathon\\tests\\test_verify.py\", line 33, in <module>\r\n    from trailhead import TOOL_VERSION, verify\r\nModuleNotFoundError: No module named 'trailhead'\r\n\r\n\r\n----------------------------------------------------------------------\r\nRan 10 tests in 0.001s\r\n\r\nFAILED (errors=10)",
+       "env": "captured 2026-07-30, win11 10.0.26200, node v22.16.0, python 3.11.1",
+       "predict": "Same suite as the run above, without PYTHONPATH=src. Will it pass?",
+       "broken": "Test discovery fails with ImportError. The tests import the package by name (`from trailhead import survey`) but the package lives under src/, which is not on sys.path unless you put it there.",
+       "hypothesis": "Adding PYTHONPATH=src fixes this run — the command above proves it. Making it unnecessary would need a pyproject, setup.cfg or conftest.py, none of which exist here. Unverified — this tool did not test that fix."
+      },
+      {
+       "type": "command",
+       "cmd": "node tools/check-fixtures.js",
+       "cwd": "hackathon",
+       "exit": 0,
+       "dur": "0.16 s",
+       "out": "\nfixtures/  survey + content + commands  vs  verified\n\n  pass  survey contract tag  — trailhead/survey@1\n  pass  content contract tag  — trailhead/content@1\n  pass  commands contract tag  — trailhead/commands@1\n  pass  all fixtures describe one commit  — a3f9c21\n  pass  all fixtures describe one repo  — payments-core\n  pass  every edge names a known module\n  pass  file paths are repo-relative with forward slashes\n  pass  checkpoint cp-a1 carries provenance + explanation\n  pass  checkpoint cp-a1 answer is well formed for kind=single\n  pass  checkpoint cp-a2 carries provenance + explanation\n  pass  checkpoint cp-a2 answer is well formed for kind=single\n  pass  checkpoint cp-c1 carries provenance + explanation\n  pass  checkpoint cp-c1 answer is well formed for kind=order\n  pass  checkpoint cp-c2 carries provenance + explanation\n  pass  checkpoint cp-c2 answer is well formed for kind=single\n  pass  content carries NO line numbers (non-negotiable #7)\n  pass  every verified claim carries a quote\n  pass  no inferred claim carries a cite\n  pass  no claim is pre-marked dropped — only stage 4 drops\n  pass  every focus string is a substring of its own quote\n  pass  claim ids are unique  — 20 claims\n  pass  exactly one unresolvable checkpoint reference  — cp-a9-does-not-exist\n  pass  exactly one command with no real capture  — make coverage\n  pass  content contains every claim the verified ledger says was dropped  — 8/8\n  pass  every run has non-empty out\n  pass  every run has both dur and dur_ms\n  pass  failing-command count matches verified report.failed  — 2\n\nFIXTURE CHAIN CONSISTENT",
+       "env": "captured 2026-07-30, win11 10.0.26200, node v22.16.0, python 3.11.1"
+      },
+      {
+       "type": "command",
+       "cmd": "node tools/verify-contract.js fixtures/verified.sample.json",
+       "cwd": "hackathon",
+       "exit": 0,
+       "dur": "0.13 s",
+       "out": "\nfixtures\\verified.sample.json\ntracks 5 | stops 11 | bundled files 7\n\nrendered claims 12 (inferred 5) | checkpoints 4 | predictions 6 | lineage steps 0 | commands 5 | links 3 | dropped 8\nanchors sha256-verified 13\n\nALL ANCHOR + CONTRACT CHECKS PASS",
+       "env": "captured 2026-07-30, win11 10.0.26200, node v22.16.0, python 3.11.1"
+      },
+      {
+       "type": "callout",
+       "level": "broken",
+       "title": "ONE COMMAND IS MISSING FROM THIS PAGE",
+       "text": "node tools/check-bundle.js was run and passed, but its output cannot be embedded here. The gate greps the whole file for stylesheet link tags and embedded font at-rules — and its own pass lines name both, so any artifact carrying its report fails it. The checker cannot tell real markup from string data inside the payload. Reported, not worked around: this sentence is written to avoid the tokens for the same reason."
+      }
+     ]
+    },
+    {
+     "id": "green",
+     "title": "What green means here",
+     "kind": "stop",
+     "minutes": 3,
+     "lede": "Three gates, three different questions. Passing all three does not mean the pipeline works — it means the artifact is internally consistent.",
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-010",
+         "text": "One gate proves self-containment by refusing any src, href, fetch or import that reaches a network origin, which is what lets the artifact open from file:// with the network off.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/check-bundle.js",
+          "start": 36,
+          "end": 37,
+          "focus": [
+           36
+          ],
+          "sha256": "699815590745bcc977e49f4c0b14538590cbe4a151b6f25f6b70387966b110fb"
+         }
+        },
+        {
+         "id": "c-011",
+         "text": "A second gate re-derives every anchor’s hash from the bundled excerpt, so a bundle whose source lines were edited after generation fails instead of rendering.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 92,
+          "end": 95,
+          "focus": [
+           95
+          ],
+          "sha256": "91b200ea701dcce05ead0fbccc75e27374a83fcc3efb85a43b21e9283606713b"
+         }
+        },
+        {
+         "id": "c-012",
+         "text": "The gate scripts exit non-zero on any failure, which is what makes them usable as a build gate rather than a report.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 62,
+          "end": 71,
+          "focus": [
+           71
+          ],
+          "sha256": "bfb4b3a382a268f878fd8337085c0c0783c79c43081ffcb49a7ee9dc576a43a1"
+         }
+        },
+        {
+         "id": "c-013",
+         "text": "Nothing runs these gates automatically — there is no continuous-integration workflow in this repository, so green is whatever the last person to type the command saw.",
+         "status": "inferred"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "DATA & LINEAGE",
+   "minutes": 8,
+   "stops": [
+    {
+     "id": "lineage",
+     "title": "Data Sources & Lineage",
+     "kind": "stop",
+     "minutes": 8,
+     "lede": "Code execution explains what runs. Data lineage explains where the values come from, how they change, and what they ultimately influence.",
+     "blocks": [
+      {
+       "type": "lineage",
+       "title": "Data Sources & Lineage",
+       "entities": [
+        {
+         "id": "payload",
+         "name": "The verified payload",
+         "status": "verified",
+         "meaning": "One verified.json per repository. It is the only interface between the generator and the artifact — everything this page shows is a projection of it.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "Fixture on disk",
+           "description": "A build manifest names one payload file per repository. There is no service call and no database — the payload is a file.",
+           "evidence_type": "config",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/inline-fixture.js",
+            "start": 25,
+            "end": 28,
+            "focus": [
+             26,
+             27
+            ],
+            "sha256": "5657c4fd5d84cb3e2f377cb11aa6d30f0a501596c7cb5ca882c26b6d197d6e5e"
+           }
+          },
+          {
+           "stage": "INGESTION",
+           "label": "JSON.parse",
+           "description": "The first thing the toolchain does with a payload is parse it, so a malformed file fails before any output is written.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/inline-fixture.js",
+            "start": 44,
+            "end": 46,
+            "focus": [
+             44
+            ],
+            "sha256": "c179cc9191571484bf6a9f0bc81e59fc5e03149a1b212fd96daf033eac4f1926"
+           }
+          },
+          {
+           "stage": "VALIDATION",
+           "label": "repo.name vs manifest key",
+           "description": "A mismatch between the payload’s own repo name and the key it is filed under is reported, not rejected — the build continues.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/inline-fixture.js",
+            "start": 44,
+            "end": 46,
+            "focus": [
+             45
+            ],
+            "sha256": "c179cc9191571484bf6a9f0bc81e59fc5e03149a1b212fd96daf033eac4f1926"
+           }
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "Serialise into BUNDLES",
+           "description": "Each payload is written verbatim into a keyed map between two marker comments. Only that region of the bundle is replaced.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/inline-fixture.js",
+            "start": 54,
+            "end": 59,
+            "focus": [
+             55
+            ],
+            "sha256": "18d2652bf9bb7df548cf84e89a8d439efbe77c47d62426f0dae657415b52b4d2"
+           }
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "loadRepo()",
+           "description": "The renderer selects one payload and binds it to D. Nothing below that point knows more than one repository exists.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "The walkthrough and its badge",
+           "description": "Every stop, the outline, the progress bar and the top-bar counts are rendered from the selected payload.",
+           "evidence_type": "graph",
+           "status": "derived"
+          }
+         ],
+         "failure_mode": {
+          "text": "A payload named in the manifest but absent exits 2 before the bundle is touched, so a missing input cannot produce a half-written artifact.",
+          "status": "verified",
+          "anchor": {
+           "file": "hackathon/tools/inline-fixture.js",
+           "start": 37,
+           "end": 37,
+           "focus": [
+            37
+           ],
+           "sha256": "36495b50060f8d681aced30fe6bde3687e08fb7214c52dd362634b5bff52ee95"
+          }
+         },
+         "boundary": {
+          "text": "Stage 4 (VERIFY) does not exist in this repository. The payload is produced outside it, so the lineage upstream of the fixture is not visible here.",
+          "status": "inferred"
+         },
+         "tests": [
+          {
+           "label": "node tools/verify-contract.js fixtures/verified.ml-gs.json",
+           "kind": "runtime",
+           "note": "exits 0; re-checks every anchor in this payload"
+          }
+         ]
+        },
+        {
+         "id": "anchors",
+         "name": "Anchor excerpts and their hashes",
+         "status": "verified",
+         "meaning": "The evidence behind every factual sentence: the actual repository lines a claim cites, carried inside the artifact with a hash so the claim can be checked offline.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "Repository files on disk",
+           "description": "Each anchor names a path and a range; the lines are read from the working tree at generation time.",
+           "evidence_type": "source",
+           "status": "derived"
+          },
+          {
+           "stage": "INGESTION",
+           "label": "files map in the payload",
+           "description": "Bundled as path → line number → text, sparse: only lines some anchor reaches are carried.",
+           "evidence_type": "config",
+           "status": "derived"
+          },
+          {
+           "stage": "VALIDATION",
+           "label": "anchor()",
+           "description": "Re-checks that the file is bundled, the range is inside it, focus lines fall within the range, no interior line is missing, and a hash is present at all.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/verify-contract.js",
+            "start": 99,
+            "end": 117,
+            "focus": [
+             112,
+             116
+            ],
+            "sha256": "bfa5caf46dd2b38b007da055f149d048cf9949d14633b7fc13e186fb309a996d"
+           }
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "excerptOf()",
+           "description": "Rebuilds the hashed text: lines joined with a newline, no line numbers, no trailing newline. The digest is taken over exactly this.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/verify-contract.js",
+            "start": 92,
+            "end": 95,
+            "focus": [
+             95
+            ],
+            "sha256": "91b200ea701dcce05ead0fbccc75e27374a83fcc3efb85a43b21e9283606713b"
+           }
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "excerpt()",
+           "description": "Renders the line-numbered table behind each claim marker, highlights the focus lines and fills the COPY button.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "anchors sha256-verified",
+           "description": "The gate reports how many anchors re-hashed correctly. That count is the artifact’s claim to being checkable rather than merely asserted.",
+           "evidence_type": "runtime",
+           "status": "verified"
+          }
+         ],
+         "failure_mode": {
+          "text": "Editing one bundled line fails every anchor that cites it. Tampering with a single line of the sample payload failed both the claim and the trace hop sharing it, dropping verified anchors from 13 to 11 and exiting 1.",
+          "status": "verified"
+         },
+         "tests": [
+          {
+           "label": "node tools/verify-contract.js",
+           "kind": "runtime",
+           "note": "every anchor in every bundled payload is re-hashed"
+          }
+         ]
+        },
+        {
+         "id": "commands",
+         "name": "Command capture records",
+         "status": "verified",
+         "meaning": "Proof that the setup and test instructions were actually run, including the ones that fail. Real exit codes are what separate this from a written guide.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "Commands run on the generation machine",
+           "description": "Each record carries the command, its exit code, wall-clock duration, captured output and an environment note.",
+           "evidence_type": "runtime",
+           "status": "verified"
+          },
+          {
+           "stage": "INGESTION",
+           "label": "command blocks",
+           "description": "The captures enter the repository already as payload data; nothing in the tree executes them.",
+           "evidence_type": "config",
+           "status": "derived"
+          },
+          {
+           "stage": "VALIDATION",
+           "label": "the command case",
+           "description": "A non-zero exit must carry banner text, and every record must carry an environment note and non-empty output.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/verify-contract.js",
+            "start": 150,
+            "end": 154,
+            "focus": [
+             152,
+             154
+            ],
+            "sha256": "2cda364e6b7c2f4cffb222e540d0f2f5a08c5099528097091ac445394a1ff9c2"
+           }
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "none, deliberately",
+           "description": "Duration stays a display string and the environment stays a note. Nothing recomputes a timing, so nothing can quietly disagree with the run.",
+           "evidence_type": "inference",
+           "status": "derived"
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "B.command",
+           "description": "Renders the exit pill, the banner and the output. While a prediction is open the result is veiled rather than omitted.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "report.failed and the prediction key",
+           "description": "The failing-command count is cross-checked against the page, and the captured exit code is itself the answer key for the prediction above it.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/tools/verify-contract.js",
+            "start": 256,
+            "end": 258,
+            "focus": [
+             258
+            ],
+            "sha256": "37d420b106b9f2b8ea288814e015eff131f92b4725268d50026c3c7239150bcf"
+           }
+          }
+         ],
+         "failure_mode": {
+          "text": "A failing command with no banner, or any command with empty output, fails the gate outright — a broken setup step cannot be quietly downgraded.",
+          "status": "verified",
+          "anchor": {
+           "file": "hackathon/tools/verify-contract.js",
+           "start": 150,
+           "end": 154,
+           "focus": [
+            152
+           ],
+           "sha256": "2cda364e6b7c2f4cffb222e540d0f2f5a08c5099528097091ac445394a1ff9c2"
+          }
+         },
+         "boundary": {
+          "text": "No command runner exists in this repository. An external process produced these captures, but the runner cannot be identified from the available evidence.",
+          "status": "inferred"
+         },
+         "tests": []
+        },
+        {
+         "id": "progress",
+         "name": "Learner progress and calibration",
+         "status": "derived",
+         "meaning": "The only data the artifact writes rather than reads: which stops are done, what was answered, and how sure the reader said they were before answering.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "Browser localStorage",
+           "description": "Keyed by repository name and commit, so switching repos or regenerating at a new commit never replays old answers against changed content.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "INGESTION",
+           "label": "loadRepo()",
+           "description": "Read once per walkthrough and merged over the defaults inside a try/catch.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "VALIDATION",
+           "label": "parse errors swallowed",
+           "description": "A corrupt value falls back to defaults. There is no shape validation, so a well-formed but wrong-shaped object would merge in as-is.",
+           "evidence_type": "inference",
+           "status": "inferred"
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "grading",
+           "description": "Checkpoint and prediction picks become a pick plus a correctness flag, against a key that came from the payload. Confidence is captured before the answer, never after.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "checkpoints, rail(), yourScore()",
+           "description": "Drives the verdict shown, the outline’s done marks, the progress percentage and the personal record in the ledger.",
+           "evidence_type": "graph",
+           "status": "derived"
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "confident and wrong",
+           "description": "The interesting number is not the score but the calibration: how often the reader said they were sure and was not.",
+           "evidence_type": "graph",
+           "status": "derived"
+          }
+         ],
+         "failure_mode": {
+          "text": "Under a storage quota or private browsing both the read and the write are wrapped, so the page keeps working with in-memory state and silently loses progress on reload.",
+          "status": "inferred"
+         },
+         "boundary": {
+          "text": "This data never leaves the browser and is never part of the generated artifact. Renderer symbols above are cited by name rather than by line because the bundle is rewritten on every build.",
+          "status": "inferred"
+         },
+         "tests": []
+        },
+        {
+         "id": "imports",
+         "name": "Python import edges",
+         "status": "verified",
+         "meaning": "Which module depends on which. This is what the architecture map is meant to be drawn from, and what checkpoint answer keys are meant to be derived from rather than authored.",
+         "steps": [
+          {
+           "stage": "SOURCE",
+           "label": "walk_files()",
+           "description": "Files are discovered under the resolved source roots and read from disk; this is where the repository enters the pipeline at all.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/survey.py",
+            "start": 429,
+            "end": 429,
+            "focus": [
+             429
+            ],
+            "sha256": "c6a2ae69889a8f0a8b3b6fdef12c88a60c1c03488b52741d58ae407a8ea2e1b5"
+           }
+          },
+          {
+           "stage": "PARSE",
+           "label": "extract_imports()",
+           "description": "Each file is parsed with the standard library ast and walked for import statements, producing one record per imported name.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/survey.py",
+            "start": 694,
+            "end": 694,
+            "focus": [
+             694
+            ],
+            "sha256": "419504f5c41f98b3ccc91d22c364964053b29c2811c701b9209c14a729d20cb9"
+           }
+          },
+          {
+           "stage": "TRANSFORM",
+           "label": "resolve_import()",
+           "description": "Prefixes are walked longest-first so a symbol import lands on the module that owns it; anything with no known prefix is external and is not a node.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/survey.py",
+            "start": 674,
+            "end": 691,
+            "focus": [
+             689,
+             691
+            ],
+            "sha256": "220b90d7832030db7b436e9fc8020045a336d37e527c901222d22bcb096ccd2b"
+           }
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "survey()",
+           "description": "The edges are assembled with the file tree, entry points and git churn into the survey payload that every later stage reads.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/survey.py",
+            "start": 1494,
+            "end": 1494,
+            "focus": [
+             1494
+            ],
+            "sha256": "bb37f7508bf8e28a7ef90f04d9e03e7805188435c321d3bf33b4e873e35e905e"
+           }
+          },
+          {
+           "stage": "CONSUMER",
+           "label": "mapper.order_nodes()",
+           "description": "Module-level nodes are ordered and packed into columns, so the graph’s geometry is decided at generation time rather than in the page.",
+           "evidence_type": "source",
+           "status": "verified",
+           "anchor": {
+            "file": "hackathon/src/trailhead/mapper.py",
+            "start": 122,
+            "end": 122,
+            "focus": [
+             122
+            ],
+            "sha256": "6aff448544beb65c93edc95fc484fabeaa1ed3963c88c5f43b36049eb3b5f383"
+           }
+          },
+          {
+           "stage": "OUTCOME",
+           "label": "the module map",
+           "description": "What the reader sees on the map stop: node area from lines of code, edge thickness from the number of resolved imports.",
+           "evidence_type": "graph",
+           "status": "derived"
+          }
+         ],
+         "failure_mode": {
+          "text": "A third-party import resolves to nothing and is deliberately excluded from the map rather than drawn as an unknown node.",
+          "status": "verified",
+          "anchor": {
+           "file": "hackathon/tests/test_survey.py",
+           "start": 85,
+           "end": 88,
+           "focus": [
+            88
+           ],
+           "sha256": "5c4f2b75da99315af051727a338f13d4a8df5782f8a12c4e97f94f3809a2c9b1"
+          }
+         },
+         "boundary": {
+          "text": "The map on the earlier stop was laid out by the scratch resolver that built this payload, not by mapper.py. The two are not yet wired together for this repository, so the geometry you see is not the geometry that code would produce.",
+          "status": "inferred"
+         },
+         "tests": [
+          {
+           "label": "PYTHONPATH=src py -3.11 -m unittest discover -s tests -v",
+           "kind": "runtime",
+           "note": "8 tests, all passing; covers both functions"
+          },
+          {
+           "label": "tests/test_survey.py",
+           "kind": "test",
+           "note": "ResolveImport asserts longest-prefix, exact match, third-party and unknown-submodule cases"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "callout",
+       "level": "info",
+       "title": "HOW THIS DIFFERS FROM THE TRACE",
+       "text": "The next track follows control flow — which function calls which. This one follows values: where each originates, what rewrites it, and which output it decides. Two entities below end without a consumer, which a call graph alone would not show you."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "FOLLOW ONE PATH",
+   "minutes": 10,
+   "stops": [
+    {
+     "id": "trace",
+     "title": "How a payload becomes a page",
+     "kind": "stop",
+     "minutes": 6,
+     "lede": "The one end-to-end path that exists in code today: a JSON fixture becomes the data block of a self-contained HTML file, and is then re-checked from inside that file.",
+     "blocks": [
+      {
+       "type": "trace",
+       "steps": [
+        {
+         "claim": "The fixture is read and parsed first, so a malformed payload fails before anything is written.",
+         "anchor": {
+          "file": "hackathon/tools/inline-fixture.js",
+          "start": 44,
+          "end": 46,
+          "focus": [
+           44
+          ],
+          "sha256": "c179cc9191571484bf6a9f0bc81e59fc5e03149a1b212fd96daf033eac4f1926"
+         },
+         "next": "assemble the data block"
+        },
+        {
+         "claim": "Each payload is serialised into a keyed map fenced by two marker comments, so only that region of the bundle is ever replaced.",
+         "anchor": {
+          "file": "hackathon/tools/inline-fixture.js",
+          "start": 54,
+          "end": 59,
+          "focus": [
+           55
+          ],
+          "sha256": "18d2652bf9bb7df548cf84e89a8d439efbe77c47d62426f0dae657415b52b4d2"
+         },
+         "next": "write it back"
+        },
+        {
+         "claim": "The bundle is written back in place — which is also why this step is destructive on a file with uncommitted work.",
+         "anchor": {
+          "file": "hackathon/tools/inline-fixture.js",
+          "start": 61,
+          "end": 62,
+          "focus": [
+           62
+          ],
+          "sha256": "e0124631a5de85e1db825b2a0d39e5f61a7b18ec91f3c424dbcd724ea0ad8d9e"
+         },
+         "next": "verify every anchor"
+        },
+        {
+         "claim": "Verification re-reads each anchor from the bundle, refuses one that carries no hash, and compares the recomputed digest against the recorded one.",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 99,
+          "end": 117,
+          "focus": [
+           112,
+           116
+          ],
+          "sha256": "bfa5caf46dd2b38b007da055f149d048cf9949d14633b7fc13e186fb309a996d"
+         },
+         "next": "cross-check the report"
+        },
+        {
+         "claim": "Finally the report is cross-checked against the page itself: the ledger length must equal the reported drop count, and the number of failing commands must match.",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 247,
+          "end": 258,
+          "focus": [
+           254,
+           258
+          ],
+          "sha256": "e330e8ac54129a4c0d2b4f94fe01e4fd732b36fb508173152acab0494e6a5a62"
+         },
+         "next": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "cp-c",
+     "title": "Checkpoint C",
+     "kind": "cp",
+     "minutes": 3,
+     "lede": "Put the build in the order the repository documents.",
+     "blocks": [
+      {
+       "type": "checkpoint",
+       "id": "cp-c1",
+       "kind": "order",
+       "prompt": "Order the four steps of regenerating the artifact after a payload change.",
+       "options": [
+        "<code>node tools/verify-contract.js</code> — re-check every anchor and the report",
+        "Edit <code>fixtures/verified.*.json</code> — the single source of truth",
+        "<code>node tools/check-bundle.js</code> — confirm the file is still self-contained",
+        "<code>node tools/inline-fixture.js</code> — splice the payload into the bundle"
+       ],
+       "answer": [
+        4,
+        1,
+        3,
+        2
+       ],
+       "provenance": "The run order documented in hackathon/README.md and repeated as the change procedure in docs/verified-contract.md: edit the fixture, splice, then both gates.",
+       "explanation": "Editing the HTML data block directly is the mistake this order prevents: the fixture is the source of truth and the splice overwrites whatever the bundle held."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "CHANGE SOMETHING",
+   "minutes": 8,
+   "stops": [
+    {
+     "id": "impact",
+     "title": "Where a change hurts",
+     "kind": "stop",
+     "minutes": 5,
+     "lede": "Four places where a small edit reaches much further than it looks.",
+     "blocks": [
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-020",
+         "text": "Changing how the excerpt is rebuilt — a different join, a kept trailing newline, line numbers left in — recomputes every hash and drops every anchor at once, with the payload and the source both untouched.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 92,
+          "end": 95,
+          "focus": [
+           95
+          ],
+          "sha256": "91b200ea701dcce05ead0fbccc75e27374a83fcc3efb85a43b21e9283606713b"
+         }
+        },
+        {
+         "id": "c-021",
+         "text": "The checker rejects a block type it does not know, so a payload can only ship types the gate has been taught — but nothing checks the renderer learned them too.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 242,
+          "end": 243,
+          "focus": [
+           243
+          ],
+          "sha256": "1b86acfde0ddd5ac14ce3e3ea0fe90addb33878d2fb551944fdb151966a4f989"
+         }
+        },
+        {
+         "id": "c-022",
+         "text": "A failing command must carry its banner text or the gate fails the bundle, which is what stops a broken setup step from being quietly downgraded to a warning.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 150,
+          "end": 154,
+          "focus": [
+           152
+          ],
+          "sha256": "2cda364e6b7c2f4cffb222e540d0f2f5a08c5099528097091ac445394a1ff9c2"
+         }
+        },
+        {
+         "id": "c-023",
+         "text": "An inferred claim carrying an anchor is rejected outright, because an anchor is what makes a sentence render as verified.",
+         "status": "verified",
+         "anchor": {
+          "file": "hackathon/tools/verify-contract.js",
+          "start": 123,
+          "end": 129,
+          "focus": [
+           128
+          ],
+          "sha256": "2937d3d9c121bdfc6bf31c4476d837cb2ba1913922d5bdafb946943f354fa2f4"
+         }
+        }
+       ]
+      },
+      {
+       "type": "table",
+       "sortable": true,
+       "caption": "Validation order, narrowest first. Commands are those documented in hackathon/README.md.",
+       "columns": [
+        "STEP",
+        "COMMAND",
+        "WHAT IT CATCHES"
+       ],
+       "rows": [
+        [
+         "1",
+         "<code>node tools/verify-contract.js fixtures/…json</code>",
+         "Anchor, hash and report errors in the payload alone"
+        ],
+        [
+         "2",
+         "<code>node tools/inline-fixture.js</code>",
+         "Marker or brace-balance damage in the bundle"
+        ],
+        [
+         "3",
+         "<code>node tools/check-bundle.js</code>",
+         "Broken inline JS, external loads, missing affordances"
+        ],
+        [
+         "4",
+         "<code>node tools/check-fixtures.js</code>",
+         "Fixtures that have drifted onto different repos"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "gotchas",
+     "title": "Conventions and traps",
+     "kind": "stop",
+     "minutes": 3,
+     "lede": "Everything in this stop is unverified. It is judgement drawn from the working rules and from what went wrong while this page was being generated.",
+     "blocks": [
+      {
+       "type": "callout",
+       "level": "inferred",
+       "title": "THIS ENTIRE STOP IS UNVERIFIED",
+       "text": "None of the statements below are anchored. They are the low-verifiability material, quarantined here rather than mixed into the anchored prose."
+      },
+      {
+       "type": "prose",
+       "claims": [
+        {
+         "id": "c-030",
+         "text": "Two sets of working rules apply in this repository depending on the directory, and they invert each other: the vol project is research-first and discourages jumping to code, while the hackathon rules ask for a rough end-to-end loop over any polished fragment.",
+         "status": "inferred"
+        },
+        {
+         "id": "c-031",
+         "text": "The tree can change underneath you. While this page was being generated another session implemented all five pipeline stages, took the test suite from 8 to 416, and rewrote the demo bundle three times — falsifying several claims this generator had already verified.",
+         "status": "inferred"
+        },
+        {
+         "id": "c-032",
+         "text": "Because most of hackathon/ is untracked, git will not save you from an in-place rewrite there — copy before you splice.",
+         "status": "inferred"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "CLOSE",
+   "minutes": 4,
+   "stops": [
+    {
+     "id": "audit",
+     "title": "Audit",
+     "kind": "stop",
+     "minutes": 4,
+     "lede": "Every claim this generator attempted, and every one it deleted. The deletions below are real: each was a statement made earlier in this session that no longer resolves against the repository.",
+     "blocks": [
+      {
+       "type": "ledger"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "dropped": [
+  {
+   "id": "c-040",
+   "text": "The sample payload declares the frozen contract trailhead/verified@1.",
+   "file": "hackathon/fixtures/verified.sample.json",
+   "reason": "snippet not found verbatim in file"
+  },
+  {
+   "id": "c-041",
+   "text": "The renderer derives its localStorage key at line 1399 of the bundle.",
+   "file": "hackathon/demo/trailhead-demo.html",
+   "reason": "snippet not found verbatim in file"
+  },
+  {
+   "id": "c-042",
+   "text": "The demo bundle ships from deliverables/trailhead-demo.html.",
+   "file": "deliverables/trailhead-demo.html",
+   "reason": "file does not exist at this commit"
+  },
+  {
+   "id": "c-043",
+   "text": "The bundle’s surface palette is defined as --ink:#0c0b09.",
+   "file": "hackathon/demo/trailhead-demo.html",
+   "reason": "snippet not found verbatim in file"
+  }
+ ],
+ "contract": "trailhead/verified@2"
+}
+};
+/* Demo-only: which of these are synthetic fixtures rather than real repos.
+   Kept outside the payloads so each stays a pure verified.json. */
+const SYNTHETIC = {"payments-core":true};
+/* ==== TRAILHEAD-DATA-END ==== */
+
+/* ============================================================
+   RENDER — knows only the eight block types
+   ============================================================ */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* This demo bundle carries one payload per repo so the two walkthroughs can
+   share a renderer instead of shipping as two near-identical files. A real
+   generated artifact carries exactly one. Everything below `D` is unchanged by
+   that: the renderer still sees a single verified.json and knows nothing else. */
+let D, KEY, STOPS, S;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+
+function loadRepo(name){
+  D=BUNDLES[name]||BUNDLES[Object.keys(BUNDLES)[0]];
+  /* progress is keyed per repo AND per commit, so switching never mixes two
+     walkthroughs and a regenerated commit starts clean (spec §2) */
+  KEY="trailhead:"+D.repo.name+":"+D.repo.commit;
+  STOPS=D.tracks.flatMap((t,ti)=>t.stops.map(s=>({...s,ti,track:t.title})));
+  S={cur:0,done:{},ans:{},pred:{},conf:{}};
+  try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
+  S.pred=S.pred||{}; S.conf=S.conf||{};
+  try{localStorage.setItem("trailhead:repo",D.repo.name)}catch(e){}
+  topbar();
+}
+
+/* The top bar used to be hand-written HTML whose numbers happened to match the
+   payload. Generating it means the badge cannot drift from the report, which is
+   the one number the pitch rests on (non-negotiable #3). */
+function topbar(){
+  const r=D.report, names=Object.keys(BUNDLES);
+  $("#rname").textContent=D.repo.name;
+  $("#rmeta").textContent=D.repo.commit+" · generated "+D.repo.generated_at.replace("T"," ").replace("Z"," UTC")
+    +" · trailhead "+r.tool_version;
+  $("#rsample").hidden=!SYNTHETIC[D.repo.name];
+  $("#badge").innerHTML=
+     `<span><i class="n">${r.claims}</i> claims</span>`
+    +`<span class="d">${r.dropped} dropped</span>`
+    +`<span><i class="n">${r.commands}</i> cmds</span>`
+    +`<span class="f">${r.failed} failing</span>`;
+  const sel=$("#rsel");
+  sel.hidden=names.length<2;
+  sel.innerHTML=names.map(n=>`<option value="${esc(n)}"${n===D.repo.name?" selected":""}>${esc(n)}</option>`).join("");
+  document.title="Trailhead · "+D.repo.name;
+}
+
+/* ---- predict-then-reveal ----------------------------------------------
+   Retrieval practice: commit to an answer before the artifact shows you
+   the real one. The key is never authored — it is derived from data that
+   was already verified (a captured exit code, the next resolved anchor),
+   so a prediction question cannot disagree with what the page then shows.
+   ---------------------------------------------------------------------- */
+function predict(id,question,options,key,prov){
+  const a=S.pred[id];
+  const opts=options.map((o,i)=>{
+    let cls="popt";
+    if(a){ if(i===key)cls+=" right"; else if(a.pick===i)cls+=" wrong"; }
+    return `<div class="${cls}" ${a?"":`data-pi="${i}"`} ${a?"":'tabindex="0" role="button"'}>
+      <span class="i">${a?(i===key?"✓":(a.pick===i?"✕":String.fromCharCode(65+i))):String.fromCharCode(65+i)}</span><span>${o}</span></div>`;
+  }).join("");
+  return `<div class="pred${a?(a.ok?" done ok":" done no"):""}" data-pred="${id}" data-key="${key}">
+    <div class="q"><b>PREDICT</b>${esc(question)}</div>
+    <div class="popts">${opts}</div>
+    ${a?`<div class="pfoot"><span class="verdict ${a.ok?"y":"n"}">${a.ok?"CORRECT":"NOT QUITE"}</span>
+         <span class="prov"><b>ANSWER KEY</b> ${esc(prov)}</span></div>`:""}
+  </div>`;
+}
+
+/* ---- excerpt ---- */
+function excerpt(a,cap){
+  const f=D.files[a.file]||{}, focus=new Set(a.focus||[]);
+  let rows="",prev=null;
+  for(let n=a.start;n<=a.end;n++){
+    if(!(n in f)){ if(prev!==null){rows+=`<tr class="el"><td colspan="2">… elided</td></tr>`;prev=null;} continue; }
+    rows+=`<tr class="${focus.has(n)?"hl":""}"><td class="ln">${n}</td><td class="src">${esc(f[n])}</td></tr>`;
+    prev=n;
+  }
+  const raw=Object.keys(f).filter(n=>+n>=a.start&&+n<=a.end).map(n=>f[n]).join("\n");
+  return `<figure class="ex">
+    <header><b>${esc(a.file)}</b><span>: ${a.start}–${a.end}</span><span class="sp"></span>
+      <button class="cp-btn" data-copy="${esc(raw).replace(/"/g,"&quot;")}">COPY</button></header>
+    <div class="code"><table>${rows}</table></div>
+    ${cap?`<figcaption>${cap}</figcaption>`:""}
+  </figure>`;
+}
+
+/* A prediction is worthless if the answer is further down the same screen, and
+   on this stop the summary callout gave away both failures. Everything after an
+   open prediction is rendered into the DOM but veiled, so nothing is silently
+   omitted (spec §6) and print still shows the whole stop (acceptance test 11). */
+const openPred=b=>b.type==="command"&&b.predict&&!S.pred["pc:"+b.cmd];
+function veil(blocks){
+  const cut=blocks.findIndex(openPred);
+  const html=blocks.map((b,i)=>
+    (cut>=0&&i>cut)?`<div class="veil">${B[b.type](b)}</div>`:B[b.type](b)).join("");
+  return html+((cut>=0&&cut<blocks.length-1)
+    ?`<div class="veilnote">The rest of this stop stays hidden until you answer the prediction above.</div>`:"");
+}
+
+/* ---- blocks ---- */
+const B={
+ prose:b=>`<div class="prose">${b.claims.map(c=>
+   c.status==="inferred"
+    ? `<p><span class="claim inf">${esc(c.text)}</span><span class="tag">INFERRED</span></p>`
+    : `<p><span class="claim">${esc(c.text)}</span><button class="mark" aria-expanded="false" data-claim="${c.id}">${c.id.slice(-3)}</button></p>
+       <div class="pop" data-pop="${c.id}" hidden>${excerpt(c.anchor,"Anchor for claim "+c.id+": re-read and hash-matched at generation time.")}</div>`
+  ).join("")}</div>`,
+
+ excerpt:b=>excerpt(b.anchor,b.caption),
+
+ command:b=>{
+   /* Answer key is the captured exit code itself, so it cannot drift from the
+      run shown directly below it. While a prediction is outstanding the verdict,
+      the timing, the BROKEN banner, the output and the fail border are all
+      withheld — otherwise there is nothing to predict. */
+   const pid="pc:"+b.cmd, a=b.predict?S.pred[pid]:1, shut=b.predict&&!S.pred[pid];
+   /* The result is veiled rather than omitted, so print still shows it. */
+   return `<div class="cmd ${b.exit&&!shut?"fail":""}">
+   <header><span class="pr">$</span><code>${esc(b.cmd)}</code>
+     ${shut?`<span class="pill wait">RESULT HIDDEN</span>`:""}
+     <span class="res${shut?" veil":""}"><span class="pill ${b.exit?"bad":"ok"}">exit ${b.exit}</span><span class="dur">${b.dur}</span></span></header>
+   ${b.predict?predict(pid,b.predict,["It passes (exit 0)","It fails (non-zero exit)"],b.exit?1:0,
+       "the exit code captured by the command runner: "+esc(b.env)):""}
+   <div class="${shut?"veil":""}">${b.broken?`<div class="brk"><b>BROKEN</b><div>${esc(b.broken)}
+     ${b.hypothesis?`<div style="margin-top:8px;font-size:12.5px;color:var(--dim)"><span class="tag" style="margin:0 6px 0 0">INFERRED</span>${esc(b.hypothesis)}</div>`:""}</div></div>`:""}
+   <details class="out"><summary>output (${b.out.split("\n").length} lines)</summary><pre>${esc(b.out)}</pre></details>
+   <div class="envnote">${esc(b.env)}</div></div></div>`;
+ },
+
+ /* @2: optional `links[]` — where to actually install the prerequisites named in
+    `text`. Kept structured rather than allowing raw HTML in `text`, so the prose
+    stays fully escaped like every other string in the payload. The scheme is
+    whitelisted here at render time: a javascript: or data: href arriving in a
+    data file must never become a live anchor, and the renderer is the last place
+    that can stop it. Anything not http(s) renders as a visible refusal, never
+    silently dropped (spec §6). */
+ callout:b=>`<div class="call ${b.level}"><b>${esc(b.title)}</b>${esc(b.text)}
+   ${b.links&&b.links.length?`<div class="lks">${b.links.map(l=>
+     /^https?:\/\//i.test(l.href)
+      ? `<a class="lk" href="${esc(l.href).replace(/"/g,"&quot;")}" target="_blank" rel="noopener noreferrer"
+          >${esc(l.label)}${l.note?`<i>${esc(l.note)}</i>`:""}</a>`
+      : `<span class="lk" style="color:var(--bad);border-color:var(--bad)">${esc(l.label)}<i>unsafe href — not linked</i></span>`
+   ).join("")}</div>`:""}
+   ${b.linknote?`<div class="lknote">${esc(b.linknote)}</div>`:""}</div>`,
+
+ table:b=>`<div class="tbl"><table>
+   <thead><tr>${b.columns.map((c,i)=>`<th ${b.sortable?`data-sort="${i}"`:""}>${c}</th>`).join("")}</tr></thead>
+   <tbody>${b.rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${i>1&&/^[\d,]+$|^n\/a$/.test(c)?"r":""}">${c}</td>`).join("")}</tr>`).join("")}</tbody>
+   </table></div>${b.caption?`<div class="envnote" style="border:1px solid var(--rule2);border-top:0">${esc(b.caption)}</div>`:""}`,
+
+ graph:()=>graph(),
+
+ /* Worked-example fading: the first hops are narrated in full, later ones ask
+    where the call goes before revealing the pointer. Options are every file in
+    the trace, sorted so the index is stable across renders; the key is the next
+    hop's own anchor, so it is the resolved call graph, not an authored answer. */
+ trace:b=>{
+   const files=[...new Set(b.steps.map(s=>s.anchor.file))].sort();
+   /* the next hop's own heading is the answer, so veil from there down too */
+   const cut=b.steps.findIndex((s,i)=>s.predict&&b.steps[i+1]&&!S.pred["pt:"+s.anchor.file]);
+   return `<div class="trace">${b.steps.map((s,i)=>{
+     const nx=b.steps[i+1]&&b.steps[i+1].anchor.file;
+     const ask=s.predict&&nx, pid="pt:"+s.anchor.file, done=!ask||S.pred[pid];
+     return `<div class="hop${cut>=0&&i>cut?" veil":""}">
+   <div class="dot">${i+1}</div>
+   <h4>${esc(s.anchor.file.split("/").pop())}</h4>
+   <div class="an">${esc(s.anchor.file)} : ${s.anchor.start}–${s.anchor.end}</div>
+   <div class="prose" style="margin-bottom:10px"><span class="claim">${esc(s.claim)}</span></div>
+   ${excerpt(s.anchor,"")}
+   ${ask?predict(pid,s.predict,files.map(f=>"<code>"+f+"</code>"),files.indexOf(nx),
+       "the next hop's resolved anchor: "+esc(nx)):""}
+   <div class="${done?"":"veil"}">${s.next?`<div class="nx">next → <b>${esc(s.next)}</b></div>`:`<div class="nx">response leaves the process</div>`}</div>
+ </div>`;}).join("")}</div>`;
+ },
+
+ checkpoint:b=>{
+  const a=S.ans[b.id], k=S.conf[b.id];
+  /* Confidence is captured before the answer, never after, or it is hindsight
+     rather than calibration. The audit panel reports confident-and-wrong. */
+  const gate=!a&&!k;
+  const conf=(!a&&!k)
+    ? `<div class="conf"><span>Before you answer, how sure are you?</span>
+        <button class="cbtn" data-conf="${b.id}" data-c="sure">I'M SURE</button>
+        <button class="cbtn" data-conf="${b.id}" data-c="guess">I'M GUESSING</button></div>`
+    : (k?`<div class="conf said"><span>You said you were <b>${k==="sure"?"sure":"guessing"}</b>.</span></div>`:"");
+  if(b.kind==="order"){
+    const opts=b.options.map((o,i)=>`<div class="ordr"><select data-ord="${b.id}" data-i="${i}" ${a||gate?"disabled":""}>
+        <option value="">–</option>${b.options.map((_,k2)=>`<option value="${k2+1}" ${a&&a.pick[i]===k2+1?"selected":""}>${k2+1}</option>`).join("")}
+      </select><span>${o}</span>${a?(a.pick[i]===b.answer[i]?`<span class="verdict y" style="margin-left:auto">✓</span>`:`<span class="verdict n" style="margin-left:auto">✕ ${b.answer[i]}</span>`):""}</div>`).join("");
+    return `<div class="cpx" data-cp="${b.id}"><div class="k">CHECKPOINT · ORDER</div><h4>${esc(b.prompt)}</h4>
+      ${conf}${opts}
+      ${a?verdict(b,a):`<div class="act"><button class="sub" data-go="${b.id}" ${gate?"disabled":""}>CHECK</button></div>`}</div>`;
+  }
+  const opts=b.options.map((o,i)=>{
+    let cls="opt"; if(a){ if(i===b.answer)cls+=" right"; else if(a.pick===i)cls+=" wrong"; }
+    if(gate)cls+=" gated";
+    return `<div class="${cls}" ${gate?"":`data-pick="${b.id}" data-i="${i}" tabindex="0" role="button"`}>
+      <span class="i">${a?(i===b.answer?"✓":(a.pick===i?"✕":String.fromCharCode(65+i))):String.fromCharCode(65+i)}</span><span>${o}</span></div>`;
+  }).join("");
+  return `<div class="cpx" data-cp="${b.id}"><div class="k">CHECKPOINT · SINGLE ANSWER</div>
+    <h4>${esc(b.prompt)}</h4>${conf}${opts}${a?verdict(b,a):""}</div>`;
+ },
+
+ ledger:()=>ledgerTable(),
+
+ /* ---- lineage ----------------------------------------------------------
+    Execution flow says A calls B. Lineage says a value comes from Y, is
+    rewritten by B, and decides Z — so the unit is the value, not the call, and
+    the stages are fixed rather than discovered. Every stage carries its status
+    as a word before it carries it as a colour; a stage with an anchor is a
+    button and opens the same drawer the map uses. */
+ lineage:b=>{
+   const ents=b.entities||[];
+   const steps=ents.flatMap(e=>e.steps||[]);
+   const n=s=>steps.filter(x=>x.status===s).length;
+   const sum=`<div class="linsum">
+     <div><div class="v">${ents.length}</div><div class="l">DATA ENTITIES</div></div>
+     <div><div class="v" style="color:var(--ok)">${n("verified")}</div><div class="l">VERIFIED STEPS</div></div>
+     <div><div class="v" style="color:var(--brand2)">${n("derived")}</div><div class="l">DERIVED STEPS</div></div>
+     <div><div class="v" style="color:var(--inf)">${n("inferred")}</div><div class="l">INFERRED STEPS</div></div>
+     <div><div class="v" style="color:var(--bad)">${ents.filter(e=>e.failure_mode).length}</div><div class="l">FAILURE MODES</div></div>
+   </div>`;
+   return sum+ents.map((e,ei)=>{
+     const flow=(e.steps||[]).map((s,si)=>{
+       const id=`${e.id}:${si}`; LINSTEPS[id]={s,e};
+       const has=!!s.anchor;
+       const inner=`<span class="sk">${esc(s.stage)}</span>
+         <span class="sl">${esc(s.label)}</span>
+         <span class="sd">${esc(s.description)}</span>
+         <span class="sm">${estat(s.status)}<span class="etype">${esc(s.evidence_type||"")}</span>
+           ${has?`<span class="ln">${esc(s.anchor.file.split("/").pop())}:${s.anchor.start}–${s.anchor.end}</span>`:""}</span>`;
+       /* only an anchored stage is interactive — a button that opened an empty
+          drawer would be a lie about what evidence exists */
+       const cell=has
+         ?`<button class="lstage" data-lin="${id}" title="Open evidence">${inner}</button>`
+         :`<div class="lstage">${inner}</div>`;
+       const nx=(e.steps||[])[si+1];
+       const cc=nx?(nx.status==="inferred"?" inf":""):"";
+       return cell+(nx?`<span class="conn${cc}" aria-hidden="true"></span>`:"");
+     }).join("");
+     const rows=[];
+     if(e.failure_mode)rows.push(`<div class="erow fail"><span class="rk">FAILURE MODE</span>
+       <span>${esc(e.failure_mode.text)} ${estat(e.failure_mode.status)}</span></div>`);
+     if(e.boundary)rows.push(`<div class="erow bound"><span class="rk">REPOSITORY BOUNDARY</span>
+       <span>${esc(e.boundary.text)} ${estat(e.boundary.status==="verified"?"verified":"inferred")}</span></div>`);
+     rows.push(`<div class="erow"><span class="rk">TESTS</span><span>${
+       (e.tests&&e.tests.length)
+         ? e.tests.map(t=>`<code>${esc(t.label)}</code>${t.note?" — "+esc(t.note):""}`).join("<br>")
+         : "No direct test was found for this data flow."}</span></div>`);
+     return `<div class="ent">
+       <header><span class="k">DATA ENTITY ${String(ei+1).padStart(2,"0")}</span>
+         <h4>${esc(e.name)}</h4>${estat(e.status)}</header>
+       <div class="mean">${esc(e.meaning)}</div>
+       <div class="flow">${flow}</div>
+       ${rows.join("")}
+     </div>`;
+   }).join("");
+ }
+};
+
+/* Status is a word first and a colour second: the label is always rendered, so
+   the three states stay separable without relying on hue (spec §8). */
+const EST={verified:["v","VERIFIED"],derived:["d","DERIVED"],inferred:["i","INFERRED"],
+           unknown:["i","UNKNOWN"],broken:["x","BROKEN"]};
+const estat=s=>{const p=EST[s]||EST.inferred;return `<span class="est ${p[0]}">${p[1]}</span>`};
+/* Rebuilt on every render, like the checkpoint lookup — draw() replaces the
+   whole stage, so a stale registry would outlive the DOM it describes. */
+const LINSTEPS={};
+function verdict(b,a){
+  return `<div class="act"><span class="verdict ${a.ok?"y":"n"}">${a.ok?"CORRECT":"NOT QUITE"}</span></div>
+    <div class="expl">${esc(b.explanation)}<div class="prov"><b>ANSWER KEY</b> ${esc(b.provenance)}</div></div>`;
+}
+function ledgerTable(){
+  return `<div class="sumgrid">
+    <div><div class="v">${D.report.claims}</div><div class="l">CLAIMS MADE</div></div>
+    <div><div class="v" style="color:var(--ok)">${D.report.verified}</div><div class="l">VERIFIED</div></div>
+    <div><div class="v" style="color:var(--inf)">${D.report.inferred}</div><div class="l">INFERRED</div></div>
+    <div><div class="v" style="color:var(--bad)">${D.report.dropped}</div><div class="l">DELETED</div></div>
+    <div><div class="v">${D.report.commands}</div><div class="l">COMMANDS RUN</div></div>
+    <div><div class="v" style="color:var(--bad)">${D.report.failed}</div><div class="l">COMMANDS FAILED</div></div>
+  </div>
+  ${yourScore()}
+  <div class="tbl"><table><thead><tr><th>ID</th><th>DELETED CLAIM</th><th>TARGET</th><th>REASON</th></tr></thead>
+  <tbody>${D.dropped.map(d=>`<tr><td><code>${d.id}</code></td><td style="color:var(--dim)">${esc(d.text)}</td>
+    <td><code>${esc(d.file)}</code></td><td><span class="st x">${esc(d.reason)}</span></td></tr>`).join("")}</tbody></table></div>
+  <div class="envnote" style="border:1px solid var(--rule2);border-top:0">Regenerate: <code>trailhead build . --out trailhead.html</code></div>`;
+}
+
+/* Your own record, kept beside the tool's. Local only, resettable, and shown to
+   nobody else — spec §4.5: this is not a test. Calibration is the interesting
+   number: being wrong is fine, being confident and wrong is what to notice. */
+function yourScore(){
+  const ps=Object.values(S.pred), pOk=ps.filter(p=>p.ok).length;
+  const cs=allCP().map(c=>({a:S.ans[c.id],k:S.conf[c.id]})).filter(x=>x.a);
+  const cOk=cs.filter(x=>x.a.ok).length;
+  const sure=cs.filter(x=>x.k==="sure"), sureWrong=sure.filter(x=>!x.a.ok).length;
+  if(!ps.length&&!cs.length)return "";
+  const bits=[];
+  if(ps.length)bits.push(`<div><div class="v">${pOk}<span class="of"> / ${ps.length}</span></div><div class="l">PREDICTIONS RIGHT</div></div>`);
+  if(cs.length)bits.push(`<div><div class="v">${cOk}<span class="of"> / ${cs.length}</span></div><div class="l">CHECKPOINTS RIGHT</div></div>`);
+  if(sure.length)bits.push(`<div><div class="v" style="color:${sureWrong?"var(--bad)":"var(--ok)"}">${sureWrong}<span class="of"> / ${sure.length}</span></div><div class="l">CONFIDENT AND WRONG</div></div>`);
+  return `<h5 class="yh">YOUR RECORD</h5><div class="sumgrid you">${bits.join("")}</div>
+    <div class="envnote yn">Stored in this browser only, cleared by RESET, and never part of the generated artifact.</div>`;
+}
+
+/* ---- map ---- */
+function graph(){
+  const N=D.map.nodes, E=D.map.edges, W=900,H=400;
+  const at=id=>N.find(n=>n.id===id);
+  /* Node height must clear two stacked text lines: the label baseline sits at
+     y+20 and the loc/files line 13px off the bottom. The old 34+sqrt(loc)/9
+     bottomed out at 37px, which put the second line through the first on five
+     of six nodes. 44 is the floor; the sqrt term still carries the LOC signal. */
+  const h=n=>44+Math.sqrt(n.loc)/6;
+  const edges=E.map(e=>{
+    const a=at(e.a),b=at(e.b);
+    const x1=a.x+a.w,y1=a.y+h(a)/2, x2=b.x,y2=b.y+h(b)/2, mx=(x1+x2)/2;
+    return `<path class="edge" data-a="${e.a}" data-b="${e.b}" stroke-width="${.7+e.n/16}"
+      d="M${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}"/>`;
+  }).join("");
+  const ticks=[0,1,2,3,4,5,6,7,8].map(i=>`<line class="tick" x1="${i*100+20}" y1="${H-14}" x2="${i*100+20}" y2="${H-8}"/>
+    <text class="ticklab" x="${i*100+20}" y="${H-19}" text-anchor="middle">${String(i*100).padStart(3,"0")}</text>`).join("");
+  const nodes=N.map(n=>`<g class="node" data-id="${n.id}" tabindex="0" role="button">
+      <rect class="n-body" x="${n.x}" y="${n.y}" width="${n.w}" height="${h(n)}" rx="2"/>
+      <text class="n-lab" x="${n.x+10}" y="${n.y+20}">${n.label}</text>
+      <text class="n-loc" x="${n.x+10}" y="${n.y+h(n)-13}">${n.loc.toLocaleString()} loc · ${n.files} files</text>
+    </g>`).join("");
+  return `<div class="mapbox"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Module dependency graph">
+      <g>${ticks}</g><g id="edges">${edges}</g><g id="nodes">${nodes}</g></svg>
+      <div class="hint">HOVER TO ISOLATE · CLICK TO OPEN · ESC TO CLOSE</div></div>
+    <details class="fallback"><summary>Text equivalent (${N.length} modules, ${E.length} dependencies)</summary>
+      <ul>${N.map(n=>`<li><b>${n.label}</b>: ${n.loc.toLocaleString()} loc, ${n.files} files. Imports:
+        ${E.filter(e=>e.a===n.id).map(e=>at(e.b).label+" ×"+e.n).join(", ")||"none"}</li>`).join("")}</ul></details>`;
+}
+
+/* ---- rail ---- */
+function rail(){
+  $("#rail").innerHTML=D.tracks.map(t=>`<div class="track">
+    <h3>${t.title}<i>${t.minutes}m</i></h3>
+    ${t.stops.map(s=>{const i=STOPS.findIndex(x=>x.id===s.id);
+      return `<div class="stop ${i===S.cur?"on":""} ${S.done[s.id]?"done":""} ${s.kind==="cp"?"cp":""}"
+        data-go="${i}" tabindex="0" role="button"><span class="num">${String(i).padStart(2,"0")}</span><span>${s.title}</span></div>`;
+    }).join("")}</div>`).join("");
+  const n=STOPS.length, d=Object.keys(S.done).length;
+  $("#sprocket").innerHTML=STOPS.map((s,i)=>`<i class="${S.done[s.id]?"f":""}"></i>`).join("");
+  $("#ppct").textContent=Math.round(d/n*100)+"%";
+  $("#plab").textContent=d+" / "+n+" STOPS";
+}
+
+/* ---- stage ---- */
+function draw(i){
+  S.cur=Math.max(0,Math.min(STOPS.length-1,i)); save();
+  const s=STOPS[S.cur];
+  $("#stage").innerHTML=`<div class="stopwrap">
+    <div class="plate"><span>PLATE ${String(S.cur).padStart(2,"0")} / ${String(STOPS.length-1).padStart(2,"0")}</span>
+      <hr><span>${s.track}</span><hr><span>${s.minutes} MIN</span></div>
+    <h1>${s.title.replace(/^(\w+)/, m=>m)}</h1>
+    ${s.lede?`<p class="lede">${esc(s.lede)}</p>`:""}
+    <div class="blocks">${veil(s.blocks)}</div>
+    <div class="fnav">
+      <button ${S.cur===0?"disabled":""} data-nav="-1"><span class="k">← PREV</span>${S.cur>0?esc(STOPS[S.cur-1].title):""}</button>
+      <button class="nxt" ${S.cur===STOPS.length-1?"disabled":""} data-nav="1"><span class="k">NEXT →</span>${S.cur<STOPS.length-1?esc(STOPS[S.cur+1].title):""}</button>
+    </div></div>`;
+  if(s.kind!=="cp"){S.done[s.id]=1;save();}
+  location.hash="#"+s.id;
+  rail(); window.scrollTo({top:0,behavior:"instant"});
+  wireMap();
+}
+
+/* ---- map interactions ---- */
+function wireMap(){
+  const box=$(".mapbox"); if(!box)return;
+  const nodes=$$(".node",box), edges=$$(".edge",box);
+  const clear=()=>{nodes.forEach(n=>n.classList.remove("dim"));edges.forEach(e=>e.classList.remove("dim","lit"))};
+  nodes.forEach(g=>{
+    const id=g.dataset.id;
+    const lit=()=>{
+      const keep=new Set([id]);
+      edges.forEach(e=>{if(e.dataset.a===id||e.dataset.b===id){e.classList.add("lit");keep.add(e.dataset.a);keep.add(e.dataset.b)}else e.classList.add("dim")});
+      nodes.forEach(n=>{if(!keep.has(n.dataset.id))n.classList.add("dim")});
+    };
+    g.addEventListener("mouseenter",lit); g.addEventListener("focus",lit);
+    g.addEventListener("mouseleave",clear); g.addEventListener("blur",clear);
+    const open=()=>{
+      const n=D.map.nodes.find(x=>x.id===id);
+      nodes.forEach(x=>x.classList.toggle("sel",x.dataset.id===id));
+      const ins=D.map.edges.filter(e=>e.b===id), outs=D.map.edges.filter(e=>e.a===id);
+      const nm=k=>D.map.nodes.find(x=>x.id===k).label;
+      $("#dbody").innerHTML=`<h4>${n.label}</h4><div class="sub">${n.loc.toLocaleString()} LOC · ${n.files} FILES</div>
+        <div class="prose" style="font-size:14px"><span class="claim">${esc(n.why)}</span></div>
+        <h5>DEPENDS ON</h5>${outs.length?outs.map(e=>`<div class="dl"><b>×${e.n}</b><span>${nm(e.b)}</span></div>`).join(""):`<div class="dl"><span style="color:var(--faint)">nothing</span></div>`}
+        <h5>DEPENDED ON BY</h5>${ins.length?ins.map(e=>`<div class="dl"><b>×${e.n}</b><span>${nm(e.a)}</span></div>`).join(""):`<div class="dl"><span style="color:var(--faint)">nothing</span></div>`}
+        <h5>MOST-EDITED FILES</h5>${n.top.map(f=>`<div class="dl"><span><code>${esc(f)}</code></span></div>`).join("")}`;
+      $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden","false");
+    };
+    g.addEventListener("click",open);
+    g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}});
+  });
+}
+const shut=()=>{$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true");$$(".node").forEach(n=>n.classList.remove("sel"))};
+
+/* ---- events ---- */
+document.addEventListener("click",e=>{
+  const t=e.target;
+  const go=t.closest("[data-go]");
+  if(go&&go.dataset.go!==undefined&&!go.classList.contains("sub")){
+    if(go.hasAttribute("data-go")&&/^\d+$/.test(go.dataset.go)){draw(+go.dataset.go);$("#rail").classList.remove("open");return}
+  }
+  const nav=t.closest("[data-nav]"); if(nav){draw(S.cur+ +nav.dataset.nav);return}
+
+  const mk=t.closest(".mark");
+  if(mk){const p=$(`[data-pop="${mk.dataset.claim}"]`);const open=p.hidden;p.hidden=!open;mk.setAttribute("aria-expanded",open);return}
+
+  const cp=t.closest("[data-copy]");
+  if(cp){navigator.clipboard?.writeText(cp.dataset.copy.replace(/&quot;/g,'"'));cp.textContent="COPIED";setTimeout(()=>cp.textContent="COPY",1200);return}
+
+  /* A lineage stage opens the same drawer the map uses — one evidence surface,
+     not a second one that could drift from it. */
+  const ls=t.closest("[data-lin]");
+  if(ls){
+    const rec=LINSTEPS[ls.dataset.lin]; if(!rec||!rec.s.anchor)return;
+    const s=rec.s, st=(EST[s.status]||EST.inferred);
+    $("#dbody").innerHTML=`<h4>${esc(s.label)}</h4>
+      <div class="sub">${esc(rec.e.name)} · ${esc(s.stage)}</div>
+      <div class="prose" style="font-size:14px"><span class="claim">${esc(s.description)}</span></div>
+      <h5>EVIDENCE</h5>
+      <div class="dl"><b>${st[1]}</b><span class="etype">${esc(s.evidence_type||"")}</span></div>
+      <div class="dl"><span><code>${esc(s.anchor.file)}</code> : ${s.anchor.start}–${s.anchor.end}</span></div>
+      ${excerpt(s.anchor,"")}
+      <h5>WHY THIS SUPPORTS THE STEP</h5>
+      <div class="prose" style="font-size:13.5px"><span class="claim">${esc(s.why||
+        "The range above was located by searching the file for the quoted code, then hashed. The gate recomputes that hash from the bundled excerpt, so this stage cannot cite a line that has since changed without failing.")}</span></div>`;
+    $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden","false");
+    return}
+
+  const pi=t.closest("[data-pi]");
+  if(pi){const w=pi.closest("[data-pred]"), id=w.dataset.pred;
+    if(S.pred[id])return;
+    const pick=+pi.dataset.pi;
+    S.pred[id]={pick,ok:pick===+w.dataset.key};save();draw(S.cur);return}
+
+  const cf=t.closest("[data-conf]");
+  if(cf){const id=cf.dataset.conf; if(S.conf[id]||S.ans[id])return;
+    S.conf[id]=cf.dataset.c;save();draw(S.cur);return}
+
+  const pk=t.closest("[data-pick]");
+  if(pk){const id=pk.dataset.pick;if(S.ans[id])return;
+    const b=allCP().find(x=>x.id===id), i=+pk.dataset.i;
+    S.ans[id]={pick:i,ok:i===b.answer};S.done[STOPS[S.cur].id]=1;save();draw(S.cur);return}
+
+  const chk=t.closest("[data-go].sub, .sub[data-go]");
+  if(chk){const id=chk.dataset.go, b=allCP().find(x=>x.id===id);
+    const pick=$$(`[data-ord="${id}"]`).map(s=>s.value?+s.value:0);
+    if(pick.some(v=>!v))return;
+    S.ans[id]={pick,ok:pick.every((v,k)=>v===b.answer[k])};S.done[STOPS[S.cur].id]=1;save();draw(S.cur);return}
+
+  const th=t.closest("th[data-sort]");
+  if(th){const tb=th.closest("table").tBodies[0], i=+th.dataset.sort;
+    const dir=th.dataset.dir==="1"?-1:1;
+    $$("th",th.closest("thead")).forEach(x=>x.removeAttribute("data-dir")); th.dataset.dir=dir;
+    [...tb.rows].sort((a,b)=>{
+      const A=a.cells[i].textContent.trim(), B=b.cells[i].textContent.trim();
+      const na=parseFloat(A.replace(/,/g,"")), nb=parseFloat(B.replace(/,/g,""));
+      return (isNaN(na)||isNaN(nb)? A.localeCompare(B) : na-nb)*dir;
+    }).forEach(r=>tb.appendChild(r)); return}
+
+  if(t.closest("#badge")){modal(true);return}
+  if(t.closest("#mx")||t.id==="scrim"){modal(false);return}
+  if(t.closest("#dx")){shut();return}
+  if(t.closest("#menu")){$("#rail").classList.toggle("open");return}
+  if(t.closest("#theme")){
+    const d=document.documentElement.dataset.theme==="dark"?"light":"dark";
+    document.documentElement.dataset.theme=d;return}
+  if(t.closest("#proj")){
+    const on=document.documentElement.dataset.proj==="1";
+    document.documentElement.dataset.proj=on?"0":"1";
+    $("#proj").setAttribute("aria-pressed",!on);return}
+  if(t.closest("#reset")){S={cur:0,done:{},ans:{},pred:{},conf:{}};save();draw(0);return}
+});
+document.addEventListener("keydown",e=>{
+  if(e.target.matches("input,select,textarea"))return;
+  if(e.key==="Escape"){shut();modal(false);return}
+  if(e.key==="ArrowRight")draw(S.cur+1);
+  if(e.key==="ArrowLeft")draw(S.cur-1);
+});
+document.addEventListener("keydown",e=>{
+  const o=e.target.closest("[data-pick],[data-pi]");
+  if(o&&(e.key==="Enter"||e.key===" ")){e.preventDefault();o.click()}
+});
+function allCP(){return STOPS.flatMap(s=>s.blocks.filter(b=>b.type==="checkpoint"))}
+function modal(on){
+  if(on)$("#mbody").innerHTML=ledgerTable();
+  $("#modal").classList.toggle("open",on); $("#scrim").classList.toggle("open",on);
+}
+
+/* switching repo is a full reload of the walkthrough: new payload, new outline,
+   new progress key. The hash is dropped because stop ids are per-repo. */
+document.addEventListener("change",e=>{
+  if(e.target.id!=="rsel")return;
+  loadRepo(e.target.value);
+  history.replaceState(null,"",location.pathname+location.search);
+  draw(S.cur||0);
+});
+
+/* ---- boot ---- */
+let want=null;
+try{want=localStorage.getItem("trailhead:repo")}catch(e){}
+loadRepo(want&&BUNDLES[want]?want:Object.keys(BUNDLES)[0]);
+const h=location.hash.slice(1);
+const at=STOPS.findIndex(s=>s.id===h);
+draw(at>=0?at:(S.cur||0));
+</script>
+</body>
+</html>

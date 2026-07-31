@@ -1,0 +1,20 @@
+{
+  "claims": [
+    {
+      "text": "Exit 0 proves only that the volforecast package resolves from src: the real work is deferred, ExperimentConfig is imported inside main only when a run command executes, so a bare import never touches the config, the models, or the tournament path.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/__main__.py",
+        "quote": "    if args.command == \"run\":\n        if args.config is None:\n            from volforecast.cli.config_picker import pick_config\n\n            selected = pick_config()\n            if selected is None:\n                return 0\n            args.config = str(selected)\n\n        from volforecast.config import ExperimentConfig\n\n        config = ExperimentConfig.from_yaml(args.config)",
+        "focus": [
+          "        from volforecast.config import ExperimentConfig",
+          "        config = ExperimentConfig.from_yaml(args.config)"
+        ]
+      }
+    },
+    {
+      "text": "Importing is not testing: this snapshot imports 14 modules that have no file on disk, volforecast.config among them, and the roughly 2,700 tests under src/tests never ran, so the very interpreter that returned 0 here fails the moment vol run asks for ExperimentConfig.",
+      "status": "inferred"
+    }
+  ]
+}

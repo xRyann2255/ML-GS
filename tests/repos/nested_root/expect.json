@@ -1,0 +1,30 @@
+{
+  "repo": "nested_root",
+  "proves": "Root cascade step 1 via a pyproject one level down: anchor root != import root, tests outside the declared package, corrected relative-import resolution, and enough nodes to actually draw the graph.",
+  "plan": ["11.1", "3.2 rule 1", "3.4", "3.7 rank 1", "3.8 row 3", "4.1", "4.2", "9 row 1", "9 row 2", "9 row 8"],
+  "invocation": "--provider stub --run-commands none",
+  "degradation_rows": [1, 2, 7, 8],
+  "degradations": ["no_trace", "no_test_command", "narration_budget", "no_commands", "stop_dropped"],
+  "degradations_if_no_churn": ["no_churn"],
+  "stop_drops": {
+    "cp-c": "fewer than two hops were specified, so the trace stop was not generated"
+  },
+  "map_nodes": 3,
+  "notes": [
+    "VOCABULARY IS MEASURED, NOT GUESSED -- see hazards/expect.json note 1 for the full reconciliation. no_entry_point -> no_trace, stops_dropped -> stop_dropped, and narration_budget + no_commands are genuinely emitted under the invocation above.",
+    "ROW 1 FIRES HERE TOO, and this file used to deny it. It fires on the fewer-than-two-hops half, not the no-entry-point half: entry_points is correctly non-empty (three of them, below), but hops are hand-specified per decision 25 in fixtures/trace.<repo>.json and only restored/ ships one, so ctx.hops is [] for every fixture repo and build_trace degrades to its labelled callout. cp-c drops with it (row 8), because its answer key is a hop.",
+    "cp-a SURVIVES here and nowhere else in tests/repos. Both keys are generated -- cp-a1 has >=4 rankable modules with no fan-in tie at the top, cp-a2 has an entry point plus three distinct distractor files -- and compose._needs_checkpoints demands both.",
+    "roots: repo_root=<repo>, import_roots=[src], test_roots=[src/tests], pyproject=src/pyproject.toml, declared_packages=[widget]. packages=[\"widget\"] has no directory component, so import_root is the pyproject's parent (3.2 rule 1).",
+    "The only fixture repo with three or more map nodes, so it is the only one that exercises 4.2's packing, ordering and placement at all.",
+    "map_nodes=3 assumes adaptive depth settles at 2 -- widget, widget/core, widget/io -- with the tests group taken OFF the board by the @3 off-board rule (>=60% of its files under a test root; it is named in map.note instead). VERIFIED 2026-07-31 against the layered mapper. If collapse legitimately settles elsewhere, fix this number rather than the repo.",
+    "Edge direction runs left to right by design: tests and widget import core and io; core imports nothing. That keeps edges_dropped_backward at 0 (4.2 step 7).",
+    "Relative imports: widget/core/__init__.py uses level 1 from a package __init__, widget/io/loader.py uses level 2 from a plain module. These are the ONLY exercise those code paths get -- restored has 2560 ImportFrom nodes and every one is level 0.",
+    "One dangling target, widget.config, imported inside a function body: dangling must never become a node or an edge (3.4).",
+    "entry_points rank 1 fires from [project.scripts] with a real toml_line, and rank 3 from widget/__main__.py. VERIFIED: three entries -- console_script at src/pyproject.toml, module_main and main_guard at src/widget/__main__.py.",
+    "Row 2 fires because 3.8 refuses to admit the pytest candidate: pytest is not importable under py -3.11, so the candidate is emitted allowed=false with a deny_reason. Under --run-commands none the recorded reason is the disabled-runner one instead, which is the same refusal by a shorter route."
+  ],
+  "gaps": [
+    "NO NARRATION STORE IS CHECKED IN, so this repo does not test the one number the pitch turns on. Under --provider stub, narrate returns 0 of 3 units, every claim on the page is a template claim, report.dropped is [] and verify's resolve-and-delete path is never entered on any of the four fixtures. This repo is the right host for the fix -- it is the only fixture with >=3 map nodes and real anchorable quotes -- and the fix is a store of narration JSON keyed by sha256(system + \\u0000 + user) under <work>/narration/, containing at least one deliberately unanchorable claim so a non-zero DROPPED is regression-tested.",
+    "That store is NOT expect.json's to write: the key is computed from prompts.py's text (owned elsewhere) and the store is read from <work>/narration, so the section 11.3 loop would also have to pass --work tests/repos/nested_root/.trailhead for a checked-in copy to be found. Both belong to whoever owns narrate/provider and the harness."
+  ]
+}

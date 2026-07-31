@@ -1,0 +1,43 @@
+{
+  "role": [
+    "One module per subcommand, each exposing a `register(subparsers)` hook that the entry point calls lazily, so the command surface is owned by the modules that implement it. The package docstring maps modules to workflow skills, ingest for DATA_INGEST, build_features for FEATURE_BUILD, train for MODEL_TRAIN, evaluate for EVALUATE, so the CLI mirrors the research loop rather than accumulating loose scripts.",
+    "`vol audit` is the data-quality gate: it validates every cached parquet against its manifest contract, assesses per-layer readiness, regenerates data/manifest.json, and appends a dated summary to the research journal at workspace/research/research-journal.md, exiting 1 when critical issues are found. `vol backfill-rk` repairs the realized kernel column: it finds dates where `rk` is NaN, refetches raw ticks from Chunk Store in multi-day batches, and recomputes RK and `noise_gap` in place, checkpointing progress so an interrupt loses nothing.",
+    "`vol forecast` is the live end product: a config-driven multi-model ensemble that trains each model on full history, predicts next-day [[realized variance]], compares it to current ATM [[implied volatility]] fetched live from TSDB, and emits a weighted LONG, SHORT, or FLAT signal. The distinctive habit is engineering around expensive data: backfill fetches five days per API call and requests only the trade-price field, roughly three times less data per fetch."
+  ],
+  "reads": "User intent plus cached data: argv and YAML configs from workspace/configs/, RV parquet caches, manifest contracts, raw ticks from Chunk Store, and live ATM IV from the gs_quant TSDB session.",
+  "feeds": "Its outputs, a regenerated data/manifest.json, repaired rk and noise_gap columns in the parquet cache, and the daily LONG, SHORT, or FLAT call, feed the tournament's training data, the research journal, and the trading decision itself.",
+  "key_files": [
+    {
+      "file": "__init__.py",
+      "purpose": "the docstring that maps each CLI module to one workflow skill, DATA_INGEST through RESEARCH; the quickest map of the command surface"
+    },
+    {
+      "file": "audit.py",
+      "purpose": "validates every cached parquet against manifest contracts, regenerates data/manifest.json, and writes audit summaries to the research journal"
+    },
+    {
+      "file": "backfill_rk.py",
+      "purpose": "repairs NaN realized kernel dates from raw ticks, batched five days per API call with symbol-level parallelism"
+    },
+    {
+      "file": "forecast.py",
+      "purpose": "the live signal: multi-model ensemble to LONG, SHORT, or FLAT against current ATM IV"
+    }
+  ],
+  "concepts": [
+    "register() pattern",
+    "manifest contract",
+    "realized kernel",
+    "noise_gap",
+    "IV-RV gap signal",
+    "layer readiness"
+  ],
+  "cite": {
+    "file": "src/volforecast/cli/__init__.py",
+    "quote": "\"\"\"CLI entry points for volforecast skills.\n\nEach module corresponds to one skill's command-line interface:\n- ingest: DATA_INGEST skill\n- build_features: FEATURE_BUILD skill\n- train: MODEL_TRAIN skill\n- evaluate: EVALUATE skill\n- report: HTML report generation\n- notebook: NOTEBOOK skill\n- research: RESEARCH skill\n\"\"\"",
+    "focus": [
+      "Each module corresponds to one skill's command-line interface:"
+    ]
+  },
+  "caption": "The package docstring: one CLI module per workflow skill."
+}

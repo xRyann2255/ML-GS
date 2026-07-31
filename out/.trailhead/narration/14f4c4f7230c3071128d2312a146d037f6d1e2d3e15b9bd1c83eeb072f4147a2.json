@@ -1,0 +1,48 @@
+{
+ "steps": [
+  {
+   "id": "n-src-volforecast-cli",
+   "text": "Start here. Every interaction is a `vol` subcommand: one primary command, `vol run --config`, drives ingest, training, and evaluation from a single YAML file, and around it sit the ingest, audit, and live forecast commands. Each subcommand registers itself, so the surface grows without touching the entry point."
+  },
+  {
+   "id": "n-src-volforecast-models",
+   "text": "The zoo: naive baselines that set the floor, LightGBM and XGBoost trained on a custom [[QLIKE]] objective, and a graph suite whose controls deliberately nest the simpler models. One shared contract means a random walk and a graph attention network take the same walk through the same folds."
+  },
+  {
+   "id": "n-src-volforecast-features",
+   "text": "The design matrix factory: layered feature classes turn daily measures into model inputs, from [[HAR]] lags through options-implied signals like the [[variance risk premium]] to calendar effects. A config stacks layers by name; the registry finds them."
+  },
+  {
+   "id": "n-src-volforecast-reporting",
+   "text": "The HTML experiment report, honestly unfinished: most sections are documented stubs, and the one real section prices the forecasts with the realistic straddle engine, lagging implied vol by a day to avoid look-ahead."
+  },
+  {
+   "id": "n-src-volforecast-visualization",
+   "text": "The smallest box on the board: what survives here renders model lineage as a flowchart for dashboards. The dashboard builder itself is one of the modules this snapshot lost."
+  },
+  {
+   "id": "n-src-volforecast-pipeline",
+   "text": "The anti-cheating layer: per-symbol normalisers fitted on training rows only, a fingerprint-keyed cache that decides when an expensive fold may be skipped, and a per-sample Duan correction estimated strictly walk-forward from earlier folds."
+  },
+  {
+   "id": "n-src-volforecast-data",
+   "text": "The heaviest lifting: ticks from Chunk Store, daily series from TSDB, the SPX vol surface from Marquee, all cached as per-symbol parquet. Its estimators turn millions of ticks into the daily [[realized variance]] panel everything downstream trains on."
+  },
+  {
+   "id": "n-src-volforecast",
+   "text": "The hub. The registry maps model, feature, and graph names to classes, which is why most of the repo imports this tiny package: a YAML config names components, the registry turns names into code, and the tournament routing lives beside it."
+  },
+  {
+   "id": "n-src-volforecast-evaluation",
+   "text": "Where claims go to die: [[QLIKE]] ranking, Diebold-Mariano tests, the Model Confidence Set, then the money tests, realistic delta-hedged straddles and the GSVIVS01 signal, with Sharpe ratios deflated for selection luck."
+  },
+  {
+   "id": "n-src-volforecast-graphs",
+   "text": "Point-in-time graph construction for the graph models: a graph used to forecast a date is estimated only on data up to that date, re-estimated on a schedule, and frozen between refits, so the network structure itself cannot leak the future."
+  },
+  {
+   "id": "n-src-volforecast-utils",
+   "text": "Last, the quiet foundation: paths.py anchors every cache to the repo root, and cv.py holds the purged and walk-forward splitters that keep every result honest. Everything above imports these seven files; nothing here imports back."
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+{
+ "claims": [
+  {
+   "text": "Modules are laid out as the forecasting pipeline reads: volforecast.data ingests, features transforms, models fits, evaluation scores and cli drives, with the shared volforecast.utils at the highest fan-in in the repo, so imports flow the same direction the data does.",
+   "status": "inferred"
+  },
+  {
+   "text": "Errors are contained where they happen: Optuna workers catch exceptions so one failed trial cannot kill a tuning study, ingestion writes parquet atomically via a staging directory and merges rather than overwrites, and the audit command signals problems with a non-zero exit code.",
+   "status": "inferred"
+  },
+  {
+   "text": "Mathematics is defended twice, in docstrings that write out the QLIKE gradient and hessian and cite Easley, Lopez de Prado and O'Hara for VPIN, and in a 45,000 line unit suite that checks those formulas against numerical differentiation on seeded synthetic data.",
+   "status": "inferred"
+  },
+  {
+   "text": "The habit the authors clearly cared most about is look-ahead hygiene: hyperparameter tuning uses expanding window walk-forward CV, holdout splits carry explicit purge gaps, and Optuna study names hash the model config so trials from a stale setup are never silently reused.",
+   "status": "inferred"
+  }
+ ]
+}

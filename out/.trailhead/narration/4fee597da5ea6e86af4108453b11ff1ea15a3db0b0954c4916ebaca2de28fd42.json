@@ -1,0 +1,116 @@
+{
+ "terms": [
+  {
+   "term": "realized variance (RV)",
+   "def": "The sum of squared intraday returns over one trading day, computed from 5 minute returns with no mean subtraction. It is the quantity every model in this repo forecasts.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "    def test_rv_sum_of_squares(self, gbm_5min_returns):\n        \"\"\"RV should equal sum of squared returns.\"\"\"\n        rv = compute_realized_variance(pd.Series(gbm_5min_returns))\n        expected = float(np.sum(gbm_5min_returns**2))\n        assert rv == pytest.approx(expected, rel=1e-10)",
+    "focus": [
+     "\"\"\"RV should equal sum of squared returns.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "QLIKE",
+   "def": "The quasi-likelihood loss for variance forecasts, exp(e) - e - 1 on the log-space error e. It is exactly zero for a perfect forecast and punishes under-predicting volatility more than over-predicting it, which is why the tournament ranks models by it.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "class TestQLIKE:\n    def test_perfect_prediction_is_zero(self):\n        y = np.array([-8.0, -9.0, -7.5, -8.5])\n        assert qlike(y, y, log_space=True) == pytest.approx(0.0, abs=1e-15)\n\n    def test_positive_for_imperfect(self):\n        y = np.array([-8.0, -9.0, -7.5, -8.5])\n        h = y + 0.5\n        assert qlike(y, h, log_space=True) > 0",
+    "focus": [
+     "assert qlike(y, y, log_space=True) == pytest.approx(0.0, abs=1e-15)"
+    ]
+   }
+  },
+  {
+   "term": "HAR",
+   "def": "The heterogeneous autoregressive baseline: regress tomorrow's log RV on the daily value `log_rv_d`, the 5 day mean `log_rv_w`, and the 22 day mean `log_rv_m`. Three coefficients, brutally hard to beat, and the benchmark every ML model in the tournament is scored against.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "class TestHARDesignMatrix:\n    def test_design_matrix_columns(self, synthetic_rv_series):\n        X = build_har_design_matrix(synthetic_rv_series)\n        assert list(X.columns) == [\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"]\n\n    def test_design_matrix_nan_first_rows(self, synthetic_rv_series):\n        X = build_har_design_matrix(synthetic_rv_series)\n        # First 22 rows should have NaN (need 22 days lookback + 1 shift)\n        assert X.iloc[0].isna().any()",
+    "focus": [
+     "assert list(X.columns) == [\"log_rv_d\", \"log_rv_w\", \"log_rv_m\"]"
+    ]
+   }
+  },
+  {
+   "term": "realized kernel (RK)",
+   "def": "A microstructure-noise-robust variance estimator that weights return autocovariances with a flat-top Parzen kernel. On clean prices it agrees with 5 minute RV; on noisy tick data it recovers true variance where naive tick-by-tick RV is inflated.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "class TestRealizedKernel:\n    def test_rk_close_to_rv_no_noise(self, gbm_log_prices, gbm_5min_returns):\n        \"\"\"RK from clean GBM prices should approximate 5-min RV.\"\"\"\n        rk = realized_kernel(gbm_log_prices)\n        rv_5min = compute_realized_variance(pd.Series(gbm_5min_returns))",
+    "focus": [
+     "\"\"\"RK from clean GBM prices should approximate 5-min RV.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "Chunk Store",
+   "def": "The GS internal tick store, reached through `pytickclient`. It supplies the L1 trades and quotes (and L2 depth for the E-mini) that every realized measure is computed from; tests mock its query layer because it is unreachable outside the GS network.",
+   "cite": {
+    "file": "src/tests/integration/test_data_pipeline.py",
+    "quote": "def _mock_chunk_query(symbols, st, et, chunkdb, fields=None):\n    \"\"\"Return synthetic Chunk Store response dict.\"\"\"\n    n = 100\n    base_time = st\n    times = [base_time + timedelta(seconds=i * 10) for i in range(n)]\n    rng = np.random.default_rng(42)",
+    "focus": [
+     "\"\"\"Return synthetic Chunk Store response dict.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "tournament",
+   "def": "The evaluation mode where every candidate model, 13 in the full config, is trained and scored on identical folds, ranked by QLIKE, and compared with statistical tests. Every `vol run --config` invocation uses this code path, even for a single model.",
+   "cite": {
+    "file": "README.md",
+    "quote": "# Single-model experiment (ingest + train + evaluate + dashboard)\nvol run --config workspace/configs/baseline_har.yaml\n\n# Tournament: 13 models compared with statistical tests\nvol run --config workspace/configs/tournament_full_spy.yaml",
+    "focus": [
+     "# Tournament: 13 models compared with statistical tests"
+    ]
+   }
+  },
+  {
+   "term": "purge gap",
+   "def": "A buffer of observations deleted between CV training and test blocks so overlapping RV windows cannot leak across the boundary. The pipeline enforces an effective purge of at least the forecast horizon h on every fold.",
+   "cite": {
+    "file": "src/tests/integration/test_pipeline.py",
+    "quote": "class TestPurgeGapEnforcement:\n    \"\"\"Verify effective_purge = max(config.purge_gap, h) per horizon.\"\"\"\n\n    @pytest.fixture\n    def multi_horizon_data(self) -> pd.DataFrame:\n        \"\"\"Synthetic daily data long enough for multi-horizon CV.\"\"\"",
+    "focus": [
+     "\"\"\"Verify effective_purge = max(config.purge_gap, h) per horizon.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "Duan correction",
+   "def": "The retransformation applied when log-space forecasts are converted back to variance levels: plain exponentiation is biased low, so predictions are scaled by the mean of exponentiated residuals. The Pipeline applies it per fold, from that fold's training residuals only.",
+   "cite": {
+    "file": "src/tests/integration/test_rv_pipeline.py",
+    "quote": "class TestDuanCorrection:\n    \"\"\"Verify Pipeline applies per-fold Duan retransformation correction.\"\"\"\n\n    def _make_synthetic_rv_df(self, n_days=400, seed=42):\n        \"\"\"Create synthetic daily RV DataFrame mimicking real data.\"\"\"\n        rng = np.random.default_rng(seed)",
+    "focus": [
+     "\"\"\"Verify Pipeline applies per-fold Duan retransformation correction.\"\"\""
+    ]
+   }
+  },
+  {
+   "term": "IV-RV gap",
+   "def": "The spread between options-implied volatility and forecast realized volatility. Implied usually sits above subsequent realized (the variance risk premium), and turning QLIKE improvements into a tradeable read on this gap is the project's stated goal."
+  },
+  {
+   "term": "variance risk premium",
+   "def": "Option-implied variance minus subsequently realized variance. Usually positive: investors pay a premium for volatility protection, and the project computes it as squared ATM implied vol minus annualized realized variance."
+  },
+  {
+   "term": "VPIN",
+   "def": "Volume-Synchronized Probability of Informed Trading: the mean absolute buy-sell volume imbalance across equal-volume buckets, a daily order-flow toxicity measure from the microstructure layer."
+  },
+  {
+   "term": "implied volatility",
+   "def": "The volatility the options market prices in. The project compares it with the forecast of realized volatility: when implied looks rich against the forecast, the strategies sell vol, and when cheap they buy."
+  },
+  {
+   "term": "Model Confidence Set",
+   "def": "The Hansen et al. 2011 procedure returning the set of models statistically indistinguishable from the best at a chosen confidence level, via sequential bootstrap elimination. Membership, not rank, is the honest headline."
+  },
+  {
+   "term": "DSR",
+   "def": "Deflated Sharpe Ratio: the probability that an observed Sharpe beats the maximum expected by chance given how many strategy configurations were tried, correcting backtest results for selection luck."
+  }
+ ]
+}

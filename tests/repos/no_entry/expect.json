@@ -1,0 +1,28 @@
+{
+  "repo": "no_entry",
+  "proves": "Section 9 row 1 on its no-entry-point half, plus row 2, on a repo that is otherwise perfectly healthy -- four directories, four map nodes, a real import chain -- and cp-a1 refusing a question that has two equally correct answers.",
+  "plan": ["11.1", "3.2 rule 4", "3.7", "9 row 1", "9 row 2", "9 row 8"],
+  "invocation": "--provider stub --run-commands none",
+  "degradation_rows": [1, 2, 7, 8],
+  "degradations": ["no_trace", "no_test_command", "narration_budget", "no_commands", "stop_dropped"],
+  "degradations_if_no_churn": ["no_churn"],
+  "stop_drops": {
+    "cp-a": "no survey answer key for cp-a1, cp-a2",
+    "cp-c": "no traceable entry point, so the trace stop was not generated"
+  },
+  "map_nodes": 4,
+  "notes": [
+    "VOCABULARY IS MEASURED, NOT GUESSED -- see hazards/expect.json note 1 for the full reconciliation. no_entry_point -> no_trace, stops_dropped -> stop_dropped, and narration_budget + no_commands are genuinely emitted under the invocation above.",
+    "entry_points must come back EMPTY. No pyproject, no setup.py, no __main__.py, no if __name__ guard anywhere, and no module-level FastAPI/Flask/Typer/click.Group assignment. If any rank of 3.7 fires here, 3.7 is over-matching. VERIFIED 2026-07-30: entry_points == [].",
+    "CP-A DROPS HERE TOO. This file previously said the >=4-distinct-directories precondition was met and that cp-c was the only drop; that was wrong, and the plan's row 8 is what misled it. The implemented preconditions are stricter than the row's one-line summary and deliberately so: cp-a1 needs >=4 rankable modules AND NO TIE AT THE TOP of the fan-in ranking, cp-a2 needs an entry point plus three distinct distractor files. Both refuse here, so compose._needs_checkpoints drops the stop.",
+    "The fan-in tie is the interesting half and is a property of this repo, not a bug. theme -> extras -> toolkit -> rules is a straight line, so every module ties at fan_in <= 1 and 'which module is imported the most' has two equally correct answers. checkpoints.py:157-161 refuses rather than mark a correct answer wrong -- decision 15 and non-negotiable 6, whose answer keys come from survey.json with no model in the page to grade anything. The drop is not silent: it lands in report.degradations as stop_dropped and on the page under the labelled STOPS NOT GENERATED callout.",
+    "Do not 'fix' this by adding a fifth directory or an extra edge. The tie IS the path being proved, and nested_root is where a surviving cp-a is exercised.",
+    "roots.rule must land on cascade step 4 -- no pyproject, no src/, but immediate child dirs hold __init__.py -- so import_roots is [<repo>] and declared_packages is empty, which forces 4.1 rule 4's no-declared-packages scope fallback.",
+    "Row 1 fires on its no-entry-point half here, which is the distinction from flat_script and nested_root; it would fire anyway on the fewer-than-two-hops half, since hops are hand-specified per decision 25 and no fixture repo ships a fixtures/trace.*.json. cp-c drops with it.",
+    "The chain theme -> extras -> toolkit -> rules is a straight line, so ordering by (fan_in - fan_out) has one correct answer and any back edge is a real bug.",
+    "No tests directory and no pyproject, so command_candidates has no kind=test entry at all -- row 2 fires on the 'nothing was even a candidate' path, where nested_root fires it on the 'candidate denied' path."
+  ],
+  "gaps": [
+    "This run proves nothing about verify's drop path: with --provider stub and no narration store, 0 units narrate, report.dropped is [] and resolve-and-delete is never entered. See nested_root/expect.json gaps."
+  ]
+}

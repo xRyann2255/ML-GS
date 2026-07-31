@@ -1,0 +1,254 @@
+{
+  "unit": "dive:src-volforecast-data",
+  "kind": "dive",
+  "title": "Inside data",
+  "max_claims": 8,
+  "key": "21362d5002b22fee40b9fcd182df079d6cde0a718b5724f5cfa1cac508fb6d1c",
+  "system": "You are the narration stage of Trailhead, a tool that generates a walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Every\nquote you return is searched for verbatim in the file on disk; anything that is\nnot found exactly is deleted and counted on screen. You cannot talk your way\npast the checker, so do not try: an honest \"inferred\" sentence survives, an\ninvented quote does not.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. `cite.quote` is a VERBATIM, CONTIGUOUS copy of 3-24 lines from ONE file,\n   lines joined with newlines. Copy the leading indentation exactly, character\n   for character. Do not reflow, re-indent, elide, or add an ellipsis.\n4. Quote only code you were shown below. Quoting something you inferred exists\n   is the single most expensive thing you can do here.\n5. `cite.focus` is an array of exact substrings of your own `cite.quote`, the\n   one or two lines that actually carry the point.\n6. If you cannot support a sentence with a quote, set `\"status\": \"inferred\"` and\n   omit `cite` entirely. That is a legitimate, visible answer, not a failure.\n7. `text` is one plain sentence, at most 280 characters. Backticks may mark\n   code identifiers and [[term]] or [[id|label]] may mark a glossary term.\n   No newlines, no markdown links, no `<`. Use commas instead of dashes.\n8. Say what the system DOES in its own domain's terms. When the README or a\n   package docstring states the project's purpose, that purpose is the story;\n   argument parsing, CLI wiring, and directory layout are never what a repo\n   is for.\n9. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"this codebase appears to\", say what it does.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/volforecast/data/chunk_store.py ---\n    1| \"\"\"Tick data access via pytickclient (Chunk Store).\n    2| \n    3| Provides functions to fetch L1 trade/quote data for all 34 symbols and\n    4| L2 order book depth data for E-mini S&P 500. Raw tick data is the\n    5| foundation for computing realized volatility measures at arbitrary\n    6| frequencies (5-min, 1-min, tick-by-tick).\n    7| \"\"\"\n    8| \n    9| from __future__ import annotations\n   10| \n   11| import logging\n   12| import threading\n   ...\n   44| def _reset_session() -> None:\n   45|     \"\"\"Mark session as dead so the next _ensure_session() re-initializes.\"\"\"\n   46|     global _session_started  # noqa: PLW0603\n   47|     with _session_lock:\n   48|         if _session_started:\n   49|             try:\n   50|                 _pyslang.stop()\n   51|             except Exception:  # noqa: BLE001\n   52|                 pass\n   ...\n   56| def _ensure_session() -> None:\n   57|     \"\"\"Lazily start a pyslang session (thread-safe, double-checked locking).\n   58| \n   59|     pyslang.start() internally spawns secexpr and waits up to 5 minutes\n   60|     (grace period) for it to become responsive. If start() returns without\n   61|     raising, the session is ready — no extra health check needed.\n   62| \n   63|     If pyslang is not available or secexpr is not installed (e.g. Coder\n   64|     workspace), skip session start — pytickclient can connect to Chunk Store\n   ...\n  129| def _third_friday(year: int, month: int) -> date:\n  130|     \"\"\"Return the 3rd Friday of the given month/year.\"\"\"\n  131|     # First day of month\n  132|     first = date(year, month, 1)\n  133|     # Day of week: 0=Mon, 4=Fri\n  134|     days_until_friday = (4 - first.weekday()) % 7\n  135|     first_friday = first.day + days_until_friday\n  136|     return date(year, month, first_friday + 14)  # +14 gives 3rd Friday\n  137| \n  138| \n  139| def _es_roll_date(year: int, month: int) -> date:\n  140|     \"\"\"Return the ES roll date: Thursday before 3rd Friday of expiry month.\"\"\"\n  141|     third_fri = _third_friday(year, month)\n  142|     return third_fri - timedelta(days=1)  # Thursday\n  143| \n  144| \n  145| def _resolve_es_symbol(trade_date: date) -> str:\n  146|     \"\"\"Map a date to the correct front-month E-mini S&P 500 RIC.\n  147| \n  148|     ES contracts expire quarterly (H=Mar, M=Jun, U=Sep, Z=Dec).\n  149|     The front contract rolls to the next quarter on the Thursday\n  150|     before the 3rd Friday of the expiry month. Before that date,\n  151|     the expiring contract is still the front month.\n  152|     \"\"\"\n  153|     # Determine current and next expiry months relative to trade_date\n   ...\n  187| def _generate_trading_days(start: date, end: date):\n  188|     \"\"\"Yield weekdays between start and end (inclusive).\"\"\"\n  189|     current = start\n  190|     while current <= end:\n  191|         if current.weekday() < 5:\n  192|             yield current\n  193|         current += timedelta(days=1)\n  194| \n  195| \n  196| def _validate_symbol(symbol: str) -> None:\n  197|     if symbol not in SYMBOL_UNIVERSE:\n  198|         raise ValueError(\n  199|             f\"Symbol '{symbol}' not in the symbol universe ({len(SYMBOL_UNIVERSE)} symbols). \"\n  200|             f\"Add it to EQUITY_SYMBOLS in constants.py.\"\n  201|         )\n  202| \n  203| \n  204| def fetch_trades(\n  205|     symbol: str,\n  206|     start_date: date,\n  207|     end_date: date,\n  208|     exchange: str | None = None,\n  209| ) -> pd.DataFrame:\n  210|     \"\"\"Fetch L1 trade ticks from Chunk Store.\n  211| \n  212|     Parameters\n   ...\n  281| def _chunk_query_with_timeout(\n  282|     symbols: list[str],\n  283|     st: datetime,\n  284|     et: datetime,\n  285|     chunkdb: str,\n  286|     fields: list[str],\n  287|     timeout_s: float = 120.0,\n  288|     retries: int = 2,\n  289|     backoff_base: float = 2.0,\n   ...\n  361| def _group_contiguous_dates(dates: list[date]) -> list[list[date]]:\n  362|     \"\"\"Group sorted weekday dates into contiguous trading-day runs.\n  363| \n  364|     Two dates are contiguous if there are no weekday gaps between them\n  365|     (weekend gaps are allowed).\n  366|     \"\"\"\n  367|     if not dates:\n  368|         return []\n  369|     groups: list[list[date]] = [[dates[0]]]\n   ...\n  384| def _parse_raw_to_day_frames(raw: dict) -> dict[date, pd.DataFrame]:\n  385|     \"\"\"Parse a raw chunk_query response into per-day trade DataFrames.\"\"\"\n  386|     df = pd.DataFrame(raw)\n  387|     if df.empty:\n  388|         return {}\n  389| \n  390|     for f in L1_FIELDS:\n  391|         if f in df.columns:\n  392|             df[f] = df[f].ffill()\n   ...\n  407|                 \"price\": pd.to_numeric(grp[\"TRDPRC_1\"], errors=\"coerce\").values,\n  408|                 \"size\": pd.to_numeric(grp[\"TRDVOL_1\"], errors=\"coerce\").values,\n  409|             },\n  410|             index=timestamps,\n  411|         )\n  412|         day_df.index.name = \"timestamp\"\n  413|         result[day] = day_df\n  414|     return result\n  415| \n  416| \n  417| def fetch_trades_batch(\n  418|     symbol: str,\n  419|     dates: list[date],\n  420|     batch_size: int = 5,\n  421|     timeout_s: float = 120.0,\n  422|     retries: int = 2,\n  423|     on_fetch: Callable[[str, list[date], int, float], None] | None = None,\n  424| ) -> dict[date, pd.DataFrame]:\n  425|     \"\"\"Fetch trades for multiple dates using batched API calls.\n  426| \n  427|     Groups dates into contiguous runs and issues one ``chunk_query`` per\n  428|     batch (up to *batch_size* days), reducing total API calls.\n  429| \n  430|     Parameters\n  431|     ----------\n  432|     symbol : str\n  433|         Ticker symbol.\n  434|     dates : list[date]\n  435|         Specific dates to fetch (must be weekdays).\n  436|     batch_size : int\n  437|         Maximum days per single API call (default 5).\n  438|     timeout_s : float\n  439|         Timeout per API call in seconds (default 120).\n  440|     retries : int\n  441|         Number of retries per failed API call (default 2).\n  442|     on_fetch : callable, optional\n  443|         Progress callback ``(event, chunk_dates, n_ticks, elapsed_s)``.\n  444|         *event* is ``\"start\"`` (before API call) or ``\"done\"`` (after).\n  445| \n  446|     Returns\n  447|     -------\n  448|     dict[date, pd.DataFrame]\n  449|         Mapping of date -> trades DataFrame. Dates with no data get\n  450|         an empty DataFrame.\n  451|     \"\"\"\n  452|     if not dates:\n  453|         return {}\n  454| \n  455|     _validate_symbol(symbol)\n  456|     if query is None:\n  457|         raise ConnectionError(\"pytickclient not available.\")\n  458|     _ensure_session()\n  459| \n  460|     empty_df = pd.DataFrame(columns=[\"price\", \"size\"])\n  461|     result: dict[date, pd.DataFrame] = {d: empty_df for d in dates}\n  462| \n  463|     def _notify(event: str, chunk: list[date], n_ticks: int, elapsed_s: float) -> None:\n  464|         if on_fetch is None:\n  465|             return\n  466|         try:\n   ...\n  547| def fetch_bars(\n  548|     symbol: str,\n  549|     dates: list[date],\n  550|     interval: float = 300.0,\n  551|     batch_size: int = 20,\n  552|     timeout_s: float = 120.0,\n  553|     retries: int = 2,\n  554| ) -> dict[date, pd.DataFrame]:\n  555|     \"\"\"Fetch 5-min OHLCV bars via AggGroupBy server-side aggregation.\n   ...\n  674| def fetch_quotes(\n  675|     symbol: str,\n  676|     start_date: date,\n  677|     end_date: date,\n  678| ) -> pd.DataFrame:\n  679|     \"\"\"Fetch L1 quote ticks (bid/ask) from Chunk Store.\n  680| \n  681|     Returns\n  682|     -------\n   ...\n  733| def fetch_depth(\n  734|     start_date: date,\n  735|     end_date: date,\n  736|     levels: int = 5,\n  737| ) -> pd.DataFrame:\n  738|     \"\"\"Fetch L2 order book depth for E-mini S&P 500.\n  739| \n  740|     Parameters\n  741|     ----------\n\n--- src/volforecast/data/micro.py ---\n    1| \"\"\"Per-symbol microstructure ingestion from ChunkStore LeeReady processor.\n    2| \n    3| Fetches tick data with server-side LeeReadySumVolume trade classification,\n    4| aggregates into 10-second signed-volume bars, then produces:\n    5|   1. Daily aggregates (signed_volume_ratio, vpin, ofi) → data/raw/micro/{SYM}.parquet\n    6|   2. 10-second bar sequences (for LSTM/TCN) → data/raw/micro/sequences/{SYM}.parquet\n    7| \n    8| Public API:\n    9|     ingest_symbol_micro  — Fetch + compute + save for one symbol (both outputs)\n   10|     fetch_micro_bars     — LeeReady + AggGroupBy fetch from ChunkStore\n   11|     compute_vpin         — Volume-time bucket VPIN (Easley et al. 2012)\n   12|     compute_daily_micro  — 10s bars → daily scalar aggregates\n   ...\n   58| def _build_processors(interval: float = MICRO_BAR_INTERVAL) -> list:\n   59|     \"\"\"Build AggGroupBy processor for server-side 10s bar aggregation.\n   60| \n   61|     Client-side BVC (Bulk Volume Classification) is applied after fetch\n   62|     to classify bars as buy/sell initiated using the tick rule.\n   63| \n   64|     Returns\n   65|     -------\n   66|     list\n   ...\n   87| def _classify_bars_bvc(df: pd.DataFrame) -> pd.DataFrame:\n   88|     \"\"\"Apply Bulk Volume Classification (tick rule) to OHLCV bars.\n   89| \n   90|     For each bar:\n   91|       - close > open → all volume is buy-initiated\n   92|       - close < open → all volume is sell-initiated\n   93|       - close == open → split 50/50\n   94| \n   95|     Adds columns: buy_vol, sell_vol, neutral_vol.\n   ...\n  127| def fetch_micro_bars(\n  128|     symbol: str,\n  129|     dates: list[date],\n  130|     batch_size: int = 20,\n  131|     timeout_s: float = 120.0,\n  132|     retries: int = 2,\n  133|     interval: float = MICRO_BAR_INTERVAL,\n  134|     on_batch: Callable[[dict[date, pd.DataFrame]], None] | None = None,\n  135|     progress=None,\n   ...\n  323| def compute_vpin(\n  324|     buy_vols: np.ndarray,\n  325|     sell_vols: np.ndarray,\n  326|     bucket_volume: int | float,\n  327|     n_buckets: int = VPIN_N_BUCKETS,\n  328| ) -> float:\n  329|     \"\"\"Compute Volume-Synchronized Probability of Informed Trading (VPIN).\n  330| \n  331|     Reference: Easley, Lopez de Prado & O'Hara (2012), Eq. 1.\n   ...\n  411| \n  412|     # VPIN = mean of last n_buckets imbalances\n  413|     return float(np.mean(bucket_imbalances[-n_buckets:]))\n  414| \n  415| \n  416| # ---------------------------------------------------------------------------\n  417| # Daily aggregate computation\n  418| # ---------------------------------------------------------------------------\n  419| \n  420| \n  421| def compute_daily_micro(\n  422|     bars_by_date: dict[date, pd.DataFrame],\n  423|     bucket_volume: int | float,\n  424|     n_buckets: int = VPIN_N_BUCKETS,\n  425| ) -> pd.DataFrame:\n  426|     \"\"\"Aggregate 10-second bars to daily microstructure scalars.\n  427| \n  428|     Parameters\n  429|     ----------\n  430|     bars_by_date : dict[date, DataFrame]\n  431|         Mapping of date → DataFrame with at least columns [buy_vol, sell_vol].\n  432|     bucket_volume : int or float\n  433|         VPIN bucket volume (total volume per bucket).\n  434|     n_buckets : int\n  435|         Number of VPIN buckets (default: 50).\n  436| \n  437|     Returns\n  438|     -------\n  439|     pd.DataFrame\n  440|         Daily features with columns from MICRO_DAILY_COLUMNS.\n  441|         Index: date objects (sorted ascending).\n  442|     \"\"\"\n  443|     records: list[dict] = []\n  444| \n  445|     for day in sorted(bars_by_date.keys()):\n  446|         bars = bars_by_date[day]\n  447|         buy = bars[\"buy_vol\"].values.astype(np.float64)\n  448|         sell = bars[\"sell_vol\"].values.astype(np.float64)\n  449| \n  450|         total_buy = float(buy.sum())\n  451|         total_sell = float(sell.sum())\n  452|         total_vol = total_buy + total_sell\n  453| \n  454|         if total_vol <= 0:\n  455|             records.append(\n  456|                 {\n  457|                     \"date\": day,\n  458|                     \"signed_volume_ratio\": float(\"nan\"),\n  459|                     \"vpin\": float(\"nan\"),\n  460|                     \"order_flow_imbalance\": float(\"nan\"),\n  461|                     \"buy_volume\": 0.0,\n  462|                     \"sell_volume\": 0.0,\n  463|                     \"total_volume\": 0.0,\n  464|                 }\n  465|             )\n  466|             continue\n  467| \n  468|         signed_volume_ratio = abs(total_buy - total_sell) / total_vol\n  469|         order_flow_imbalance = (total_buy - total_sell) / total_vol\n  470|         vpin = compute_vpin(buy, sell, bucket_volume, n_buckets=n_buckets)\n   ...\n  496| def _build_sequences_df(bars_by_date: dict[date, pd.DataFrame]) -> pd.DataFrame:\n  497|     \"\"\"Build flat sequences DataFrame from per-day 10s bars.\n  498| \n  499|     Output schema (v3): [date, bar_idx, buy_vol, sell_vol, net_flow, vwap,\n  500|                          n_trades, log_ret, vol_share, buy_ratio,\n  501|                          log_n_trades, abs_ret, price_accel, rolling_vpin,\n  502|                          cum_rv, session_frac]\n  503| \n  504|     V1 columns (buy_vol, sell_vol, net_flow, vwap, n_trades) preserved for\n   ...\n  613| def _build_5min_sequences_df(\n  614|     bars_by_date: dict[date, pd.DataFrame],\n  615| ) -> pd.DataFrame:\n  616|     \"\"\"Aggregate 10-second bars into 5-minute bars with 12 enriched features.\n  617| \n  618|     Parameters\n  619|     ----------\n  620|     bars_by_date : dict[date, pd.DataFrame]\n  621|         Same format as ``_build_sequences_df`` — each value has columns\n   ...\n  768| def save_micro_cache(\n  769|     symbol: str,\n  770|     df: pd.DataFrame,\n  771|     *,\n  772|     cache_dir: Path | None = None,\n  773| ) -> Path:\n  774|     \"\"\"Persist daily micro aggregates to parquet (atomic write).\n  775| \n  776|     Merges new data with any existing cache — new rows take priority\n   ...\n  810| def save_sequences_cache(\n  811|     symbol: str,\n  812|     df: pd.DataFrame,\n  813|     *,\n  814|     sequences_dir: Path | None = None,\n  815|     bar_interval: int = 10,\n  816| ) -> Path:\n  817|     \"\"\"Persist bar sequences to parquet (atomic write).\"\"\"\n  818|     if sequences_dir is None:\n   ...\n  835| def load_micro_cache(symbol: str, *, cache_dir: Path | None = None) -> pd.DataFrame | None:\n  836|     \"\"\"Load cached daily micro aggregates (or None if missing).\"\"\"\n  837|     if cache_dir is None:\n  838|         cache_dir = micro_cache_dir()\n  839|     path = cache_dir / f\"{symbol}.parquet\"\n  840|     if not path.exists():\n  841|         return None\n  842|     return pd.read_parquet(path)\n  843| \n  844| \n  845| def load_sequences_cache(symbol: str, *, sequences_dir: Path | None = None) -> pd.DataFrame | None:\n  846|     \"\"\"Load cached 10s bar sequences (or None if missing).\"\"\"\n  847|     if sequences_dir is None:\n  848|         sequences_dir = micro_sequences_dir()\n  849|     path = sequences_dir / f\"{symbol}.parquet\"\n  850|     if not path.exists():\n  851|         return None\n  852|     return pd.read_parquet(path)\n  853| \n  854| \n  855| def cache_covers_range(\n  856|     symbol: str,\n  857|     start_date: date,\n  858|     end_date: date,\n  859|     *,\n  860|     cache_dir: Path | None = None,\n  861| ) -> bool:\n  862|     \"\"\"Check if cached daily parquet covers the requested date range.\"\"\"\n  863|     df = load_micro_cache(symbol, cache_dir=cache_dir)\n   ...\n  875| def _get_cached_dates(\n  876|     symbol: str, *, sequences_dir: Path | None = None\n  877| ) -> set[date]:\n  878|     \"\"\"Return set of dates present in the existing sequences parquet.\n  879| \n  880|     Sequences are the authoritative source for which dates have been\n  881|     ingested (daily aggregates can be recomputed from them).\n  882|     \"\"\"\n  883|     if sequences_dir is None:\n   ...\n  904| def detect_gaps(\n  905|     symbol: str,\n  906|     start_date: date,\n  907|     end_date: date,\n  908|     *,\n  909|     sequences_dir: Path | None = None,\n  910| ) -> list[date]:\n  911|     \"\"\"Return trading days missing from the sequences cache.\n  912| \n   ...\n  924| def _format_date_ranges(dates: list[date]) -> str:\n  925|     \"\"\"Format a list of dates as compact contiguous ranges for logging.\n  926| \n  927|     Example: [Jan2, Jan3, Jan4, Jan8, Jan9] → \"2024-01-02→2024-01-04, 2024-01-08→2024-01-09\"\n  928|     \"\"\"\n  929|     if not dates:\n  930|         return \"(none)\"\n  931|     sorted_dates = sorted(dates)\n  932|     ranges: list[str] = []\n   ...\n  958| def _get_staged_dates(symbol: str) -> set[date]:\n  959|     \"\"\"Return set of dates already written to staging for this symbol.\"\"\"\n  960|     staging = micro_staging_dir(symbol)\n  961|     if not staging.exists():\n  962|         return set()\n  963|     dates_found: set[date] = set()\n  964|     for f in staging.iterdir():\n  965|         if f.suffix == \".parquet\":\n  966|             try:\n   ...\n  978| def _write_staging_batch(\n  979|     symbol: str,\n  980|     batch_bars: dict[date, pd.DataFrame],\n  981| ) -> None:\n  982|     \"\"\"Write a batch of bars to the staging directory as a parquet chunk.\"\"\"\n  983|     if not batch_bars:\n  984|         return\n  985|     staging = micro_staging_dir(symbol)\n  986|     staging.mkdir(parents=True, exist_ok=True)\n   ...\n 1008| def _consolidate_staging(symbol: str, *, sequences_dir: Path | None = None) -> pd.DataFrame:\n 1009|     \"\"\"Consolidate all staging parquets into the final sequences file.\n 1010| \n 1011|     Merges staging chunks with any existing sequences parquet (preserving\n 1012|     historical data), deduplicates, writes final parquet, then removes\n 1013|     the staging directory.\n 1014| \n 1015|     Returns the consolidated DataFrame (existing + new).\n 1016|     \"\"\"\n   ...\n 1067| def ingest_symbol_micro(\n 1068|     symbol: str,\n 1069|     start_date: date,\n 1070|     end_date: date,\n 1071|     *,\n 1072|     force: bool = False,\n 1073|     recompute: bool = False,\n 1074|     fill_gaps: bool = False,\n 1075|     batch_size: int = 20,\n   ...\n 1269| def _auto_bucket_volume(bars_by_date: dict[date, pd.DataFrame]) -> int:\n 1270|     \"\"\"Auto-calibrate VPIN bucket volume from data.\n 1271| \n 1272|     Strategy: median daily volume / VPIN_N_BUCKETS.\n 1273|     This ensures ~50 buckets per typical day.\n 1274|     \"\"\"\n 1275|     daily_vols = []\n 1276|     for bars in bars_by_date.values():\n 1277|         total = bars[\"buy_vol\"].sum() + bars[\"sell_vol\"].sum()\n\n--- src/volforecast/data/rv_panel.py ---\n    1| \"\"\"RV panel builder -- ticks to Pipeline-ready daily DataFrame.\n    2| \n    3| Orchestrates: trading calendar -> batch-fetch ticks -> compute daily RV -> cache.\n    4| Output is directly compatible with Pipeline.run().\n    5| \n    6| Architecture: streaming batch pipeline.\n    7|   For each sub-batch: fetch -> compute (optionally parallel) -> checkpoint -> release.\n    8|   Peak memory is bounded to one sub-batch of tick data at a time.\n    9| \"\"\"\n   10| \n   11| from __future__ import annotations\n   12| \n   ...\n   41| def _compute_day_record(\n   42|     day: date,\n   43|     trades: pd.DataFrame,\n   44|     symbol: str,\n   45|     freq: str,\n   46|     min_ticks: int,\n   47| ) -> dict | tuple[date, str]:\n   48|     \"\"\"Compute RV measures for a single day's trades.\n   49| \n   ...\n   75| def _compute_batch_records(\n   76|     day_trades: dict[date, pd.DataFrame],\n   77|     symbol: str,\n   78|     freq: str,\n   79|     min_ticks: int,\n   80|     max_workers: int = 1,\n   81| ) -> tuple[list[dict], int, list[tuple[date, str]], float]:\n   82|     \"\"\"Compute RV records for a batch of day frames.\n   83| \n   ...\n  165| def _compute_bar_batch_records(\n  166|     day_bars: dict[date, pd.DataFrame],\n  167|     symbol: str,\n  168|     min_bars: int = 10,\n  169| ) -> tuple[list[dict], int, list[tuple[date, str]], float]:\n  170|     \"\"\"Compute RV records from pre-aggregated bars for a batch of days.\n  171| \n  172|     Parameters\n  173|     ----------\n   ...\n  226| def build_rv_panel(\n  227|     symbol: str,\n  228|     start_date: date,\n  229|     end_date: date,\n  230|     freq: str = \"5min\",\n  231|     min_ticks: int = 100,\n  232|     cache_dir: Path | None = None,\n  233|     progress=None,\n  234|     max_workers: int = 4,\n   ...\n  613| def _format_eta(seconds: float) -> str:\n  614|     \"\"\"Format seconds into a human-readable ETA string.\"\"\"\n  615|     if seconds < 60:\n  616|         return f\"{seconds:.0f}s\"\n  617|     if seconds < 3600:\n  618|         m, s = divmod(int(seconds), 60)\n  619|         return f\"{m}m{s:02d}s\"\n  620|     h, remainder = divmod(int(seconds), 3600)\n  621|     m, _ = divmod(remainder, 60)\n   ...\n  625| def _update_progress_desc(progress, sub_key: str | None, description: str) -> None:\n  626|     \"\"\"Update subtask description text without advancing.\"\"\"\n  627|     if sub_key is None or progress is None:\n  628|         return\n  629|     progress.update_subtask(sub_key, description)\n  630| \n  631| \n  632| def _save_checkpoint(\n  633|     records: list[dict],\n  634|     skipped_dates: list[tuple[date, str]],\n  635|     cached_panel: pd.DataFrame | None,\n  636|     symbol: str,\n  637|     cache_dir: Path,\n  638| ) -> None:\n  639|     \"\"\"Save partial progress to parquet cache (includes NaN sentinels for skipped days).\"\"\"\n  640|     if records:\n   ...\n  688| def load_rv_cache(symbol: str, cache_dir: Path) -> pd.DataFrame | None:\n  689|     \"\"\"Load cached RV panel from parquet.\n  690| \n  691|     Parameters\n  692|     ----------\n  693|     symbol : str\n  694|         Ticker symbol.\n  695|     cache_dir : Path\n  696|         Directory containing cache files.\n   ...\n  704|     if not path.exists():\n  705|         return None\n  706|     panel = pd.read_parquet(path)\n  707|     # Ensure index is date objects (not Timestamps)\n  708|     if hasattr(panel.index, \"date\"):\n  709|         panel.index = panel.index.date\n  710|     panel.index.name = \"date\"\n  711|     return panel\n  712| \n  713| \n  714| def save_rv_cache(panel: pd.DataFrame, symbol: str, cache_dir: Path) -> Path:\n  715|     \"\"\"Save RV panel to parquet cache.\n  716| \n  717|     Parameters\n  718|     ----------\n  719|     panel : pd.DataFrame\n  720|         RV panel to cache.\n  721|     symbol : str\n  722|         Ticker symbol (used for filename).\n  723|     cache_dir : Path\n  724|         Directory to write cache file.\n  725| \n  726|     Returns\n  727|     -------\n  728|     Path\n  729|         Path to the written parquet file.\n  730|     \"\"\"\n  731|     cache_dir = Path(cache_dir)\n  732|     cache_dir.mkdir(parents=True, exist_ok=True)\n  733|     path = cache_dir / f\"{symbol}.parquet\"\n  734|     panel.to_parquet(path)\n  735|     return path\n  736| \n  737| \n  738| def enrich_panel_with_ohlcv(\n  739|     panel: pd.DataFrame,\n  740|     symbol: str,\n  741|     start_date: date,\n  742|     end_date: date,\n  743| ) -> pd.DataFrame:\n  744|     \"\"\"Merge TSDB daily open/close prices into an RV panel.\n  745| \n  746|     Fetches daily OHLCV from TSDB and joins open/close columns onto\n\n--- src/volforecast/data/__init__.py ---\n    1| \"\"\"Data access layer for tick data, daily OHLCV, and IV surfaces.\"\"\"\n\n--- README.md ---\n    1| # ml-vol-estimator\n    2| \n    3| ML realized volatility forecasting — signal discovery. Progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to produce statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.\n    4| \n    5| **Timeline:** ~20-week internship, May–Sep 2026.\n    6| \n    7| ---\n    8| \n    9| ## Quick Start\n   10| \n   11| 1. Open `ml-vol-estimator.code-workspace` in VS Code.\n   12| 2. Boot protocol loads automatically: `memory/person/user.md` + `memory/INDEX.md`.\n   13| 3. Use `/bootup` to start a session — it reads the research journal and orients you.\n   14| 4. Drive work with slash commands: `/research`, `/feature`, `/experiment`, `/backtest`.\n   15| \n   16| See [AGENTS.md](AGENTS.md) for the full project spec, and [workspace/docs/user-manual.md](workspace/docs/user-manual.md) for all commands.\n   17| \n   18| ---\n   19| \n   20| ## CLI\n   21| \n   22| The `vol` wrapper handles uv, PATH, and working directory internally.\n   23| \n   24| ### Wrapper Commands\n   25| \n   26| ```\n   27| vol test [args]               # pytest (extra args forwarded: -k, -v, --tb=short)\n   28| vol testlf [args]             # re-run last-failed tests only\n   29| vol run --config <yaml>       # primary entry point (see below)\n   30| vol status                    # show data ingestion manifest\n   31| vol lint                      # ruff check (read-only)\n   32| vol fmt                       # ruff auto-format\n   33| vol typecheck                 # mypy\n   34| vol sync                      # install/update deps\n   35| vol shell                     # REPL with volforecast importable\n   36| vol notebook                  # jupyter\n   37| vol help                      # usage\n   38| ```\n   39| \n   40| ### Primary Command: `vol run --config <yaml>`\n   41| \n   42| Every `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).\n   43| \n   44| Optional overrides: `--symbols SPY,AAPL` (override YAML universe), `--skip-ingest` (skip data fetch), `--workers 8` (thread count).\n   45| \n   46| ### Examples\n   47| \n   48| ```bash\n   49| # Single-model experiment (ingest + train + evaluate + dashboard)\n   50| vol run --config workspace/configs/baseline_har.yaml\n   51| \n   52| # Tournament: 13 models compared with statistical tests\n   53| vol run --config workspace/configs/tournament_full_spy.yaml\n   54| \n   55| # Skip ingestion (data already cached), subset of symbols\n   56| vol run --config workspace/configs/tournament_har_dev.yaml --skip-ingest --symbols SPY,AAPL\n   57| \n   58| # Ingest only\n   59| vol run --config workspace/configs/ingest_full_universe.yaml --workers 8\n   60| \n\nTASK: Inside data\nWrite 6 to 8 sentences that take a new joiner INSIDE this\npart of the repo: what it is for in domain terms, what flows in and out,\nthe mechanism that makes it work, how you can tell it is correct, and\nanything a newcomer would not guess. Substantive facts only; never\nrestate code mechanics the reader can see in the excerpt.\nQuote from the files shown above wherever a sentence can be anchored,\nand mark honest readings 'inferred'. One inferred sentence about what\nthis part does NOT do is welcome.\n\nGROUP: data at src/volforecast/data: 21 files, 9195 loc.",
+  "windows": [
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 44,
+      "end": 52
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 56,
+      "end": 64
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 129,
+      "end": 153
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 187,
+      "end": 212
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 281,
+      "end": 289
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 361,
+      "end": 369
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 384,
+      "end": 392
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 407,
+      "end": 466
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 547,
+      "end": 555
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 674,
+      "end": 682
+    },
+    {
+      "file": "src/volforecast/data/chunk_store.py",
+      "start": 733,
+      "end": 741
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 58,
+      "end": 66
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 87,
+      "end": 95
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 127,
+      "end": 135
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 323,
+      "end": 331
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 411,
+      "end": 470
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 496,
+      "end": 504
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 613,
+      "end": 621
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 768,
+      "end": 776
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 810,
+      "end": 818
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 835,
+      "end": 863
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 875,
+      "end": 883
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 904,
+      "end": 912
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 924,
+      "end": 932
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 958,
+      "end": 966
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 978,
+      "end": 986
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 1008,
+      "end": 1016
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 1067,
+      "end": 1075
+    },
+    {
+      "file": "src/volforecast/data/micro.py",
+      "start": 1269,
+      "end": 1277
+    },
+    {
+      "file": "src/volforecast/data/rv_panel.py",
+      "start": 41,
+      "end": 49
+    },
+    {
+      "file": "src/volforecast/data/rv_panel.py",
+      "start": 75,
+      "end": 83
+    },
+    {
+      "file": "src/volforecast/data/rv_panel.py",
+      "start": 165,
+      "end": 173
+    },
+    {
+      "file": "src/volforecast/data/rv_panel.py",
+      "start": 226,
+      "end": 234
+    },
+    {
+      "file": "src/volforecast/data/rv_panel.py",
+      "start": 613,
+      "end": 621
+    },
+    {
+      "file": "src/volforecast/data/rv_panel.py",
+      "start": 625,
+      "end": 640
+    },
+    {
+      "file": "src/volforecast/data/rv_panel.py",
+      "start": 688,
+      "end": 696
+    },
+    {
+      "file": "src/volforecast/data/rv_panel.py",
+      "start": 704,
+      "end": 746
+    },
+    {
+      "file": "README.md",
+      "start": 13,
+      "end": 60
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "claims"
+    ],
+    "properties": {
+      "claims": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "status",
+            "cite"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "inferred"
+              ]
+            },
+            "cite": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "focus": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\21362d5002b22fee40b9fcd182df079d6cde0a718b5724f5cfa1cac508fb6d1c.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\21362d5002b22fee40b9fcd182df079d6cde0a718b5724f5cfa1cac508fb6d1c.json"
+}

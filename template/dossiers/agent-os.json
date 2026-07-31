@@ -1,0 +1,297 @@
+{
+  "area": "agent-os",
+  "overview": "The second half of this repo is not Python at all: it is an operating system for GitHub Copilot agents, layered on top of the volforecast package so that an agent can run the vol forecasting pipeline safely. AGENTS.md is the master contract. It declares a 5-primitive framework (Persona, Skill, Memory, Workflow, Policy), a boot protocol that loads exactly two P0 memory files (user.md and project-state.md), and a routing rule: follow the /prompt attachment, else match keywords in workflows/INDEX.md, else default to plan.md. Skills are narrow executable capabilities: skills/INDEX.md registers 48 of them, 8 for ML vol work (DATA_AUDIT, DATA_INGEST, FEATURE_BUILD, MODEL_TRAIN, EVALUATE, BACKTEST, RESEARCH, NOTEBOOK) and 40 for GS infrastructure such as Slang and SecDB editing, GitLab, Procmon, and Symphony. An agent uses a skill by writing a JSON args file into workspace/tmp/, invoking a predefined VS Code task (run_task), then reading an output file whose final line must be EXIT_CODE=0. Personas are reasoning styles with hard cannot-do bounds; five are active (VOL-RESEARCHER, EVAL-SENTINEL, TRACEHOUND, MODEL-BUILDER, BUDGETEER) and eleven former personas were inlined into workflows and deleted. Policy files enforce what no model may override: QLIKE as the primary metric, purged CV only, log-RV training space, explicit COVID regime handling, plus a subagent protocol with context packets, depth limits, model pinning, and terminal isolation. Memory follows CoALA with P0 to P3 priority tiers and token budgets (P0+P1 under 50k, P2 under 100k, at most roughly 60 percent of the context window). Workflows are keyword-dispatched state machines; research and execute are the two workhorses, and only two GS execution surfaces (Windows desktop S-A, Linux Coder S-B) are supported, with cloud runners explicitly unsupported.",
+  "modules": [
+    {
+      "path": "AGENTS.md",
+      "role": "The master agent contract every Copilot session reads first. It declares the 5-primitive framework, the boot protocol (2 P0 memory files loaded at session start), keyword routing, the non-negotiable ML constraints table, the 34-symbol data universe, the 7-layer feature plan, and the two supported execution surfaces (GS Windows desktop S-A as primary, GS Linux Coder S-B as secondary, cloud runner S-C explicitly unsupported). It also owns the policy quick-ref: skill output goes to workspace/tmp/, files there are ephemeral, and agents must delete what they create. README.md mirrors it for humans and documents the vol CLI wrapper (vol test, vol run --config, vol lint) that every ML skill ultimately drives.",
+      "key_files": [
+        { "file": "AGENTS.md", "purpose": "Master contract: framework, boot protocol, routing, ML constraints, data summary, skills roster, execution surfaces." },
+        { "file": "README.md", "purpose": "Human-facing quick start, vol CLI reference, and directory map claiming 49 skills, 18 personas, 20 workflows, and 48 slash commands." }
+      ],
+      "concepts": ["5-primitive framework", "boot protocol", "execution surfaces", "vol CLI wrapper", "QLIKE"]
+    },
+    {
+      "path": "skills/",
+      "role": "The capability layer: 48 skills registered in INDEX.md, each a UPPER_SNAKE_CASE directory whose SKILL.md declares identity, authority bounds, and procedures. Eight are ML vol skills that wrap python -m volforecast through a shared vf_entry.py adapter; the other 40 wrap GS-internal infrastructure (Slang and SecDB editing, GitLab, Procmon, Symphony, Outlook, directory lookups). Execution follows one pattern everywhere: write a JSON args file to workspace/tmp/, invoke the matching run_task label, then read an out_file whose final line must be EXIT_CODE=0; the args file path is fixed per task so concurrent agents race last-writer-wins. skills/design.md is the governing spec: skills must be stateless, must not link upward to personas or policy, and must push domain knowledge into memory/.",
+      "key_files": [
+        { "file": "INDEX.md", "purpose": "Registry of all 48 skills grouped into ML vol, Slang/SecDB, infrastructure, operations, messaging, docs, and maintenance domains." },
+        { "file": "design.md", "purpose": "Rules for the skill primitive: SKILL.md structure, statelessness, size lints, and the ban on upward links to personas or policy." },
+        { "file": "MODEL_TRAIN/SKILL.md", "purpose": "Trains HAR-family, Ridge/Lasso, LightGBM (QLIKE objective), LSTM/TCN, and ensemble models under enforced CV rules." },
+        { "file": "DATA_INGEST/SKILL.md", "purpose": "Bulk-fetches Chunk Store ticks, TSDB daily OHLCV, and the SPX-only Marquee ERDVOL IV surface into Parquet." },
+        { "file": "FEATURE_BUILD/SKILL.md", "purpose": "Computes feature layers 0-6, from HAR core and semivariances through microstructure, cross-asset, calendar, and interaction features." },
+        { "file": "EVALUATE/SKILL.md", "purpose": "Runs QLIKE/MSE, Diebold-Mariano tests, Model Confidence Set membership, tournament tables, and overfitting checks." },
+        { "file": "BACKTEST/SKILL.md", "purpose": "Turns forecasts into economic value tests: IV-RV gap straddle signal and vol-targeting portfolio P&L." }
+      ],
+      "concepts": ["skill registry", "args file", "EXIT_CODE sentinel", "run_task", "authority bounds", "last-writer-wins race"]
+    },
+    {
+      "path": "personas/",
+      "role": "The reasoning-style layer. Five personas are active, each an XML-tagged file with identity, constraints, execution loop, and output style: VOL-RESEARCHER (read-only exploration), EVAL-SENTINEL (read-only three-stage review), TRACEHOUND (read-only root-cause debugging with a 3-failure circuit breaker), MODEL-BUILDER (the only code-writing ML persona), and BUDGETEER (minimal-context executor for the lightweight workflow). INDEX.md carries a capabilities matrix with an explicit Cannot Do column plus role conflict rules, and records that eleven former personas were inlined into workflows and deleted. design.md forbids domain knowledge and tool logic inside personas and requires read-only personas to declare Write and Edit tools blocked.",
+      "key_files": [
+        { "file": "INDEX.md", "purpose": "Capabilities matrix, conflict rules, and the roster of eleven inlined-and-deleted personas." },
+        { "file": "vol-researcher.md", "purpose": "Read-only RV analyst persona embedding the data constraints (L2 for E-mini only, IV for SPX only, 34-symbol universe)." },
+        { "file": "eval-sentinel.md", "purpose": "Overfitting watchdog with staged review: protocol compliance must pass before statistical quality is assessed." },
+        { "file": "model-builder.md", "purpose": "The ML executor persona: smallest viable diff, verification required, no replanning in flight." },
+        { "file": "tracehound.md", "purpose": "Diagnosis-only debugger: reproduce, hypothesize one at a time, stop after 3 disproven hypotheses." },
+        { "file": "budgeteer.md", "purpose": "Token-frugal executor barred from persona files, P1/P2 memory, and plan artifacts." }
+      ],
+      "concepts": ["persona", "cannot-do bounds", "role conflict rules", "read-only enforcement", "circuit breaker"]
+    },
+    {
+      "path": "policy/",
+      "role": "The guardrail layer: twelve documents indexed in index.md governing interaction, execution, output, communication, and ML discipline. ml-constraints.md holds the eight non-negotiable ML rules (QLIKE primary, purged CV only, log-RV space, research-first, explicit COVID handling). subagent_protocol.md is the sole home of the context packet schema, return contract, spawn thresholds, depth limits, concurrency cap, model pinning, and the terminal isolation rules that force all compute through ./vol exec and ./vol bg. preflight-gates.md fires before anything else: load the user profile first, always run secexpr with --safe, and never hardcode kerberos IDs or database paths.",
+      "key_files": [
+        { "file": "index.md", "purpose": "Index of the twelve policy documents and what each governs." },
+        { "file": "ml-constraints.md", "purpose": "Eight non-negotiable ML vol rules with formulas, acceptable CV strategies, and the COVID regime requirement." },
+        { "file": "subagent_protocol.md", "purpose": "Context packets, return contract, depth and concurrency limits, model pinning, and terminal isolation for subagents." },
+        { "file": "preflight-gates.md", "purpose": "Mandatory pre-flight checks: user profile first, secexpr safe mode, no hardcoded identifiers." }
+      ],
+      "concepts": ["context packet", "model pinning", "terminal isolation", "preflight gates", "non-negotiable constraints"]
+    },
+    {
+      "path": "workflows/",
+      "role": "The orchestration layer: fifteen keyword-dispatched state machines registered in INDEX.md, all implementing the shared contract in _protocol.md (explicit per-phase memory loads, evidence-based exit, retry-once error rule, max nesting 2). Each workflow names its allowed persona per phase: execute runs MODEL-BUILDER through DECOMPOSE, IMPLEMENT, VERIFY with a test-first gate; research runs VOL-RESEARCHER through ORIENT, FOCUS, EXPLORE, DOCUMENT with a mandatory Hypothesis Card and a research journal update. INDEX.md also carries a skill dispatch table that routes keywords like procmon or confluence straight to a skill without any workflow.",
+      "key_files": [
+        { "file": "INDEX.md", "purpose": "Workflow registry mapping keywords to workflows and personas, plus the direct keyword-to-skill dispatch table." },
+        { "file": "_protocol.md", "purpose": "Shared entry/exit/error/composition contract and the persona quick-reference table." },
+        { "file": "execute.md", "purpose": "Implementation state machine with subagent orchestration, TEST-FIRST gate, and scope drift detection." },
+        { "file": "research.md", "purpose": "Research session state machine: hypothesis card, one topic deep, subagent slicing for multi-symbol computation." }
+      ],
+      "concepts": ["state machine", "keyword dispatch", "hypothesis card", "TEST-FIRST gate", "workflow composition"]
+    },
+    {
+      "path": "memory/",
+      "role": "The knowledge layer, following the CoALA framework: compressed, atomic, linked, actionable files organized in domain folders (meta, person, research, slang, ref, sys) plus a _dormant parking lot of 37 inactive files. INDEX.md is the master index; every row carries a priority tier, a measured token count (round(bytes/4)), a status, and a load trigger, so the agent can budget context before loading. design.md sets the governance rules: frontmatter required, balanced growth (adding content means compressing elsewhere), per-domain line caps, and P3 staleness flagging after 90 days. The research domain holds 25 distilled research cards (feature layers, evaluation framework, data access) that the ML skills cite as their knowledge base.",
+      "key_files": [
+        { "file": "INDEX.md", "purpose": "Master memory index with per-file priority, measured token counts, status, and load triggers." },
+        { "file": "design.md", "purpose": "CoALA governance: required frontmatter, distillation rules, size caps, token budgets, and staleness policy." }
+      ],
+      "concepts": ["CoALA", "P0-P3 priorities", "token budgets", "load triggers", "dormant files"]
+    }
+  ],
+  "claims": [
+    {
+      "text": "The repo layers a Copilot agent operating system over the Python package, organized as a 5-primitive framework: Persona, Skill, Memory, Workflow, and Policy.",
+      "file": "AGENTS.md",
+      "start": 1,
+      "end": 12,
+      "focus": [5],
+      "quote": "**Framework:** 5-primitive agent framework (Persona, Skill, Memory, Workflow, Policy). See [memory/INDEX.md](memory/INDEX.md) and [workflows/INDEX.md](workflows/INDEX.md)."
+    },
+    {
+      "text": "The operating layer is subagent-first: the orchestrating agent is defined as a coordinator, not a laborer, and decomposes any non-trivial task into bounded subtasks executed by subagents with fresh context.",
+      "file": "AGENTS.md",
+      "start": 11,
+      "end": 22,
+      "focus": [15],
+      "quote": "**Philosophy:** Context bloat kills agent performance. The orchestrating agent is a coordinator, not a laborer. For any non-trivial task, the orchestrator decomposes work into bounded subtasks and spawns subagents with fresh context to execute each one."
+    },
+    {
+      "text": "The stated project thesis is that enriching HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting yields statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.",
+      "file": "AGENTS.md",
+      "start": 36,
+      "end": 47,
+      "focus": [40],
+      "quote": "**Thesis:** Progressively enriching HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting produces statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal with economic value."
+    },
+    {
+      "text": "The CoALA memory system boots with exactly 2 always-loaded P0 files and caps memory at roughly 60 percent of the context window, reserving 40 percent for conversation.",
+      "file": "AGENTS.md",
+      "start": 127,
+      "end": 136,
+      "focus": [129, 132],
+      "quote": "- **Boot = 2 P0 files** (see Boot Protocol above).\n- Max ~60% of context window for memory; reserve 40% for conversation."
+    },
+    {
+      "text": "Memory files carry a four-tier priority scheme: P0 is always loaded at boot, P1 loads on demand per task type, P2 loads only on specific query, and P3 is archive-tier reference.",
+      "file": "memory/INDEX.md",
+      "start": 1,
+      "end": 12,
+      "focus": [5],
+      "quote": "**Priority:** P0 = always loaded at boot · P1 = loaded on demand per task type · P2 = loaded only on specific query · P3 = archive-tier reference"
+    },
+    {
+      "text": "Memory is governed like code: every memory file must be registered in INDEX.md with priority, token estimate, and load trigger in the same changeset, and P3 archive files are auto-flagged stale after 90 days without update.",
+      "file": "memory/design.md",
+      "start": 39,
+      "end": 50,
+      "focus": [41, 50],
+      "quote": "1. Every memory file must be listed in `INDEX.md` (priority, ~tokens, load trigger) in the same changeset it's added.\n10. Staleness: P3 files auto-flagged `stale` after 90 days without update. Quarterly review recommended."
+    },
+    {
+      "text": "Every skill's SKILL.md must declare a Skill Identity table with Name, Scope, Inputs, Outputs, and Authority, and a size lint warns at 250 lines and errors at 400 to force knowledge out of skills and into memory.",
+      "file": "skills/design.md",
+      "start": 42,
+      "end": 53,
+      "focus": [46, 49],
+      "quote": "3. `SKILL.md` must include a Skill Identity table (Name, Scope, Inputs, Outputs, Authority).\n6. `SKILL.md` files ≥250 lines trigger a WARN; ≥400 lines is an ERROR → extract to memory."
+    },
+    {
+      "text": "The MODEL_TRAIN skill hard-codes the vol forecasting discipline: random k-fold is banned in favor of purged or expanding-window CV because it causes look-ahead bias, and all training targets are log realized variance, exponentiated only for final reporting.",
+      "file": "skills/MODEL_TRAIN/SKILL.md",
+      "start": 37,
+      "end": 46,
+      "focus": [41, 42],
+      "quote": "1. **Never random k-fold.** Always purged/blocked k-fold or expanding-window walk-forward. Random k-fold causes catastrophic look-ahead bias on time-series data.\n2. **Train in log-RV space.** All targets are $\\log(RV)$. Predictions are exponentiated only for final reporting."
+    },
+    {
+      "text": "The EVALUATE skill defines QLIKE as the primary metric via the formula QLIKE equals the mean of RV over forecast variance minus its log minus 1, an asymmetric loss that penalizes underestimating volatility more than overestimating it.",
+      "file": "skills/EVALUATE/SKILL.md",
+      "start": 74,
+      "end": 85,
+      "focus": [78, 80],
+      "quote": "$$QLIKE = \\frac{1}{T} \\sum_{t=1}^{T} \\left( \\frac{RV_t}{\\hat{\\sigma}_t^2} - \\log\\frac{RV_t}{\\hat{\\sigma}_t^2} - 1 \\right)$$\n- Penalizes underestimation more than overestimation (asymmetric)"
+    },
+    {
+      "text": "Model comparison uses Diebold-Mariano pairwise tests of equal predictive accuracy plus the Hansen et al. 2011 Model Confidence Set, which identifies the set of models whose performance is statistically indistinguishable.",
+      "file": "skills/EVALUATE/SKILL.md",
+      "start": 99,
+      "end": 112,
+      "focus": [101, 108, 109],
+      "quote": "- Pairwise test for equal predictive accuracy\n- Hansen et al. (2011) procedure\n- Identifies the set of models with statistically indistinguishable performance"
+    },
+    {
+      "text": "The BACKTEST skill trades the IV-RV gap: when implied vol exceeds the predicted next-day RV the signal sells vol via short straddles, and when implied vol is below it the signal buys vol, with position size proportional to the gap.",
+      "file": "skills/BACKTEST/SKILL.md",
+      "start": 92,
+      "end": 103,
+      "focus": [97, 98],
+      "quote": "- If $IV_t > \\hat{RV}_{t+1}$: implied vol is \"rich\" → sell vol (short straddle/strangle)\n- If $IV_t < \\hat{RV}_{t+1}$: implied vol is \"cheap\" → buy vol (long straddle/strangle)"
+    },
+    {
+      "text": "Data ingestion pulls from three GS-internal sources: Chunk Store tick data via pytickclient, TSDB daily OHLCV, and the Marquee ERDVOL_PERCENT_STANDARD implied vol surface, which is available for SPX only.",
+      "file": "skills/DATA_INGEST/SKILL.md",
+      "start": 77,
+      "end": 98,
+      "focus": [79, 93, 94],
+      "quote": "- **Source:** Chunk Store via `pytickclient`\n- **Source:** Marquee API `ERDVOL_PERCENT_STANDARD`\n- **Limitation:** SPX only"
+    },
+    {
+      "text": "The subagent protocol names context isolation as the primary reason to spawn: even sequential tasks are delegated so the orchestrator stays thin while subagents do the heavy file reads, code writes, and computations on fresh context.",
+      "file": "policy/subagent_protocol.md",
+      "start": 3,
+      "end": 12,
+      "focus": [10],
+      "quote": "**Context isolation is the primary reason for spawning.** Even sequential tasks get subagents if they'd bloat the orchestrator's context. The orchestrator stays thin: plan, coordinate, verify. Subagents do heavy lifting (file reads, code writes, computations) on fresh context."
+    },
+    {
+      "text": "Subagent recursion is bounded: standard workflows allow depth 1 with no further spawning, only the team workflow allows depth 2, and at most 6 subagents may run concurrently.",
+      "file": "policy/subagent_protocol.md",
+      "start": 79,
+      "end": 88,
+      "focus": [81, 87],
+      "quote": "- Workflows (/plan, /execute, /research, /refactor): max subagent depth = 1. Subagents do NOT spawn further subagents.\nMax 6 concurrent subagents. Full orchestration rules: workflows/team.md."
+    },
+    {
+      "text": "Long-running compute like data ingestion and model training must go through ./vol bg, with completion detected by polling an output file for an EXIT_CODE sentinel line, and every subagent must kill its background terminals before returning or it is counted as failed.",
+      "file": "policy/subagent_protocol.md",
+      "start": 99,
+      "end": 108,
+      "focus": [105, 106],
+      "quote": "5. **Use `./vol bg` for long-running jobs** (data ingestion, model training, anything >30s). It returns immediately. Poll the OUTPUT_FILE for the `EXIT_CODE=` sentinel line. Check `./vol jobs` for status.\n6. **Kill your terminals before returning (EXIT GATE).** Before sending your final response, you MUST call `kill_terminal(id=<terminal_id>)` for every background terminal you spawned. This is not optional. A subagent that returns without killing its terminals is FAILED."
+    },
+    {
+      "text": "Policy bans random splits at the API level: sklearn KFold with shuffle=True is named as never acceptable on time-indexed data, and purged k-fold must use a purge window at least as long as the forecast horizon.",
+      "file": "policy/ml-constraints.md",
+      "start": 7,
+      "end": 18,
+      "focus": [12, 16],
+      "quote": "- Purged k-fold with gap parameter (purge window ≥ forecast horizon)\n**Never acceptable:** `sklearn.model_selection.KFold(shuffle=True)` or any random split on time-indexed data."
+    },
+    {
+      "text": "All models train on log realized variance because the log transform gaussianizes the heavy-tailed RV distribution and stabilizes variance; predictions are exponentiated only for final evaluation and reporting.",
+      "file": "policy/ml-constraints.md",
+      "start": 74,
+      "end": 85,
+      "focus": [78],
+      "quote": "Log transform gaussianizes the RV distribution and stabilizes variance. All models operate on $\\log(\\text{RV})$; predictions are exponentiated only for final evaluation and reporting."
+    },
+    {
+      "text": "The five active personas each carry an explicit cannot-do bound: VOL-RESEARCHER explores features and literature but may write no code, while BUDGETEER executes with minimal context and is barred from P1/P2 memory loads, persona swaps, and plan artifacts.",
+      "file": "personas/INDEX.md",
+      "start": 3,
+      "end": 14,
+      "focus": [7, 11],
+      "quote": "| [VOL-RESEARCHER](vol-researcher.md) | RV Analyst & Data Access | Feature exploration, empirical findings, QLIKE relevance, literature synthesis, data source analysis | No code, no model training, no data pipeline engineering |\n| [BUDGETEER](budgeteer.md) | Budget Executor | Minimal-context implementation, terse reports | No P1/P2 memory loads, no persona swaps, no plan artifacts |"
+    },
+    {
+      "text": "EVAL-SENTINEL is a read-only overfitting watchdog with its Write and Edit tools blocked; it can never approve results carrying CRITICAL or HIGH severity issues, and its protocol compliance stage must pass before statistical quality is even assessed.",
+      "file": "personas/eval-sentinel.md",
+      "start": 12,
+      "end": 23,
+      "focus": [13, 14, 15],
+      "quote": "- Read-only: Write and Edit tools are blocked.\n- Never approve results with CRITICAL or HIGH severity issues.\n- Stage 1 (Protocol Compliance) MUST pass before Stage 2 (Statistical Quality)."
+    },
+    {
+      "text": "The research workflow requires a mandatory Hypothesis Card before any data exploration begins, stating the question, feature layer, data needed, method, success criterion, null hypothesis, and pitfalls.",
+      "file": "workflows/research.md",
+      "start": 51,
+      "end": 64,
+      "focus": [56],
+      "quote": "6. Present the **Hypothesis Card** (mandatory before moving to EXPLORE):"
+    }
+  ],
+  "glossary": [
+    { "term": "QLIKE", "definition": "Quasi-likelihood loss, the project's primary evaluation metric; it penalizes underestimating volatility more than overestimating it and is robust to noise in the RV proxy.", "file": "policy/ml-constraints.md", "line": 22 },
+    { "term": "CoALA", "definition": "The cognitive-architecture framework this repo's memory follows: knowledge is kept compressed, atomic, linked, and actionable, persisted across agent sessions.", "file": "memory/design.md", "line": 9 },
+    { "term": "Persona", "definition": "A reasoning style and set of behavioral defaults for one role, such as read-only diagnosis; personas define how the agent thinks, never what it knows or executes.", "file": "personas/design.md", "line": 9 },
+    { "term": "Skill", "definition": "A narrow executable capability wrapping one tool or API with declared inputs, outputs, and authority bounds; 48 are registered in the skills index.", "file": "skills/design.md", "line": 9 },
+    { "term": "Workflow", "definition": "An orchestration state machine with explicit phase transitions and per-phase memory loads; workflows own the how-to-run, never domain knowledge.", "file": "workflows/_protocol.md", "line": 61 },
+    { "term": "Context packet", "definition": "The structured YAML brief given to every spawned subagent: goal, file scope, write scope, acceptance criteria, memory refs, constraints, and dependencies.", "file": "policy/subagent_protocol.md", "line": 33 },
+    { "term": "Model pinning", "definition": "A hard rule that all subagents run on a pinned model (Claude Opus 4.6 in this repo); spawning on a weaker model is forbidden.", "file": "policy/subagent_protocol.md", "line": 12 },
+    { "term": "IV-RV gap", "definition": "The spread between options-implied volatility and the model's predicted realized volatility; its sign and size drive the sell-vol or buy-vol trading signal in BACKTEST.", "file": "skills/BACKTEST/SKILL.md", "line": 94 },
+    { "term": "Purged k-fold", "definition": "Time-aware cross-validation that removes a gap of days between train and test folds so future information cannot leak across the boundary.", "file": "policy/ml-constraints.md", "line": 12 },
+    { "term": "P0-P3 priorities", "definition": "The four memory tiers: P0 always loads at boot, P1 loads per task type, P2 loads on specific query, and P3 is archive reference with per-file caps only.", "file": "memory/INDEX.md", "line": 5 },
+    { "term": "Diebold-Mariano test", "definition": "A pairwise statistical test of equal predictive accuracy between two forecast models, run here on QLIKE loss differentials with HAC standard errors.", "file": "skills/EVALUATE/SKILL.md", "line": 99 },
+    { "term": "Model Confidence Set", "definition": "The Hansen et al. 2011 procedure that identifies the subset of models whose performance cannot be statistically distinguished from the best.", "file": "skills/EVALUATE/SKILL.md", "line": 106 },
+    { "term": "HAR", "definition": "Heterogeneous Autoregressive model: regresses next-day log RV on daily, weekly, and monthly lagged RV averages; it is the baseline family the ML models must beat.", "file": "skills/MODEL_TRAIN/SKILL.md", "line": 93 },
+    { "term": "EXIT_CODE sentinel", "definition": "The convention that every skill run writes captured stdout and stderr to an out_file whose final line is EXIT_CODE=<rc>; a run succeeded iff that line reads EXIT_CODE=0.", "file": "skills/MODEL_TRAIN/SKILL.md", "line": 78 }
+  ],
+  "checkpoints": [
+    {
+      "kind": "single",
+      "prompt": "In EVAL-SENTINEL's review, which stage must pass before Stage 2 (Statistical Quality) is even assessed?",
+      "options": ["Stage 1 (Protocol Compliance)", "Stage 3 (Overfitting Detection)", "The Diebold-Mariano stage", "The COVID regime stage"],
+      "answer": 0,
+      "provenance": "personas/eval-sentinel.md:15",
+      "explanation": "The persona's constraints state that Stage 1 (Protocol Compliance) MUST pass before Stage 2 (Statistical Quality); protocol violations are CRITICAL and block approval outright."
+    },
+    {
+      "kind": "single",
+      "prompt": "What is the maximum number of concurrent subagents the subagent protocol allows?",
+      "options": ["3", "6", "10", "Unlimited"],
+      "answer": 1,
+      "provenance": "policy/subagent_protocol.md:87",
+      "explanation": "The Concurrency section states a hard cap: max 6 concurrent subagents, with full orchestration rules in workflows/team.md."
+    },
+    {
+      "kind": "order",
+      "prompt": "Order the research workflow's states as they execute.",
+      "options": ["ORIENT", "FOCUS", "EXPLORE", "DOCUMENT"],
+      "answer": 0,
+      "provenance": "workflows/research.md:19",
+      "explanation": "The state machine diagram reads ORIENT then FOCUS then EXPLORE then DOCUMENT then DONE: orient on the journal, write the hypothesis card, explore on real data, then document findings."
+    },
+    {
+      "kind": "single",
+      "prompt": "Which cross-validation method does policy name as never acceptable on this project's time-series data?",
+      "options": ["Expanding-window walk-forward", "Purged k-fold with a gap parameter", "sklearn KFold with shuffle=True", "Blocked k-fold"],
+      "answer": 2,
+      "provenance": "policy/ml-constraints.md:16",
+      "explanation": "ml-constraints.md names sklearn.model_selection.KFold(shuffle=True), or any random split on time-indexed data, as never acceptable; the other three are the sanctioned strategies."
+    },
+    {
+      "kind": "single",
+      "prompt": "How many P0 memory files does the boot protocol load at session start?",
+      "options": ["2", "5", "12", "Every P0 and P1 file"],
+      "answer": 0,
+      "provenance": "AGENTS.md:129",
+      "explanation": "AGENTS.md states Boot = 2 P0 files: memory/person/user.md and memory/research/project-state.md; everything else loads on demand via the INDEX.md lookup tables."
+    }
+  ],
+  "confirmed_missing": [
+    "No missing files found among cross-references checked: .github/copilot-instructions.md, workspace/design.md, memory/INDEX.md, memory/person/user.md, memory/research/project-state.md, policy/context-isolation.md, and workflows/team.md all exist on disk.",
+    "Count drift (files present but doc counts stale, not missing): README.md:131 claims 49 skills but skills/INDEX.md registers 48 (the 49th directory is the _shared helper, not a skill); README.md:130 claims 18 personas but only 5 active persona files exist (11 were inlined and deleted per personas/INDEX.md:25); README.md:134 claims 48 slash commands but .github/prompts/ contains 34 files; README.md:133 claims 20 workflows but workflows/INDEX.md registers 15."
+  ]
+}

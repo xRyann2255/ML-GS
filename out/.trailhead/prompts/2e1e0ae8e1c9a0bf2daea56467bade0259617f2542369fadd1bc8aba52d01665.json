@@ -1,0 +1,138 @@
+{
+  "unit": "node:src-volforecast-reporting",
+  "kind": "node",
+  "title": "Drawer: reporting",
+  "max_claims": 1,
+  "key": "2e1e0ae8e1c9a0bf2daea56467bade0259617f2542369fadd1bc8aba52d01665",
+  "system": "You are the narration stage of Trailhead, a tool that generates a verified walkthrough of an unfamiliar Python repository for a new joiner.\n\nEverything you write is checked afterwards by ordinary deterministic code. Any\nquote you return is searched for verbatim in the file on disk; anything not\nfound exactly is deleted and counted on screen. Fields that fail their checks\nare dropped, and a malformed answer is discarded whole, so answer the schema\nexactly.\n\nRules, all enforced in code after you answer:\n\n1. Reply with JSON matching the schema and nothing else. An unknown key\n   anywhere discards the whole answer.\n2. NEVER return a line number. The gutter (`  123| `) is orientation for you\n   only. It is not part of any line and must not appear inside a quote.\n3. Where the schema allows a `cite`, its `quote` is a VERBATIM, CONTIGUOUS copy\n   of 3-24 lines from ONE file shown below, lines joined with newlines,\n   indentation copied exactly. `focus` is an array of exact substrings of your\n   own quote. A cite is optional: omitting one is honest, inventing one is not.\n4. Prose fields are plain sentences. Backticks may mark code identifiers and\n   [[term]] or [[id|label]] may mark a glossary term. No newlines inside a\n   field, no markdown links, no `<`. Use commas instead of dashes.\n5. State substantive domain facts: what a thing is FOR, what flows through it,\n   what would surprise a newcomer. Never restate code mechanics the reader can\n   see, and never present argument parsing or CLI wiring as a purpose. When the\n   README or a package docstring states the purpose, that purpose is the story.\n6. Write for someone who has never opened this repo. Name real symbols and real\n   paths. Never say \"appears to\", say what it is.\n",
+  "user": "FACTS (from survey.json, deterministic). Rely on these; never quote them.\nrepo: volforecast @ 5248556\nsize: 1062 files, 455 python files, 96897 loc, 364 modules\nimport roots: src\ndeclared packages: volforecast\ntest roots: src/tests\nexternal dependencies: dateutil, generate, goldmansachs, gs_quant, gs_quant_internal, joblib, leverage_attribution, lightgbm, numpy, optuna, pandas, plotly\nmodules (largest first, fan-in = how many modules import it):\n  tests.unit: 158 files, 44871 loc, fan-in 0\n  volforecast.models: 22 files, 9802 loc, fan-in 6\n  volforecast.data: 21 files, 9195 loc, fan-in 8\n  volforecast.cli: 28 files, 7342 loc, fan-in 3\n  volforecast.evaluation: 14 files, 7031 loc, fan-in 8\n  tests.integration: 20 files, 5283 loc, fan-in 0\n  volforecast.features: 18 files, 3110 loc, fan-in 5\n  volforecast.utils: 7 files, 1552 loc, fan-in 10\n  tests: 8 files, 1534 loc, fan-in 2\n  tests.unit.formulas: 15 files, 1327 loc, fan-in 0\nentry points:\n  console_script: volforecast -> volforecast.__main__:main (in src/pyproject.toml)\n  module_main: python -m volforecast -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/evaluation/economic_value.py -> volforecast.evaluation.economic_value (in src/volforecast/evaluation/economic_value.py)\n  main_guard: src/volforecast/__main__.py -> volforecast.__main__ (in src/volforecast/__main__.py)\n  main_guard: src/volforecast/cli/audit.py -> volforecast.cli.audit (in src/volforecast/cli/audit.py)\n  main_guard: src/volforecast/cli/backfill_rk.py -> volforecast.cli.backfill_rk (in src/volforecast/cli/backfill_rk.py)\ndangling imports: 14 module name(s) imported by this repo have no file on disk, across 706 import statements: volforecast.config, volforecast.data.edrvol, volforecast.pipeline.runner, volforecast.models.har_family, volforecast.constants\ngit history: available; files are ranked by commit count\n\nSOURCE (line numbers are a gutter, not part of any line; never quote them)\n\n--- src/volforecast/reporting/html_report.py ---\n    1| \"\"\"Main report orchestrator: loads experiment artifacts and assembles HTML.\n    2| \n    3| See workspace/plans/html-report.md for the full implementation plan.\n    4| \"\"\"\n    5| \n    6| from __future__ import annotations\n    7| \n    8| from pathlib import Path\n    9| \n   10| from volforecast.config import ExperimentConfig\n   11| \n   12| \n   13| def generate_report(\n   14|     config: ExperimentConfig,\n   15|     output_path: Path | None = None,\n   16| ) -> Path:\n   17|     \"\"\"Generate an interactive HTML report for a completed experiment.\n   18| \n   19|     Loads metrics, predictions, and config from the experiment output directory,\n   20|     renders each report section, and assembles the final HTML file.\n   21| \n   22|     Parameters\n   23|     ----------\n   24|     config : ExperimentConfig\n   25|         The experiment configuration (used to locate saved artifacts).\n   26|     output_path : Path, optional\n   27|         Override output path. Defaults to ``{experiment_dir}/report.html``.\n   28| \n   29|     Returns\n   30|     -------\n   31|     Path\n   32|         Absolute path to the generated ``.html`` report file.\n   33|     \"\"\"\n   34|     # TODO: implement — full plan in workspace/plans/html-report.md\n   35|     #\n   36|     # Implementation steps:\n   37|     # 1. Load metrics via persistence.load_all_metrics(config)\n   38|     # 2. Load predictions via persistence.load_predictions(config, symbol, horizon)\n   39|     #    for each symbol/horizon combination\n   40|     # 3. Load config snapshot from experiment_dir(config) / \"config.yaml\"\n   41|     # 4. Call each section renderer from reporting.sections (summary, forecast_vs_actual,\n   42|     #    qlike_analysis, statistical_tests, economic_value, diagnostics)\n   43|     # 5. Render base.html Jinja2 template with all section HTML fragments\n   44|     # 6. Write assembled HTML to output_path\n   45|     # 7. Return output_path\n   46|     raise NotImplementedError(\"TODO: implement report generation\")\n\n--- src/volforecast/reporting/sections/economic_value.py ---\n    1| \"\"\"Economic value section: IV-RV gap signal, P&L curves, Sharpe.\n    2| \n    3| Renders realistic delta-hedged straddle metrics using the Phase 1\n    4| analytic engine (tenor-decayed gamma, vanna/volga, cost bands, DSR).\n    5| Gracefully handles missing IV data by rendering a placeholder message.\n    6| \"\"\"\n    7| \n    8| from __future__ import annotations\n    9| \n   10| import numpy as np\n   11| import pandas as pd\n   12| \n   13| \n   14| def render(\n   15|     predictions: dict[str, dict[int, pd.DataFrame]],\n   16|     market_data: pd.DataFrame | None = None,\n   17| ) -> str:\n   18|     \"\"\"Render the economic value section as an HTML fragment.\n   19| \n   20|     Parameters\n   21|     ----------\n   22|     predictions : dict\n   23|         ``{symbol: {horizon: DataFrame}}`` with ``prediction`` column.\n   24|     market_data : pd.DataFrame, optional\n   25|         Daily market data with columns: iv_1m_atm (%), close, log_rv,\n   26|         and optionally 'symbol' for multi-symbol data.\n   27|         If None, section renders a placeholder.\n   28| \n   29|     Returns\n   30|     -------\n   31|     str\n   32|         HTML ``<section>`` block with delta-hedged straddle metrics,\n   33|         cost band table, and cumulative P&L summary.\n   34|     \"\"\"\n   35|     if market_data is None:\n   36|         return (\n   37|             '<section id=\"economic-value\">\\n'\n   38|             \"<h2>Economic Value</h2>\\n\"\n   39|             '<p class=\"placeholder\">Market data (IV, spot) not available. '\n   40|             \"Economic value tests require iv_1m_atm and close columns.</p>\\n\"\n   41|             \"</section>\"\n   42|         )\n   43| \n   44|     from volforecast.evaluation.realistic_straddle import (\n   45|         realistic_delta_hedged_sharpe,\n   46|     )\n   47| \n   48|     rows: list[dict] = []\n   49| \n   50|     for symbol, horizons in predictions.items():\n   51|         # Filter market_data for this symbol\n   52|         if \"symbol\" in market_data.columns:\n   53|             sym_md = market_data[market_data[\"symbol\"] == symbol]\n   54|         else:\n   55|             sym_md = market_data\n   56| \n   57|         if sym_md.empty:\n   58|             continue\n   59| \n   60|         # Need iv_1m_atm and close columns\n   61|         if \"iv_1m_atm\" not in sym_md.columns or \"close\" not in sym_md.columns:\n   62|             continue\n   63| \n   ...\n  159| def _render_metrics_table(rows: list[dict]) -> str:\n  160|     \"\"\"Render the main metrics summary table.\"\"\"\n  161|     lines = [\n  162|         \"<h3>Sharpe Ratios &amp; P&amp;L</h3>\",\n  163|         \"<table>\",\n  164|         \"<thead><tr>\",\n  165|         \"<th>Symbol</th><th>h</th><th>Sharpe (raw)</th>\",\n  166|         \"<th>Sharpe (adj)</th><th>DSR</th>\",\n  167|         \"<th>95% CI</th><th>Cum P&amp;L (%)</th>\",\n   ...\n  190| def _render_cost_band_table(rows: list[dict]) -> str:\n  191|     \"\"\"Render cost band sensitivity table.\"\"\"\n  192|     lines = [\n  193|         \"<h3>Cost Band Sensitivity (Sharpe)</h3>\",\n  194|         \"<p>Base option spread: timing-aware=0.5, effective=1.0, quoted=1.5 vol pts.</p>\",\n  195|         \"<table>\",\n  196|         \"<thead><tr>\",\n  197|         \"<th>Symbol</th><th>h</th>\",\n  198|         \"<th>Timing-Aware</th><th>Effective</th><th>Quoted</th>\",\n\n--- src/volforecast/reporting/sections/forecast_vs_actual.py ---\n    1| \"\"\"Forecast vs Actual section: THE MAIN CHART.\n    2| \n    3| Interactive time-series plot of predicted log-RV vs realized log-RV\n    4| with horizon/symbol selectors and COVID period highlighting.\n    5| \"\"\"\n    6| \n    7| from __future__ import annotations\n    8| \n    9| import pandas as pd\n   10| \n   11| \n   12| def render(\n   13|     predictions: dict[str, dict[int, pd.DataFrame]],\n   14|     actuals: dict[str, pd.Series] | None = None,\n   15| ) -> str:\n   16|     \"\"\"Render the forecast-vs-actual section as an HTML fragment.\n   17| \n   18|     Parameters\n   19|     ----------\n   20|     predictions : dict\n   21|         Nested dict: ``{symbol: {horizon: DataFrame}}``.\n   22|         Each DataFrame has a ``prediction`` column and DatetimeIndex.\n   23|     actuals : dict, optional\n   24|         ``{symbol: Series}`` of actual log-RV values. If None, actuals are\n   25|         loaded from the RV panel.\n   26| \n   27|     Returns\n   28|     -------\n   29|     str\n   30|         HTML ``<section>`` block containing:\n   31|         - Plotly time-series chart: predicted vs actual log-RV\n   32|         - Dropdown to switch between horizons (h=1, h=5, h=22)\n   33|         - Dropdown to switch between symbols\n   34|         - COVID period shading (Feb-Jun 2020)\n   35|         - Hover tooltips: date, predicted, actual, error\n   36|         - Range slider for date navigation\n   37|     \"\"\"\n   38|     # TODO: implement — see workspace/plans/html-report.md § Section 5\n   39|     #\n   40|     # Implementation notes:\n   41|     # - Use plotly.graph_objects.Scatter for each trace\n   42|     # - Use updatemenus for horizon/symbol dropdowns\n   43|     # - Add vrect shape for COVID period (constants.COVID_START to constants.COVID_END)\n   44|     # - Call plotly.io.to_html(fig, include_plotlyjs=False, full_html=False) for fragment\n   45|     raise NotImplementedError(\"TODO: implement forecast vs actual chart\")\n\n--- src/volforecast/reporting/sections/statistical_tests.py ---\n    1| \"\"\"Statistical tests section: DM test, MCS membership, Mincer-Zarnowitz.\n    2| \n    3| Gracefully handles NotImplementedError from statistical_tests.py stubs\n    4| by rendering a placeholder message.\n    5| \"\"\"\n    6| \n    7| from __future__ import annotations\n    8| \n    9| import pandas as pd\n   10| \n   11| \n   12| def render(\n   13|     predictions: dict[str, dict[int, pd.DataFrame]],\n   14|     baseline_predictions: dict[str, dict[int, pd.DataFrame]] | None = None,\n   15| ) -> str:\n   16|     \"\"\"Render the statistical tests section as an HTML fragment.\n   17| \n   18|     Parameters\n   19|     ----------\n   20|     predictions : dict\n   21|         ``{symbol: {horizon: DataFrame}}`` with ``prediction`` column.\n   22|     baseline_predictions : dict, optional\n   23|         Baseline model predictions for DM test comparison.\n   24| \n   25|     Returns\n   26|     -------\n   27|     str\n   28|         HTML ``<section>`` block containing:\n   29|         - Diebold-Mariano test results table (statistic, p-value, significance)\n   30|         - Model Confidence Set membership table\n   31|         - Mincer-Zarnowitz regression (alpha, beta, R², joint test p-value)\n   32|         - p-value dot plot for DM tests\n   33|         - Placeholder message if underlying tests are not yet implemented\n   34|     \"\"\"\n   35|     # TODO: implement — see workspace/plans/html-report.md § Section 7\n   36|     # Note: wrap calls to volforecast.evaluation.statistical_tests in try/except\n   37|     # NotImplementedError to show \"Statistical tests not yet implemented\" placeholder\n   38|     raise NotImplementedError(\"TODO: implement statistical tests section\")\n\n--- src/volforecast/reporting/__init__.py ---\n    1| \"\"\"Interactive HTML experiment reporting.\n    2| \n    3| Generates self-contained HTML reports with Plotly charts for each experiment.\n    4| \"\"\"\n    5| \n    6| from volforecast.reporting.html_report import generate_report\n    7| \n    8| __all__ = [\"generate_report\"]\n\n--- README.md ---\n    1| # ml-vol-estimator\n    2| \n    3| ML realized volatility forecasting — signal discovery. Progressively enriches HAR-family baselines with microstructure, options-implied, and cross-asset features via gradient boosting to produce statistically significant QLIKE improvements that translate into a tradeable IV-RV gap signal.\n    4| \n    5| **Timeline:** ~20-week internship, May–Sep 2026.\n    6| \n    7| ---\n    8| \n    9| ## Quick Start\n   10| \n   11| 1. Open `ml-vol-estimator.code-workspace` in VS Code.\n   12| 2. Boot protocol loads automatically: `memory/person/user.md` + `memory/INDEX.md`.\n   13| 3. Use `/bootup` to start a session — it reads the research journal and orients you.\n   14| 4. Drive work with slash commands: `/research`, `/feature`, `/experiment`, `/backtest`.\n   15| \n   16| See [AGENTS.md](AGENTS.md) for the full project spec, and [workspace/docs/user-manual.md](workspace/docs/user-manual.md) for all commands.\n   17| \n   18| ---\n   19| \n   20| ## CLI\n   21| \n   22| The `vol` wrapper handles uv, PATH, and working directory internally.\n   23| \n   24| ### Wrapper Commands\n   25| \n   26| ```\n   27| vol test [args]               # pytest (extra args forwarded: -k, -v, --tb=short)\n   28| vol testlf [args]             # re-run last-failed tests only\n   29| vol run --config <yaml>       # primary entry point (see below)\n   30| vol status                    # show data ingestion manifest\n   31| vol lint                      # ruff check (read-only)\n   32| vol fmt                       # ruff auto-format\n   33| vol typecheck                 # mypy\n   34| vol sync                      # install/update deps\n   35| vol shell                     # REPL with volforecast importable\n   36| vol notebook                  # jupyter\n   37| vol help                      # usage\n   38| ```\n   39| \n   40| ### Primary Command: `vol run --config <yaml>`\n   41| \n   42| Every `vol run --config` invocation uses the tournament code path — even single-model configs produce ranked tables and an interactive Plotly HTML dashboard. The only special case is `mode: ingest` (data ingestion only).\n   43| \n   44| Optional overrides: `--symbols SPY,AAPL` (override YAML universe), `--skip-ingest` (skip data fetch), `--workers 8` (thread count).\n   45| \n   46| ### Examples\n   47| \n   48| ```bash\n   49| # Single-model experiment (ingest + train + evaluate + dashboard)\n   50| vol run --config workspace/configs/baseline_har.yaml\n   51| \n   52| # Tournament: 13 models compared with statistical tests\n   53| vol run --config workspace/configs/tournament_full_spy.yaml\n   54| \n   55| # Skip ingestion (data already cached), subset of symbols\n   56| vol run --config workspace/configs/tournament_har_dev.yaml --skip-ingest --symbols SPY,AAPL\n   57| \n   58| # Ingest only\n   59| vol run --config workspace/configs/ingest_full_universe.yaml --workers 8\n   60| \n\nTASK: Drawer: reporting\nFill the drawer for this module group. Return a JSON object with:\n  role: 2 or 3 short paragraphs saying what this group IS and DOES in\n        domain terms, and what is distinctive about how it does it.\n  reads: one sentence, what this group consumes and where it comes from.\n  feeds: one sentence, what depends on this group's output.\n  key_files: 3 to 6 entries; 'file' is copied exactly from the FILES\n        list below and 'purpose' is one line saying why a newcomer\n        would open that file.\n  concepts: 3 to 6 short terms a newcomer should recognise here.\n  cite (optional): one verbatim quote of 3-24 contiguous lines from\n        the source shown above that best captures this group, with an\n        optional one-line caption.\n\nGROUP: reporting at src/volforecast/reporting: 9 files, 461 loc.\nFILES you may name in key_files (copy the name exactly):\n  - html_report.py (src/volforecast/reporting/html_report.py)\n  - economic_value.py (src/volforecast/reporting/sections/economic_value.py)\n  - forecast_vs_actual.py (src/volforecast/reporting/sections/forecast_vs_actual.py)\n  - statistical_tests.py (src/volforecast/reporting/sections/statistical_tests.py)\n  - __init__.py (src/volforecast/reporting/__init__.py)",
+  "windows": [
+    {
+      "file": "src/volforecast/reporting/html_report.py",
+      "start": 13,
+      "end": 46
+    },
+    {
+      "file": "src/volforecast/reporting/sections/economic_value.py",
+      "start": 13,
+      "end": 63
+    },
+    {
+      "file": "src/volforecast/reporting/sections/economic_value.py",
+      "start": 159,
+      "end": 167
+    },
+    {
+      "file": "src/volforecast/reporting/sections/economic_value.py",
+      "start": 190,
+      "end": 198
+    },
+    {
+      "file": "src/volforecast/reporting/sections/forecast_vs_actual.py",
+      "start": 13,
+      "end": 45
+    },
+    {
+      "file": "src/volforecast/reporting/sections/statistical_tests.py",
+      "start": 13,
+      "end": 38
+    },
+    {
+      "file": "README.md",
+      "start": 13,
+      "end": 60
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "role",
+      "reads",
+      "feeds",
+      "key_files",
+      "concepts"
+    ],
+    "properties": {
+      "role": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 3,
+        "items": {
+          "type": "string",
+          "maxLength": 600
+        }
+      },
+      "reads": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "feeds": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "key_files": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file",
+            "purpose"
+          ],
+          "properties": {
+            "file": {
+              "type": "string",
+              "enum": [
+                "html_report.py",
+                "economic_value.py",
+                "forecast_vs_actual.py",
+                "statistical_tests.py",
+                "__init__.py"
+              ]
+            },
+            "purpose": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "concepts": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
+        "items": {
+          "type": "string",
+          "maxLength": 60
+        }
+      },
+      "cite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "caption": {
+        "type": "string",
+        "maxLength": 200
+      }
+    }
+  },
+  "out": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\narration\\2e1e0ae8e1c9a0bf2daea56467bade0259617f2542369fadd1bc8aba52d01665.json",
+  "pack": "C:\\Users\\RyanPC\\Documents\\Projects\\ML-GS\\hackathon\\out\\.trailhead\\prompts\\2e1e0ae8e1c9a0bf2daea56467bade0259617f2542369fadd1bc8aba52d01665.json"
+}

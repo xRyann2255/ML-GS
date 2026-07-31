@@ -1,0 +1,95 @@
+{
+  "claims": [
+    {
+      "text": "The vol shell wrapper is the front door: its ingest-ohlcv case forwards every argument unchanged to python -m volforecast ingest-ohlcv, deciding nothing itself beyond the nix library path the Python process needs.",
+      "status": "verified",
+      "cite": {
+        "file": "vol",
+        "quote": "    ingest-ohlcv)\n        LD_LIBRARY_PATH=\"${_NIX_PY_LD_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" python -m volforecast ingest-ohlcv \"$@\"\n        ;;",
+        "focus": [
+          "python -m volforecast ingest-ohlcv \"$@\""
+        ]
+      }
+    },
+    {
+      "text": "Inside Python the module entry lands in main, which builds the full command tree once, lets argparse decide that ingest-ohlcv was the command asked for, and simply prints help and exits cleanly when no subcommand is given.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/__main__.py",
+        "quote": "def main(argv: list[str] | None = None) -> int:\n    parser = _build_parser()\n    args = parser.parse_args(argv)\n\n    if args.command is None:\n        parser.print_help()\n        return 0",
+        "focus": [
+          "    parser = _build_parser()",
+          "    args = parser.parse_args(argv)"
+        ]
+      }
+    },
+    {
+      "text": "_build_parser does not define the subcommand itself, it imports the ingest_ohlcv module's register function and hands it the subparsers object, the lazy registration pattern all of the roughly two dozen utility commands follow.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/__main__.py",
+        "quote": "    from volforecast.cli.ingest_ohlcv import register as _reg_ingest_ohlcv\n\n    _reg_ingest_ohlcv(subparsers)",
+        "focus": [
+          "    from volforecast.cli.ingest_ohlcv import register as _reg_ingest_ohlcv"
+        ]
+      }
+    },
+    {
+      "text": "register declares what the command means in data terms, fetching split-adjusted daily OHLCV from the TSDB eqpad_ namespace, with a start date defaulting to 2015-01-02, an end date defaulting to yesterday, a symbol filter, and a force flag to bypass the cache.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/cli/ingest_ohlcv.py",
+        "quote": "    parser = subparsers.add_parser(\n        \"ingest-ohlcv\",\n        help=\"Fetch split-adjusted daily OHLCV from TSDB eqpad_ for all symbols\",\n    )\n    parser.add_argument(\n        \"--start\", type=str, default=\"2015-01-02\", help=\"Start date (YYYY-MM-DD)\"\n    )\n    parser.add_argument(\n        \"--end\", type=str, default=None, help=\"End date (YYYY-MM-DD, default: yesterday)\"",
+        "focus": [
+          "        help=\"Fetch split-adjusted daily OHLCV from TSDB eqpad_ for all symbols\","
+        ]
+      }
+    },
+    {
+      "text": "set_defaults binds handle as this subcommand's callable, and handle converts the parsed strings into real date objects, filling in yesterday when no end date was given, before delegating the actual work to run.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/cli/ingest_ohlcv.py",
+        "quote": "    parser.set_defaults(func=handle)\n\n\ndef handle(args) -> int:\n    \"\"\"Execute ingest-ohlcv command. Return exit code.\"\"\"\n    from datetime import timedelta\n\n    start = date.fromisoformat(args.start)\n    end = date.fromisoformat(args.end if args.end else (date.today() - timedelta(days=1)).isoformat())\n    symbols = args.symbols.split(\",\") if args.symbols else None\n    return run(start, end, symbols=symbols, force=args.force)",
+        "focus": [
+          "    parser.set_defaults(func=handle)",
+          "    return run(start, end, symbols=symbols, force=args.force)"
+        ]
+      }
+    },
+    {
+      "text": "run is the ingestion pipeline proper: for each symbol it skips anything the parquet cache already covers, fetches split-adjusted daily prices from TSDB otherwise, and hands every non-empty frame to save_ohlcv_cache while recording the ingestion in the data manifest.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/cli/ingest_ohlcv.py",
+        "quote": "        for sym in target_symbols:\n            # Check cache unless force\n            if not force:\n                if cache_covers_range(sym, start_date, end_date):\n                    sp.log(f\"{sym}: cached, skipping\")\n                    skipped += 1\n                    sp.advance(task)\n                    continue\n\n            try:\n                df = fetch_ohlcv(sym, start_date, end_date)\n                if df.empty:\n                    sp.log(f\"{sym}: no data returned\")\n                    failed.append(sym)\n                else:\n                    save_ohlcv_cache(sym, df)\n                    record_ingestion_yaml(\n                        \"ohlcv\",\n                        sym,\n                        start_date,\n                        end_date,\n                        len(df),\n                        file_size_bytes=int(df.memory_usage(deep=True).sum()),",
+        "focus": [
+          "                df = fetch_ohlcv(sym, start_date, end_date)",
+          "                    save_ohlcv_cache(sym, df)"
+        ]
+      }
+    },
+    {
+      "text": "Each fetched frame lands in save_ohlcv_cache, which merges new rows over any existing history and writes the parquet through a temporary file swapped in with os.replace, so a crash mid-write can never leave a half-written cache on disk.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/data/ohlcv.py",
+        "quote": "    # Atomic write: write to temp file then rename\n    fd, tmp = tempfile.mkstemp(suffix=\".parquet\", dir=str(path.parent))\n    try:\n        os.close(fd)\n        df.to_parquet(tmp)\n        os.replace(tmp, str(path))\n    except BaseException:\n        try:\n            os.unlink(tmp)\n        except OSError:\n            pass\n        raise",
+        "focus": [
+          "        os.replace(tmp, str(path))"
+        ]
+      }
+    },
+    {
+      "text": "The destination is decided by ohlcv_cache_path: one parquet per symbol under data/raw/ohlcv/, resolved from the repo root by marker files so the cache lands in the same place no matter which directory the command was launched from.",
+      "status": "verified",
+      "cite": {
+        "file": "src/volforecast/utils/paths.py",
+        "quote": "def ohlcv_cache_dir() -> Path:\n    \"\"\"Absolute path to data/raw/ohlcv/ (daily OHLCV from TSDB).\"\"\"\n    return data_path(\"raw/ohlcv\")\n\n\ndef ohlcv_cache_path(symbol: str) -> Path:\n    \"\"\"Parquet path for a symbol's daily OHLCV: data/raw/ohlcv/{SYMBOL}.parquet.\"\"\"\n    return data_path(\"raw/ohlcv\", f\"{symbol}.parquet\")",
+        "focus": [
+          "    \"\"\"Parquet path for a symbol's daily OHLCV: data/raw/ohlcv/{SYMBOL}.parquet.\"\"\""
+        ]
+      }
+    }
+  ]
+}
