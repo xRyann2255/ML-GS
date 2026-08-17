@@ -1,0 +1,60 @@
+"""Spine slide polish: align equation states vertically, drop the read-it
+paragraph, add the HARd-to-Beat quote + benchmark framing to the final state."""
+import re
+from pathlib import Path
+
+DECK = Path(r"C:\Users\RyanPC\Documents\Projects\ML-GS\ml-vol-estimator\workspace\presentation\presentation-latest.html")
+html = DECK.read_text(encoding="utf-8")
+
+# --- 1. fixed-height flex-centred equation box so every state shares a centre
+s = html.index('<div class="spine-eq"')
+e = html.index("</div></div>", html.rindex("hs4-")) + len("</div></div>")
+block = html[s:e]
+heights = []
+for m in re.finditer(r'<svg style="width:(\d+)px;height:auto;"[^>]*?width="([\d.]+)pt" height="([\d.]+)pt"', block):
+    wpx, wpt, hpt = float(m.group(1)), float(m.group(2)), float(m.group(3))
+    heights.append(hpt / wpt * wpx)
+assert len(heights) == 5, f"expected 5 state svgs, found {len(heights)}: {heights}"
+box_h = int(max(heights)) + 8
+
+old_rule = '.equation[data-eq="spine"] { margin: 0; }'
+new_rule = (f'.equation[data-eq="spine"] {{ margin: 0; height: {box_h}px; '
+            'display: flex; align-items: center; }')
+assert old_rule in html
+html = html.replace(old_rule, new_rule, 1)
+
+# --- 2. remove the read-it-left-to-right paragraph
+p_start = html.index('<p class="eq-final" style="visibility:hidden;">Read it left to right.')
+p_end = html.index("</p>", p_start) + len("</p>")
+
+# --- 3. quote block (verbatim from Audrino & Chassot 2024 abstract) in its place
+quote = (
+    '<div class="eq-final" style="visibility:hidden;">'
+    '<div class="har-quote">'
+    '<p class="har-quote-text">&ldquo;Despite extensive hyperparameter tuning, ML models '
+    'fail to surpass the linear benchmark set by HAR &hellip;&rdquo;</p>'
+    '<div class="har-quote-attr">Audrino &amp; Chassot, &ldquo;HARd to Beat&rdquo;, '
+    'International Journal of Forecasting (2024) &middot; 1,445 US stocks</div>'
+    '</div></div>')
+html = html[:p_start] + quote + html[p_end:]
+
+old_dim = ("This is HAR-IV, a desk classic, and it is genuinely hard to beat, which is the "
+           "problem. On its own it scores QLIKE 0.1617. Everything from here is what a "
+           "straight line cannot do.")
+new_dim = ("This is HAR-IV, a desk classic. On its own: QLIKE 0.1617. That is the baseline "
+           "benchmark, and everything from here is about beating it.")
+assert old_dim in html
+html = html.replace(old_dim, new_dim, 1)
+
+css_anchor = ".eq-state { display: none; }"
+assert css_anchor in html
+html = html.replace(css_anchor,
+                    ".har-quote { border-left: 2px solid #e8b339; padding: 4px 0 4px 22px; "
+                    "margin: 16px 0 12px; max-width: 980px; }\n"
+                    ".har-quote-text { font-family: Georgia, 'Times New Roman', serif; "
+                    "font-size: 21px; font-style: italic; color: #e8e4da; margin-bottom: 8px; "
+                    "max-width: 960px; }\n"
+                    ".har-quote-attr { font-size: 14px; color: #7d8896; }\n" + css_anchor, 1)
+
+DECK.write_text(html, encoding="utf-8")
+print(f"state heights: {[round(h) for h in heights]} -> box {box_h}px; quote in, paragraph out")

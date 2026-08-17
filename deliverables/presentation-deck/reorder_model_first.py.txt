@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""Build presentation-latest.html for the Predicting Volatility talk.
+
+ARCHITECTURE (v2, 2026-08-17)
+-----------------------------
+The deck is no longer derived from presentation.html by lifting and rewriting
+slides. During the live editing session of 16-17 Aug 2026 the deck was
+reworked slide by slide in the browser, far beyond what string transformations
+of the old source could reproduce honestly. The result of that session is
+frozen as presentation-template.html, and THAT file is now the canonical
+source. This script does two things:
+
+1. Copies the template to presentation-latest.html.
+2. If presentation.html exists next to it AND carries the real GSVIVS01
+   index series (the GS build, made by generate.py with the real tournament
+   dashboard), grafts that real chart into slide 3 in place of the template's
+   synthetic placeholder, then re-applies everything the session layered onto
+   the chart: the Sharpe stat label, the trimmed caption, and the entrance
+   animation classes.
+
+Run:      python3 reorder_model_first.py
+On GS:    regenerate presentation.html first (generate.py with
+          --dashboard-path pointing at the real tournament dashboard),
+          then run this script. The chart swap is automatic.
+Locally:  presentation.html is absent, so the synthetic chart stays and the
+          output equals the template byte for byte.
+
+The old lift-and-retarget script is preserved as reorder_model_first.legacy.py
+for reference. It no longer produces the current deck.
+
+WHAT THE TEMPLATE CONTAINS (28 slides)
+--------------------------------------
+ 1  Predicting Volatility (title; byline Ryan Vincent, Eqs STS Strats)
+ 2  Motivation and Project Scope (three bands: issue, goal, part 1 / part 2)
+ 3  GSVIVS01 sells variance every single day (Sharpe 2.06 label in chart;
+    chart is the synthetic placeholder until the GS graft)
+ 4  Part 1 divider: building the model to predict realized volatility
+ 5  The number we train on (supervised label; tape to 5-minute grid)
+ 6  A sharper target
+ 7  One day is a terrible sample size (the windows)
+ 8  The forward-looking term (IV)
+ 9  Four terms (the spine, stepped equation)
+10-16  The features: layers 0, 1, 2, 3, 4, 5, and 6 and beyond
+17  Let the trees learn only what the spine gets wrong (XGBoost defined,
+    staged architecture diagram, why the spine is the start: 5 builds)
+18  Walk-forward with a moat, three seeds (6 presenter builds ending in the
+    full-period out-of-sample bar)
+19  The ruler decides what wrong means (MSE vs QLIKE scoreboard)
+20  Making the black-box interpretable (SHAP)
+21  Five that don't repeat each other (shortlist)
+22  ALE: the shape behind each name
+23  Back to the variance seller (payoff formula, we have / we need)
+24  Every morning: compare the forecast to the strike (Kvar)
+25  Where it wins, and what it costs (results; three-seed footnote)
+26  Ninety-one percent of it was a straight line
+27  Three numbers        28  Where this goes next
+
+The slide count above reflects the template at freeze time. If slides are
+added or removed, edit presentation-template.html directly (or regenerate a
+new freeze from a live editing session) and update this inventory.
+
+INTERACTION SYSTEMS BAKED INTO THE TEMPLATE
+-------------------------------------------
+- show()/advance() navigation. ArrowRight, Space and PageDown first step
+  equation states (.eq-state), then presenter builds, then the slide.
+- Presenter builds: a slide with data-builds="N" gains classes b1..bN one
+  keypress at a time; CSS keyed on .slide.active.bK runs each step's
+  animation. Used by slide 16 (5 builds) and slide 17 (6 builds).
+  Build classes are cvA- (walk-forward) and ovA- (overlay).
+- Entrance animations: slide 3's chart draws itself on each visit (pdA-
+  classes; the polyline carries pathLength="1" for the draw-in).
+- prefers-reduced-motion disables all of it and shows finished diagrams.
+- Equation SVGs are matplotlib mathtext (Computer Modern) rendered at build
+  time of their slides. Glyph path ids inside them are namespaced (eqp-,
+  eqh-, eqn-, eqm- prefixes) because HTML resolves SVG ids document-wide
+  and colliding ids make <use> references pick up glyphs from other slides.
+  Any new equation pasted into the deck must namespace its ids the same way.
+
+STYLE CONTRACT
+--------------
+- No em dashes anywhere in deck prose. Rewrite the sentence instead.
+- No second person in slide copy.
+- Any figure stated by the deck comes from NUMBERS_134 below, except worked
+  pedagogical arithmetic (the QLIKE/MSE scoreboard) and structural constants
+  (78 five-minute returns). NUMBERS_134 is retained as the reference for
+  editing copy; the template carries the numbers inline.
+"""
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+TEMPLATE = HERE / "presentation-template.html"
+SRC = HERE / "presentation.html"  # optional donor of the real GSVIVS01 chart
+DST = HERE / "presentation-latest.html"
+
+# Source: trial_134, h=1, 100 symbols, expanding window, train 1008 / test 126,
+# purge_gap 10. XGBoost figures are a three-seed average. Comparisons are
+# computed FROM plain `har`. Reference for copy edits; not applied mechanically.
+NUMBERS_134 = {
+    "qlike_xgb": "0.1239",
+    "qlike_champion": "0.1273",
+    "qlike_har": "0.1617",
+    "qlike_naive": "0.1934",
+    "qlike_xgb_turb": "0.1362",
+    "qlike_har_turb": "0.2068",
+    "xgb_vs_har": "23.4%",
+    "champion_vs_har": "21.2%",
+    "gap_closed_by_line": "91%",
+    "turb_gain": "34.2%",
+    "calm_gain": "21.7%",
+    "r2_xgb": "0.734",
+    "r2_har": "0.664",
+    "dm_p": "0.003",
+    "sharpe_xgb": "2.57",
+    "sharpe_champion": "2.54",
+    "sharpe_har": "2.25",
+    "sharpe_always": "2.06",
+    "sharpe_naive": "2.01",
+    "vol_xgb": "3.1%",
+    "vol_always": "4.1%",
+    "totret_xgb": "+35.0%",
+    "totret_always": "+38.0%",
+    "dd_xgb": "2.5%",
+    "dd_always": "5.1%",
+    "dd_reduction": "51%",
+    "flat_xgb": "28.7%",
+    "backtest_days": "962",
+    "n_symbols": "100",
+    "n_seeds": "three-seed mean",
+}
+
+
+def _find_chart_svg(html: str) -> tuple[int, int]:
+    """Return (start, end) of the product_day chart's <svg>...</svg> span."""
+    div = html.index('data-diagram="product_day"')
+    s = html.index("<svg", div)
+    e = html.index("</svg>", s) + len("</svg>")
+    return s, e
+
+
+def _polyline_points(svg: str) -> int:
+    m = re.search(r'<polyline[^>]*points="([^"]+)"', svg)
+    return len(m.group(1).split()) if m else 0
+
+
+def _add_class(elem: str, cls: str) -> str:
+    tag = elem[1:elem.index(" ")]
+    return elem.replace(f"<{tag} ", f'<{tag} class="{cls}" ', 1)
+
+
+def _tag_real_chart(svg: str, stat_texts: list[str]) -> str:
+    """Re-apply the session's chart layers to a freshly grafted real chart:
+    animation classes, pathLength, caption trim, Sharpe stat texts."""
+    for pat, cls, exact in (
+        (r'<line x1="40" y1="32"[^>]*>', "pdA-tlline", 1),
+        (r'<circle cx="95"[^>]*>', "pdA-tl1", 1),
+        (r'<text x="95"[^>]*>', "pdA-tl1", 2),
+        (r'<circle cx="330"[^>]*>', "pdA-tl2", 1),
+        (r'<text x="330"[^>]*>', "pdA-tl2", 2),
+        (r'<circle cx="565"[^>]*>', "pdA-tl3", 1),
+        (r'<text x="565"[^>]*>', "pdA-tl3", 2),
+        (r'<line x1="70"[^>]*>', "pdA-grid", None),
+        (r'<text x="58"[^>]*>', "pdA-grid", None),
+        (r'<text x="8"[^>]*>', "pdA-grid", 1),
+        (r'<line x1="[0-9.]+" y1="304" x2="[0-9.]+" y2="312"[^>]*>', "pdA-grid", None),
+        (r'<text x="[0-9.]+" y="330"[^>]*>', "pdA-grid", None),
+        (r'<text x="[0-9.]+" y="358"[^>]*>', "pdA-cap", 1),
+    ):
+        hits = re.findall(pat, svg)
+        if exact is not None and len(hits) != exact:
+            raise SystemExit(f"chart graft: expected {exact} of {pat}, found {len(hits)}")
+        for h in set(hits):
+            svg = svg.replace(h, _add_class(h, cls))
+    # red drawdown ticks, tagged in chronological (left to right) order
+    ticks = re.findall(r'<line[^>]*stroke="#e05252"[^>]*>', svg)
+    ordered = sorted(set(ticks), key=lambda t: float(re.search(r'x1="([0-9.]+)"', t).group(1)))
+    for suffix, h in zip("abc", ordered):
+        svg = svg.replace(h, _add_class(h, f"pdA-tick-{suffix}"))
+    # the index curve draws itself in
+    poly = re.search(r"<polyline[^>]*>", svg).group(0)
+    svg = svg.replace(poly, poly.replace("<polyline ", '<polyline class="pdA-line" pathLength="1" ', 1), 1)
+    # caption: drop the level range, capitalise the tick note
+    svg = re.sub(r",\s*100 to [0-9][0-9.]*\.", ".", svg, count=1)
+    svg = re.sub(r"\bred ticks", "Red ticks", svg, count=1)
+    # Sharpe stat label, carried over from the template verbatim
+    svg = svg.replace("<polyline ", "".join(stat_texts) + "<polyline ", 1)
+    return svg
+
+
+def main() -> None:
+    html = TEMPLATE.read_text(encoding="utf-8")
+
+    if SRC.exists():
+        src = SRC.read_text(encoding="utf-8")
+        ss, se = _find_chart_svg(src)
+        src_svg = src[ss:se]
+        if _polyline_points(src_svg) > 50:
+            ts, te = _find_chart_svg(html)
+            stat_texts = re.findall(r'<text class="pdA-stat"[^>]*>[^<]*</text>', html[ts:te])
+            if len(stat_texts) != 2:
+                raise SystemExit("template chart lost its Sharpe stat texts")
+            html = html[:ts] + _tag_real_chart(src_svg, stat_texts) + html[te:]
+            print("slide 3 chart: real dashboard data grafted")
+        else:
+            print("slide 3 chart: presentation.html holds a synthetic series, keeping the template chart")
+    else:
+        print("slide 3 chart: presentation.html not found, keeping the template's illustrative chart")
+
+    opens = len(re.findall(r'<section class="slide[^>]*>', html))
+    closes = html.count("</section>")
+    if opens != closes:
+        raise SystemExit(f"section imbalance: {opens} opens vs {closes} closes")
+    for needle in ("function advance()", 'data-builds="6"', 'data-builds="5"', "eq-state"):
+        if needle not in html:
+            raise SystemExit(f"template is missing an interaction system: {needle}")
+    print(f"{opens} slides, sections balanced, interaction systems present")
+
+    DST.write_text(html, encoding="utf-8")
+    print(f"wrote {DST}")
+
+
+if __name__ == "__main__":
+    main()

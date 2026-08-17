@@ -1,0 +1,85 @@
+"""Regenerate slide 6's BPV graph with non-colliding layout."""
+from pathlib import Path
+
+DECK = Path(r"C:\Users\RyanPC\Documents\Projects\ML-GS\ml-vol-estimator\workspace\presentation\presentation-latest.html")
+INK, GREY, MUT, HAIR, AMBER, GREEN, RED = (
+    "#e8e4da", "#7d8896", "#9aa5b1", "#1f2a37", "#e8b339", "#4cc38a", "#e05252")
+SANS = "'Segoe UI', Verdana, sans-serif"
+F = f'font-family="{SANS}"'
+
+mag = [7, 4, 9, 5, 11, 3, 8, 12, 4, 6, 10, 5, 7, 13, 6, 3, 46, 2, 8, 5, 11, 6]
+sign = [1 if (i * 5) % 3 else -1 for i in range(len(mag))]
+J = 16
+sign[J] = -1
+SC = 0.12
+CAP = 80
+x0, bw, gp = 150, 18, 8
+pitch = bw + gp
+xend = x0 + len(mag) * pitch          # 722
+LBL = 746                             # right row-labels zone
+RX = 985                              # sum rail zone
+
+
+def bx(i):
+    return x0 + i * pitch
+
+
+p = ['<svg viewBox="0 0 1080 300" style="width:1000px;height:278px;display:block;">']
+# row 1: returns
+yc = 52
+p.append(f'<text x="136" y="{yc + 4}" text-anchor="end" fill="{MUT}" font-size="14" {F}>returns</text>')
+p.append(f'<line x1="{x0}" y1="{yc}" x2="{xend}" y2="{yc}" stroke="{HAIR}" stroke-width="1"/>')
+for i, m in enumerate(mag):
+    hpx = min(m, 26) if i != J else 38
+    y = yc - hpx if sign[i] > 0 else yc
+    col = RED if i == J else (GREEN if sign[i] > 0 else "#8a5560")
+    p.append(f'<rect x="{bx(i)}" y="{y}" width="{bw}" height="{hpx}" fill="{col}" opacity="{1 if i == J else 0.55}"/>')
+p.append(f'<text x="{LBL}" y="{yc - 4}" fill="{GREY}" font-size="13" {F}>one violent bar,</text>')
+p.append(f'<text x="{LBL}" y="{yc + 14}" fill="{GREY}" font-size="13" {F}>twenty-one ordinary ones</text>')
+# row 2: squared
+yb2 = 168
+p.append(f'<text x="136" y="{yb2 - 8}" text-anchor="end" fill="{MUT}" font-size="14" {F}>squared</text>')
+p.append(f'<line x1="{x0}" y1="{yb2}" x2="{xend}" y2="{yb2}" stroke="{HAIR}" stroke-width="1"/>')
+for i, m in enumerate(mag):
+    if i == J:
+        p.append(f'<rect x="{bx(i)}" y="{yb2 - CAP}" width="{bw}" height="{CAP}" fill="{RED}"/>')
+        p.append(f'<line x1="{bx(i) - 5}" y1="{yb2 - 50}" x2="{bx(i) + bw + 5}" y2="{yb2 - 58}" stroke="#0c1117" stroke-width="4"/>')
+        p.append(f'<line x1="{bx(i) - 5}" y1="{yb2 - 43}" x2="{bx(i) + bw + 5}" y2="{yb2 - 51}" stroke="#0c1117" stroke-width="4"/>')
+    else:
+        v = max(m * m * SC, 1.2)
+        p.append(f'<rect x="{bx(i)}" y="{yb2 - v:.1f}" width="{bw}" height="{v:.1f}" fill="#24303f"/>')
+p.append(f'<text x="{LBL}" y="{yb2 - 34}" fill="{INK}" font-size="14" {F}>what RV sums</text>')
+p.append(f'<text x="{LBL}" y="{yb2 - 15}" fill="{GREY}" font-size="13" {F}>r&#178; puts the jump off scale</text>')
+# row 3: neighbour products
+yb3 = 254
+p.append(f'<text x="136" y="{yb3 - 8}" text-anchor="end" fill="{MUT}" font-size="14" {F}>products</text>')
+p.append(f'<line x1="{x0}" y1="{yb3}" x2="{xend}" y2="{yb3}" stroke="{HAIR}" stroke-width="1"/>')
+for i in range(1, len(mag)):
+    v = max(mag[i] * mag[i - 1] * SC, 1.2)
+    hot = i == J or i == J + 1
+    col = AMBER if hot else "#24303f"
+    p.append(f'<rect x="{bx(i)}" y="{yb3 - v:.1f}" width="{bw}" height="{v:.1f}" fill="{col}"/>')
+p.append(f'<text x="{LBL}" y="{yb3 - 34}" fill="{INK}" font-size="14" {F}>what BPV sums</text>')
+p.append(f'<text x="{LBL}" y="{yb3 - 15}" fill="{GREY}" font-size="13" {F}>one factor of the jump, not two</text>')
+# sum rail
+rvsum = sum(m * m for m in mag)
+bpvsum = sum(mag[i] * mag[i - 1] for i in range(1, len(mag)))
+rail_h = 130
+p.append(f'<text x="{RX + 40}" y="60" text-anchor="middle" fill="{AMBER}" font-size="12" letter-spacing="2" {F}>THE SUMS</text>')
+p.append(f'<rect x="{RX}" y="{210 - rail_h}" width="30" height="{rail_h}" fill="{RED}" opacity="0.75"/>')
+p.append(f'<text x="{RX + 15}" y="228" text-anchor="middle" fill="{MUT}" font-size="13" {F}>RV</text>')
+hb2 = rail_h * bpvsum / rvsum
+p.append(f'<rect x="{RX + 50}" y="{210 - hb2:.0f}" width="30" height="{hb2:.0f}" fill="{GREEN}" opacity="0.85"/>')
+p.append(f'<text x="{RX + 65}" y="228" text-anchor="middle" fill="{MUT}" font-size="13" {F}>BPV</text>')
+p.append(f'<text x="{RX + 40}" y="254" text-anchor="middle" fill="{GREY}" font-size="12" {F}>same day,</text>')
+p.append(f'<text x="{RX + 40}" y="270" text-anchor="middle" fill="{GREY}" font-size="12" {F}>two readings</text>')
+p.append('</svg>')
+new_svg = "".join(p)
+
+html = DECK.read_text(encoding="utf-8")
+k6 = html.index('A reading one violent bar cannot spoil')
+d0 = html.index('<div class="diagram" data-diagram="layer1">', k6)
+d1 = html.index('</svg></div>', d0) + len('</svg>')
+html = html[:d0 + len('<div class="diagram" data-diagram="layer1">')] + new_svg + html[d1:]
+DECK.write_text(html, encoding="utf-8")
+print(f"graph regenerated; RV sum {rvsum}, BPV sum {bpvsum} ({bpvsum / rvsum:.0%})")

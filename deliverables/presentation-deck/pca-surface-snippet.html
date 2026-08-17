@@ -1,0 +1,134 @@
+<!-- Canonical PCA vol-surface animation snippet for the layer-2 options
+     slide of presentation-latest.html. Click-driven (PC1/PC2/PC3 rows
+     select the component; no autoplay). Self-contained, no libraries.
+     To be folded into reorder_model_first.py at the next back-port. -->
+<div class="diagram" data-diagram="pca_surface" id="pca-surface-root" style="position:relative;width:1060px;height:420px"></div>
+<script>
+(function(){
+"use strict";
+var root=document.getElementById('pca-surface-root');
+if(!root||root.getAttribute('data-pca-init'))return;
+root.setAttribute('data-pca-init','1');
+var NS='http://www.w3.org/2000/svg';
+var INK='#e8e4da',GREY='#7d8896',HAIR='#1f2a37',AMBER='#e8b339',GREEN='#4cc38a',RED='#e05252';
+/* projection: u = moneyness 0..1 (90%..110%), v = tenor 0..1 (1w..12m), z = implied vol */
+var NU=12,NV=9,OX=70,OY=300,AX=520,AY=88,BX=190,BY=-120,ZS=520,ZF=0.05;
+var AMP=[0.032,0.030,0.034],OSC=3.1;
+var NAMES=['PC1 · LEVEL','PC2 · TERM STRUCTURE','PC3 · SKEW'];
+var SUBS=['the whole surface moves together','front end pivots against the back','put wing and call wing twist apart'];
+var SHARE=[0.83,0.10,0.04],PCT=['83%','10%','4%'];
+function px(u,v){return OX+u*AX+v*BX}
+function py(u,v,z){return OY+u*AY+v*BY-z*ZS}
+function iv(u,v){var m=0.20*u-0.10;return 0.165+0.05*v+(0.45*v-0.85)*m+(1.6-0.6*v)*m*m}
+function shp(ph,u,v){if(ph===0)return 1;if(ph===1)return Math.cos(Math.PI*v);return(1-2*u)*(1-0.35*v)}
+function ss(x){return x<=0?0:x>=1?1:x*x*(3-2*x)}
+var svg=document.createElementNS(NS,'svg');
+svg.setAttribute('width','1060');svg.setAttribute('height','420');
+svg.setAttribute('viewBox','0 0 1060 420');
+svg.setAttribute('font-family',"'Segoe UI',Verdana,sans-serif");
+root.appendChild(svg);
+function E(t,a){var e=document.createElementNS(NS,t),k;for(k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e}
+function T(x,y,s,sz,fill,a){a=a||{};a.x=x;a.y=y;a['font-size']=sz;a.fill=fill;var e=E('text',a);e.textContent=s;return e}
+/* static floor + axes (hairlines) */
+function fs(u,v){return px(u,v).toFixed(1)+','+py(u,v,ZF).toFixed(1)}
+E('polygon',{points:fs(0,0)+' '+fs(1,0)+' '+fs(1,1)+' '+fs(0,1),fill:'none',stroke:HAIR,'stroke-width':1});
+var i;
+for(i=1;i<4;i++){
+ E('polyline',{points:fs(0,i/4)+' '+fs(1,i/4),fill:'none',stroke:HAIR,'stroke-width':1});
+ E('polyline',{points:fs(i/4,0)+' '+fs(i/4,1),fill:'none',stroke:HAIR,'stroke-width':1});
+}
+E('polyline',{points:px(0,0)+','+py(0,0,ZF).toFixed(1)+' '+px(0,0)+','+py(0,0,0.335).toFixed(1),fill:'none',stroke:GREY,'stroke-width':1,'stroke-opacity':0.5});
+T(px(0,0),py(0,0,0.335)-9,'IV',11,GREY,{'text-anchor':'middle','letter-spacing':'1'});
+T(px(0,0),py(0,0,ZF)+18,'90%',11,GREY,{'text-anchor':'middle'});
+T(px(1,0)+6,py(1,0,ZF)+18,'110%',11,GREY,{'text-anchor':'middle'});
+T(330,352,'MONEYNESS',10.5,GREY,{'text-anchor':'middle','letter-spacing':'2.5',transform:'rotate(9.6 330 352)'});
+T(px(1,0)+20,py(1,0,ZF)+2,'1w',11,GREY);
+T(px(1,1)+14,py(1,1,ZF)+4,'12m',11,GREY);
+T(715,312,'TENOR',10.5,GREY,{'text-anchor':'middle','letter-spacing':'2.5',transform:'rotate(-32.3 715 312)'});
+/* wireframe grid */
+var cols=[],rows=[],r,c;
+for(c=0;c<NU;c++)cols.push(E('polyline',{fill:'none',stroke:INK,'stroke-width':1,'stroke-opacity':0.30}));
+for(r=0;r<NV;r++)rows.push(E('polyline',{fill:'none',stroke:INK,'stroke-width':1.2,'stroke-opacity':(0.80-0.05*r).toFixed(2)}));
+var hlA=E('polyline',{fill:'none','stroke-width':2.2,'stroke-linejoin':'round','stroke-linecap':'round',stroke:AMBER,'stroke-opacity':0});
+var hlB=E('polyline',{fill:'none','stroke-width':2.2,'stroke-linejoin':'round','stroke-linecap':'round',stroke:GREEN,'stroke-opacity':0});
+/* label block */
+var nameEl=T(830,142,'',14,AMBER,{'letter-spacing':'2','font-weight':'600'});
+var subEl=T(830,168,'',12.5,GREY);
+T(830,235,'VARIANCE EXPLAINED',9.5,GREY,{'letter-spacing':'2','fill-opacity':0.75});
+var bars=[],rowLabels=[];
+for(i=0;i<3;i++){
+ var yy=256+24*i;
+ rowLabels.push(T(830,yy+7,'PC'+(i+1),10,GREY));
+ E('rect',{x:862,y:yy,width:132,height:7,rx:1.5,fill:HAIR});
+ bars.push(E('rect',{x:862,y:yy,width:Math.max(5,Math.round(132*SHARE[i])),height:7,rx:1.5,fill:GREY,'fill-opacity':0.5}));
+ T(1002,yy+7,PCT[i],10,GREY,{'fill-opacity':0.75});
+ (function(idx){var cr=E('rect',{x:824,y:yy-7,width:186,height:21,fill:'#000','fill-opacity':0,cursor:'pointer'});cr.addEventListener('click',function(){select(idx);});})(i);
+}
+/* precomputed screen x (z never moves x) */
+var N=NU*NV,SXs=new Array(N),SY=new Array(N),UU=new Array(NU),VV=new Array(NV);
+for(c=0;c<NU;c++)UU[c]=c/(NU-1);
+for(r=0;r<NV;r++)VV[r]=r/(NV-1);
+for(r=0;r<NV;r++)for(c=0;c<NU;c++)SXs[r*NU+c]=px(UU[c],VV[r]).toFixed(1);
+function P(r,c){var k=r*NU+c;return SXs[k]+','+SY[k].toFixed(1)+' '}
+var sel=0,selT=0;
+function select(i){if(i===sel)return;sel=i;selT=performance.now();setPhase(sel);}
+function setPhase(ph){
+ nameEl.textContent=NAMES[ph];
+ subEl.textContent=SUBS[ph];
+ for(var k=0;k<3;k++){
+  bars[k].setAttribute('fill',k===ph?AMBER:GREY);
+  bars[k].setAttribute('fill-opacity',k===ph?'1':'0.5');
+  rowLabels[k].setAttribute('fill',k===ph?AMBER:GREY);
+ }
+ hlA.setAttribute('stroke',ph===2?RED:AMBER);
+}
+function frame(now){
+ requestAnimationFrame(frame);
+ if(root.offsetParent===null)return; /* slide hidden: skip drawing */
+ var ph=sel,tt=Math.max(0,(now-selT)*0.001);
+ var env=ss(tt/0.6),osc=Math.sin(2*Math.PI*tt/OSC),a=AMP[ph]*env*osc;
+ var k;
+ for(r=0;r<NV;r++)for(c=0;c<NU;c++){k=r*NU+c;SY[k]=py(UU[c],VV[r],iv(UU[c],VV[r])+a*shp(ph,UU[c],VV[r]));}
+ var s,rp=[],cp=[];
+ for(r=0;r<NV;r++){s='';for(c=0;c<NU;c++)s+=P(r,c);rows[r].setAttribute('points',s);rp[r]=s;}
+ for(c=0;c<NU;c++){s='';for(r=0;r<NV;r++)s+=P(r,c);cols[c].setAttribute('points',s);cp[c]=s;}
+ var hop=(env*(0.3+0.55*Math.abs(osc))).toFixed(3);
+ if(ph===0){
+  s='';
+  for(c=0;c<NU;c++)s+=P(0,c);
+  for(r=1;r<NV;r++)s+=P(r,NU-1);
+  for(c=NU-2;c>=0;c--)s+=P(NV-1,c);
+  for(r=NV-2;r>=0;r--)s+=P(r,0);
+  hlA.setAttribute('points',s);
+  hlB.setAttribute('stroke-opacity','0');
+ }else if(ph===1){
+  hlA.setAttribute('points',rp[0]);
+  hlB.setAttribute('points',rp[NV-1]);
+  hlB.setAttribute('stroke-opacity',hop);
+ }else{
+  hlA.setAttribute('points',cp[0]);
+  hlB.setAttribute('points',cp[NU-1]);
+  hlB.setAttribute('stroke-opacity',hop);
+ }
+ hlA.setAttribute('stroke-opacity',hop);
+ var lop=0.12+0.88*Math.min(1,env*1.7);
+ nameEl.setAttribute('fill-opacity',lop.toFixed(3));
+ subEl.setAttribute('fill-opacity',(lop*0.9).toFixed(3));
+}
+var mySlide=root.closest('.slide'),slideIdx=Array.prototype.indexOf.call(document.querySelectorAll('.slide'),mySlide);
+function jumpTo(i){sel=i;selT=performance.now();setPhase(i);}
+addEventListener('keydown',function(e){
+var vis=root.offsetParent!==null;
+var fwd=(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown');
+var bwd=(e.key==='ArrowLeft'||e.key==='PageUp');
+if(vis&&fwd&&sel<2){jumpTo(sel+1);e.stopImmediatePropagation();e.preventDefault();return;}
+if(vis&&bwd&&sel>0){jumpTo(sel-1);e.stopImmediatePropagation();e.preventDefault();return;}
+if(!vis&&fwd&&typeof idx!=='undefined'&&idx===slideIdx-1)jumpTo(0);
+if(!vis&&bwd&&typeof idx!=='undefined'&&idx===slideIdx+1)jumpTo(2);
+if(vis&&e.key==='ArrowDown'){jumpTo((sel+1)%3);e.preventDefault();}
+else if(vis&&e.key==='ArrowUp'){jumpTo((sel+2)%3);e.preventDefault();}
+});
+setPhase(0);selT=performance.now();
+requestAnimationFrame(frame);
+})();
+</script>

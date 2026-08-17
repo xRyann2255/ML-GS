@@ -1,0 +1,38 @@
+"""Namespace glyph ids inside the three newly inserted equation SVGs.
+
+HTML resolves SVG ids document-wide; the deck's pre-existing matplotlib
+equations define ids that collide with the new renders, so <use> references
+in the new slides resolve to the wrong glyph paths. Prefixing every id (and
+its href/url references) inside just the new blocks isolates them.
+"""
+import re
+from pathlib import Path
+
+DECK = Path(r"C:\Users\RyanPC\Documents\Projects\ML-GS\ml-vol-estimator\workspace\presentation\presentation-latest.html")
+html = DECK.read_text(encoding="utf-8")
+
+
+def namespace_ids(block: str, prefix: str) -> tuple[str, int]:
+    ids = sorted(set(re.findall(r'id="([^"]+)"', block)), key=len, reverse=True)
+    for i in ids:
+        block = block.replace(f'id="{i}"', f'id="{prefix}{i}"')
+        block = block.replace(f'href="#{i}"', f'href="#{prefix}{i}"')
+        block = block.replace(f'url(#{i})', f'url(#{prefix}{i})')
+    return block, len(ids)
+
+
+def fix_block(start_marker: str, prefix: str, occurrence: int = 0) -> int:
+    global html
+    starts = [m.start() for m in re.finditer(re.escape(start_marker), html)]
+    s = starts[occurrence]
+    e = html.index("</div>", html.index("</svg>", s))
+    block, n = namespace_ids(html[s:e], prefix)
+    html = html[:s] + block + html[e:]
+    return n
+
+
+n1 = fix_block('<div class="equation" data-eq="payoff">', "eqp-")
+n2 = fix_block('<div class="eq-sym"', "eqh-", 0)
+n3 = fix_block('<div class="eq-sym"', "eqn-", 1)
+DECK.write_text(html, encoding="utf-8")
+print(f"namespaced ids: payoff={n1} have={n2} need={n3}")

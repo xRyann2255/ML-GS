@@ -1,0 +1,131 @@
+"""Apply the approved Part 1 / Part 2 restructure to presentation-latest.html.
+
+- Insert a Part 1 divider slide after the GSVIVS01 product slide.
+- Insert the Part 2 re-entry slide (Option B ledger layout, matplotlib-mathtext
+  equations, matching generate.py's render_equation_svg) before Results.
+- Move the Kvar claim slide to sit right after the Part 2 re-entry slide.
+"""
+import io
+import re
+from pathlib import Path
+
+DECK = Path(r"C:\Users\RyanPC\Documents\Projects\ML-GS\ml-vol-estimator\workspace\presentation\presentation-latest.html")
+
+
+def render_equation_svg(latex: str, *, color: str, fontsize: float = 26.0) -> str:
+    """Verbatim copy of generate.py's helper: LaTeX -> inline SVG paths."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    matplotlib.rcParams["svg.hashsalt"] = "volforecast-deck"
+    from matplotlib.figure import Figure
+
+    fig = Figure(figsize=(0.01, 0.01))
+    fig.text(0, 0, f"${latex}$", fontsize=fontsize, color=color,
+             math_fontfamily="cm")
+    buf = io.BytesIO()
+    fig.savefig(buf, format="svg", bbox_inches="tight", pad_inches=0.03,
+                transparent=True)
+    svg = buf.getvalue().decode("utf-8")
+    svg = svg[svg.index("<svg"):]
+    svg = re.sub(r"<metadata>.*?</metadata>", "", svg, flags=re.S)
+    return re.sub(r"<!--.*?-->", "", svg, flags=re.S)
+
+
+def render_first_that_works(candidates, **kw):
+    last = None
+    for latex in candidates:
+        try:
+            return latex, render_equation_svg(latex, **kw)
+        except Exception as e:  # mathtext parse errors
+            last = e
+    raise last
+
+
+BODY, INK, AMBER = "#c7cdd6", "#e8e4da", "#e8b339"
+
+used_payoff, eq_payoff = render_first_that_works(
+    [r"P\&L \;=\; N \cdot \left(\sigma_R^2 \,-\, K_{\mathrm{var}}^2\right)",
+     r"\mathrm{P\&L} \;=\; N \cdot \left(\sigma_R^2 \,-\, K_{\mathrm{var}}^2\right)",
+     r"\mathrm{PnL} \;=\; N \cdot \left(\sigma_R^2 \,-\, K_{\mathrm{var}}^2\right)"],
+    color=BODY)
+used_have, eq_have = render_first_that_works(
+    [r"\widehat{\sigma}_R^{\,2}", r"\hat{\sigma}_R^{\,2}"], color=INK)
+used_need, eq_need = render_first_that_works(
+    [r"K_{\mathrm{var}}"], color=AMBER)
+
+divider = """<section class="slide">
+  <div class="kicker">Part 1</div>
+  <div class="rule"></div>
+  <h1 style="font-size:64px; margin-top:150px; max-width:980px;">Building the model to predict realized volatility</h1>
+  <p class="dim" style="font-size:20px;">From a naive guess to a model that beats the benchmark and explains itself.</p>
+</section>
+"""
+
+part2 = f"""<section class="slide">
+  <div class="kicker">Part 2 &middot; Trading the forecast</div>
+  <div class="rule"></div>
+  <h1>Back to the variance seller</h1>
+  <div style="display:grid; grid-template-columns: 3fr 2fr; gap: 24px; margin-top: 8px;">
+    <div style="border:1px solid #1f2a37; padding: 24px 28px;">
+      <div class="overview-label">The payoff</div>
+      <div class="equation" data-eq="payoff">{eq_payoff}</div>
+      <div class="overview-label" style="margin-top:18px;">Assumed away</div>
+      <p style="font-size:16px; color:#9aa5b1; margin-bottom:6px;">Continuous delta-hedging: the strip is hedged discretely.</p>
+      <p style="font-size:16px; color:#9aa5b1; margin-bottom:6px;">Transaction costs on the strip and the hedge.</p>
+      <p style="font-size:16px; color:#9aa5b1; margin-bottom:0;">Financing at mid.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:24px;">
+      <div style="border:1px solid #1f2a37; padding: 22px 28px; flex:1;">
+        <div class="next-label" style="color:#4cc38a;">We have</div>
+        <div class="eq-sym" style="margin:10px 0 12px;">{eq_have}</div>
+        <div class="next-sub">the Part 1 forecast of the variance the day will deliver</div>
+      </div>
+      <div style="border:1px solid #e8b339; padding: 22px 28px; flex:1;">
+        <div class="next-label">We need</div>
+        <div class="eq-sym" style="margin:10px 0 12px;">{eq_need}</div>
+        <div class="next-sub">the strike on offer at 09:30, an implied-volatility number. The next slide computes it.</div>
+      </div>
+    </div>
+  </div>
+</section>
+"""
+
+html = DECK.read_text(encoding="utf-8")
+n_before = html.count('<section class="slide"')
+
+
+def section_bounds(kicker: str):
+    k = html.index(f'<div class="kicker">{kicker}</div>')
+    start = html.rindex('<section class="slide">', 0, k)
+    end = html.index('</section>', k) + len('</section>\n')
+    return start, end
+
+# 1. extract the Kvar claim slide
+c0, c1 = section_bounds("The claim")
+claim = html[c0:c1]
+assert "kvar" in claim, "claim slide should carry the kvar equation"
+html = html[:c0] + html[c1:]
+
+# 2. divider after the product slide
+p0, p1 = section_bounds("The product and its problem")
+html = html[:p1] + divider + html[p1:]
+
+# 3. part2 re-entry + moved claim slide, immediately before Results
+rk = html.index('<div class="kicker">Results</div>')
+r0 = html.rindex('<section class="slide">', 0, rk)
+html = html[:r0] + part2 + claim + html[r0:]
+
+# 4. CSS for the new equation blocks
+css_anchor = ".diagram { margin: 18px 0; }"
+new_css = (".equation[data-eq=\"payoff\"] svg { height: 58px; width: auto; }\n"
+           ".eq-sym svg { height: 50px; width: auto; }\n" + css_anchor)
+assert css_anchor in html
+html = html.replace(css_anchor, new_css, 1)
+
+DECK.write_text(html, encoding="utf-8")
+n_after = html.count('<section class="slide"')
+print(f"sections: {n_before} -> {n_after}")
+print(f"payoff form: {used_payoff}")
+print(f"have form:   {used_have}")
+print(f"svg sizes: payoff={len(eq_payoff)}B have={len(eq_have)}B need={len(eq_need)}B")
